@@ -1,0 +1,92 @@
+import { lazy, Suspense } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
+
+import { MapIcon } from "lucide-react";
+
+import { SignInPanel } from "#/components/sync-panel.tsx";
+import { activityMapQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const ActivityMap = lazy(() =>
+  import("#/components/activity-map.tsx").then((mod) => ({ default: mod.ActivityMap })),
+);
+
+export const Route = createFileRoute("/_app/map")({
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(activityMapQueryOptions),
+      context.queryClient.ensureQueryData(homeQueryOptions),
+    ]),
+  pendingMs: 200,
+  pendingComponent: MapPending,
+  errorComponent: MapError,
+  component: MapPage,
+});
+
+function MapPage() {
+  const { data } = useSuspenseQuery(activityMapQueryOptions);
+  const { data: home } = useSuspenseQuery(homeQueryOptions);
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <MapIcon aria-hidden className="size-5 text-ds-green-700" />
+          Map
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          Every GPS track on one map. Filter by sport.
+        </p>
+      </div>
+      {data.signedIn ? (
+        <Suspense fallback={<Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />}>
+          <ActivityMap
+            tracks={data.tracks}
+            sportTypes={home.settings.sportTypes}
+            sportGroupShares={home.settings.sportGroupShares}
+          />
+        </Suspense>
+      ) : (
+        <>
+          <Empty className="min-h-64 border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MapIcon className="text-ds-green-700" />
+              </EmptyMedia>
+              <EmptyTitle>Sign in to see your map</EmptyTitle>
+              <EmptyDescription>
+                Connect Strava to plot ride and run passages from your activity GPS.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+          <SignInPanel />
+        </>
+      )}
+    </>
+  );
+}
+
+function MapPending() {
+  return (
+    <>
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="h-4 w-full max-w-xl" />
+      <Skeleton className="h-9 w-full max-w-lg" />
+      <Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />
+    </>
+  );
+}
+
+function MapError({ error }: ErrorComponentProps) {
+  const message = error instanceof Error ? error.message : "Something went wrong.";
+  return (
+    <Empty className="min-h-64 border">
+      <EmptyHeader>
+        <EmptyTitle>Could not load map</EmptyTitle>
+        <EmptyDescription>{message}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}

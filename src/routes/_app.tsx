@@ -1,0 +1,26 @@
+import { Outlet, createFileRoute } from "@tanstack/react-router";
+
+import { AppSidebar } from "#/components/app-sidebar.tsx";
+import { homeQueryOptions } from "#/lib/queries.ts";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+
+export const Route = createFileRoute("/_app")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(homeQueryOptions),
+  component: AppLayout,
+});
+
+function AppLayout() {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 pt-[max(0px,env(safe-area-inset-top))] md:pt-0">
+          <SidebarTrigger />
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:gap-6 sm:p-6">
+          <Outlet />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

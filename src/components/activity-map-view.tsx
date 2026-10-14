@@ -1,0 +1,239 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import type { FeatureCollection, LineString, MultiLineString } from "geojson";
+
+import { formatSportType } from "#/services/calendar-settings.types.ts";
+import {
+  ALL_SPORTS,
+  focusBoundsOf,
+  decodePolyline,
+  mapSportOptions,
+  type LngLat,
+} from "#/services/activity-map.types.ts";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Map as MapView, MapControls, MapGeoJSON, useMap } from "@/components/ui/map";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+import type { ActivityMapProps } from "./activity-map.tsx";
+
+type DecoratedTrack = ActivityMapProps["tracks"][number] & { coordinates: LngLat[] };
+
+function resolveThemeColor(token: string) {
+  const probe = document.createElement("span");
+  probe.style.color = token;
+  document.body.append(probe);
+  const cssColor = getComputedStyle(probe).color;
+  probe.remove();
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return cssColor || token;
+  ctx.fillStyle = cssColor;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+  if (a === 255) return `rgb(${r}, ${g}, ${b})`;
+  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
+}
+
+function FitTracks({
+  bounds,
+  center,
+  zoom,
+}: {
+  bounds: [LngLat, LngLat] | null;
+  center: LngLat;
+  zoom: number;
+}) {
+  const { map, isLoaded } = useMap();
+  const boundsKey = bounds ? bounds.flat().join(",") : `${center.join(",")}:${zoom}`;
+
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+    if (bounds) {
+      map.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 400 });
+      return;
+    }
+    map.jumpTo({ center, zoom });
+  }, [bounds, boundsKey, center, isLoaded, map, zoom]);
+
+  return null;
+}
+
+export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: ActivityMapProps) {
+  const [sportType, setSportType] = useState(ALL_SPORTS);
+
+  const decoded = useMemo<DecoratedTrack[]>(
+    () =>
+      tracks.flatMap((track) => {
+        const coordinates = decodePolyline(track.polyline);
+        if (coordinates.length < 2) return [];
+        return [{ ...track, coordinates }];
+      }),
+    [tracks],
+  );
+
+  const sports = useMemo(
+    () =>
+      mapSportOptions(
+        decoded.map((track) => track.sportType),
+        sportGroupShares,
+        (type) => sportTypes[type]?.visible !== false,
+      ),
+    [decoded, sportGroupShares, sportTypes],
+  );
+
+  const selectedType = sports.some((sport) => sport.sportType === sportType) ? sportType : ALL_SPORTS;
+  const selectedMembers =
+    selectedType === ALL_SPORTS
+      ? null
+      : (sports.find((sport) => sport.sportType === selectedType)?.members ?? [selectedType]);
+
+  const visibleTracks = useMemo(
+    () =>
+      decoded.filter((track) => {
+        if (sportTypes[track.sportType]?.visible === false) return false;
+        if (!selectedMembers) return true;
+        return selectedMembers.includes(track.sportType);
+      }),
+    [decoded, selectedMembers, sportTypes],
+  );
+
+  const viewport = useMemo(() => focusBoundsOf(visibleTracks), [visibleTracks]);
+
+  const geojson = useMemo<FeatureCollection<LineString | MultiLineString>>(() => {
+    const colors = new Map<string, string>();
+    const colorOf = (token: string) => {
+      const cached = colors.get(token);
+      if (cached) return cached;
+      const resolved = resolveThemeColor(token);
+      colors.set(token, resolved);
+      return resolved;
+    };
+    const byColor = new Map<string, LngLat[][]>();
+    for (const track of visibleTracks) {
+      const color = colorOf(sportTypes[track.sportType]?.color ?? "var(--color-ds-gray-700)");
+      let lines = byColor.get(color);
+      if (!lines) {
+        lines = [];
+        byColor.set(color, lines);
+      }
+      lines.push(track.coordinates);
+    }
+    return {
+      type: "FeatureCollection",
+      features: [...byColor.entries()].map(([color, lines], index) => ({
+        type: "Feature",
+        id: index,
+        properties: { color },
+        geometry: { type: "MultiLineString", coordinates: lines },
+      })),
+    };
+  }, [sportTypes, visibleTracks]);
+
+  if (!decoded.length) {
+    return (
+      <Empty className="min-h-64 border">
+        <EmptyHeader>
+          <EmptyTitle>No GPS tracks yet</EmptyTitle>
+          <EmptyDescription>
+            Sync outdoor activities from Strava that include a map. Indoor sessions without a GPS
+            path stay off this view.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  if (!sports.length) {
+    return (
+      <Empty className="min-h-64 border">
+        <EmptyHeader>
+          <EmptyTitle>No activity types enabled</EmptyTitle>
+          <EmptyDescription>
+            Turn on at least one activity type in settings to plot passages.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <ToggleGroup
+          size="sm"
+          variant="outline"
+          spacing={0}
+          value={[selectedType]}
+          onValueChange={(next) => {
+            const value = next[0];
+            if (value) setSportType(value);
+          }}
+          className="flex-wrap"
+        >
+          <ToggleGroupItem value={ALL_SPORTS}>All</ToggleGroupItem>
+          {sports.map((sport) => (
+            <ToggleGroupItem key={sport.sportType} value={sport.sportType}>
+              <span
+                aria-hidden
+                className="size-2 rounded-full"
+                style={{
+                  backgroundColor:
+                    sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
+                }}
+              />
+              {formatSportType(sport.sportType)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-muted-foreground text-xs">
+          {visibleTracks.length} mapped {visibleTracks.length === 1 ? "activity" : "activities"}
+          {selectedType === ALL_SPORTS ? null : (
+            <>
+              {" "}
+              · <Badge variant="outline">{formatSportType(selectedType)}</Badge>
+            </>
+          )}
+        </p>
+      </div>
+      <Card className="overflow-hidden py-0">
+        <CardContent className="p-0">
+          <div className="h-[min(48rem,calc(100dvh-16rem))] w-full">
+            {visibleTracks.length && viewport ? (
+              <MapView center={viewport.center} zoom={viewport.zoom}>
+                <FitTracks
+                  bounds={viewport.bounds}
+                  center={viewport.center}
+                  zoom={viewport.zoom}
+                />
+                <MapGeoJSON
+                  data={geojson}
+                  fillPaint={false}
+                  linePaint={{
+                    "line-color": ["get", "color"],
+                    "line-width": 2.5,
+                    "line-opacity": 0.55,
+                  }}
+                />
+                <MapControls showZoom showFullscreen />
+              </MapView>
+            ) : (
+              <Empty className="h-full min-h-64 border-0">
+                <EmptyHeader>
+                  <EmptyTitle>Nothing to plot for this type</EmptyTitle>
+                  <EmptyDescription>
+                    Choose All or another sport that has GPS tracks.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,102 @@
+import { eq, inArray } from "drizzle-orm";
+
+import { db } from "#/db/index.ts";
+import { activities, activityStreams } from "#/db/schema.ts";
+import { getOptionalSession } from "#/lib/session.server.ts";
+import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
+import { mergeCalendarSettings } from "./calendar-settings.types.ts";
+import {
+  ALL_SPORTS,
+  addHeartrateSamples,
+  collapseSportBuckets,
+  createSportBucket,
+  noteActivityPeak,
+  overallFromSports,
+  type HeartRateData,
+  type HeartRateSport,
+} from "./heart-rate.ts";
+
+const STREAM_BATCH = 40;
+
+const EMPTY_OVERALL: HeartRateSport = {
+  sportType: ALL_SPORTS,
+  members: [],
+  family: null,
+  zoneModel: "Each sport uses its own zone model",
+  maxHeartrate: null,
+  lthr: null,
+  activityCount: 0,
+  sampleSeconds: 0,
+  peakActivityName: null,
+  peakActivityStart: null,
+  zones: [],
+};
+
+export async function loadHeartRateImpl(): Promise<HeartRateData> {
+  const session = await getOptionalSession();
+  if (!session) {
+    return { signedIn: false, overall: EMPTY_OVERALL, sports: [] };
+  }
+
+  const rows = await db
+    .select({
+      id: activities.id,
+      name: activities.name,
+      sportType: activities.sportType,
+      startDate: activities.startDate,
+      maxHeartrate: activities.maxHeartrate,
+      hasHeartrate: activities.hasHeartrate,
+    })
+    .from(activities)
+    .where(eq(activities.userId, session.user.id));
+
+  const bySport = new Map<string, ReturnType<typeof createSportBucket>>();
+  const streamIds: string[] = [];
+
+  for (const row of rows) {
+    if (!row.hasHeartrate && row.maxHeartrate == null) continue;
+    const start = row.startDate.toISOString();
+    const peak = { maxHeartrate: row.maxHeartrate, name: row.name, start };
+    const sport = bySport.get(row.sportType) ?? createSportBucket(row.sportType);
+    noteActivityPeak(sport, peak);
+    bySport.set(row.sportType, sport);
+    if (row.hasHeartrate) streamIds.push(row.id);
+  }
+
+  const sportById = new Map(rows.map((row) => [row.id, row.sportType]));
+  for (let index = 0; index < streamIds.length; index += STREAM_BATCH) {
+    const chunk = streamIds.slice(index, index + STREAM_BATCH);
+    const streams = await db
+      .select({
+        activityId: activityStreams.activityId,
+        heartrate: activityStreams.heartrate,
+        time: activityStreams.time,
+      })
+      .from(activityStreams)
+      .where(inArray(activityStreams.activityId, chunk));
+
+    for (const stream of streams) {
+      const sportType = sportById.get(stream.activityId);
+      if (!sportType) continue;
+      const sport = bySport.get(sportType);
+      if (!sport) continue;
+      addHeartrateSamples(sport.histogram, stream.heartrate, stream.time);
+    }
+  }
+
+  const settings = mergeCalendarSettings(
+    await getCalendarSettingsForUser(session.user.id),
+    rows.map((row) => row.sportType),
+  );
+  const sports = collapseSportBuckets(
+    bySport,
+    settings.sportGroupShares,
+    (sportType) => settings.sportTypes[sportType]?.visible !== false,
+  );
+
+  return {
+    signedIn: true,
+    overall: overallFromSports(sports),
+    sports,
+  };
+}

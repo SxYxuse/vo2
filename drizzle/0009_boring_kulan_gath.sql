@@ -1,0 +1,2 @@
+DROP INDEX "field_tests_activity_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "field_tests_activity_idx" ON "field_tests" USING btree ("activity_id") WHERE "field_tests"."activity_id" is not null;
