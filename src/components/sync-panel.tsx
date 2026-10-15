@@ -132,8 +132,8 @@ export function SignInPanel({ description = true }: { description?: boolean } = 
     <div className="flex flex-col items-start gap-3">
       {description ? (
         <p className="text-muted-foreground max-w-xl text-sm">
-          Connect Strava to import every activity and its streams into local Postgres. Rate limits are
-          respected automatically.
+          Connect Strava to import every activity and its streams into local Postgres. Rate limits
+          are respected automatically.
         </p>
       ) : null}
       <Button

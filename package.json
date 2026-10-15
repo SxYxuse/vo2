@@ -80,16 +80,16 @@
   "overrides": {
     "vite": "npm:@voidzero-dev/vite-plus-core@1.2.0"
   },
-  "engines": {
-    "node": ">=22",
-    "bun": "1.4.3"
-  },
-  "packageManager": "bun@1.4.3",
   "devEngines": {
     "packageManager": {
       "name": "bun",
       "version": "1.4.3",
       "onFail": "download"
     }
-  }
+  },
+  "engines": {
+    "bun": "1.4.3",
+    "node": ">=22"
+  },
+  "packageManager": "bun@1.4.3"
 }
