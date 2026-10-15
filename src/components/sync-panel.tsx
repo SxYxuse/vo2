@@ -124,16 +124,18 @@ export function SyncPanel(props: SyncPanelProps) {
   );
 }
 
-export function SignInPanel() {
+export function SignInPanel({ description = true }: { description?: boolean } = {}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col items-start gap-3">
-      <p className="text-muted-foreground max-w-xl text-sm">
-        Connect Strava to import every activity and its streams into local Postgres. Rate limits are
-        respected automatically.
-      </p>
+      {description ? (
+        <p className="text-muted-foreground max-w-xl text-sm">
+          Connect Strava to import every activity and its streams into local Postgres. Rate limits are
+          respected automatically.
+        </p>
+      ) : null}
       <Button
         className="w-full sm:w-auto"
         disabled={pending}
