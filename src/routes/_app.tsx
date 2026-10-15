@@ -1,15 +1,28 @@
-import { Outlet, createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AppSidebar } from "#/components/app-sidebar.tsx";
+import { SignedOutPage } from "#/components/signed-out-page.tsx";
 import { appShellQueryOptions } from "#/lib/queries.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
+  beforeLoad: async ({ context, location }) => {
+    const shell = await context.queryClient.ensureQueryData(appShellQueryOptions);
+    if (!shell.signedIn && location.pathname !== "/") {
+      throw redirect({ to: "/" });
+    }
+  },
   loader: ({ context }) => context.queryClient.ensureQueryData(appShellQueryOptions),
   component: AppLayout,
 });
 
 function AppLayout() {
+  const { data } = useSuspenseQuery(appShellQueryOptions);
+  if (!data.signedIn) {
+    return <SignedOutPage />;
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />

@@ -251,8 +251,15 @@ function SidebarUserMenu({ onOpenSettings }: { onOpenSettings: () => void }) {
                       variant="destructive"
                       onClick={() => {
                         void authClient.signOut().then(async () => {
-                          queryClient.clear();
+                          queryClient.setQueryData(appShellQueryOptions.queryKey, {
+                            signedIn: false,
+                            training: null,
+                          });
+                          queryClient.removeQueries({
+                            predicate: (query) => query.queryKey[0] !== "app-shell",
+                          });
                           await router.invalidate();
+                          await router.navigate({ to: "/", replace: true });
                         });
                       }}
                     >

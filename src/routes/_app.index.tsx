@@ -3,7 +3,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "#/components/activity-calendar.tsx";
-import { SignInPanel, SyncPanel } from "#/components/sync-panel.tsx";
+import { SyncPanel } from "#/components/sync-panel.tsx";
 import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -66,19 +66,15 @@ function CalendarPage() {
           on Tests.
         </p>
       </div>
-      {signedIn ? (
-        <SyncPanel
-          activityCount={status?.activityCount ?? activities.length}
-          streamsPending={status?.streamsPending ?? 0}
-          status={status?.status ?? "idle"}
-          pausedUntil={status?.pausedUntil ?? null}
-          lastError={status?.lastError ?? null}
-          shortLimitRemaining={status?.shortLimitRemaining ?? null}
-          dailyLimitRemaining={status?.dailyLimitRemaining ?? null}
-        />
-      ) : (
-        <SignInPanel />
-      )}
+      <SyncPanel
+        activityCount={status?.activityCount ?? activities.length}
+        streamsPending={status?.streamsPending ?? 0}
+        status={status?.status ?? "idle"}
+        pausedUntil={status?.pausedUntil ?? null}
+        lastError={status?.lastError ?? null}
+        shortLimitRemaining={status?.shortLimitRemaining ?? null}
+        dailyLimitRemaining={status?.dailyLimitRemaining ?? null}
+      />
       <ActivityCalendar
         activities={activities}
         plannedSessions={plannedSessions}
