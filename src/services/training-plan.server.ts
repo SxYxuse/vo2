@@ -1,21 +1,25 @@
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
-import { activities, athleteMetrics, plannedSessions } from "#/db/schema.ts";
+import { activities, athleteMetrics, fieldTests, plannedSessions } from "#/db/schema.ts";
 import { getRequiredSession } from "#/lib/session.server.ts";
+import { parseAssessmentResult } from "./assessments-score.ts";
 import { familyCollectors } from "./calendar-settings.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { toFitnessLoad } from "./training-load.ts";
 import {
+  assignActivitiesToSessions,
   dayKey,
+  isAssessmentSession,
   latestPmc,
   isTrainingPlanComplete,
   parseTrainingPlan,
   planRemainingWeek,
   sportFamilyOf,
   weekStartKey,
-  type CompletedSession,
+  type MatchableActivity,
   type PlannedSession,
+  type TestAnchors,
   type TrainingPlan,
 } from "./training-plan.types.ts";
 
@@ -48,8 +52,32 @@ function toPlanned(row: {
   targetLoad: number;
   status: "planned" | "done" | "adapted";
   note: string | null;
+  activityId?: string | null;
+  activityTitle?: string | null;
 }): PlannedSession {
-  return row;
+  return {
+    ...row,
+    activityId: row.activityId ?? null,
+    activityTitle: row.activityTitle ?? null,
+  };
+}
+
+function plannedInsert(userId: string, session: PlannedSession) {
+  return {
+    id: session.id,
+    userId,
+    date: session.date,
+    weekStart: session.weekStart,
+    sportFamily: session.sportFamily,
+    title: session.title,
+    targetMinutes: session.targetMinutes,
+    targetLoad: session.targetLoad,
+    status: session.status,
+    note: session.note,
+    activityId: session.activityId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 }
 
 export async function listPlannedSessions(userId: string, from: string): Promise<PlannedSession[]> {
@@ -64,41 +92,53 @@ export async function listPlannedSessions(userId: string, from: string): Promise
       targetLoad: plannedSessions.targetLoad,
       status: plannedSessions.status,
       note: plannedSessions.note,
+      activityId: plannedSessions.activityId,
+      activityTitle: activities.name,
     })
     .from(plannedSessions)
+    .leftJoin(activities, eq(plannedSessions.activityId, activities.id))
     .where(and(eq(plannedSessions.userId, userId), gte(plannedSessions.date, from)))
     .orderBy(plannedSessions.date);
   return rows.map(toPlanned);
 }
 
-async function completedFromActivities(
+async function weekActivitiesForUser(
   userId: string,
   weekStart: string,
   weekEnd: string,
   timeZone: string,
-) {
+): Promise<MatchableActivity[]> {
   const rows = await db
     .select({
+      id: activities.id,
       startDate: activities.startDate,
       sportType: activities.sportType,
       movingTime: activities.movingTime,
       trainingLoad: activities.trainingLoad,
-      loadSource: activities.loadSource,
     })
     .from(activities)
     .where(eq(activities.userId, userId));
-  const completed: CompletedSession[] = [];
+  const week: MatchableActivity[] = [];
   for (const row of rows) {
     const date = dayKey(row.startDate, timeZone);
     if (date < weekStart || date > weekEnd) continue;
-    completed.push({
+    week.push({
+      id: row.id,
       date,
       family: sportFamilyOf(row.sportType),
       minutes: Math.round(row.movingTime / 60),
       load: row.trainingLoad ?? 0,
     });
   }
-  return completed;
+  return week;
+}
+
+async function flaggedActivityIds(userId: string) {
+  const rows = await db
+    .select({ activityId: fieldTests.activityId })
+    .from(fieldTests)
+    .where(and(eq(fieldTests.userId, userId), isNotNull(fieldTests.activityId)));
+  return new Set(rows.flatMap((row) => (row.activityId ? [row.activityId] : [])));
 }
 
 async function fitnessLoadsForUser(userId: string) {
@@ -158,9 +198,18 @@ async function rebuildWeek(
   const weekEnd = addDate(weekStart, 6);
   const loads = await fitnessLoadsForUser(userId);
   const pmc = latestPmc(loads, timeZone);
-  const completed = await completedFromActivities(userId, weekStart, weekEnd, timeZone);
+  const flagged = await flaggedActivityIds(userId);
+  const weekActivities = await weekActivitiesForUser(userId, weekStart, weekEnd, timeZone);
+  const completed = weekActivities
+    .filter((activity) => !flagged.has(activity.id))
+    .map((activity) => ({
+      date: activity.date,
+      family: activity.family,
+      minutes: activity.minutes,
+      load: activity.load,
+    }));
 
-  const keep = await db
+  const existing = await db
     .select({
       id: plannedSessions.id,
       date: plannedSessions.date,
@@ -171,15 +220,32 @@ async function rebuildWeek(
       targetLoad: plannedSessions.targetLoad,
       status: plannedSessions.status,
       note: plannedSessions.note,
+      activityId: plannedSessions.activityId,
     })
     .from(plannedSessions)
-    .where(
-      and(
-        eq(plannedSessions.userId, userId),
-        eq(plannedSessions.weekStart, weekStart),
-        eq(plannedSessions.status, "done"),
-      ),
-    );
+    .where(and(eq(plannedSessions.userId, userId), eq(plannedSessions.weekStart, weekStart)));
+
+  const existingPlanned = existing.map((row) => toPlanned(row));
+  const matches = assignActivitiesToSessions(
+    weekActivities.filter((activity) => !flagged.has(activity.id)),
+    existingPlanned,
+  );
+  const matchBySession = new Map(matches.map((match) => [match.sessionId, match]));
+  const preserved = existingPlanned
+    .filter((session) => {
+      if (session.status === "done" || matchBySession.has(session.id)) return true;
+      return mode === "adapt" && !isAssessmentSession(session);
+    })
+    .map((session) => {
+      const match = matchBySession.get(session.id);
+      if (!match) return session;
+      return {
+        ...session,
+        status: "done" as const,
+        activityId: match.activityId,
+        date: match.date,
+      };
+    });
 
   await db
     .delete(plannedSessions)
@@ -191,55 +257,88 @@ async function rebuildWeek(
       ),
     );
 
-  const preserved = keep.filter((row) => row.date < today).map(toPlanned);
-
   const settings = await getCalendarSettingsForUser(userId);
   const sportTypes = settings?.sportTypes ?? {};
-  const drafts = planRemainingWeek({
-    plan: { ...plan, timeZone },
-    today,
-    ctl: pmc.ctl,
-    tsb: pmc.tsb,
-    completed,
-    collectors: {
-      running: familyCollectors(sportTypes, "running"),
-      cycling: familyCollectors(sportTypes, "cycling"),
-    },
-  });
+  const drafts =
+    mode === "suggest"
+      ? planRemainingWeek({
+          plan: { ...plan, timeZone },
+          today,
+          ctl: pmc.ctl,
+          tsb: pmc.tsb,
+          completed,
+          collectors: {
+            running: familyCollectors(sportTypes, "running"),
+            cycling: familyCollectors(sportTypes, "cycling"),
+          },
+          anchors: await latestTestAnchors(userId),
+        })
+      : [];
 
   const nextStatus = mode === "adapt" ? ("adapted" as const) : ("planned" as const);
   const rows = [
-    ...preserved.map((row) => ({
-      ...row,
-      userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })),
-    ...drafts.map((draft) => ({
-      id: crypto.randomUUID(),
-      userId,
-      ...draft,
-      status: nextStatus,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    })),
+    ...preserved.map((session) => plannedInsert(userId, session)),
+    ...drafts.map((draft) =>
+      plannedInsert(userId, {
+        id: crypto.randomUUID(),
+        ...draft,
+        status: nextStatus,
+      }),
+    ),
   ];
 
   if (rows.length) {
     await db.insert(plannedSessions).values(rows);
   }
 
-  return rows.map((row) => ({
-    id: row.id,
-    date: row.date,
-    weekStart: row.weekStart,
-    sportFamily: row.sportFamily,
-    title: row.title,
-    targetMinutes: row.targetMinutes,
-    targetLoad: row.targetLoad,
-    status: row.status,
-    note: row.note ?? null,
-  }));
+  return rows.map((row) =>
+    toPlanned({
+      id: row.id,
+      date: row.date,
+      weekStart: row.weekStart,
+      sportFamily: row.sportFamily,
+      title: row.title,
+      targetMinutes: row.targetMinutes,
+      targetLoad: row.targetLoad,
+      status: row.status,
+      note: row.note ?? null,
+      activityId: row.activityId ?? null,
+    }),
+  );
+}
+
+async function latestTestAnchors(userId: string): Promise<TestAnchors> {
+  const rows = await db
+    .select({
+      assessmentId: fieldTests.assessmentId,
+      result: fieldTests.result,
+    })
+    .from(fieldTests)
+    .where(and(eq(fieldTests.userId, userId), eq(fieldTests.status, "completed")))
+    .orderBy(desc(fieldTests.completedAt));
+
+  const anchors: TestAnchors = {
+    ftpWatts: null,
+    cyclingLthr: null,
+    cyclingMaxHr: null,
+    runLthr: null,
+    runMaxHr: null,
+  };
+  for (const row of rows) {
+    const result = parseAssessmentResult(row.result);
+    if (row.assessmentId === "ftp-20") {
+      if (anchors.ftpWatts == null) anchors.ftpWatts = result.ftpWatts;
+      if (anchors.cyclingLthr == null) anchors.cyclingLthr = result.cyclingLthr;
+      if (anchors.cyclingMaxHr == null) anchors.cyclingMaxHr = result.peakHr;
+    }
+    if (row.assessmentId === "run-lthr" && anchors.runLthr == null) {
+      anchors.runLthr = result.runLthr;
+    }
+    if (row.assessmentId === "beep-test" && anchors.runMaxHr == null) {
+      anchors.runMaxHr = result.peakHr;
+    }
+  }
+  return anchors;
 }
 
 function addDate(key: string, days: number) {

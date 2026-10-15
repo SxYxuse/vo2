@@ -7,6 +7,7 @@ import { BikeIcon, FootprintsIcon, SparklesIcon } from "lucide-react";
 import {
   addDayKey,
   formatHours,
+  doneWeekSessions,
   openWeekBucket,
   sessionFitsWindow,
   TIME_WINDOWS,
@@ -56,6 +57,7 @@ export function WeekPlanBucket({
 }) {
   const [available, setAvailable] = useState(0);
   const bucket = useMemo(() => openWeekBucket(sessions, weekStart), [sessions, weekStart]);
+  const done = useMemo(() => doneWeekSessions(sessions, weekStart), [sessions, weekStart]);
   const targetMinutes = Math.round(plan.targetWeeklyHours * 60);
   const remainingMinutes = bucket.reduce((sum, session) => sum + session.targetMinutes, 0);
   const filled = targetMinutes <= 0 ? 0 : Math.min(100, Math.round((loggedMinutes / targetMinutes) * 100));
@@ -180,6 +182,51 @@ export function WeekPlanBucket({
             </EmptyHeader>
           </Empty>
         )}
+        {done.length ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground text-xs">Logged from Strava</p>
+            <ItemGroup className="gap-2">
+              {done.map((session) => {
+                const SportIcon = session.sportFamily === "cycling" ? BikeIcon : FootprintsIcon;
+                return (
+                  <Item
+                    key={session.id}
+                    variant="muted"
+                    size="sm"
+                    render={<button type="button" onClick={() => onSelectSession(session.id)} />}
+                    className="cursor-pointer text-start"
+                  >
+                    <ItemMedia variant="icon">
+                      <SportIcon
+                        className={
+                          session.sportFamily === "cycling"
+                            ? "text-ds-blue-700"
+                            : "text-ds-amber-700"
+                        }
+                      />
+                    </ItemMedia>
+                    <ItemContent>
+                      <ItemTitle>
+                        {session.title}
+                        <Badge variant="success">Done</Badge>
+                      </ItemTitle>
+                      <ItemDescription>
+                        {session.activityTitle
+                          ? `${session.activityTitle} · ${format(parseISO(`${session.date}T12:00:00`), "EEE d")}`
+                          : format(parseISO(`${session.date}T12:00:00`), "EEE d")}
+                      </ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <span className="font-mono text-xs tabular-nums">
+                        {formatHours(session.targetMinutes / 60)}
+                      </span>
+                    </ItemActions>
+                  </Item>
+                );
+              })}
+            </ItemGroup>
+          </div>
+        ) : null}
       </div>
       <SheetFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onFillWeek}>

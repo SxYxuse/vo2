@@ -115,10 +115,16 @@ export const plannedSessions = pgTable(
     targetLoad: real("target_load").notNull(),
     status: text("status").$type<"planned" | "done" | "adapted">().notNull().default("planned"),
     note: text("note"),
+    activityId: text("activity_id").references(() => activities.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("planned_sessions_user_week_idx").on(table.userId, table.weekStart)],
+  (table) => [
+    index("planned_sessions_user_week_idx").on(table.userId, table.weekStart),
+    uniqueIndex("planned_sessions_activity_idx")
+      .on(table.activityId)
+      .where(sql`${table.activityId} is not null`),
+  ],
 );
 
 export const calendarSettings = pgTable("calendar_settings", {

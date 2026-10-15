@@ -74,6 +74,14 @@ export type FamilyCollectors = {
   powerPartial: boolean;
 };
 
+export type TestAnchors = {
+  ftpWatts: number | null;
+  cyclingLthr: number | null;
+  cyclingMaxHr: number | null;
+  runLthr: number | null;
+  runMaxHr: number | null;
+};
+
 export const WEEKDAYS = [
   { id: 1, label: "Monday" },
   { id: 2, label: "Tuesday" },
@@ -120,6 +128,8 @@ export type PlannedSession = {
   targetLoad: number;
   status: "planned" | "done" | "adapted";
   note: string | null;
+  activityId: string | null;
+  activityTitle: string | null;
 };
 
 const ASSESSMENT_TITLES = new Set([
@@ -249,6 +259,88 @@ export function sessionFitsWindow(targetMinutes: number, availableMinutes: numbe
   return targetMinutes <= availableMinutes + 10;
 }
 
+export type MatchableActivity = {
+  id: string;
+  date: string;
+  family: CompletedSession["family"];
+  minutes: number;
+  load: number;
+};
+
+export type SessionActivityMatch = {
+  sessionId: string;
+  activityId: string;
+  date: string;
+};
+
+export function sessionRole(title: string): "quality" | "long" | "easy" {
+  const normalized = title.trim().toLowerCase();
+  if (/\bvo2\b|threshold|tempo|sweet-spot/.test(normalized)) return "quality";
+  if (/\blong\b/.test(normalized)) return "long";
+  return "easy";
+}
+
+export function durationFitsPlan(actualMinutes: number, targetMinutes: number) {
+  if (targetMinutes <= 0 || actualMinutes <= 0) return false;
+  const ratio = actualMinutes / targetMinutes;
+  return ratio >= 0.55 && ratio <= 1.6;
+}
+
+function matchScore(activity: MatchableActivity, session: PlannedSession) {
+  if (activity.family !== session.sportFamily) return -1;
+  if (!durationFitsPlan(activity.minutes, session.targetMinutes)) return -1;
+  const durationError = Math.abs(activity.minutes - session.targetMinutes) / session.targetMinutes;
+  const durationScore = 1 - Math.min(1, durationError);
+  const hours = activity.minutes / 60;
+  const intensity = hours > 0 ? activity.load / hours : 0;
+  const role = sessionRole(session.title);
+  if (role === "quality") return durationScore * 2 + Math.min(intensity, 120) / 120;
+  if (role === "long") return durationScore + Math.min(activity.minutes / session.targetMinutes, 1.2);
+  return durationScore * 1.5 - Math.min(intensity, 80) / 200;
+}
+
+export function assignActivitiesToSessions(
+  weekActivities: MatchableActivity[],
+  sessions: PlannedSession[],
+): SessionActivityMatch[] {
+  const linked = new Set(
+    sessions.map((session) => session.activityId).filter((id): id is string => Boolean(id)),
+  );
+  const open = sessions
+    .filter(
+      (session) =>
+        session.status !== "done" &&
+        !session.activityId &&
+        !isAssessmentSession(session),
+    )
+    .sort((left, right) => {
+      const order = { quality: 0, long: 1, easy: 2 } as const;
+      const byRole = order[sessionRole(left.title)] - order[sessionRole(right.title)];
+      if (byRole !== 0) return byRole;
+      return right.targetMinutes - left.targetMinutes;
+    });
+  const usedActivities = new Set<string>();
+  const matches: SessionActivityMatch[] = [];
+  for (const session of open) {
+    let best: { activity: MatchableActivity; score: number } | null = null;
+    for (const activity of weekActivities) {
+      if (linked.has(activity.id) || usedActivities.has(activity.id)) continue;
+      if (activity.family === "other") continue;
+      const score = matchScore(activity, session);
+      if (score < 0) continue;
+      if (!best || score > best.score) best = { activity, score };
+    }
+    if (!best) continue;
+    usedActivities.add(best.activity.id);
+    matches.push({
+      sessionId: session.id,
+      activityId: best.activity.id,
+      date: best.activity.date,
+    });
+  }
+  return matches;
+}
+
 export function openWeekBucket(sessions: PlannedSession[], weekStart: string) {
   return sessions
     .filter(
@@ -258,6 +350,17 @@ export function openWeekBucket(sessions: PlannedSession[], weekStart: string) {
         !isAssessmentSession(session),
     )
     .sort((left, right) => right.targetMinutes - left.targetMinutes);
+}
+
+export function doneWeekSessions(sessions: PlannedSession[], weekStart: string) {
+  return sessions
+    .filter(
+      (session) =>
+        session.weekStart === weekStart &&
+        session.status === "done" &&
+        !isAssessmentSession(session),
+    )
+    .sort((left, right) => left.date.localeCompare(right.date) || left.title.localeCompare(right.title));
 }
 
 function rampFor(plan: TrainingPlan, tsb: number) {
@@ -291,6 +394,7 @@ export function planRemainingWeek(input: {
   tsb: number;
   completed: CompletedSession[];
   collectors?: { running: FamilyCollectors; cycling: FamilyCollectors };
+  anchors?: TestAnchors;
 }): Draft[] {
   const weekStart = weekStartKey(new Date(`${input.today}T12:00:00`), input.plan.timeZone);
   const weekEnd = addDayKey(weekStart, 6);
@@ -392,7 +496,10 @@ export function planRemainingWeek(input: {
         collectors,
         minutes,
         family,
+        input.anchors,
       ),
+      activityId: null,
+      activityTitle: null,
     };
   });
 }
@@ -405,23 +512,76 @@ function qualityWork(plan: TrainingPlan, tsb: number): QualityKind | null {
   return "threshold";
 }
 
+function rangeLabel(low: number, high: number, unit: string) {
+  if (low === high) return `${low} ${unit}`;
+  return `${low}–${high} ${unit}`;
+}
+
+function pctRange(anchor: number, lowPct: number, highPct: number, unit: string) {
+  return rangeLabel(Math.round(anchor * lowPct), Math.round(anchor * highPct), unit);
+}
+
+function familyLthr(family: "running" | "cycling", anchors: TestAnchors | undefined) {
+  return family === "cycling" ? (anchors?.cyclingLthr ?? null) : (anchors?.runLthr ?? null);
+}
+
+function familyMaxHr(family: "running" | "cycling", anchors: TestAnchors | undefined) {
+  return family === "cycling" ? (anchors?.cyclingMaxHr ?? null) : (anchors?.runMaxHr ?? null);
+}
+
+function powerCue(kind: QualityKind, ftpWatts: number | null) {
+  if (ftpWatts) {
+    if (kind === "vo2") return `at ${pctRange(ftpWatts, 1.1, 1.2, "W")}`;
+    if (kind === "tempo") return `at ${pctRange(ftpWatts, 0.88, 0.94, "W")}`;
+    return `at ${pctRange(ftpWatts, 0.95, 1, "W")}`;
+  }
+  if (kind === "vo2") return "at 110–120% FTP";
+  if (kind === "tempo") return "at 88–94% FTP";
+  return "at 95–100% FTP";
+}
+
+function heartCue(
+  kind: QualityKind,
+  family: "running" | "cycling",
+  anchors: TestAnchors | undefined,
+) {
+  const lthr = familyLthr(family, anchors);
+  const maxHr = familyMaxHr(family, anchors);
+  if (kind === "vo2") {
+    if (maxHr) return `at ~${Math.round(maxHr * 0.95)} bpm`;
+    return "at ~95% max HR";
+  }
+  if (kind === "tempo") {
+    if (lthr) return `at ${pctRange(lthr, 0.9, 0.94, "bpm")}`;
+    return "at 90–94% LTHR";
+  }
+  if (lthr) return `at ${lthr} bpm`;
+  return "at LTHR";
+}
+
 function intensityCue(
   kind: QualityKind,
+  family: "running" | "cycling",
   collectors: FamilyCollectors | undefined,
+  anchors: TestAnchors | undefined,
 ) {
-  if (collectors?.power) {
-    if (kind === "vo2") return "at 110–120% FTP";
-    if (kind === "tempo") return "at 88–94% FTP";
-    return "at 95–100% FTP";
-  }
-  if (collectors?.heartRate) {
-    if (kind === "vo2") return "at ~95% max HR";
-    if (kind === "tempo") return "at 90–94% LTHR";
-    return "at LTHR";
-  }
+  if (collectors?.power) return powerCue(kind, anchors?.ftpWatts ?? null);
+  if (collectors?.heartRate) return heartCue(kind, family, anchors);
   if (kind === "vo2") return "at RPE 9, still controlled";
   if (kind === "tempo") return "at RPE 6–7";
   return "at RPE 8, even effort";
+}
+
+function mixedCollectorNote(
+  kind: QualityKind,
+  anchors: TestAnchors | undefined,
+) {
+  const hr = heartCue(kind, "cycling", anchors);
+  const numbered = /\d/.test(hr);
+  if (numbered) {
+    return ` Use those watts on bikes with a meter; ${hr.replace(/^at /, "")} on the others.`;
+  }
+  return " Use power on bikes you marked with a meter; heart rate or RPE on the others.";
 }
 
 function mainSet(
@@ -480,15 +640,14 @@ function sessionNote(
   collectors: FamilyCollectors | undefined,
   minutes: number,
   family: "running" | "cycling",
+  anchors: TestAnchors | undefined,
 ) {
   const pace = BUILD_PACES.find((item) => item.id === plan.buildPace)?.label ?? plan.buildPace;
   if (isBrick) return "Shorter extra session. Stack it on a day you already train, and keep it easy.";
   if (tsb < -20) return `Form is low. Kept this easy under your ${pace.toLowerCase()} goal.`;
   if (isQuality && kind) {
-    const cue = intensityCue(kind, collectors);
-    const mixed = collectors?.powerPartial
-      ? " Use power on bikes you marked with a meter; heart rate or RPE on the others."
-      : "";
+    const cue = intensityCue(kind, family, collectors, anchors);
+    const mixed = collectors?.powerPartial ? mixedCollectorNote(kind, anchors) : "";
     return `15 min easy. ${mainSet(kind, family, minutes, cue)} 10 min easy.${mixed}`;
   }
   if (isQuality) return `Quality session while form allows it (${pace.toLowerCase()}). Pick any day.`;

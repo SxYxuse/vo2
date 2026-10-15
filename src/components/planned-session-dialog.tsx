@@ -59,9 +59,11 @@ export function PlannedSessionDialog({
             </Badge>
           </div>
           <DialogDescription>
-            {dateLabel
-              ? `${dateLabel}. Not logged yet — pick any day that fits.`
-              : "Planned workout"}
+            {session?.status === "done" && session.activityTitle
+              ? `Logged as ${session.activityTitle} on ${format(parseISO(`${session.date}T12:00:00`), "MMM d")}.`
+              : dateLabel
+                ? `${dateLabel}. Not logged yet — pick any day that fits.`
+                : "Planned workout"}
           </DialogDescription>
         </DialogHeader>
         {session ? (

@@ -1,0 +1,3 @@
+ALTER TABLE "planned_sessions" ADD COLUMN "activity_id" text;--> statement-breakpoint
+ALTER TABLE "planned_sessions" ADD CONSTRAINT "planned_sessions_activity_id_activities_id_fk" FOREIGN KEY ("activity_id") REFERENCES "public"."activities"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "planned_sessions_activity_idx" ON "planned_sessions" USING btree ("activity_id") WHERE "planned_sessions"."activity_id" is not null;
