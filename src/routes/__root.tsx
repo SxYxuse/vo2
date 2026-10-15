@@ -5,6 +5,7 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { ThemeProvider } from "#/components/theme-provider.tsx";
+import { APP_NAME, APP_TITLE } from "#/lib/brand.ts";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
@@ -23,9 +24,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: "vo — Strava calendar" },
+      { title: APP_TITLE },
       { name: "theme-color", content: "#171717" },
-      { name: "apple-mobile-web-app-title", content: "vo" },
+      { name: "apple-mobile-web-app-title", content: APP_NAME },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [

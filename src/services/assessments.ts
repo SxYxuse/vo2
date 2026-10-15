@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import { APP_NAME } from "#/lib/brand.ts";
 import type { AssessmentResult } from "./assessments-score.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";
@@ -29,7 +30,7 @@ export const ASSESSMENT_SESSIONS = [
     scoring: [
       "FTP (watts) = 20-min average power × 0.95.",
       "Cycling LTHR ≈ average heart rate of that same 20-min block.",
-      "Open the ride in vo and flag it as FTP 20-min. Do not rely on the Strava title.",
+      `Open the ride in ${APP_NAME} and flag it as FTP 20-min. Do not rely on the Strava title.`,
     ],
     caveats: [
       "This estimates ~60-min power; some riders’ 20-min × 0.95 runs a little high or low versus a true hour.",
@@ -75,7 +76,7 @@ export const ASSESSMENT_SESSIONS = [
     scoring: [
       "Running LTHR = average heart rate of minutes 10–30 (the last 20 min).",
       "Ignore the first 10 min average.",
-      "Open the run in vo and flag it as Run LTHR. Do not rely on the Strava title.",
+      `Open the run in ${APP_NAME} and flag it as Run LTHR. Do not rely on the Strava title.`,
     ],
     caveats: [
       "Must be solo. A race or training partners push HR above true threshold.",
@@ -179,7 +180,7 @@ function beepScoring(age: number | null) {
       : "VO2max (ml/kg/min) = −27.4 + 6.0 × last-stage speed in km/h (Léger & Gadoury 1989; adult equation holds age at 18).",
     `Example: stage 11.0 → ${exampleSpeed.toFixed(1)} km/h → about ${exampleVo2} ml/kg/min.`,
     "Peak HR is a field estimate of running max HR if you reached exhaustion.",
-    "Open the run in vo, flag it as Beep test, and enter the last completed stage.",
+    `Open the run in ${APP_NAME}, flag it as Beep test, and enter the last completed stage.`,
   ];
 }
 

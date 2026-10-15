@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "vo",
-  "short_name": "vo",
+  "name": "VO2",
+  "short_name": "VO2",
   "description": "Strava activity calendar",
   "start_url": "/",
   "scope": "/",

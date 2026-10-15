@@ -1,4 +1,4 @@
-# vo
+# VO2
 
 Local Strava activity calendar. Sign in with Strava, import every activity and its streams into Postgres, then browse them in a month/week/day calendar.
 
@@ -31,9 +31,11 @@ vp run dev
 
 The app is at http://localhost:3000.
 
+Local Postgres still uses the `vo` user, password, and database name so existing `.env` files and volumes keep working.
+
 ## Sync behavior
 
-Strava read limits are typically 100 requests / 15 minutes and 1,000 / day. vo:
+Strava read limits are typically 100 requests / 15 minutes and 1,000 / day. VO2:
 
 - pages `/athlete/activities` (200 per page)
 - then fetches `/activities/{id}/streams` in small batches
