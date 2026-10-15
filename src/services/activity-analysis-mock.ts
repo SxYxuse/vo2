@@ -1,9 +1,4 @@
-import {
-  EventType,
-  type AnyTextAdapter,
-  type ModelMessage,
-  type TextOptions,
-} from "@tanstack/ai";
+import { EventType, type AnyTextAdapter, type ModelMessage, type TextOptions } from "@tanstack/ai";
 
 import { composeMockAnalysis } from "./activity-analysis.types.ts";
 import type {
@@ -66,8 +61,7 @@ function collectResults(messages: ModelMessage[]) {
   for (const [index, message] of toolMessages.entries()) {
     const value = parseContent(message.content);
     parsed.push(value);
-    const name =
-      message.name || names.get(message.toolCallId ?? "") || TOOL_ORDER[index];
+    const name = message.name || names.get(message.toolCallId ?? "") || TOOL_ORDER[index];
     if (name) byName[name] = value;
   }
   const fromShape = {
@@ -81,14 +75,17 @@ function collectResults(messages: ModelMessage[]) {
     elevation: (byName.detect_elevation_segments ?? fromShape.elevation) as
       | ElevationSegmentsReport
       | undefined,
-    correlations: (byName.correlate_streams ?? fromShape.correlations) as CorrelationReport | undefined,
+    correlations: (byName.correlate_streams ?? fromShape.correlations) as
+      | CorrelationReport
+      | undefined,
     effort: (byName.summarize_effort_phases ?? fromShape.effort) as EffortReport | undefined,
   };
 }
 
 function chunksOf(text: string, size = 90) {
   const chunks: string[] = [];
-  for (let index = 0; index < text.length; index += size) chunks.push(text.slice(index, index + size));
+  for (let index = 0; index < text.length; index += size)
+    chunks.push(text.slice(index, index + size));
   return chunks;
 }
 

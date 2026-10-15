@@ -18,7 +18,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
@@ -60,7 +68,8 @@ export function WeekPlanBucket({
   const done = useMemo(() => doneWeekSessions(sessions, weekStart), [sessions, weekStart]);
   const targetMinutes = Math.round(plan.targetWeeklyHours * 60);
   const remainingMinutes = bucket.reduce((sum, session) => sum + session.targetMinutes, 0);
-  const filled = targetMinutes <= 0 ? 0 : Math.min(100, Math.round((loggedMinutes / targetMinutes) * 100));
+  const filled =
+    targetMinutes <= 0 ? 0 : Math.min(100, Math.round((loggedMinutes / targetMinutes) * 100));
   const ranked = useMemo(() => {
     const withFit = bucket.map((session) => ({
       session,
@@ -88,7 +97,8 @@ export function WeekPlanBucket({
           <Badge variant="outline">{weekRangeLabel(weekStart)}</Badge>
         </div>
         <SheetDescription>
-          Fill sessions whenever you have time. Preferred rest: {restLabel(plan.preferredRestWeekday)}.
+          Fill sessions whenever you have time. Preferred rest:{" "}
+          {restLabel(plan.preferredRestWeekday)}.
           {needsStack ? " More sessions than days left — stack a couple if you can." : null}
         </SheetDescription>
       </SheetHeader>
@@ -140,23 +150,21 @@ export function WeekPlanBucket({
                   variant="outline"
                   size="sm"
                   render={<button type="button" onClick={() => onSelectSession(session.id)} />}
-                  className={fits ? "cursor-pointer text-start" : "cursor-pointer text-start opacity-40"}
+                  className={
+                    fits ? "cursor-pointer text-start" : "cursor-pointer text-start opacity-40"
+                  }
                 >
                   <ItemMedia variant="icon">
                     <SportIcon
                       className={
-                        session.sportFamily === "cycling"
-                          ? "text-ds-blue-700"
-                          : "text-ds-amber-700"
+                        session.sportFamily === "cycling" ? "text-ds-blue-700" : "text-ds-amber-700"
                       }
                     />
                   </ItemMedia>
                   <ItemContent>
                     <ItemTitle>
                       {session.title}
-                      {session.status === "adapted" ? (
-                        <Badge variant="info">Updated</Badge>
-                      ) : null}
+                      {session.status === "adapted" ? <Badge variant="info">Updated</Badge> : null}
                       {available > 0 && fits ? <Badge variant="success">Fits</Badge> : null}
                     </ItemTitle>
                     <ItemDescription>{session.note ?? "Pick any day this week."}</ItemDescription>
@@ -173,7 +181,9 @@ export function WeekPlanBucket({
         ) : (
           <Empty className="min-h-24 border">
             <EmptyHeader>
-              <EmptyTitle>{loggedMinutes > 0 ? "Bucket is clear" : "No sessions in the bucket"}</EmptyTitle>
+              <EmptyTitle>
+                {loggedMinutes > 0 ? "Bucket is clear" : "No sessions in the bucket"}
+              </EmptyTitle>
               <EmptyDescription>
                 {loggedMinutes > 0
                   ? "This week’s planned run and ride slots are filled. Refresh if you want a new mix."
@@ -230,7 +240,11 @@ export function WeekPlanBucket({
       </div>
       <SheetFooter>
         <Button type="button" variant="outline" disabled={pending} onClick={onFillWeek}>
-          {pending ? <Spinner data-icon="inline-start" /> : <SparklesIcon data-icon="inline-start" />}
+          {pending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <SparklesIcon data-icon="inline-start" />
+          )}
           {bucket.length ? "Refresh week" : "Fill week"}
         </Button>
       </SheetFooter>

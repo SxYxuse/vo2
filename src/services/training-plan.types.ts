@@ -3,7 +3,12 @@ import { addDays, startOfDay } from "date-fns";
 import { z } from "zod";
 
 import { sportGroupFor } from "./sport-groups.ts";
-import { averageWeeklyMovingSeconds, buildPmc, slicePmc, type FitnessLoad } from "./training-load.ts";
+import {
+  averageWeeklyMovingSeconds,
+  buildPmc,
+  slicePmc,
+  type FitnessLoad,
+} from "./training-load.ts";
 
 export const BUILD_PACES = [
   {
@@ -132,13 +137,7 @@ export type PlannedSession = {
   activityTitle: string | null;
 };
 
-const ASSESSMENT_TITLES = new Set([
-  "ftp test",
-  "ftp ramp",
-  "ftp 20-min",
-  "beep test",
-  "run lthr",
-]);
+const ASSESSMENT_TITLES = new Set(["ftp test", "ftp ramp", "ftp 20-min", "beep test", "run lthr"]);
 
 export function isAssessmentSession(session: { title: string }) {
   return ASSESSMENT_TITLES.has(session.title.trim().toLowerCase());
@@ -178,7 +177,9 @@ export function isTrainingPlanComplete(value: unknown): value is TrainingPlan {
   return Boolean(plan && trainingConsistency(plan).ok);
 }
 
-export function trainingConsistency(plan: Pick<TrainingPlan, "maxRunSessions" | "maxRideSessions" | "targetWeeklyHours">) {
+export function trainingConsistency(
+  plan: Pick<TrainingPlan, "maxRunSessions" | "maxRideSessions" | "targetWeeklyHours">,
+) {
   const sessions = plan.maxRunSessions + plan.maxRideSessions;
   if (sessions <= 0) {
     return { ok: false, message: "Plan at least one run or ride each week." };
@@ -295,7 +296,8 @@ function matchScore(activity: MatchableActivity, session: PlannedSession) {
   const intensity = hours > 0 ? activity.load / hours : 0;
   const role = sessionRole(session.title);
   if (role === "quality") return durationScore * 2 + Math.min(intensity, 120) / 120;
-  if (role === "long") return durationScore + Math.min(activity.minutes / session.targetMinutes, 1.2);
+  if (role === "long")
+    return durationScore + Math.min(activity.minutes / session.targetMinutes, 1.2);
   return durationScore * 1.5 - Math.min(intensity, 80) / 200;
 }
 
@@ -309,9 +311,7 @@ export function assignActivitiesToSessions(
   const open = sessions
     .filter(
       (session) =>
-        session.status !== "done" &&
-        !session.activityId &&
-        !isAssessmentSession(session),
+        session.status !== "done" && !session.activityId && !isAssessmentSession(session),
     )
     .sort((left, right) => {
       const order = { quality: 0, long: 1, easy: 2 } as const;
@@ -360,7 +360,9 @@ export function doneWeekSessions(sessions: PlannedSession[], weekStart: string) 
         session.status === "done" &&
         !isAssessmentSession(session),
     )
-    .sort((left, right) => left.date.localeCompare(right.date) || left.title.localeCompare(right.title));
+    .sort(
+      (left, right) => left.date.localeCompare(right.date) || left.title.localeCompare(right.title),
+    );
 }
 
 function rampFor(plan: TrainingPlan, tsb: number) {
@@ -413,11 +415,13 @@ export function planRemainingWeek(input: {
 
   let runLeft = Math.max(
     0,
-    input.plan.maxRunSessions - weekCompleted.filter((session) => session.family === "running").length,
+    input.plan.maxRunSessions -
+      weekCompleted.filter((session) => session.family === "running").length,
   );
   let rideLeft = Math.max(
     0,
-    input.plan.maxRideSessions - weekCompleted.filter((session) => session.family === "cycling").length,
+    input.plan.maxRideSessions -
+      weekCompleted.filter((session) => session.family === "cycling").length,
   );
 
   let daysLeft = remainingDaysInWeek(input.today, weekEnd);
@@ -448,7 +452,11 @@ export function planRemainingWeek(input: {
     return -1;
   };
   const longIndex =
-    brickFrom > 1 ? (lastPrimary("cycling") >= 0 ? lastPrimary("cycling") : lastPrimary("running")) : -1;
+    brickFrom > 1
+      ? lastPrimary("cycling") >= 0
+        ? lastPrimary("cycling")
+        : lastPrimary("running")
+      : -1;
 
   const kind = qualityWork(input.plan, input.tsb);
   const qualityIndex =
@@ -483,8 +491,7 @@ export function planRemainingWeek(input: {
       sportFamily: family,
       title: sessionTitle(family, isLong, isQuality, brick, kind),
       targetMinutes: minutes,
-      targetLoad:
-        isQuality && kind ? Math.round(load * 1.25 * 10) / 10 : load,
+      targetLoad: isQuality && kind ? Math.round(load * 1.25 * 10) / 10 : load,
       status: "planned" as const,
       note: sessionNote(
         input.plan,
@@ -572,10 +579,7 @@ function intensityCue(
   return "at RPE 8, even effort";
 }
 
-function mixedCollectorNote(
-  kind: QualityKind,
-  anchors: TestAnchors | undefined,
-) {
+function mixedCollectorNote(kind: QualityKind, anchors: TestAnchors | undefined) {
   const hr = heartCue(kind, "cycling", anchors);
   const numbered = /\d/.test(hr);
   if (numbered) {
@@ -584,12 +588,7 @@ function mixedCollectorNote(
   return " Use power on bikes you marked with a meter; heart rate or RPE on the others.";
 }
 
-function mainSet(
-  kind: QualityKind,
-  family: "running" | "cycling",
-  minutes: number,
-  cue: string,
-) {
+function mainSet(kind: QualityKind, family: "running" | "cycling", minutes: number, cue: string) {
   const budget = Math.max(20, minutes - 25);
   if (kind === "vo2") {
     const reps = Math.min(6, Math.max(4, Math.floor(budget / 6)));
@@ -643,15 +642,18 @@ function sessionNote(
   anchors: TestAnchors | undefined,
 ) {
   const pace = BUILD_PACES.find((item) => item.id === plan.buildPace)?.label ?? plan.buildPace;
-  if (isBrick) return "Shorter extra session. Stack it on a day you already train, and keep it easy.";
+  if (isBrick)
+    return "Shorter extra session. Stack it on a day you already train, and keep it easy.";
   if (tsb < -20) return `Form is low. Kept this easy under your ${pace.toLowerCase()} goal.`;
   if (isQuality && kind) {
     const cue = intensityCue(kind, family, collectors, anchors);
     const mixed = collectors?.powerPartial ? mixedCollectorNote(kind, anchors) : "";
     return `15 min easy. ${mainSet(kind, family, minutes, cue)} 10 min easy.${mixed}`;
   }
-  if (isQuality) return `Quality session while form allows it (${pace.toLowerCase()}). Pick any day.`;
-  if (isLong) return `Aerobic volume for the ${pace.toLowerCase()} block. Do it when you have the time.`;
+  if (isQuality)
+    return `Quality session while form allows it (${pace.toLowerCase()}). Pick any day.`;
+  if (isLong)
+    return `Aerobic volume for the ${pace.toLowerCase()} block. Do it when you have the time.`;
   return `${pace} week · easy aerobic. Fill it on any open day.`;
 }
 

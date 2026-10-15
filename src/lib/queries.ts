@@ -3,9 +3,17 @@ import { queryOptions } from "@tanstack/react-query";
 import { getActivityAnalysis, getAnalysisStatus } from "#/services/activity-analysis.ts";
 import { getActivityDetail } from "#/services/activity-detail.ts";
 import { loadActivityMap } from "#/services/activity-map.ts";
+import { loadAppShell } from "#/services/app-shell.ts";
 import { loadAssessments } from "#/services/assessments.ts";
 import { loadHeartRate } from "#/services/heart-rate.ts";
 import { loadHomeData } from "#/services/strava-sync.ts";
+import { loadFitnessData } from "#/services/training-load.ts";
+
+export const appShellQueryOptions = queryOptions({
+  queryKey: ["app-shell"],
+  queryFn: () => loadAppShell(),
+  staleTime: 60_000,
+});
 
 export const homeQueryOptions = queryOptions({
   queryKey: ["home"],
@@ -16,6 +24,12 @@ export const homeQueryOptions = queryOptions({
 export const activityMapQueryOptions = queryOptions({
   queryKey: ["activity-map"],
   queryFn: () => loadActivityMap(),
+  staleTime: 30_000,
+});
+
+export const fitnessQueryOptions = queryOptions({
+  queryKey: ["fitness"],
+  queryFn: () => loadFitnessData(),
   staleTime: 30_000,
 });
 

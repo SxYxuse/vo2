@@ -76,4 +76,3 @@ function parsePair(value: string | null) {
   if (!Number.isFinite(short) || !Number.isFinite(daily)) return null;
   return [short, daily] as const;
 }
-

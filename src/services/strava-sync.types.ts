@@ -15,7 +15,9 @@ export type CalendarActivity = {
   hasHeartrate: boolean;
 };
 
-export function isMissingHeartrate(activity: Pick<CalendarActivity, "hasStreams" | "hasHeartrate">) {
+export function isMissingHeartrate(
+  activity: Pick<CalendarActivity, "hasStreams" | "hasHeartrate">,
+) {
   return activity.hasStreams && !activity.hasHeartrate;
 }
 

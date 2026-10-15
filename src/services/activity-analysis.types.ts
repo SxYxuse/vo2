@@ -230,7 +230,9 @@ export function parseCoachMarkdown(markdown: string): CoachSection[] {
   }
   flushParagraph(current.blocks, paragraph);
   if (current.title || current.blocks.length) sections.push(current);
-  return sections.length ? sections : [{ title: null, blocks: [{ type: "p", text: markdown.trim() }] }];
+  return sections.length
+    ? sections
+    : [{ title: null, blocks: [{ type: "p", text: markdown.trim() }] }];
 }
 
 const MAX_SAMPLES = 1400;
@@ -379,10 +381,18 @@ function segmentStats(
   const slice = samples.slice(start, end + 1);
   const first = slice[0];
   const last = slice[end - start];
-  const hrs = slice.map((sample) => sample.heartrate).filter((value): value is number => value != null);
-  const speeds = slice.map((sample) => sample.speedKmh).filter((value): value is number => value != null);
-  const watts = slice.map((sample) => sample.watts).filter((value): value is number => value != null && value > 0);
-  const grades = slice.map((sample) => sample.gradePct).filter((value): value is number => value != null);
+  const hrs = slice
+    .map((sample) => sample.heartrate)
+    .filter((value): value is number => value != null);
+  const speeds = slice
+    .map((sample) => sample.speedKmh)
+    .filter((value): value is number => value != null);
+  const watts = slice
+    .map((sample) => sample.watts)
+    .filter((value): value is number => value != null && value > 0);
+  const grades = slice
+    .map((sample) => sample.gradePct)
+    .filter((value): value is number => value != null);
   const lookbackT = first.t - 45;
   const before = samples.filter(
     (sample) => sample.t >= lookbackT && sample.t < first.t && sample.heartrate != null,
@@ -403,8 +413,7 @@ function segmentStats(
       last.altitudeM != null && first.altitudeM != null ? last.altitudeM - first.altitudeM : 0,
     avgGradePct,
     avgHeartrate: hrDuring == null ? null : Math.round(hrDuring),
-    heartrateRise:
-      hrDuring != null && hrBefore != null ? Math.round(hrDuring - hrBefore) : null,
+    heartrateRise: hrDuring != null && hrBefore != null ? Math.round(hrDuring - hrBefore) : null,
     avgSpeedKmh,
     avgWatts: mean(watts) == null ? null : Math.round(mean(watts) as number),
     likelyHike: isHikeLike({ kind, avgSpeedKmh, avgGradePct }, sportType),
@@ -433,7 +442,9 @@ function mergeNearbyClimbs(raw: IndexedSegment[], samples: ActivitySample[], spo
       end += 2;
     }
     merged.push(
-      end === index ? current : segmentStats(samples, current.startIndex, raw[end].endIndex, sportType),
+      end === index
+        ? current
+        : segmentStats(samples, current.startIndex, raw[end].endIndex, sportType),
     );
     index = end + 1;
   }
@@ -505,7 +516,9 @@ export function detectElevationSegments(
     otherClimbCount: Math.max(0, climbs.length - defining.length),
     hikeClimbCount,
     descentCount: descents.length,
-    climbGainM: Math.round(climbs.reduce((sum, segment) => sum + Math.max(0, segment.elevationDeltaM), 0)),
+    climbGainM: Math.round(
+      climbs.reduce((sum, segment) => sum + Math.max(0, segment.elevationDeltaM), 0),
+    ),
     notes,
   };
 }
@@ -538,10 +551,11 @@ function strengthFor(r: number | null): StreamCorrelation["strength"] {
   return "none";
 }
 
-function correlationNote(r: number, lagSec: number, y: AnalysisStreamKey): Pick<
-  StreamCorrelation,
-  "strength" | "coachRelevant" | "note"
-> {
+function correlationNote(
+  r: number,
+  lagSec: number,
+  y: AnalysisStreamKey,
+): Pick<StreamCorrelation, "strength" | "coachRelevant" | "note"> {
   const strength = strengthFor(r);
   const coachRelevant = strength === "moderate" || strength === "strong";
   if (!coachRelevant) {
@@ -630,9 +644,7 @@ export function correlateStreams(
   sportType?: string,
 ): CorrelationReport {
   const present = new Set(availableStreams(samples));
-  const notes: string[] = [
-    "Only pairs with coachRelevant=true belong in the write-up.",
-  ];
+  const notes: string[] = ["Only pairs with coachRelevant=true belong in the write-up."];
   const usable = (pairs ?? defaultPairs(sportType)).filter(([x, y]) => {
     const ok = present.has(x) && present.has(y);
     if (!ok) notes.push(`Skipped ${x} vs ${y}: missing stream.`);
@@ -678,13 +690,23 @@ export function summarizeEffort(samples: ActivitySample[]): EffortReport {
       minGrade: band.min,
       maxGrade: band.max,
       durationSec,
-      avgHeartrate: mean(slice.map((sample) => sample.heartrate).filter((value): value is number => value != null)),
-      avgSpeedKmh: mean(slice.map((sample) => sample.speedKmh).filter((value): value is number => value != null)),
-      avgWatts: mean(slice.map((sample) => sample.watts).filter((value): value is number => value != null && value > 0)),
+      avgHeartrate: mean(
+        slice.map((sample) => sample.heartrate).filter((value): value is number => value != null),
+      ),
+      avgSpeedKmh: mean(
+        slice.map((sample) => sample.speedKmh).filter((value): value is number => value != null),
+      ),
+      avgWatts: mean(
+        slice
+          .map((sample) => sample.watts)
+          .filter((value): value is number => value != null && value > 0),
+      ),
     };
   }).filter((bucket) => bucket.durationSec >= 20);
 
-  const hrs = samples.map((sample) => sample.heartrate).filter((value): value is number => value != null);
+  const hrs = samples
+    .map((sample) => sample.heartrate)
+    .filter((value): value is number => value != null);
   if (hrs.length < 30) {
     notes.push("Not enough heart-rate samples to split surges from recoveries.");
     return { phases: [], gradeBuckets, notes };
@@ -692,14 +714,13 @@ export function summarizeEffort(samples: ActivitySample[]): EffortReport {
   const high = percentile(hrs, 0.75) ?? 0;
   const low = percentile(hrs, 0.4) ?? 0;
   const climbTimes = new Set(
-    detectElevationSegments(samples)
-      .climbs.flatMap((segment) => {
-        const times: number[] = [];
-        for (const sample of samples) {
-          if (sample.t >= segment.startSec && sample.t <= segment.endSec) times.push(sample.t);
-        }
-        return times;
-      }),
+    detectElevationSegments(samples).climbs.flatMap((segment) => {
+      const times: number[] = [];
+      for (const sample of samples) {
+        if (sample.t >= segment.startSec && sample.t <= segment.endSec) times.push(sample.t);
+      }
+      return times;
+    }),
   );
   const phases: EffortPhase[] = [];
   let start = 0;
@@ -722,7 +743,9 @@ export function summarizeEffort(samples: ActivitySample[]): EffortReport {
         startSec: slice[0].t,
         endSec: slice[slice.length - 1].t,
         durationSec,
-        avgHeartrate: mean(slice.map((sample) => sample.heartrate).filter((value): value is number => value != null)),
+        avgHeartrate: mean(
+          slice.map((sample) => sample.heartrate).filter((value): value is number => value != null),
+        ),
         onClimb: slice.some((sample) => climbTimes.has(sample.t)),
       });
     }
@@ -756,8 +779,12 @@ function sessionThirds(samples: ActivitySample[]): SessionThird[] {
     const from = start + ((part - 1) / 3) * span;
     const to = start + (part / 3) * span;
     const slice = samples.filter((sample) => sample.t >= from && sample.t <= to);
-    const hrs = slice.map((sample) => sample.heartrate).filter((value): value is number => value != null);
-    const speeds = slice.map((sample) => sample.speedKmh).filter((value): value is number => value != null);
+    const hrs = slice
+      .map((sample) => sample.heartrate)
+      .filter((value): value is number => value != null);
+    const speeds = slice
+      .map((sample) => sample.speedKmh)
+      .filter((value): value is number => value != null);
     return {
       part,
       durationSec: Math.max(0, Math.round(to - from)),
@@ -834,9 +861,15 @@ export function buildOverview(input: {
 }): ActivityOverview {
   const samples = input.samples;
   const family = heartRateFamily(input.sportType);
-  const hrs = samples.map((sample) => sample.heartrate).filter((value): value is number => value != null);
-  const watts = samples.map((sample) => sample.watts).filter((value): value is number => value != null && value > 0);
-  const speeds = samples.map((sample) => sample.speedKmh).filter((value): value is number => value != null);
+  const hrs = samples
+    .map((sample) => sample.heartrate)
+    .filter((value): value is number => value != null);
+  const watts = samples
+    .map((sample) => sample.watts)
+    .filter((value): value is number => value != null && value > 0);
+  const speeds = samples
+    .map((sample) => sample.speedKmh)
+    .filter((value): value is number => value != null);
   const maxHeartrate = hrs.length ? Math.max(...hrs) : null;
   const estimatedLthr = estimateLthrFromMax(maxHeartrate, family);
   const storedLthr = input.athlete?.lthr ?? null;
@@ -932,7 +965,9 @@ export function composeMockAnalysis(results: {
   const hikeClimb = results.elevation?.climbs.find((segment) => segment.likelyHike);
   const relevant = results.correlations?.pairs.find((pair) => pair.coachRelevant);
   const surges = results.effort?.phases.filter((phase) => phase.kind === "surge") ?? [];
-  const earlySurge = surges.find((phase) => !phase.onClimb && phase.startSec < overview.movingTimeSec * 0.35);
+  const earlySurge = surges.find(
+    (phase) => !phase.onClimb && phase.startSec < overview.movingTimeSec * 0.35,
+  );
 
   const intensity =
     overview.lthr && overview.avgHeartrate
@@ -981,12 +1016,17 @@ export function composeMockAnalysis(results: {
     );
   }
   if (lines[lines.length - 1] === "## What to keep / change") {
-    lines.push("- Terrain set the pace more than a single intensity mistake. Keep judging effort from grade, speed, and how you felt together.");
+    lines.push(
+      "- Terrain set the pace more than a single intensity mistake. Keep judging effort from grade, speed, and how you felt together.",
+    );
   }
   lines.push("");
 
   lines.push("## Watch-outs");
-  if (overview.aboveThresholdSec > overview.movingTimeSec * 0.25 && overview.movingTimeSec > 45 * 60) {
+  if (
+    overview.aboveThresholdSec > overview.movingTimeSec * 0.25 &&
+    overview.movingTimeSec > 45 * 60
+  ) {
     lines.push(
       `- A long session spent ${formatDuration(overview.aboveThresholdSec)} at or above threshold. That is a lot of redline for the duration — next time cap the early surges.`,
     );
@@ -997,7 +1037,9 @@ export function composeMockAnalysis(results: {
   } else if (!overview.avgHeartrate) {
     lines.push("- Without heart rate this is a terrain and speed read only.");
   } else {
-    lines.push("- Nothing here looks like a red flag. Use the steep pitches as planned hike/run transitions rather than HR tests.");
+    lines.push(
+      "- Nothing here looks like a red flag. Use the steep pitches as planned hike/run transitions rather than HR tests.",
+    );
   }
 
   return lines.join("\n");

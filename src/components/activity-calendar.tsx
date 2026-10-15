@@ -36,7 +36,10 @@ import {
   EventCalendarToolbar,
 } from "@/components/reui/event-calendar/event-calendar-nav";
 import { zonedStartOfDay } from "@/components/reui/event-calendar/event-calendar-lib";
-import type { CalendarEvent, CalendarView } from "@/components/reui/event-calendar/event-calendar-types";
+import type {
+  CalendarEvent,
+  CalendarView,
+} from "@/components/reui/event-calendar/event-calendar-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,11 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -307,8 +306,7 @@ export function ActivityCalendar({
           start: dayStart,
           end: addDays(dayStart, 1),
           allDay: true,
-          color:
-            settings.sportTypes[activity.sportType]?.color ?? "var(--color-ds-gray-700)",
+          color: settings.sportTypes[activity.sportType]?.color ?? "var(--color-ds-gray-700)",
           readOnly: true,
           draggable: false,
           resizable: false,
@@ -437,9 +435,7 @@ export function ActivityCalendar({
               <EventCalendarToolbar>
                 <Popover>
                   <PopoverTrigger
-                    render={
-                      <Button variant="outline" size="sm" aria-label="Settings" />
-                    }
+                    render={<Button variant="outline" size="sm" aria-label="Settings" />}
                   >
                     <Settings2Icon data-icon="inline-start" />
                     <span className="hidden sm:inline">Settings</span>
@@ -448,154 +444,154 @@ export function ActivityCalendar({
                     align="end"
                     className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
                   >
-                  <PopoverTitle>Calendar settings</PopoverTitle>
-                  <Tabs
-                    value={settingsTab}
-                    onValueChange={(next) => {
-                      if (next == null) return;
-                      setSettingsTab(String(next));
-                    }}
-                  >
-                    <TabsList className="h-auto w-full flex-wrap">
-                      <TabsTrigger value="view">View</TabsTrigger>
-                      {isTimeGridView ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
-                      <TabsTrigger value="region">Region</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="view">
-                      <FieldGroup className="gap-3">
-                        <SettingsSwitch
-                          id="ec-set-weekends"
-                          label="Weekends"
-                          checked={settings.viewSettings.weekends ?? true}
-                          onCheckedChange={(weekends) =>
-                            patch({ viewSettings: { ...settings.viewSettings, weekends } })
-                          }
-                        />
-                        <SettingsSwitch
-                          id="ec-set-week-numbers"
-                          label="Week numbers"
-                          checked={settings.viewSettings.weekNumbers ?? false}
-                          onCheckedChange={(weekNumbers) =>
-                            patch({ viewSettings: { ...settings.viewSettings, weekNumbers } })
-                          }
-                        />
-                        <SettingsSwitch
-                          id="ec-set-now"
-                          label="Now indicator"
-                          checked={settings.viewSettings.nowIndicator ?? true}
-                          onCheckedChange={(nowIndicator) =>
-                            patch({ viewSettings: { ...settings.viewSettings, nowIndicator } })
-                          }
-                        />
-                        <SettingsSwitch
-                          id="ec-set-off-days"
-                          label="Mark off days"
-                          checked={settings.viewSettings.offDays ?? false}
-                          onCheckedChange={(offDays) =>
-                            patch({ viewSettings: { ...settings.viewSettings, offDays } })
-                          }
-                        />
-                        <SettingsSelect
-                          id="ec-set-week-start"
-                          label="Week starts"
-                          value={settings.weekStartsOn}
-                          options={[
-                            { value: 0, label: "Sunday" },
-                            { value: 1, label: "Monday" },
-                          ]}
-                          onValueChange={(weekStartsOn) =>
-                            patch({ weekStartsOn: Number(weekStartsOn) as 0 | 1 })
-                          }
-                        />
-                      </FieldGroup>
-                    </TabsContent>
-                    <TabsContent value="time">
-                      <FieldGroup className="gap-3">
-                        <SettingsSelect
-                          id="ec-set-day-start"
-                          label="Day starts"
-                          value={settings.dayStartHour}
-                          options={[
-                            { value: 0, label: "00:00" },
-                            { value: 6, label: "06:00" },
-                            { value: 8, label: "08:00" },
-                          ]}
-                          onValueChange={(dayStartHour) =>
-                            patch({ dayStartHour: Number(dayStartHour) })
-                          }
-                        />
-                        <SettingsSelect
-                          id="ec-set-day-end"
-                          label="Day ends"
-                          value={settings.dayEndHour}
-                          options={[
-                            { value: 18, label: "18:00" },
-                            { value: 20, label: "20:00" },
-                            { value: 24, label: "24:00" },
-                          ]}
-                          onValueChange={(dayEndHour) => patch({ dayEndHour: Number(dayEndHour) })}
-                        />
-                        <SettingsSelect
-                          id="ec-set-interval"
-                          label="Grid interval"
-                          value={settings.interval}
-                          options={[
-                            { value: 30, label: "30 min" },
-                            { value: 60, label: "60 min" },
-                          ]}
-                          onValueChange={(interval) => patch({ interval: Number(interval) })}
-                        />
-                      </FieldGroup>
-                    </TabsContent>
-                    <TabsContent value="region">
-                      <FieldGroup className="gap-3">
-                        <SettingsSelect
-                          id="ec-set-language"
-                          label="Language"
-                          value="en"
-                          options={[{ value: "en", label: "English" }]}
-                          onValueChange={() => undefined}
-                          disabled
-                        />
-                        <SettingsSelect
-                          id="ec-set-timezone"
-                          label="Time zone"
-                          value="browser"
-                          options={[{ value: "browser", label: "Browser" }]}
-                          onValueChange={() => undefined}
-                          disabled
-                        />
-                        <FieldDescription>
-                          Language is English. Time zone follows the browser.
-                        </FieldDescription>
-                      </FieldGroup>
-                    </TabsContent>
-                  </Tabs>
-                  {saveError ? (
-                    <p className="text-destructive text-xs">{saveError}</p>
-                  ) : null}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() =>
-                      setSettings(
-                        mergeCalendarSettings(
-                          {
-                            ...DEFAULT_CALENDAR_SETTINGS,
-                            sportTypes: settings.sportTypes,
-                            sportGroupShares: settings.sportGroupShares,
-                          },
-                          sportTypeNames,
-                        ),
-                      )
-                    }
-                  >
-                    Reset to defaults
-                  </Button>
-                </PopoverContent>
-              </Popover>
-            </EventCalendarToolbar>
+                    <PopoverTitle>Calendar settings</PopoverTitle>
+                    <Tabs
+                      value={settingsTab}
+                      onValueChange={(next) => {
+                        if (next == null) return;
+                        setSettingsTab(String(next));
+                      }}
+                    >
+                      <TabsList className="h-auto w-full flex-wrap">
+                        <TabsTrigger value="view">View</TabsTrigger>
+                        {isTimeGridView ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
+                        <TabsTrigger value="region">Region</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="view">
+                        <FieldGroup className="gap-3">
+                          <SettingsSwitch
+                            id="ec-set-weekends"
+                            label="Weekends"
+                            checked={settings.viewSettings.weekends ?? true}
+                            onCheckedChange={(weekends) =>
+                              patch({ viewSettings: { ...settings.viewSettings, weekends } })
+                            }
+                          />
+                          <SettingsSwitch
+                            id="ec-set-week-numbers"
+                            label="Week numbers"
+                            checked={settings.viewSettings.weekNumbers ?? false}
+                            onCheckedChange={(weekNumbers) =>
+                              patch({ viewSettings: { ...settings.viewSettings, weekNumbers } })
+                            }
+                          />
+                          <SettingsSwitch
+                            id="ec-set-now"
+                            label="Now indicator"
+                            checked={settings.viewSettings.nowIndicator ?? true}
+                            onCheckedChange={(nowIndicator) =>
+                              patch({ viewSettings: { ...settings.viewSettings, nowIndicator } })
+                            }
+                          />
+                          <SettingsSwitch
+                            id="ec-set-off-days"
+                            label="Mark off days"
+                            checked={settings.viewSettings.offDays ?? false}
+                            onCheckedChange={(offDays) =>
+                              patch({ viewSettings: { ...settings.viewSettings, offDays } })
+                            }
+                          />
+                          <SettingsSelect
+                            id="ec-set-week-start"
+                            label="Week starts"
+                            value={settings.weekStartsOn}
+                            options={[
+                              { value: 0, label: "Sunday" },
+                              { value: 1, label: "Monday" },
+                            ]}
+                            onValueChange={(weekStartsOn) =>
+                              patch({ weekStartsOn: Number(weekStartsOn) as 0 | 1 })
+                            }
+                          />
+                        </FieldGroup>
+                      </TabsContent>
+                      <TabsContent value="time">
+                        <FieldGroup className="gap-3">
+                          <SettingsSelect
+                            id="ec-set-day-start"
+                            label="Day starts"
+                            value={settings.dayStartHour}
+                            options={[
+                              { value: 0, label: "00:00" },
+                              { value: 6, label: "06:00" },
+                              { value: 8, label: "08:00" },
+                            ]}
+                            onValueChange={(dayStartHour) =>
+                              patch({ dayStartHour: Number(dayStartHour) })
+                            }
+                          />
+                          <SettingsSelect
+                            id="ec-set-day-end"
+                            label="Day ends"
+                            value={settings.dayEndHour}
+                            options={[
+                              { value: 18, label: "18:00" },
+                              { value: 20, label: "20:00" },
+                              { value: 24, label: "24:00" },
+                            ]}
+                            onValueChange={(dayEndHour) =>
+                              patch({ dayEndHour: Number(dayEndHour) })
+                            }
+                          />
+                          <SettingsSelect
+                            id="ec-set-interval"
+                            label="Grid interval"
+                            value={settings.interval}
+                            options={[
+                              { value: 30, label: "30 min" },
+                              { value: 60, label: "60 min" },
+                            ]}
+                            onValueChange={(interval) => patch({ interval: Number(interval) })}
+                          />
+                        </FieldGroup>
+                      </TabsContent>
+                      <TabsContent value="region">
+                        <FieldGroup className="gap-3">
+                          <SettingsSelect
+                            id="ec-set-language"
+                            label="Language"
+                            value="en"
+                            options={[{ value: "en", label: "English" }]}
+                            onValueChange={() => undefined}
+                            disabled
+                          />
+                          <SettingsSelect
+                            id="ec-set-timezone"
+                            label="Time zone"
+                            value="browser"
+                            options={[{ value: "browser", label: "Browser" }]}
+                            onValueChange={() => undefined}
+                            disabled
+                          />
+                          <FieldDescription>
+                            Language is English. Time zone follows the browser.
+                          </FieldDescription>
+                        </FieldGroup>
+                      </TabsContent>
+                    </Tabs>
+                    {saveError ? <p className="text-destructive text-xs">{saveError}</p> : null}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() =>
+                        setSettings(
+                          mergeCalendarSettings(
+                            {
+                              ...DEFAULT_CALENDAR_SETTINGS,
+                              sportTypes: settings.sportTypes,
+                              sportGroupShares: settings.sportGroupShares,
+                            },
+                            sportTypeNames,
+                          ),
+                        )
+                      }
+                    >
+                      Reset to defaults
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </EventCalendarToolbar>
             </div>
           </div>
           <div

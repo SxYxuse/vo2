@@ -5,8 +5,14 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { MapIcon } from "lucide-react";
 
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { activityMapQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { activityMapQueryOptions } from "#/lib/queries.ts";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ActivityMap = lazy(() =>
@@ -14,11 +20,8 @@ const ActivityMap = lazy(() =>
 );
 
 export const Route = createFileRoute("/_app/map")({
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(activityMapQueryOptions),
-      context.queryClient.ensureQueryData(homeQueryOptions),
-    ]),
+  ssr: false,
+  loader: ({ context }) => context.queryClient.ensureQueryData(activityMapQueryOptions),
   pendingMs: 200,
   pendingComponent: MapPending,
   errorComponent: MapError,
@@ -27,7 +30,6 @@ export const Route = createFileRoute("/_app/map")({
 
 function MapPage() {
   const { data } = useSuspenseQuery(activityMapQueryOptions);
-  const { data: home } = useSuspenseQuery(homeQueryOptions);
 
   return (
     <>
@@ -41,11 +43,13 @@ function MapPage() {
         </p>
       </div>
       {data.signedIn ? (
-        <Suspense fallback={<Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />}>
+        <Suspense
+          fallback={<Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />}
+        >
           <ActivityMap
             tracks={data.tracks}
-            sportTypes={home.settings.sportTypes}
-            sportGroupShares={home.settings.sportGroupShares}
+            sportTypes={data.sportTypes}
+            sportGroupShares={data.sportGroupShares}
           />
         </Suspense>
       ) : (

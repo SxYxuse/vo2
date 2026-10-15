@@ -6,7 +6,13 @@ import { FlaskConicalIcon } from "lucide-react";
 import { AssessmentTests } from "#/components/assessment-tests.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
 import { assessmentsQueryOptions } from "#/lib/queries.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/tests")({
@@ -30,8 +36,8 @@ function TestsPage() {
         <p className="text-muted-foreground text-sm">
           Published field tests for FTP, VO2max, and lactate-threshold heart rate. Suggested when
           form allows — never mixed into the weekly workout bucket. After you do one, open the
-          Strava activity and flag it as that test so the result is stored. Turn protocols on or
-          off in Settings.
+          Strava activity and flag it as that test so the result is stored. Turn protocols on or off
+          in Settings.
         </p>
       </div>
       {data.signedIn ? (

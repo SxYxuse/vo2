@@ -133,7 +133,9 @@ export function isAnalysisMocked() {
   return !serverEnv.openRouterApiKey();
 }
 
-export async function getActivityAnalysisImpl(activityId: string): Promise<StoredActivityAnalysis | null> {
+export async function getActivityAnalysisImpl(
+  activityId: string,
+): Promise<StoredActivityAnalysis | null> {
   const session = await getRequiredSession();
   const [row] = await db
     .select({
@@ -144,7 +146,12 @@ export async function getActivityAnalysisImpl(activityId: string): Promise<Store
       updatedAt: activityAnalyses.updatedAt,
     })
     .from(activityAnalyses)
-    .where(and(eq(activityAnalyses.activityId, activityId), eq(activityAnalyses.userId, session.user.id)))
+    .where(
+      and(
+        eq(activityAnalyses.activityId, activityId),
+        eq(activityAnalyses.userId, session.user.id),
+      ),
+    )
     .limit(1);
   if (!row) return null;
   return {

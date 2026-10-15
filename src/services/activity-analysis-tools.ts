@@ -1,14 +1,7 @@
 import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 
-const streamKeySchema = z.enum([
-  "heartrate",
-  "watts",
-  "cadence",
-  "speed",
-  "altitude",
-  "grade",
-]);
+const streamKeySchema = z.enum(["heartrate", "watts", "cadence", "speed", "altitude", "grade"]);
 
 export const getActivityOverviewDef = toolDefinition({
   name: "get_activity_overview",

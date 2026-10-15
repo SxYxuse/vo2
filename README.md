@@ -57,10 +57,10 @@ vp run generate:strava-sdk
 
 ## Scripts
 
-| Script                    | Purpose                      |
-| ------------------------- | ---------------------------- |
-| `vp run dev`              | Vite+ dev server             |
-| `vp run db:up`            | Start local Postgres         |
-| `vp run db:push`          | Push Drizzle schema          |
-| `vp run db:studio`        | Drizzle Studio               |
+| Script                       | Purpose                      |
+| ---------------------------- | ---------------------------- |
+| `vp run dev`                 | Vite+ dev server             |
+| `vp run db:up`               | Start local Postgres         |
+| `vp run db:push`             | Push Drizzle schema          |
+| `vp run db:studio`           | Drizzle Studio               |
 | `vp run generate:strava-sdk` | Refresh Strava OpenAPI types |

@@ -159,8 +159,7 @@ export function scoreBeepTest(input: {
       ? Math.round(input.lastStage * 2) / 2
       : null;
   const lastStageSpeedKmh = lastStage != null ? input.stageSpeed(lastStage) : null;
-  const vo2max =
-    lastStageSpeedKmh != null ? input.vo2max(lastStageSpeedKmh, input.age) : null;
+  const vo2max = lastStageSpeedKmh != null ? input.vo2max(lastStageSpeedKmh, input.age) : null;
   return {
     ...EMPTY_ASSESSMENT_RESULT,
     lastStage,

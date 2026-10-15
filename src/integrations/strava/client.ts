@@ -68,7 +68,9 @@ export class StravaApi {
     search.set("keys", keys.join(","));
     search.set("key_by_type", "true");
     try {
-      return await this.request<StreamSet>(`/activities/${activityId}/streams?${search.toString()}`);
+      return await this.request<StreamSet>(
+        `/activities/${activityId}/streams?${search.toString()}`,
+      );
     } catch (error) {
       // Manual and some indoor activities have no stream data.
       if (error instanceof StravaApiError && error.status === 404) {

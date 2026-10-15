@@ -17,7 +17,11 @@ import { getProfileSettingsForUser } from "./app-settings.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
 import type { CalendarActivity, HomeData, SyncResult } from "./strava-sync.types.ts";
-import { adaptPlannedWeek, getTrainingPlanForUser, listPlannedSessions } from "./training-plan.server.ts";
+import {
+  adaptPlannedWeek,
+  getTrainingPlanForUser,
+  listPlannedSessions,
+} from "./training-plan.server.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import { toFitnessLoad } from "./training-load.ts";
 
@@ -65,7 +69,6 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     };
   }
 
-  await refreshTrainingLoadsIfNeeded(session.user.id);
   const plannedFrom = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
   const [rows, storedSettings, run, profile, training, planned] = await Promise.all([
     db
@@ -286,11 +289,7 @@ async function upsertAllActivities(api: StravaApi, userId: string, fallbackAthle
   return upserted;
 }
 
-function activityInsertRow(
-  userId: string,
-  activity: SummaryActivity,
-  fallbackAthleteId: string,
-) {
+function activityInsertRow(userId: string, activity: SummaryActivity, fallbackAthleteId: string) {
   if (activity.id == null || !activity.start_date) return null;
   const metrics = metricsFromSummary(activity);
   return {

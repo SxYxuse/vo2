@@ -20,7 +20,7 @@ import { useTheme } from "next-themes";
 
 import { SettingsDialog } from "#/components/settings-dialog.tsx";
 import { authClient } from "#/lib/auth-client.ts";
-import { homeQueryOptions } from "#/lib/queries.ts";
+import { appShellQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -76,11 +76,13 @@ export function AppSidebar() {
   const { data: session } = authClient.useSession();
   const user = session?.user;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { data: home } = useQuery({
-    ...homeQueryOptions,
+  const { data: shell } = useQuery({
+    ...appShellQueryOptions,
     enabled: Boolean(user),
   });
-  const trainingMissing = Boolean(user && home?.signedIn && !isTrainingPlanComplete(home.training));
+  const trainingMissing = Boolean(
+    user && shell?.signedIn && !isTrainingPlanComplete(shell.training),
+  );
 
   useEffect(() => {
     if (trainingMissing) setSettingsOpen(true);
@@ -88,57 +90,53 @@ export function AppSidebar() {
 
   return (
     <>
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="vo" render={<Link to="/" />}>
-              <BikeIcon className="text-ds-blue-700" />
-              <span>vo</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigate</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.to}
-                    tooltip={item.title}
-                    render={
-                      <Link
-                        to={item.to}
-                        onClick={() => {
-                          if (isMobile) setOpenMobile(false);
-                        }}
-                      />
-                    }
-                  >
-                    <item.icon className={item.tone} />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarUserMenu onOpenSettings={() => setSettingsOpen(true)} />
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
-    {user ? (
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        userName={user.name}
-      />
-    ) : null}
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="vo" render={<Link to="/" />}>
+                <BikeIcon className="text-ds-blue-700" />
+                <span>vo</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigate</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {NAV_ITEMS.map((item) => (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton
+                      isActive={pathname === item.to}
+                      tooltip={item.title}
+                      render={
+                        <Link
+                          to={item.to}
+                          onClick={() => {
+                            if (isMobile) setOpenMobile(false);
+                          }}
+                        />
+                      }
+                    >
+                      <item.icon className={item.tone} />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarFooter>
+          <SidebarUserMenu onOpenSettings={() => setSettingsOpen(true)} />
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+      {user ? (
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} userName={user.name} />
+      ) : null}
     </>
   );
 }
@@ -165,112 +163,109 @@ function SidebarUserMenu({ onOpenSettings }: { onOpenSettings: () => void }) {
 
   return (
     <>
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu
-          modal={false}
-          open={menuOpen}
-          onOpenChange={(open) => {
-            if (!open && themeOpen) return;
-            setMenuOpen(open);
-          }}
-        >
-          <DropdownMenuTrigger
-            render={
-              <SidebarMenuButton className="data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center" />
-            }
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <DropdownMenu
+            modal={false}
+            open={menuOpen}
+            onOpenChange={(open) => {
+              if (!open && themeOpen) return;
+              setMenuOpen(open);
+            }}
           >
-            {isPending ? (
-              <Avatar size="sm">
-                <AvatarFallback>V</AvatarFallback>
-              </Avatar>
-            ) : (
-              <Avatar size="sm">
-                {user?.image ? <AvatarImage src={user.image} alt={user.name} /> : null}
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-            )}
-            <span className="truncate font-medium group-data-[collapsible=icon]:hidden">
-              {user?.name ?? "Guest"}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side={isMobile ? "top" : "right"}
-            align="end"
-            sideOffset={8}
-            className="min-w-56"
-          >
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{user?.name ?? "Account"}</DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <div
-                className="px-2 py-1.5"
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <Field orientation="horizontal">
-                  <FieldLabel htmlFor="sidebar-theme">Theme</FieldLabel>
-                  <Select
-                    value={currentTheme}
-                    open={themeOpen}
-                    onOpenChange={setThemeOpen}
-                    onValueChange={(next) => {
-                      if (next == null) return;
-                      setTheme(String(next));
-                    }}
-                  >
-                    <SelectTrigger id="sidebar-theme" size="sm" className="ml-auto w-28">
-                      <SelectValue>
-                        <currentOption.icon />
-                        {currentOption.label}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false} align="end" side="top">
-                      <SelectGroup>
-                        {THEME_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            <option.icon />
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-            </DropdownMenuGroup>
-            {user ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      onOpenSettings();
-                    }}
-                  >
-                    <Settings2Icon />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={() => {
-                      void authClient.signOut().then(async () => {
-                        queryClient.clear();
-                        await router.invalidate();
-                      });
-                    }}
-                  >
-                    <LogOutIcon />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+            <DropdownMenuTrigger
+              render={
+                <SidebarMenuButton className="data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center" />
+              }
+            >
+              {isPending ? (
+                <Avatar size="sm">
+                  <AvatarFallback>V</AvatarFallback>
+                </Avatar>
+              ) : (
+                <Avatar size="sm">
+                  {user?.image ? <AvatarImage src={user.image} alt={user.name} /> : null}
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+              )}
+              <span className="truncate font-medium group-data-[collapsible=icon]:hidden">
+                {user?.name ?? "Guest"}
+              </span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side={isMobile ? "top" : "right"}
+              align="end"
+              sideOffset={8}
+              className="min-w-56"
+            >
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{user?.name ?? "Account"}</DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <div className="px-2 py-1.5" onPointerDown={(event) => event.stopPropagation()}>
+                  <Field orientation="horizontal">
+                    <FieldLabel htmlFor="sidebar-theme">Theme</FieldLabel>
+                    <Select
+                      value={currentTheme}
+                      open={themeOpen}
+                      onOpenChange={setThemeOpen}
+                      onValueChange={(next) => {
+                        if (next == null) return;
+                        setTheme(String(next));
+                      }}
+                    >
+                      <SelectTrigger id="sidebar-theme" size="sm" className="ml-auto w-28">
+                        <SelectValue>
+                          <currentOption.icon />
+                          {currentOption.label}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false} align="end" side="top">
+                        <SelectGroup>
+                          {THEME_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              <option.icon />
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              </DropdownMenuGroup>
+              {user ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        onOpenSettings();
+                      }}
+                    >
+                      <Settings2Icon />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => {
+                        void authClient.signOut().then(async () => {
+                          queryClient.clear();
+                          await router.invalidate();
+                        });
+                      }}
+                    >
+                      <LogOutIcon />
+                      Log out
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
     </>
   );
 }

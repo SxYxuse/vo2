@@ -327,7 +327,9 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}
-                  {showPmc ? <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" /> : null}
+                  {showPmc ? (
+                    <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" />
+                  ) : null}
                   <ChartTooltip
                     cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
                     content={

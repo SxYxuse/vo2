@@ -36,7 +36,9 @@ const DEFAULT_SPORT_COLORS: Record<string, string> = {
 const GEIST_700_VALUES = new Set(ACTIVITY_COLOR_OPTIONS.map((option) => option.value));
 
 function coerceToGeist700(color: string) {
-  const match = color.match(/--color-ds-(blue|red|amber|green|teal|purple|pink|gray)(?:-alpha)?-\d+/);
+  const match = color.match(
+    /--color-ds-(blue|red|amber|green|teal|purple|pink|gray)(?:-alpha)?-\d+/,
+  );
   if (match) return `var(--color-ds-${match[1]}-700)`;
   return GEIST_700_VALUES.has(color) ? color : "var(--color-ds-gray-700)";
 }
@@ -151,9 +153,7 @@ export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
 };
 
 export function formatSportType(sportType: string) {
-  return sportType
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
+  return sportType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
 }
 
 export function sortSportTypeKeys(sportTypes: CalendarSettings["sportTypes"]) {

@@ -12,7 +12,13 @@ import {
   WeightIcon,
 } from "lucide-react";
 
-import { assessmentsQueryOptions, heartRateQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import {
+  activityMapQueryOptions,
+  appShellQueryOptions,
+  assessmentsQueryOptions,
+  heartRateQueryOptions,
+  homeQueryOptions,
+} from "#/lib/queries.ts";
 import {
   ageFromBirthDate,
   formatBirthDate,
@@ -210,11 +216,13 @@ export function SettingsDialog({
   );
   const locked = !data || !isTrainingPlanComplete(data.training);
   const [section, setSection] = useState<SettingsSection>("training");
-  const [profile, setProfile] = useState<ProfileSettings>(data?.profile ?? {
-    birthDate: null,
-    weightKg: null,
-    heightCm: null,
-  });
+  const [profile, setProfile] = useState<ProfileSettings>(
+    data?.profile ?? {
+      birthDate: null,
+      weightKg: null,
+      heightCm: null,
+    },
+  );
   const [weightInput, setWeightInput] = useState(
     data?.profile.weightKg != null ? String(data.profile.weightKg) : "",
   );
@@ -259,7 +267,10 @@ export function SettingsDialog({
   const consistency = parsedTraining.success
     ? trainingConsistency(parsedTraining.data)
     : { ok: false, message: draft.buildPace ? null : "Choose how hard you want to build fitness." };
-  const hoursMax = Math.min(30, Math.max(12, Math.ceil((avgHours || 5) * 1.5), draft.targetWeeklyHours));
+  const hoursMax = Math.min(
+    30,
+    Math.max(12, Math.ceil((avgHours || 5) * 1.5), draft.targetWeeklyHours),
+  );
 
   const save = useMutation({
     mutationFn: saveAppSettings,
@@ -274,8 +285,13 @@ export function SettingsDialog({
             }
           : current,
       );
+      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
+        current ? { ...current, training: saved.training } : current,
+      );
+      void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
+      void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
       setSaveError(null);
       if (isTrainingPlanComplete(saved.training)) onOpenChange(false);
@@ -359,608 +375,624 @@ export function SettingsDialog({
             ))}
           </nav>
           <div className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="flex flex-col gap-4 p-4">
-              {!data ? (
-                <div className="flex justify-center py-12">
-                  <Spinner />
-                </div>
-              ) : section === "profile" ? (
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="settings-name">Name</FieldLabel>
-                    <Input id="settings-name" value={userName} disabled />
-                    <FieldDescription>From your Strava account.</FieldDescription>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="settings-birth">Birthday</FieldLabel>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Popover>
-                        <PopoverTrigger
-                          render={
-                            <Button
-                              id="settings-birth"
-                              type="button"
-                              variant="outline"
-                              className="min-w-48 justify-start font-normal"
-                            />
-                          }
-                        >
-                          <CalendarIcon data-icon="inline-start" />
-                          {birth ? format(birth, "MMM d, yyyy") : "Pick a date"}
-                        </PopoverTrigger>
-                        <PopoverContent align="start" className="w-auto p-2">
-                          <Calendar
-                            mode="single"
-                            captionLayout="dropdown"
-                            selected={birth ?? undefined}
-                            defaultMonth={birth ?? new Date(1990, 0)}
-                            startMonth={new Date(1926, 0)}
-                            endMonth={new Date()}
-                            disabled={{ after: new Date() }}
-                            onSelect={(next) => {
-                              setProfile((current) => ({
-                                ...current,
-                                birthDate: next ? formatBirthDate(next) : null,
-                              }));
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      {age != null ? (
-                        <Badge variant="secondary">{age} years old</Badge>
-                      ) : (
-                        <Badge variant="outline">Age unknown</Badge>
-                      )}
-                      {profile.birthDate ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setProfile((current) => ({ ...current, birthDate: null }))}
-                        >
-                          Clear
-                        </Button>
-                      ) : null}
-                    </div>
-                    <FieldDescription>
-                      Used later for age-graded analysis. Age updates from this date.
-                    </FieldDescription>
-                  </Field>
-                  <Field data-invalid={Boolean(fieldErrors.weight)}>
-                    <FieldLabel htmlFor="settings-weight">Weight</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id="settings-weight"
-                        type="number"
-                        inputMode="decimal"
-                        min={20}
-                        max={250}
-                        step="0.1"
-                        placeholder="72"
-                        value={weightInput}
-                        aria-invalid={Boolean(fieldErrors.weight)}
-                        onChange={(event) => setWeightInput(event.currentTarget.value)}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>
-                          <WeightIcon />
-                          kg
-                        </InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                    {fieldErrors.weight ? <FieldError>{fieldErrors.weight}</FieldError> : null}
-                  </Field>
-                  <Field data-invalid={Boolean(fieldErrors.height)}>
-                    <FieldLabel htmlFor="settings-height">Height</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id="settings-height"
-                        type="number"
-                        inputMode="numeric"
-                        min={80}
-                        max={250}
-                        step="1"
-                        placeholder="178"
-                        value={heightInput}
-                        aria-invalid={Boolean(fieldErrors.height)}
-                        onChange={(event) => setHeightInput(event.currentTarget.value)}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>
-                          <RulerIcon />
-                          cm
-                        </InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                    {fieldErrors.height ? <FieldError>{fieldErrors.height}</FieldError> : null}
-                  </Field>
-                </FieldGroup>
-              ) : section === "training" ? (
-                <FieldGroup>
-                  {locked ? (
-                    <Alert variant="warning">
-                      <TargetIcon />
-                      <AlertTitle>Training goal required</AlertTitle>
-                      <AlertDescription>
-                        Tell us how you want to build fitness, how many sessions you can do, and
-                        your preferred rest day. Then you can fill a weekly bucket on the calendar.
-                      </AlertDescription>
-                    </Alert>
-                  ) : null}
-                  <FieldSet data-invalid={Boolean(!draft.buildPace && trainingError)}>
-                    <FieldLegend>Fitness and form</FieldLegend>
-                    <FieldDescription>
-                      Keep building, or hold where you are. Faster ramps raise fitness quicker and
-                      sit you in more fatigue.
-                    </FieldDescription>
-                    <RadioGroup
-                      value={draft.buildPace || undefined}
-                      onValueChange={(next) => {
-                        if (!next) return;
-                        setDraft((current) => ({ ...current, buildPace: next as BuildPace }));
-                        setTrainingError(null);
-                      }}
-                      className="gap-2"
-                    >
-                      {BUILD_PACES.map((pace) => {
-                        const id = `training-pace-${pace.id}`;
-                        return (
-                          <FieldLabel key={pace.id} htmlFor={id} className="w-full">
-                            <Field orientation="horizontal" className="items-start rounded-lg border p-3">
-                              <RadioGroupItem value={pace.id} id={id} />
-                              <FieldContent>
-                                <FieldTitle>{pace.label}</FieldTitle>
-                                <FieldDescription>{pace.hint}</FieldDescription>
-                              </FieldContent>
-                              <Badge variant={pace.id === "overreach" ? "destructive" : "outline"}>
-                                {pace.risk}
-                              </Badge>
-                            </Field>
-                          </FieldLabel>
-                        );
-                      })}
-                    </RadioGroup>
-                    {!draft.buildPace && trainingError ? (
-                      <FieldError>{trainingError}</FieldError>
-                    ) : null}
-                  </FieldSet>
-                  <FieldSeparator />
-                  <FieldSet>
-                    <FieldLegend>Weekly sessions</FieldLegend>
-                    <FieldDescription>
-                      Caps for suggested run and ride sessions in the weekly bucket. Other sports
-                      still count toward load.
-                    </FieldDescription>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <Field>
-                        <FieldLabel htmlFor="training-max-run">Max runs</FieldLabel>
-                        <Select
-                          value={String(draft.maxRunSessions)}
-                          onValueChange={(next) => {
-                            if (next == null) return;
-                            setDraft((current) => ({
-                              ...current,
-                              maxRunSessions: Number(next),
-                            }));
-                          }}
-                        >
-                          <SelectTrigger id="training-max-run">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {SESSION_COUNTS.map((count) => (
-                                <SelectItem key={count} value={String(count)}>
-                                  {count} {count === 1 ? "run" : "runs"}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="training-max-ride">Max rides</FieldLabel>
-                        <Select
-                          value={String(draft.maxRideSessions)}
-                          onValueChange={(next) => {
-                            if (next == null) return;
-                            setDraft((current) => ({
-                              ...current,
-                              maxRideSessions: Number(next),
-                            }));
-                          }}
-                        >
-                          <SelectTrigger id="training-max-ride">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              {SESSION_COUNTS.map((count) => (
-                                <SelectItem key={count} value={String(count)}>
-                                  {count} {count === 1 ? "ride" : "rides"}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    </div>
+            <ScrollArea className="h-full">
+              <div className="flex flex-col gap-4 p-4">
+                {!data ? (
+                  <div className="flex justify-center py-12">
+                    <Spinner />
+                  </div>
+                ) : section === "profile" ? (
+                  <FieldGroup>
                     <Field>
-                      <FieldLabel htmlFor="training-double-days">Days with two sessions</FieldLabel>
-                      <Select
-                        value={String(draft.maxDoubleDays)}
-                        onValueChange={(next) => {
-                          if (next == null) return;
-                          setDraft((current) => ({
-                            ...current,
-                            maxDoubleDays: Number(next),
-                          }));
-                        }}
-                      >
-                        <SelectTrigger id="training-double-days">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {DOUBLE_DAY_COUNTS.map((count) => (
-                              <SelectItem key={count} value={String(count)}>
-                                {count === 0 ? "None" : count === 1 ? "1 day" : `${count} days`}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>
-                        How many days you are OK stacking a ride and a run. The bucket does not
-                        assign those days — you pick when to double up.
-                      </FieldDescription>
+                      <FieldLabel htmlFor="settings-name">Name</FieldLabel>
+                      <Input id="settings-name" value={userName} disabled />
+                      <FieldDescription>From your Strava account.</FieldDescription>
                     </Field>
-                  </FieldSet>
-                  <FieldSet>
-                    <FieldLegend>Weekly hours</FieldLegend>
-                    <FieldDescription>
-                      Your last 3 months average {avgHours > 0.2 ? formatHours(avgHours) : "is still thin"}.
-                      Choose whether to cut back, keep that volume, or add hours.
-                    </FieldDescription>
-                    <RadioGroup
-                      value={draft.hoursIntent}
-                      onValueChange={(next) => {
-                        if (!next) return;
-                        const intent = next as HoursIntent;
-                        setDraft((current) => ({
-                          ...current,
-                          hoursIntent: intent,
-                          targetWeeklyHours: suggestedTargetHours(avgHours, intent),
-                        }));
-                      }}
-                    >
-                      {HOURS_INTENTS.map((intent) => {
-                        const id = `training-hours-${intent.id}`;
-                        return (
-                          <Field key={intent.id} orientation="horizontal">
-                            <RadioGroupItem value={intent.id} id={id} />
-                            <FieldLabel htmlFor={id} className="font-normal">
-                              {intent.label}
-                            </FieldLabel>
-                          </Field>
-                        );
-                      })}
-                    </RadioGroup>
-                    <Field data-invalid={!consistency.ok}>
-                      <FieldLabel htmlFor="training-hours-slider">
-                        Target {formatHours(draft.targetWeeklyHours)} a week
-                      </FieldLabel>
-                      <Slider
-                        id="training-hours-slider"
-                        min={0.5}
-                        max={hoursMax}
-                        step={0.5}
-                        value={[draft.targetWeeklyHours]}
-                        onValueChange={(next) => {
-                          const value = Array.isArray(next) ? next[0] : next;
-                          if (typeof value !== "number") return;
-                          setDraft((current) => ({ ...current, targetWeeklyHours: value }));
-                        }}
-                      />
-                      {!consistency.ok && consistency.message ? (
-                        <FieldError>{consistency.message}</FieldError>
-                      ) : (
-                        <FieldDescription>
-                          Kept in range with {draft.maxRunSessions + draft.maxRideSessions} run and
-                          ride sessions.
-                        </FieldDescription>
-                      )}
-                    </Field>
-                  </FieldSet>
-                  <FieldSet>
-                    <FieldLegend>Suggested sessions</FieldLegend>
-                    <FieldDescription>
-                      Hours of training keeps the weekly bucket as easy aerobic volume. Intervals
-                      and zones add threshold, VO2, and tempo when form allows — watts if that sport
-                      has a power meter, heart rate if it has a belt or watch, otherwise RPE.
-                    </FieldDescription>
-                    <RadioGroup
-                      value={draft.workoutStyle}
-                      onValueChange={(next) => {
-                        if (!next) return;
-                        setDraft((current) => ({
-                          ...current,
-                          workoutStyle: next as WorkoutStyle,
-                        }));
-                      }}
-                      className="gap-2"
-                    >
-                      {WORKOUT_STYLES.map((style) => {
-                        const id = `training-style-${style.id}`;
-                        return (
-                          <FieldLabel key={style.id} htmlFor={id} className="w-full">
-                            <Field orientation="horizontal" className="items-start rounded-lg border p-3">
-                              <RadioGroupItem value={style.id} id={id} />
-                              <FieldContent>
-                                <FieldTitle>{style.label}</FieldTitle>
-                                <FieldDescription>{style.hint}</FieldDescription>
-                              </FieldContent>
-                            </Field>
-                          </FieldLabel>
-                        );
-                      })}
-                    </RadioGroup>
-                    {draft.workoutStyle === "structured" ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="self-start"
-                        onClick={() => setSection("sports")}
-                      >
-                        Set collectors per sport
-                      </Button>
-                    ) : null}
-                  </FieldSet>
-                  <FieldSet>
-                    <FieldLegend>Preferred rest day</FieldLegend>
-                    <FieldDescription>
-                      A reminder in the weekly bucket. Workouts are not pinned to other days, so you
-                      can still train here if that is when you have time.
-                    </FieldDescription>
-                    <ToggleGroup
-                      size="sm"
-                      variant="outline"
-                      spacing={0}
-                      value={[String(draft.preferredRestWeekday)]}
-                      onValueChange={(next) => {
-                        const value = next[0];
-                        if (value == null) return;
-                        setDraft((current) => ({
-                          ...current,
-                          preferredRestWeekday: Number(value),
-                        }));
-                      }}
-                      className="flex-wrap"
-                    >
-                      {WEEKDAYS.map((day) => (
-                        <ToggleGroupItem key={day.id} value={String(day.id)}>
-                          {day.label.slice(0, 3)}
-                        </ToggleGroupItem>
-                      ))}
-                    </ToggleGroup>
-                  </FieldSet>
-                  <FieldSeparator />
-                  <FieldSet>
-                    <FieldLegend>Field tests</FieldLegend>
-                    <FieldDescription>
-                      Published field tests for FTP, VO2max, and lactate-threshold HR. They live on
-                      Tests, not in the weekly bucket. Turn off any you do not want suggested.
-                    </FieldDescription>
-                    <Field orientation="horizontal">
-                      <Switch
-                        id="training-ftp-test"
-                        checked={draft.suggestFtpTest}
-                        onCheckedChange={(checked) =>
-                          setDraft((current) => ({ ...current, suggestFtpTest: checked }))
-                        }
-                      />
-                      <FieldContent>
-                        <FieldLabel htmlFor="training-ftp-test" className="font-normal">
-                          FTP 20-min
-                        </FieldLabel>
-                        <FieldDescription>
-                          Allen & Coggan. About 1h 15. FTP = 95% of 20-min power.
-                        </FieldDescription>
-                      </FieldContent>
-                    </Field>
-                    <Field orientation="horizontal">
-                      <Switch
-                        id="training-beep-test"
-                        checked={draft.suggestBeepTest}
-                        onCheckedChange={(checked) =>
-                          setDraft((current) => ({ ...current, suggestBeepTest: checked }))
-                        }
-                      />
-                      <FieldContent>
-                        <FieldLabel htmlFor="training-beep-test" className="font-normal">
-                          Beep test
-                        </FieldLabel>
-                        <FieldDescription>
-                          Léger 20 m shuttle. Stage speed estimates VO2max; peak HR is run max HR.
-                        </FieldDescription>
-                      </FieldContent>
-                    </Field>
-                    <Field orientation="horizontal">
-                      <Switch
-                        id="training-run-lthr"
-                        checked={draft.suggestRunLthrTest}
-                        onCheckedChange={(checked) =>
-                          setDraft((current) => ({ ...current, suggestRunLthrTest: checked }))
-                        }
-                      />
-                      <FieldContent>
-                        <FieldLabel htmlFor="training-run-lthr" className="font-normal">
-                          Run LTHR
-                        </FieldLabel>
-                        <FieldDescription>
-                          Friel 30-min solo time trial. Last 20 min average HR is run threshold.
-                        </FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  </FieldSet>
-                </FieldGroup>
-              ) : sortedSports.length === 0 ? (
-                <Empty className="min-h-48 border">
-                  <EmptyHeader>
-                    <EmptyTitle>No activity types yet</EmptyTitle>
-                    <EmptyDescription>
-                      Sync from Strava to choose which sports appear in the calendar, map, and heart rate.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <FieldGroup className="gap-3">
-                  {shareableGroups.length ? (
-                    <>
-                    <FieldSet>
-                      <FieldLegend>Shared data</FieldLegend>
-                      <FieldDescription>
-                        When on, types in the group share one max heart rate and zone set — a peak
-                        on a gravel ride also sets indoor and road ride zones.
-                      </FieldDescription>
-                      {shareableGroups.map((group) => {
-                        const inputId = `app-group-${group.id}`;
-                        return (
-                          <Field key={group.id} orientation="horizontal">
-                            <Switch
-                              id={inputId}
-                              checked={sportGroupShares[group.id]}
-                              onCheckedChange={(shared) =>
-                                setSportGroupShares((current) => ({
+                    <Field>
+                      <FieldLabel htmlFor="settings-birth">Birthday</FieldLabel>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger
+                            render={
+                              <Button
+                                id="settings-birth"
+                                type="button"
+                                variant="outline"
+                                className="min-w-48 justify-start font-normal"
+                              />
+                            }
+                          >
+                            <CalendarIcon data-icon="inline-start" />
+                            {birth ? format(birth, "MMM d, yyyy") : "Pick a date"}
+                          </PopoverTrigger>
+                          <PopoverContent align="start" className="w-auto p-2">
+                            <Calendar
+                              mode="single"
+                              captionLayout="dropdown"
+                              selected={birth ?? undefined}
+                              defaultMonth={birth ?? new Date(1990, 0)}
+                              startMonth={new Date(1926, 0)}
+                              endMonth={new Date()}
+                              disabled={{ after: new Date() }}
+                              onSelect={(next) => {
+                                setProfile((current) => ({
                                   ...current,
-                                  [group.id]: shared,
-                                }))
-                              }
+                                  birthDate: next ? formatBirthDate(next) : null,
+                                }));
+                              }}
                             />
-                            <FieldContent>
-                              <FieldLabel htmlFor={inputId} className="font-normal">
-                                {group.label}
-                              </FieldLabel>
-                              <FieldDescription>
-                                {group.members.map(formatSportType).join(", ")}
-                              </FieldDescription>
-                            </FieldContent>
-                          </Field>
-                        );
-                      })}
+                          </PopoverContent>
+                        </Popover>
+                        {age != null ? (
+                          <Badge variant="secondary">{age} years old</Badge>
+                        ) : (
+                          <Badge variant="outline">Age unknown</Badge>
+                        )}
+                        {profile.birthDate ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setProfile((current) => ({ ...current, birthDate: null }))
+                            }
+                          >
+                            Clear
+                          </Button>
+                        ) : null}
+                      </div>
+                      <FieldDescription>
+                        Used later for age-graded analysis. Age updates from this date.
+                      </FieldDescription>
+                    </Field>
+                    <Field data-invalid={Boolean(fieldErrors.weight)}>
+                      <FieldLabel htmlFor="settings-weight">Weight</FieldLabel>
+                      <InputGroup>
+                        <InputGroupInput
+                          id="settings-weight"
+                          type="number"
+                          inputMode="decimal"
+                          min={20}
+                          max={250}
+                          step="0.1"
+                          placeholder="72"
+                          value={weightInput}
+                          aria-invalid={Boolean(fieldErrors.weight)}
+                          onChange={(event) => setWeightInput(event.currentTarget.value)}
+                        />
+                        <InputGroupAddon align="inline-end">
+                          <InputGroupText>
+                            <WeightIcon />
+                            kg
+                          </InputGroupText>
+                        </InputGroupAddon>
+                      </InputGroup>
+                      {fieldErrors.weight ? <FieldError>{fieldErrors.weight}</FieldError> : null}
+                    </Field>
+                    <Field data-invalid={Boolean(fieldErrors.height)}>
+                      <FieldLabel htmlFor="settings-height">Height</FieldLabel>
+                      <InputGroup>
+                        <InputGroupInput
+                          id="settings-height"
+                          type="number"
+                          inputMode="numeric"
+                          min={80}
+                          max={250}
+                          step="1"
+                          placeholder="178"
+                          value={heightInput}
+                          aria-invalid={Boolean(fieldErrors.height)}
+                          onChange={(event) => setHeightInput(event.currentTarget.value)}
+                        />
+                        <InputGroupAddon align="inline-end">
+                          <InputGroupText>
+                            <RulerIcon />
+                            cm
+                          </InputGroupText>
+                        </InputGroupAddon>
+                      </InputGroup>
+                      {fieldErrors.height ? <FieldError>{fieldErrors.height}</FieldError> : null}
+                    </Field>
+                  </FieldGroup>
+                ) : section === "training" ? (
+                  <FieldGroup>
+                    {locked ? (
+                      <Alert variant="warning">
+                        <TargetIcon />
+                        <AlertTitle>Training goal required</AlertTitle>
+                        <AlertDescription>
+                          Tell us how you want to build fitness, how many sessions you can do, and
+                          your preferred rest day. Then you can fill a weekly bucket on the
+                          calendar.
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                    <FieldSet data-invalid={Boolean(!draft.buildPace && trainingError)}>
+                      <FieldLegend>Fitness and form</FieldLegend>
+                      <FieldDescription>
+                        Keep building, or hold where you are. Faster ramps raise fitness quicker and
+                        sit you in more fatigue.
+                      </FieldDescription>
+                      <RadioGroup
+                        value={draft.buildPace || undefined}
+                        onValueChange={(next) => {
+                          if (!next) return;
+                          setDraft((current) => ({ ...current, buildPace: next as BuildPace }));
+                          setTrainingError(null);
+                        }}
+                        className="gap-2"
+                      >
+                        {BUILD_PACES.map((pace) => {
+                          const id = `training-pace-${pace.id}`;
+                          return (
+                            <FieldLabel key={pace.id} htmlFor={id} className="w-full">
+                              <Field
+                                orientation="horizontal"
+                                className="items-start rounded-lg border p-3"
+                              >
+                                <RadioGroupItem value={pace.id} id={id} />
+                                <FieldContent>
+                                  <FieldTitle>{pace.label}</FieldTitle>
+                                  <FieldDescription>{pace.hint}</FieldDescription>
+                                </FieldContent>
+                                <Badge
+                                  variant={pace.id === "overreach" ? "destructive" : "outline"}
+                                >
+                                  {pace.risk}
+                                </Badge>
+                              </Field>
+                            </FieldLabel>
+                          );
+                        })}
+                      </RadioGroup>
+                      {!draft.buildPace && trainingError ? (
+                        <FieldError>{trainingError}</FieldError>
+                      ) : null}
                     </FieldSet>
                     <FieldSeparator />
-                    </>
-                  ) : null}
-                  <FieldDescription>
-                    These types and colors apply to the calendar, map, heart rate, and other views.
-                    Mark the hardware you actually use — Ride with an HR belt and power-meter
-                    pedals, gravel with a belt only, running with an HR watch — so structured
-                    sessions can prescribe watts, heart rate, or RPE.
-                  </FieldDescription>
-                  {sortedSports.map((sportType) => {
-                    const typeSettings = sportTypes[sportType];
-                    const inputId = `app-type-${sportType}`;
-                    const heartId = `${inputId}-hr`;
-                    const powerId = `${inputId}-power`;
-                    const offersPower = sportOffersPower(sportType);
-                    return (
-                      <FieldGroup key={sportType} className="rounded-lg border p-3">
-                        <Field orientation="horizontal">
-                          <Switch
-                            id={inputId}
-                            checked={typeSettings.visible}
-                            onCheckedChange={(visible) =>
-                              setSportTypes((current) => ({
-                                ...current,
-                                [sportType]: { ...typeSettings, visible },
-                              }))
-                            }
-                          />
-                          <FieldLabel htmlFor={inputId} className="min-w-0 flex-1 font-normal">
-                            {formatSportType(sportType)}
-                          </FieldLabel>
+                    <FieldSet>
+                      <FieldLegend>Weekly sessions</FieldLegend>
+                      <FieldDescription>
+                        Caps for suggested run and ride sessions in the weekly bucket. Other sports
+                        still count toward load.
+                      </FieldDescription>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field>
+                          <FieldLabel htmlFor="training-max-run">Max runs</FieldLabel>
                           <Select
-                            value={typeSettings.color}
+                            value={String(draft.maxRunSessions)}
                             onValueChange={(next) => {
                               if (next == null) return;
-                              setSportTypes((current) => ({
+                              setDraft((current) => ({
                                 ...current,
-                                [sportType]: { ...typeSettings, color: String(next) },
+                                maxRunSessions: Number(next),
                               }));
                             }}
                           >
-                            <SelectTrigger
-                              id={`${inputId}-color`}
-                              size="sm"
-                              className="w-28"
-                              aria-label={`${formatSportType(sportType)} color`}
-                            >
-                              <SelectValue>
-                                <span className="flex items-center gap-2">
-                                  <ColorDot color={typeSettings.color} />
-                                  {colorLabel(typeSettings.color)}
-                                </span>
-                              </SelectValue>
+                            <SelectTrigger id="training-max-run">
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
-                                {ACTIVITY_COLOR_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    <ColorDot color={option.value} />
-                                    {option.label}
+                                {SESSION_COUNTS.map((count) => (
+                                  <SelectItem key={count} value={String(count)}>
+                                    {count} {count === 1 ? "run" : "runs"}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
                             </SelectContent>
                           </Select>
                         </Field>
-                        <FieldSet className="gap-2 ps-8">
-                          <FieldLegend variant="label">Collectors</FieldLegend>
-                          <FieldGroup className="flex-row flex-wrap gap-4">
-                            <Field orientation="horizontal">
-                              <Switch
-                                id={heartId}
-                                checked={typeSettings.heartRate !== false}
-                                onCheckedChange={(heartRate) =>
-                                  setSportTypes((current) => ({
-                                    ...current,
-                                    [sportType]: { ...typeSettings, heartRate },
-                                  }))
-                                }
-                              />
-                              <FieldLabel htmlFor={heartId} className="font-normal">
-                                {heartRateCollectorLabel(sportType)}
+                        <Field>
+                          <FieldLabel htmlFor="training-max-ride">Max rides</FieldLabel>
+                          <Select
+                            value={String(draft.maxRideSessions)}
+                            onValueChange={(next) => {
+                              if (next == null) return;
+                              setDraft((current) => ({
+                                ...current,
+                                maxRideSessions: Number(next),
+                              }));
+                            }}
+                          >
+                            <SelectTrigger id="training-max-ride">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                {SESSION_COUNTS.map((count) => (
+                                  <SelectItem key={count} value={String(count)}>
+                                    {count} {count === 1 ? "ride" : "rides"}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                      </div>
+                      <Field>
+                        <FieldLabel htmlFor="training-double-days">
+                          Days with two sessions
+                        </FieldLabel>
+                        <Select
+                          value={String(draft.maxDoubleDays)}
+                          onValueChange={(next) => {
+                            if (next == null) return;
+                            setDraft((current) => ({
+                              ...current,
+                              maxDoubleDays: Number(next),
+                            }));
+                          }}
+                        >
+                          <SelectTrigger id="training-double-days">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {DOUBLE_DAY_COUNTS.map((count) => (
+                                <SelectItem key={count} value={String(count)}>
+                                  {count === 0 ? "None" : count === 1 ? "1 day" : `${count} days`}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <FieldDescription>
+                          How many days you are OK stacking a ride and a run. The bucket does not
+                          assign those days — you pick when to double up.
+                        </FieldDescription>
+                      </Field>
+                    </FieldSet>
+                    <FieldSet>
+                      <FieldLegend>Weekly hours</FieldLegend>
+                      <FieldDescription>
+                        Your last 3 months average{" "}
+                        {avgHours > 0.2 ? formatHours(avgHours) : "is still thin"}. Choose whether
+                        to cut back, keep that volume, or add hours.
+                      </FieldDescription>
+                      <RadioGroup
+                        value={draft.hoursIntent}
+                        onValueChange={(next) => {
+                          if (!next) return;
+                          const intent = next as HoursIntent;
+                          setDraft((current) => ({
+                            ...current,
+                            hoursIntent: intent,
+                            targetWeeklyHours: suggestedTargetHours(avgHours, intent),
+                          }));
+                        }}
+                      >
+                        {HOURS_INTENTS.map((intent) => {
+                          const id = `training-hours-${intent.id}`;
+                          return (
+                            <Field key={intent.id} orientation="horizontal">
+                              <RadioGroupItem value={intent.id} id={id} />
+                              <FieldLabel htmlFor={id} className="font-normal">
+                                {intent.label}
                               </FieldLabel>
                             </Field>
-                            {offersPower ? (
-                              <Field orientation="horizontal">
+                          );
+                        })}
+                      </RadioGroup>
+                      <Field data-invalid={!consistency.ok}>
+                        <FieldLabel htmlFor="training-hours-slider">
+                          Target {formatHours(draft.targetWeeklyHours)} a week
+                        </FieldLabel>
+                        <Slider
+                          id="training-hours-slider"
+                          min={0.5}
+                          max={hoursMax}
+                          step={0.5}
+                          value={[draft.targetWeeklyHours]}
+                          onValueChange={(next) => {
+                            const value = Array.isArray(next) ? next[0] : next;
+                            if (typeof value !== "number") return;
+                            setDraft((current) => ({ ...current, targetWeeklyHours: value }));
+                          }}
+                        />
+                        {!consistency.ok && consistency.message ? (
+                          <FieldError>{consistency.message}</FieldError>
+                        ) : (
+                          <FieldDescription>
+                            Kept in range with {draft.maxRunSessions + draft.maxRideSessions} run
+                            and ride sessions.
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    </FieldSet>
+                    <FieldSet>
+                      <FieldLegend>Suggested sessions</FieldLegend>
+                      <FieldDescription>
+                        Hours of training keeps the weekly bucket as easy aerobic volume. Intervals
+                        and zones add threshold, VO2, and tempo when form allows — watts if that
+                        sport has a power meter, heart rate if it has a belt or watch, otherwise
+                        RPE.
+                      </FieldDescription>
+                      <RadioGroup
+                        value={draft.workoutStyle}
+                        onValueChange={(next) => {
+                          if (!next) return;
+                          setDraft((current) => ({
+                            ...current,
+                            workoutStyle: next as WorkoutStyle,
+                          }));
+                        }}
+                        className="gap-2"
+                      >
+                        {WORKOUT_STYLES.map((style) => {
+                          const id = `training-style-${style.id}`;
+                          return (
+                            <FieldLabel key={style.id} htmlFor={id} className="w-full">
+                              <Field
+                                orientation="horizontal"
+                                className="items-start rounded-lg border p-3"
+                              >
+                                <RadioGroupItem value={style.id} id={id} />
+                                <FieldContent>
+                                  <FieldTitle>{style.label}</FieldTitle>
+                                  <FieldDescription>{style.hint}</FieldDescription>
+                                </FieldContent>
+                              </Field>
+                            </FieldLabel>
+                          );
+                        })}
+                      </RadioGroup>
+                      {draft.workoutStyle === "structured" ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="self-start"
+                          onClick={() => setSection("sports")}
+                        >
+                          Set collectors per sport
+                        </Button>
+                      ) : null}
+                    </FieldSet>
+                    <FieldSet>
+                      <FieldLegend>Preferred rest day</FieldLegend>
+                      <FieldDescription>
+                        A reminder in the weekly bucket. Workouts are not pinned to other days, so
+                        you can still train here if that is when you have time.
+                      </FieldDescription>
+                      <ToggleGroup
+                        size="sm"
+                        variant="outline"
+                        spacing={0}
+                        value={[String(draft.preferredRestWeekday)]}
+                        onValueChange={(next) => {
+                          const value = next[0];
+                          if (value == null) return;
+                          setDraft((current) => ({
+                            ...current,
+                            preferredRestWeekday: Number(value),
+                          }));
+                        }}
+                        className="flex-wrap"
+                      >
+                        {WEEKDAYS.map((day) => (
+                          <ToggleGroupItem key={day.id} value={String(day.id)}>
+                            {day.label.slice(0, 3)}
+                          </ToggleGroupItem>
+                        ))}
+                      </ToggleGroup>
+                    </FieldSet>
+                    <FieldSeparator />
+                    <FieldSet>
+                      <FieldLegend>Field tests</FieldLegend>
+                      <FieldDescription>
+                        Published field tests for FTP, VO2max, and lactate-threshold HR. They live
+                        on Tests, not in the weekly bucket. Turn off any you do not want suggested.
+                      </FieldDescription>
+                      <Field orientation="horizontal">
+                        <Switch
+                          id="training-ftp-test"
+                          checked={draft.suggestFtpTest}
+                          onCheckedChange={(checked) =>
+                            setDraft((current) => ({ ...current, suggestFtpTest: checked }))
+                          }
+                        />
+                        <FieldContent>
+                          <FieldLabel htmlFor="training-ftp-test" className="font-normal">
+                            FTP 20-min
+                          </FieldLabel>
+                          <FieldDescription>
+                            Allen & Coggan. About 1h 15. FTP = 95% of 20-min power.
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
+                      <Field orientation="horizontal">
+                        <Switch
+                          id="training-beep-test"
+                          checked={draft.suggestBeepTest}
+                          onCheckedChange={(checked) =>
+                            setDraft((current) => ({ ...current, suggestBeepTest: checked }))
+                          }
+                        />
+                        <FieldContent>
+                          <FieldLabel htmlFor="training-beep-test" className="font-normal">
+                            Beep test
+                          </FieldLabel>
+                          <FieldDescription>
+                            Léger 20 m shuttle. Stage speed estimates VO2max; peak HR is run max HR.
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
+                      <Field orientation="horizontal">
+                        <Switch
+                          id="training-run-lthr"
+                          checked={draft.suggestRunLthrTest}
+                          onCheckedChange={(checked) =>
+                            setDraft((current) => ({ ...current, suggestRunLthrTest: checked }))
+                          }
+                        />
+                        <FieldContent>
+                          <FieldLabel htmlFor="training-run-lthr" className="font-normal">
+                            Run LTHR
+                          </FieldLabel>
+                          <FieldDescription>
+                            Friel 30-min solo time trial. Last 20 min average HR is run threshold.
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
+                    </FieldSet>
+                  </FieldGroup>
+                ) : sortedSports.length === 0 ? (
+                  <Empty className="min-h-48 border">
+                    <EmptyHeader>
+                      <EmptyTitle>No activity types yet</EmptyTitle>
+                      <EmptyDescription>
+                        Sync from Strava to choose which sports appear in the calendar, map, and
+                        heart rate.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                ) : (
+                  <FieldGroup className="gap-3">
+                    {shareableGroups.length ? (
+                      <>
+                        <FieldSet>
+                          <FieldLegend>Shared data</FieldLegend>
+                          <FieldDescription>
+                            When on, types in the group share one max heart rate and zone set — a
+                            peak on a gravel ride also sets indoor and road ride zones.
+                          </FieldDescription>
+                          {shareableGroups.map((group) => {
+                            const inputId = `app-group-${group.id}`;
+                            return (
+                              <Field key={group.id} orientation="horizontal">
                                 <Switch
-                                  id={powerId}
-                                  checked={typeSettings.power === true}
-                                  onCheckedChange={(power) =>
-                                    setSportTypes((current) => ({
+                                  id={inputId}
+                                  checked={sportGroupShares[group.id]}
+                                  onCheckedChange={(shared) =>
+                                    setSportGroupShares((current) => ({
                                       ...current,
-                                      [sportType]: { ...typeSettings, power },
+                                      [group.id]: shared,
                                     }))
                                   }
                                 />
-                                <FieldLabel htmlFor={powerId} className="font-normal">
-                                  Power meter
+                                <FieldContent>
+                                  <FieldLabel htmlFor={inputId} className="font-normal">
+                                    {group.label}
+                                  </FieldLabel>
+                                  <FieldDescription>
+                                    {group.members.map(formatSportType).join(", ")}
+                                  </FieldDescription>
+                                </FieldContent>
+                              </Field>
+                            );
+                          })}
+                        </FieldSet>
+                        <FieldSeparator />
+                      </>
+                    ) : null}
+                    <FieldDescription>
+                      These types and colors apply to the calendar, map, heart rate, and other
+                      views. Mark the hardware you actually use — Ride with an HR belt and
+                      power-meter pedals, gravel with a belt only, running with an HR watch — so
+                      structured sessions can prescribe watts, heart rate, or RPE.
+                    </FieldDescription>
+                    {sortedSports.map((sportType) => {
+                      const typeSettings = sportTypes[sportType];
+                      const inputId = `app-type-${sportType}`;
+                      const heartId = `${inputId}-hr`;
+                      const powerId = `${inputId}-power`;
+                      const offersPower = sportOffersPower(sportType);
+                      return (
+                        <FieldGroup key={sportType} className="rounded-lg border p-3">
+                          <Field orientation="horizontal">
+                            <Switch
+                              id={inputId}
+                              checked={typeSettings.visible}
+                              onCheckedChange={(visible) =>
+                                setSportTypes((current) => ({
+                                  ...current,
+                                  [sportType]: { ...typeSettings, visible },
+                                }))
+                              }
+                            />
+                            <FieldLabel htmlFor={inputId} className="min-w-0 flex-1 font-normal">
+                              {formatSportType(sportType)}
+                            </FieldLabel>
+                            <Select
+                              value={typeSettings.color}
+                              onValueChange={(next) => {
+                                if (next == null) return;
+                                setSportTypes((current) => ({
+                                  ...current,
+                                  [sportType]: { ...typeSettings, color: String(next) },
+                                }));
+                              }}
+                            >
+                              <SelectTrigger
+                                id={`${inputId}-color`}
+                                size="sm"
+                                className="w-28"
+                                aria-label={`${formatSportType(sportType)} color`}
+                              >
+                                <SelectValue>
+                                  <span className="flex items-center gap-2">
+                                    <ColorDot color={typeSettings.color} />
+                                    {colorLabel(typeSettings.color)}
+                                  </span>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  {ACTIVITY_COLOR_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      <ColorDot color={option.value} />
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                          </Field>
+                          <FieldSet className="gap-2 ps-8">
+                            <FieldLegend variant="label">Collectors</FieldLegend>
+                            <FieldGroup className="flex-row flex-wrap gap-4">
+                              <Field orientation="horizontal">
+                                <Switch
+                                  id={heartId}
+                                  checked={typeSettings.heartRate !== false}
+                                  onCheckedChange={(heartRate) =>
+                                    setSportTypes((current) => ({
+                                      ...current,
+                                      [sportType]: { ...typeSettings, heartRate },
+                                    }))
+                                  }
+                                />
+                                <FieldLabel htmlFor={heartId} className="font-normal">
+                                  {heartRateCollectorLabel(sportType)}
                                 </FieldLabel>
                               </Field>
-                            ) : null}
-                          </FieldGroup>
-                        </FieldSet>
-                      </FieldGroup>
-                    );
-                  })}
-                </FieldGroup>
-              )}
-            </div>
-          </ScrollArea>
+                              {offersPower ? (
+                                <Field orientation="horizontal">
+                                  <Switch
+                                    id={powerId}
+                                    checked={typeSettings.power === true}
+                                    onCheckedChange={(power) =>
+                                      setSportTypes((current) => ({
+                                        ...current,
+                                        [sportType]: { ...typeSettings, power },
+                                      }))
+                                    }
+                                  />
+                                  <FieldLabel htmlFor={powerId} className="font-normal">
+                                    Power meter
+                                  </FieldLabel>
+                                </Field>
+                              ) : null}
+                            </FieldGroup>
+                          </FieldSet>
+                        </FieldGroup>
+                      );
+                    })}
+                  </FieldGroup>
+                )}
+              </div>
+            </ScrollArea>
           </div>
         </div>
         <DialogFooter className="border-t px-4 py-3">

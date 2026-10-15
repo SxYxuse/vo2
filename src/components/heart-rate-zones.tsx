@@ -3,10 +3,7 @@
 import { useMemo, useState } from "react";
 import { InfoIcon } from "lucide-react";
 
-import {
-  formatSportType,
-  type CalendarSettings,
-} from "#/services/calendar-settings.types.ts";
+import { formatSportType, type CalendarSettings } from "#/services/calendar-settings.types.ts";
 import {
   ALL_SPORTS,
   HR_ZONES,
@@ -61,7 +58,12 @@ function Kpi({
           <Tooltip>
             <TooltipTrigger
               render={
-                <Button type="button" variant="ghost" size="icon-xs" aria-label={`About ${label}`} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`About ${label}`}
+                />
               }
             >
               <InfoIcon />
@@ -111,7 +113,9 @@ export function HeartRateZones({
     [data.sports, sportTypes],
   );
   const overall = useMemo(() => overallFromSports(sports), [sports]);
-  const selectedType = sports.some((sport) => sport.sportType === sportType) ? sportType : ALL_SPORTS;
+  const selectedType = sports.some((sport) => sport.sportType === sportType)
+    ? sportType
+    : ALL_SPORTS;
   const selected =
     selectedType === ALL_SPORTS
       ? overall
@@ -129,7 +133,8 @@ export function HeartRateZones({
         <EmptyHeader>
           <EmptyTitle>No heart-rate data yet</EmptyTitle>
           <EmptyDescription>
-            Sync activities with a chest strap or optical HR so we can estimate zones and time in zone.
+            Sync activities with a chest strap or optical HR so we can estimate zones and time in
+            zone.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -169,8 +174,7 @@ export function HeartRateZones({
               aria-hidden
               className="size-2 rounded-full"
               style={{
-                backgroundColor:
-                  sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
+                backgroundColor: sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
               }}
             />
             {sportLabel(sport)}
@@ -214,7 +218,12 @@ export function HeartRateZones({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button type="button" variant="ghost" size="icon-xs" aria-label="About estimated zones" />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="About estimated zones"
+                  />
                 }
               >
                 <InfoIcon />
@@ -266,9 +275,7 @@ export function HeartRateZones({
                       <span className="font-medium">
                         {zone.def.label} · {zone.def.name}
                       </span>
-                      <Badge variant="outline">
-                        {formatZoneBpm(zone, zone.id === "z5")}
-                      </Badge>
+                      <Badge variant="outline">{formatZoneBpm(zone, zone.id === "z5")}</Badge>
                       <Tooltip>
                         <TooltipTrigger
                           render={

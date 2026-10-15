@@ -8,13 +8,21 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const config = defineConfig({
-  fmt: {},
+  fmt: {
+    ignorePatterns: [
+      "drizzle/meta/**",
+      "src/integrations/strava/strava.types.ts",
+      "src/integrations/strava/openapi.json",
+      "src/routeTree.gen.ts",
+    ],
+  },
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },
     ignorePatterns: [
       "src/components/reui/**",
+      "src/components/ui/chart.tsx",
       "src/components/ui/map.tsx",
       "src/integrations/strava/strava.types.ts",
       "src/integrations/strava/openapi.json",

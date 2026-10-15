@@ -118,16 +118,14 @@ export async function loadAssessmentsImpl(): Promise<AssessmentsData> {
     };
   }
 
-  const plan = await getTrainingPlanForUser(session.user.id);
-  const [profile] = await db
-    .select({ birthDate: athleteMetrics.birthDate })
-    .from(athleteMetrics)
-    .where(eq(athleteMetrics.userId, session.user.id))
-    .limit(1);
-  const age = ageFromBirthDate(profile?.birthDate ?? null);
-  const timeZone = plan?.timeZone ?? "UTC";
   const since = new Date(Date.now() - ASSESSMENT_LOOKBACK_DAYS * 86_400_000);
-  const [loadsRows, recentCompleted, history] = await Promise.all([
+  const [plan, profileRows, loadsRows, recentCompleted, history] = await Promise.all([
+    getTrainingPlanForUser(session.user.id),
+    db
+      .select({ birthDate: athleteMetrics.birthDate })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, session.user.id))
+      .limit(1),
     db
       .select({
         startDate: activities.startDate,
@@ -149,13 +147,19 @@ export async function loadAssessmentsImpl(): Promise<AssessmentsData> {
       ),
     loadHistory(session.user.id),
   ]);
+  const [profile] = profileRows;
+  const age = ageFromBirthDate(profile?.birthDate ?? null);
+  const timeZone = plan?.timeZone ?? "UTC";
   const loads = loadsRows.map((row) =>
-    toFitnessLoad(row.startDate, row.trainingLoad ?? 0, row.loadSource ?? "duration", row.movingTime),
+    toFitnessLoad(
+      row.startDate,
+      row.trainingLoad ?? 0,
+      row.loadSource ?? "duration",
+      row.movingTime,
+    ),
   );
   const pmc = latestPmc(loads, timeZone);
-  const recentIds = recentCompleted
-    .map((row) => row.assessmentId)
-    .filter(isAssessmentId);
+  const recentIds = recentCompleted.map((row) => row.assessmentId).filter(isAssessmentId);
   const tests = assessmentStatuses({ plan, tsb: pmc.tsb, recentIds, age, history });
   await ensureOpenSuggestions(
     session.user.id,
@@ -221,13 +225,18 @@ async function scoreActivity(
   });
 }
 
-async function applyAthleteMetrics(userId: string, assessmentId: AssessmentId, result: AssessmentResult) {
+async function applyAthleteMetrics(
+  userId: string,
+  assessmentId: AssessmentId,
+  result: AssessmentResult,
+) {
   const [current] = await db
     .select({ ftp: athleteMetrics.ftp, lthr: athleteMetrics.lthr })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
-  const ftp = assessmentId === "ftp-20" ? (result.ftpWatts ?? current?.ftp ?? null) : (current?.ftp ?? null);
+  const ftp =
+    assessmentId === "ftp-20" ? (result.ftpWatts ?? current?.ftp ?? null) : (current?.ftp ?? null);
   const lthr =
     assessmentId === "ftp-20"
       ? (result.cyclingLthr ?? current?.lthr ?? null)
@@ -286,7 +295,8 @@ export async function flagActivityTestImpl(input: {
   const age = ageFromBirthDate(profile?.birthDate ?? null);
   const result = await scoreActivity(input.activityId, input.assessmentId, input.lastStage, age);
   const now = new Date();
-  const catalogTitle = allowed.find((test) => test.id === input.assessmentId)?.title ?? input.assessmentId;
+  const catalogTitle =
+    allowed.find((test) => test.id === input.assessmentId)?.title ?? input.assessmentId;
 
   const [open] = await db
     .select({ id: fieldTests.id })

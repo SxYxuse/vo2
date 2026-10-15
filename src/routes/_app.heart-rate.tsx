@@ -5,16 +5,18 @@ import { HeartPulseIcon } from "lucide-react";
 
 import { HeartRateZones } from "#/components/heart-rate-zones.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { heartRateQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { heartRateQueryOptions } from "#/lib/queries.ts";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/heart-rate")({
-  loader: ({ context }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(heartRateQueryOptions),
-      context.queryClient.ensureQueryData(homeQueryOptions),
-    ]),
+  loader: ({ context }) => context.queryClient.ensureQueryData(heartRateQueryOptions),
   pendingMs: 200,
   pendingComponent: HeartRatePending,
   errorComponent: HeartRateError,
@@ -23,7 +25,6 @@ export const Route = createFileRoute("/_app/heart-rate")({
 
 function HeartRatePage() {
   const { data } = useSuspenseQuery(heartRateQueryOptions);
-  const { data: home } = useSuspenseQuery(homeQueryOptions);
 
   return (
     <>
@@ -37,7 +38,7 @@ function HeartRatePage() {
         </p>
       </div>
       {data.signedIn ? (
-        <HeartRateZones data={data} sportTypes={home.settings.sportTypes} />
+        <HeartRateZones data={data} sportTypes={data.sportTypes} />
       ) : (
         <>
           <Empty className="min-h-64 border">

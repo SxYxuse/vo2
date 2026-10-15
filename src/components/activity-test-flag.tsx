@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FlaskConicalIcon } from "lucide-react";
 
-import { assessmentsQueryOptions, activityDetailQueryOptions, heartRateQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import {
+  activityDetailQueryOptions,
+  assessmentsQueryOptions,
+  fitnessQueryOptions,
+  heartRateQueryOptions,
+  homeQueryOptions,
+} from "#/lib/queries.ts";
 import {
   flagActivityTest,
   formatAssessmentResult,
@@ -13,12 +19,7 @@ import {
 } from "#/services/assessments.ts";
 import type { ActivityDetail } from "#/services/activity-detail.ts";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -43,7 +44,9 @@ export function ActivityTestFlag({ detail }: { detail: ActivityDetail }) {
   );
 
   useEffect(() => {
-    setStage(detail.fieldTest?.result.lastStage != null ? String(detail.fieldTest.result.lastStage) : "");
+    setStage(
+      detail.fieldTest?.result.lastStage != null ? String(detail.fieldTest.result.lastStage) : "",
+    );
   }, [detail.fieldTest]);
 
   const flag = useMutation({
@@ -52,9 +55,12 @@ export function ActivityTestFlag({ detail }: { detail: ActivityDetail }) {
       queryClient.setQueryData(activityDetailQueryOptions(detail.id).queryKey, (current) =>
         current ? { ...current, fieldTest: saved } : current,
       );
-      void queryClient.invalidateQueries({ queryKey: activityDetailQueryOptions(detail.id).queryKey });
+      void queryClient.invalidateQueries({
+        queryKey: activityDetailQueryOptions(detail.id).queryKey,
+      });
       void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
+      void queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
     },
   });
@@ -84,7 +90,11 @@ export function ActivityTestFlag({ detail }: { detail: ActivityDetail }) {
           }}
         >
           <SelectTrigger id={`activity-test-${detail.id}`} className="w-full sm:w-64">
-            {flag.isPending ? <Spinner data-icon="inline-start" /> : <FlaskConicalIcon data-icon="inline-start" />}
+            {flag.isPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <FlaskConicalIcon data-icon="inline-start" />
+            )}
             <SelectValue>
               {selected ? options.find((test) => test.id === selected)?.title : "Not a test"}
             </SelectValue>
@@ -140,7 +150,9 @@ export function ActivityTestFlag({ detail }: { detail: ActivityDetail }) {
               Save stage
             </Button>
           </div>
-          <FieldDescription>Used to estimate VO2max. Peak HR still comes from the recording.</FieldDescription>
+          <FieldDescription>
+            Used to estimate VO2max. Peak HR still comes from the recording.
+          </FieldDescription>
         </Field>
       ) : null}
       {selected && detail.fieldTest ? (

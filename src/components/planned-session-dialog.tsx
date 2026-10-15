@@ -3,10 +3,7 @@
 import { format, parseISO } from "date-fns";
 import { BikeIcon, FootprintsIcon } from "lucide-react";
 
-import {
-  formatHours,
-  type PlannedSession,
-} from "#/services/training-plan.ts";
+import { formatHours, type PlannedSession } from "#/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +50,9 @@ export function PlannedSessionDialog({
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
         <DialogHeader className="border-b px-4 py-3 pe-12">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <DialogTitle className="min-w-0 truncate">{session?.title ?? "Suggested session"}</DialogTitle>
+            <DialogTitle className="min-w-0 truncate">
+              {session?.title ?? "Suggested session"}
+            </DialogTitle>
             <Badge variant={session ? statusVariant(session.status) : "outline"}>
               {session ? statusLabel(session.status) : "Suggested"}
             </Badge>
@@ -91,9 +90,7 @@ export function PlannedSessionDialog({
                   <CardTitle className="flex items-center gap-2 text-base">
                     <SportIcon
                       className={
-                        session.sportFamily === "cycling"
-                          ? "text-ds-blue-700"
-                          : "text-ds-amber-700"
+                        session.sportFamily === "cycling" ? "text-ds-blue-700" : "text-ds-amber-700"
                       }
                     />
                     {sportLabel(session.sportFamily)}
@@ -101,9 +98,7 @@ export function PlannedSessionDialog({
                 </CardHeader>
               </Card>
             </div>
-            {session.note ? (
-              <p className="text-muted-foreground text-sm">{session.note}</p>
-            ) : null}
+            {session.note ? <p className="text-muted-foreground text-sm">{session.note}</p> : null}
           </div>
         ) : null}
         <DialogFooter className="border-t px-4 py-3">

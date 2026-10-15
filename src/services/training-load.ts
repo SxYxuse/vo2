@@ -1,5 +1,6 @@
 import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay, subMonths, subYears } from "date-fns";
+import { createServerFn } from "@tanstack/react-start";
 
 const CTL_DAYS = 42;
 const ATL_DAYS = 7;
@@ -214,7 +215,9 @@ export function slicePmc(points: PmcPoint[], period: FitnessPeriod, timeZone: st
   if (!points.length || period === "all") return points;
   const end = zonedDayStart(new Date(), timeZone);
   const start =
-    period === "1y" ? subYears(end, 1) : subMonths(end, period === "1m" ? 1 : period === "3m" ? 3 : 6);
+    period === "1y"
+      ? subYears(end, 1)
+      : subMonths(end, period === "1m" ? 1 : period === "3m" ? 3 : 6);
   const startMs = start.getTime();
   return points.filter((point) => point.t >= startMs);
 }
@@ -246,3 +249,15 @@ export function formLabel(tsb: number) {
 export function roundLoad(value: number) {
   return Math.round(value * 10) / 10;
 }
+
+export type FitnessPageData = {
+  signedIn: boolean;
+  fitnessLoads: FitnessLoad[];
+};
+
+export const loadFitnessData = createServerFn({ method: "GET" }).handler(
+  async (): Promise<FitnessPageData> => {
+    const { loadFitnessDataImpl } = await import("./training-load.server.ts");
+    return loadFitnessDataImpl();
+  },
+);

@@ -1,16 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import {
-  appSettingsSaveSchema,
-  type ProfileSettings,
-} from "./app-settings.types.ts";
+import { appSettingsSaveSchema, type ProfileSettings } from "./app-settings.types.ts";
 import type { CalendarSettings } from "./calendar-settings.types.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";
 
-export type {
-  AppSettingsSave,
-  ProfileSettings,
-} from "./app-settings.types.ts";
+export type { AppSettingsSave, ProfileSettings } from "./app-settings.types.ts";
 export {
   DEFAULT_PROFILE_SETTINGS,
   ageFromBirthDate,

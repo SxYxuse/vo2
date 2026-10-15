@@ -55,7 +55,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ActivityAnalysisCard = lazy(() =>
-  import("#/components/activity-analysis.tsx").then((mod) => ({ default: mod.ActivityAnalysisCard })),
+  import("#/components/activity-analysis.tsx").then((mod) => ({
+    default: mod.ActivityAnalysisCard,
+  })),
 );
 
 const SERIES_META: Record<
@@ -95,7 +97,10 @@ const SERIES_META: Record<
 };
 
 const CHART_CONFIG = Object.fromEntries(
-  STREAM_SERIES.map((key) => [key, { label: SERIES_META[key].label, color: SERIES_META[key].color }]),
+  STREAM_SERIES.map((key) => [
+    key,
+    { label: SERIES_META[key].label, color: SERIES_META[key].color },
+  ]),
 ) satisfies ChartConfig;
 
 type ChartLayout = "combined" | "separate";
@@ -139,15 +144,7 @@ type ActivityDetailDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-function KpiCard({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
+function KpiCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <Card size="sm" className="gap-1 py-3">
       <CardHeader className="px-3">
@@ -203,10 +200,7 @@ function StreamTooltip(props: ComponentProps<typeof ChartTooltipContent>) {
         return (
           <div className="flex w-full items-center justify-between gap-4">
             <span className="flex items-center gap-2">
-              <span
-                className="size-2.5 rounded-[2px]"
-                style={{ backgroundColor: meta.color }}
-              />
+              <span className="size-2.5 rounded-[2px]" style={{ backgroundColor: meta.color }} />
               <span className="text-muted-foreground">{meta.label}</span>
             </span>
             <span className="font-mono font-medium tabular-nums">
@@ -219,19 +213,14 @@ function StreamTooltip(props: ComponentProps<typeof ChartTooltipContent>) {
   );
 }
 
-function CombinedStreamChart({
-  series,
-  data,
-}: {
-  series: StreamSeriesKey[];
-  data: ChartRow[];
-}) {
+function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data: ChartRow[] }) {
   const normalized = series.length > 1;
   const chartData = useMemo(() => {
     if (!normalized) return data;
-    const ranges = Object.fromEntries(
-      series.map((key) => [key, seriesRange(data, key)]),
-    ) as Record<StreamSeriesKey, { min: number; max: number }>;
+    const ranges = Object.fromEntries(series.map((key) => [key, seriesRange(data, key)])) as Record<
+      StreamSeriesKey,
+      { min: number; max: number }
+    >;
 
     return data.map((point) => {
       const next: ChartRow = { ...point };
@@ -306,13 +295,7 @@ function CombinedStreamChart({
   );
 }
 
-function StreamAreaChart({
-  seriesKey,
-  data,
-}: {
-  seriesKey: StreamSeriesKey;
-  data: ChartRow[];
-}) {
+function StreamAreaChart({ seriesKey, data }: { seriesKey: StreamSeriesKey; data: ChartRow[] }) {
   const reactId = useId().replace(/:/g, "");
   const gradientId = `fill-${seriesKey}-${reactId}`;
   const meta = SERIES_META[seriesKey];
@@ -548,9 +531,7 @@ export function ActivityDetailDialog({
 
   return (
     <Dialog open={Boolean(activityId)} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="flex h-dvh max-h-dvh w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl"
-      >
+      <DialogContent className="flex h-dvh max-h-dvh w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl">
         <DialogHeader className="bg-background shrink-0 border-b px-4 py-3 pe-12 sm:px-6 sm:py-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <DialogTitle className="min-w-0 truncate text-base">{title}</DialogTitle>

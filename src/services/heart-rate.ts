@@ -1,12 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { formatSportType } from "./calendar-settings.types.ts";
-import {
-  SPORT_GROUPS,
-  sharesGroupData,
-  sportGroupFor,
-  type SportGroupId,
-} from "./sport-groups.ts";
+import { formatSportType, type CalendarSettings } from "./calendar-settings.types.ts";
+import { SPORT_GROUPS, sharesGroupData, sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 
 export const ALL_SPORTS = "all";
 export const BPM_MIN = 40;
@@ -162,6 +157,7 @@ export type HeartRateData = {
   signedIn: boolean;
   overall: HeartRateSport;
   sports: HeartRateSport[];
+  sportTypes: CalendarSettings["sportTypes"];
 };
 
 export type SportBucket = {
@@ -293,7 +289,11 @@ export function noteActivityPeak(
   if (!isPlausibleBpm(input.maxHeartrate)) return;
   const bpm = Math.round(input.maxHeartrate ?? 0);
   if (bpm < bucket.maxHeartrate) return;
-  if (bpm === bucket.maxHeartrate && bucket.peakActivityStart && input.start < bucket.peakActivityStart) {
+  if (
+    bpm === bucket.maxHeartrate &&
+    bucket.peakActivityStart &&
+    input.start < bucket.peakActivityStart
+  ) {
     return;
   }
   bucket.maxHeartrate = bpm;
@@ -365,7 +365,9 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
 }
 
 export function sortHeartRateSports(sports: HeartRateSport[]) {
-  return [...sports].sort((a, b) => formatSportType(a.sportType).localeCompare(formatSportType(b.sportType)));
+  return [...sports].sort((a, b) =>
+    formatSportType(a.sportType).localeCompare(formatSportType(b.sportType)),
+  );
 }
 
 export function mergeSportBuckets(buckets: SportBucket[], canonicalType: string): SportBucket {

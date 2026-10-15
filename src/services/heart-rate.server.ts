@@ -35,20 +35,23 @@ const EMPTY_OVERALL: HeartRateSport = {
 export async function loadHeartRateImpl(): Promise<HeartRateData> {
   const session = await getOptionalSession();
   if (!session) {
-    return { signedIn: false, overall: EMPTY_OVERALL, sports: [] };
+    return { signedIn: false, overall: EMPTY_OVERALL, sports: [], sportTypes: {} };
   }
 
-  const rows = await db
-    .select({
-      id: activities.id,
-      name: activities.name,
-      sportType: activities.sportType,
-      startDate: activities.startDate,
-      maxHeartrate: activities.maxHeartrate,
-      hasHeartrate: activities.hasHeartrate,
-    })
-    .from(activities)
-    .where(eq(activities.userId, session.user.id));
+  const [rows, storedSettings] = await Promise.all([
+    db
+      .select({
+        id: activities.id,
+        name: activities.name,
+        sportType: activities.sportType,
+        startDate: activities.startDate,
+        maxHeartrate: activities.maxHeartrate,
+        hasHeartrate: activities.hasHeartrate,
+      })
+      .from(activities)
+      .where(eq(activities.userId, session.user.id)),
+    getCalendarSettingsForUser(session.user.id),
+  ]);
 
   const bySport = new Map<string, ReturnType<typeof createSportBucket>>();
   const streamIds: string[] = [];
@@ -64,17 +67,24 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
   }
 
   const sportById = new Map(rows.map((row) => [row.id, row.sportType]));
+  const chunks: string[][] = [];
   for (let index = 0; index < streamIds.length; index += STREAM_BATCH) {
-    const chunk = streamIds.slice(index, index + STREAM_BATCH);
-    const streams = await db
-      .select({
-        activityId: activityStreams.activityId,
-        heartrate: activityStreams.heartrate,
-        time: activityStreams.time,
-      })
-      .from(activityStreams)
-      .where(inArray(activityStreams.activityId, chunk));
+    chunks.push(streamIds.slice(index, index + STREAM_BATCH));
+  }
+  const streamBatches = await Promise.all(
+    chunks.map((chunk) =>
+      db
+        .select({
+          activityId: activityStreams.activityId,
+          heartrate: activityStreams.heartrate,
+          time: activityStreams.time,
+        })
+        .from(activityStreams)
+        .where(inArray(activityStreams.activityId, chunk)),
+    ),
+  );
 
+  for (const streams of streamBatches) {
     for (const stream of streams) {
       const sportType = sportById.get(stream.activityId);
       if (!sportType) continue;
@@ -85,7 +95,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
   }
 
   const settings = mergeCalendarSettings(
-    await getCalendarSettingsForUser(session.user.id),
+    storedSettings,
     rows.map((row) => row.sportType),
   );
   const sports = collapseSportBuckets(
@@ -98,5 +108,6 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     signedIn: true,
     overall: overallFromSports(sports),
     sports,
+    sportTypes: settings.sportTypes,
   };
 }

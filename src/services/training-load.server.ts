@@ -2,10 +2,13 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, athleteMetrics } from "#/db/schema.ts";
+import { getOptionalSession } from "#/lib/session.server.ts";
 import {
   activityTrainingLoad,
   estimateFtp,
   estimateLthr,
+  toFitnessLoad,
+  type FitnessLoad,
   type LoadInputs,
   type LoadSource,
 } from "./training-load.ts";
@@ -42,13 +45,12 @@ async function loadActivityRows(userId: string): Promise<StoredLoadRow[]> {
   }));
 }
 
-async function writeLoads(
-  updates: { id: string; load: number; source: LoadSource }[],
-) {
+async function writeLoads(updates: { id: string; load: number; source: LoadSource }[]) {
   if (!updates.length) return;
   const values = sql.join(
     updates.map(
-      (update) => sql`(${update.id}::text, ${update.load}::double precision, ${update.source}::text)`,
+      (update) =>
+        sql`(${update.id}::text, ${update.load}::double precision, ${update.source}::text)`,
     ),
     sql`, `,
   );
@@ -84,6 +86,37 @@ async function refreshTrainingLoads(userId: string) {
 
 export async function refreshTrainingLoadsForUser(userId: string) {
   await refreshTrainingLoads(userId);
+}
+
+export async function loadFitnessDataImpl(): Promise<{
+  signedIn: boolean;
+  fitnessLoads: FitnessLoad[];
+}> {
+  const session = await getOptionalSession();
+  if (!session) return { signedIn: false, fitnessLoads: [] };
+
+  const rows = await db
+    .select({
+      startDate: activities.startDate,
+      movingTime: activities.movingTime,
+      trainingLoad: activities.trainingLoad,
+      loadSource: activities.loadSource,
+    })
+    .from(activities)
+    .where(eq(activities.userId, session.user.id))
+    .orderBy(activities.startDate);
+
+  return {
+    signedIn: true,
+    fitnessLoads: rows.map((row) =>
+      toFitnessLoad(
+        row.startDate,
+        row.trainingLoad ?? 0,
+        row.loadSource ?? "duration",
+        row.movingTime,
+      ),
+    ),
+  };
 }
 
 export async function refreshTrainingLoadsIfNeeded(userId: string) {

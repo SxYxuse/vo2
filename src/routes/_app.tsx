@@ -1,11 +1,11 @@
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 import { AppSidebar } from "#/components/app-sidebar.tsx";
-import { homeQueryOptions } from "#/lib/queries.ts";
+import { appShellQueryOptions } from "#/lib/queries.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(homeQueryOptions),
+  loader: ({ context }) => context.queryClient.ensureQueryData(appShellQueryOptions),
   component: AppLayout,
 });
 

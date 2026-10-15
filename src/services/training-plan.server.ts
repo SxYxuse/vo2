@@ -152,7 +152,12 @@ async function fitnessLoadsForUser(userId: string) {
     .from(activities)
     .where(eq(activities.userId, userId));
   return rows.map((row) =>
-    toFitnessLoad(row.startDate, row.trainingLoad ?? 0, row.loadSource ?? "duration", row.movingTime),
+    toFitnessLoad(
+      row.startDate,
+      row.trainingLoad ?? 0,
+      row.loadSource ?? "duration",
+      row.movingTime,
+    ),
   );
 }
 

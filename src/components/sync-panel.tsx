@@ -6,7 +6,13 @@ import { useRouter } from "@tanstack/react-router";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 
 import { authClient } from "#/lib/auth-client.ts";
-import { heartRateQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import {
+  activityMapQueryOptions,
+  appShellQueryOptions,
+  fitnessQueryOptions,
+  heartRateQueryOptions,
+  homeQueryOptions,
+} from "#/lib/queries.ts";
 import { syncStrava } from "#/services/strava-sync.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +43,11 @@ export function SyncPanel(props: SyncPanelProps) {
         setMessage(
           `Stored ${result.activitiesUpserted} activities, ${result.streamsFetched} streams this batch, ${result.streamsPending} streams left.`,
         );
+        await queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
         await queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
         await queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
+        await queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
+        await queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey });
         await router.invalidate();
         if (result.done) {
           setMessage("Strava sync is up to date.");

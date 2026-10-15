@@ -1,16 +1,26 @@
+import { lazy, Suspense } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrendingUpIcon } from "lucide-react";
 
-import { FitnessChart } from "#/components/fitness-chart.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { homeQueryOptions } from "#/lib/queries.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { fitnessQueryOptions } from "#/lib/queries.ts";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const FitnessChart = lazy(() =>
+  import("#/components/fitness-chart.tsx").then((mod) => ({ default: mod.FitnessChart })),
+);
+
 export const Route = createFileRoute("/_app/fitness")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(homeQueryOptions),
+  loader: ({ context }) => context.queryClient.ensureQueryData(fitnessQueryOptions),
   pendingMs: 200,
   pendingComponent: FitnessPending,
   errorComponent: FitnessError,
@@ -18,7 +28,7 @@ export const Route = createFileRoute("/_app/fitness")({
 });
 
 function FitnessPage() {
-  const { data } = useSuspenseQuery(homeQueryOptions);
+  const { data } = useSuspenseQuery(fitnessQueryOptions);
   const { signedIn, fitnessLoads } = data;
 
   return (
@@ -33,7 +43,9 @@ function FitnessPage() {
         </p>
       </div>
       {signedIn ? (
-        <FitnessChart loads={fitnessLoads} />
+        <Suspense fallback={<Skeleton className="h-80 w-full rounded-xl" />}>
+          <FitnessChart loads={fitnessLoads} />
+        </Suspense>
       ) : (
         <>
           <Empty className="min-h-64 border">

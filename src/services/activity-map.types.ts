@@ -14,6 +14,8 @@ export type ActivityMapTrack = {
 export type ActivityMapData = {
   signedIn: boolean;
   tracks: ActivityMapTrack[];
+  sportTypes: CalendarSettings["sportTypes"];
+  sportGroupShares: CalendarSettings["sportGroupShares"];
 };
 
 export type MapSportOption = {

@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import {
-  calendarSettingsSchema,
-  type CalendarSettings,
-} from "./calendar-settings.types.ts";
+import { calendarSettingsSchema, type CalendarSettings } from "./calendar-settings.types.ts";
 
 export type { CalendarSettings } from "./calendar-settings.types.ts";
 export {

@@ -86,7 +86,9 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
     [decoded, sportGroupShares, sportTypes],
   );
 
-  const selectedType = sports.some((sport) => sport.sportType === sportType) ? sportType : ALL_SPORTS;
+  const selectedType = sports.some((sport) => sport.sportType === sportType)
+    ? sportType
+    : ALL_SPORTS;
   const selectedMembers =
     selectedType === ALL_SPORTS
       ? null
@@ -182,8 +184,7 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
                 aria-hidden
                 className="size-2 rounded-full"
                 style={{
-                  backgroundColor:
-                    sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
+                  backgroundColor: sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
                 }}
               />
               {formatSportType(sport.sportType)}
@@ -205,11 +206,7 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
           <div className="h-[min(48rem,calc(100dvh-16rem))] w-full">
             {visibleTracks.length && viewport ? (
               <MapView center={viewport.center} zoom={viewport.zoom}>
-                <FitTracks
-                  bounds={viewport.bounds}
-                  center={viewport.center}
-                  zoom={viewport.zoom}
-                />
+                <FitTracks bounds={viewport.bounds} center={viewport.center} zoom={viewport.zoom} />
                 <MapGeoJSON
                   data={geojson}
                   fillPaint={false}

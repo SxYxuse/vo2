@@ -17,7 +17,8 @@ export const ASSESSMENT_SESSIONS = [
     minutes: 75,
     gear: "Indoor trainer with a power meter or smart trainer. A flat, traffic-free road works if you can hold even watts.",
     why: "Estimates functional threshold power (about 60-min maximal power) and cycling lactate-threshold heart rate from one field test.",
-    source: "Allen & Coggan, Training and Racing with a Power Meter. FTP = 95% of 20-min mean power.",
+    source:
+      "Allen & Coggan, Training and Racing with a Power Meter. FTP = 95% of 20-min mean power.",
     protocol: [
       "Do this fresh, alone, on a trainer if you can. Do not watch an old FTP target — hold the highest even power you can finish.",
       "Warm up 20 min easy. Then 3 × 1 min fast pedaling (≥100 rpm) with 1 min easy between. 5 min easy.",
@@ -42,7 +43,8 @@ export const ASSESSMENT_SESSIONS = [
     minutes: 20,
     gear: "A measured 20.0 m course on a non-slip surface and a Léger 20 m shuttle audio (1-min stages).",
     why: "Validated field estimate of running VO2max. Peak HR is a usable field max HR if you reach exhaustion.",
-    source: "Léger, Mercier & Gadoury, J Sports Sci 1988; Léger & Gadoury, Can J Sport Sci 1989 (adults).",
+    source:
+      "Léger, Mercier & Gadoury, J Sports Sci 1988; Léger & Gadoury, Can J Sport Sci 1989 (adults).",
     protocol: [
       "Mark two lines exactly 20 m apart. Jog 5 min easy, then two strides.",
       "Stage 1 starts at 8.5 km/h. Speed rises 0.5 km/h every 1 min. Reach the line on the beep; one foot on or behind the line. Pivot and go. Do not cut the distance.",
@@ -62,7 +64,8 @@ export const ASSESSMENT_SESSIONS = [
     minutes: 45,
     gear: "A flat, quiet loop or treadmill and a heart-rate strap. Solo — not a race or a group run.",
     why: "Field estimate of running lactate-threshold heart rate, the anchor for run zones. The beep test does not measure threshold.",
-    source: "Friel, The 30-minute test: LTHR ≈ mean HR of the last 20 min of a solo 30-min time trial.",
+    source:
+      "Friel, The 30-minute test: LTHR ≈ mean HR of the last 20 min of a solo 30-min time trial.",
     protocol: [
       "Warm up 10–15 min as you would before a race, including a few strides.",
       "Run 30 min all-out, alone. Treat it as a time trial the whole way — not 10 min easy then 20 min hard.",
@@ -83,12 +86,7 @@ export const ASSESSMENT_SESSIONS = [
 
 export type AssessmentId = (typeof ASSESSMENT_SESSIONS)[number]["id"];
 
-export type AssessmentStatus =
-  | "suggested"
-  | "fatigued"
-  | "recent"
-  | "disabled"
-  | "no-sport";
+export type AssessmentStatus = "suggested" | "fatigued" | "recent" | "disabled" | "no-sport";
 
 export type AssessmentHistoryRow = {
   id: string;
@@ -215,7 +213,11 @@ export function formatAssessmentResult(id: AssessmentId, result: AssessmentResul
   return parts.length ? parts.join(" · ") : "Flagged. Score this from streams or enter the stage.";
 }
 
-export function primaryMetric(id: AssessmentId): { label: string; unit: string; key: keyof AssessmentResult } {
+export function primaryMetric(id: AssessmentId): {
+  label: string;
+  unit: string;
+  key: keyof AssessmentResult;
+} {
   if (id === "ftp-20") return { label: "FTP", unit: "W", key: "ftpWatts" };
   if (id === "beep-test") return { label: "VO2max", unit: "ml/kg/min", key: "vo2max" };
   return { label: "LTHR", unit: "bpm", key: "runLthr" };
@@ -247,7 +249,8 @@ export function assessmentStatuses(input: {
     const recent = input.recentIds.includes(test.id);
     const metric = primaryMetric(test.id);
     let status: AssessmentStatus = "suggested";
-    let statusNote = "Form looks good. Do this on a fresh day, not stacked on a hard bucket session.";
+    let statusNote =
+      "Form looks good. Do this on a fresh day, not stacked on a hard bucket session.";
     if (!enabled) {
       status = "disabled";
       statusNote = "Turned off in Settings. Protocol stays here if you still want to run it.";
@@ -259,10 +262,12 @@ export function assessmentStatuses(input: {
           : "Add at least one run slot in Settings to make this useful.";
     } else if (recent) {
       status = "recent";
-      statusNote = "A flagged result is on file from the last 8 weeks. Repeat when that window lapses.";
+      statusNote =
+        "A flagged result is on file from the last 8 weeks. Repeat when that window lapses.";
     } else if (input.tsb < 0) {
       status = "fatigued";
-      statusNote = "Wait until form (TSB) is at or above 0. All-out tests while fatigued under-read.";
+      statusNote =
+        "Wait until form (TSB) is at or above 0. All-out tests while fatigued under-read.";
     }
     return {
       id: test.id,

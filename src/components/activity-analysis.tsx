@@ -23,7 +23,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -127,7 +133,8 @@ export function ActivityAnalysisCard({
     enabled: Boolean(activityId),
   });
   const connection = useMemo(
-    () => fetchServerSentEvents(`/api/activity-analysis?activityId=${encodeURIComponent(activityId)}`),
+    () =>
+      fetchServerSentEvents(`/api/activity-analysis?activityId=${encodeURIComponent(activityId)}`),
     [activityId],
   );
   const { messages, sendMessage, isLoading, error, stop } = useChat({

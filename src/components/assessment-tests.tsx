@@ -191,7 +191,9 @@ export function AssessmentTests({ tests }: { tests: AssessmentView[] }) {
                 <ol className="flex flex-col gap-2 text-sm">
                   {test.protocol.map((step, index) => (
                     <li key={step} className="flex gap-2">
-                      <span className="text-muted-foreground font-mono tabular-nums">{index + 1}.</span>
+                      <span className="text-muted-foreground font-mono tabular-nums">
+                        {index + 1}.
+                      </span>
                       <span>{step}</span>
                     </li>
                   ))}
