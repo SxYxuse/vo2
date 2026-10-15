@@ -1,11 +1,11 @@
-# vo
+# VO2
 
-vo is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and fills the rest of the week with planned sessions.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and fills the rest of the week with planned sessions.
 
 ## People
 
 **Athlete**:
-The person whose training vo tracks. One athlete is one Strava account.
+The person whose training VO2 tracks. One athlete is one Strava account.
 _Avoid_: User, account, client
 
 ## Completed work
