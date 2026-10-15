@@ -7,6 +7,9 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const config = defineConfig({
+  preview: {
+    allowedHosts: true,
+  },
   fmt: {},
   lint: {
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
