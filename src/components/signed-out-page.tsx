@@ -26,10 +26,12 @@ export function SignedOutPage() {
       <main className="flex flex-1 flex-col px-4 pt-16 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-24">
         <div className="mx-auto flex w-full max-w-md flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Sign in with Strava</h1>
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+              Sign in with Strava
+            </h1>
             <p className="text-muted-foreground text-sm">
-              vo imports your activities, then you can use the calendar, map, fitness, heart rate, and
-              tests.
+              vo imports your activities, then you can use the calendar, map, fitness, heart rate,
+              and tests.
             </p>
           </div>
           <SignInPanel description={false} />
@@ -49,7 +51,9 @@ function ThemeCycleButton() {
 
   const current = THEME_CYCLE.find((option) => option.value === theme) ?? THEME_CYCLE[2];
   const next =
-    THEME_CYCLE[(THEME_CYCLE.findIndex((option) => option.value === current.value) + 1) % THEME_CYCLE.length];
+    THEME_CYCLE[
+      (THEME_CYCLE.findIndex((option) => option.value === current.value) + 1) % THEME_CYCLE.length
+    ];
   const Icon = current.icon;
 
   return (
