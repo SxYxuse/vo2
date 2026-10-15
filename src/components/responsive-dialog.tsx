@@ -22,24 +22,31 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-const DESKTOP_MQ = "(min-width: 768px)";
+export const DESKTOP_MQ = "(min-width: 768px)";
+
+const useIsoLayoutEffect = typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
 export function readIsDesktop() {
   return typeof window !== "undefined" && window.matchMedia(DESKTOP_MQ).matches;
 }
 
-export function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = React.useState(readIsDesktop);
+/** `null` until the viewport is measured on the client, so SSR does not assume a layout. */
+export function useDesktopMedia() {
+  const [matches, setMatches] = React.useState<boolean | null>(null);
 
-  React.useEffect(() => {
+  useIsoLayoutEffect(() => {
     const mql = window.matchMedia(DESKTOP_MQ);
-    const onChange = () => setIsDesktop(mql.matches);
+    const onChange = () => setMatches(mql.matches);
     onChange();
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
 
-  return isDesktop;
+  return matches;
+}
+
+export function useIsDesktop() {
+  return useDesktopMedia() ?? false;
 }
 
 const DesktopContext = React.createContext(false);

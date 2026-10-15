@@ -132,6 +132,25 @@ export const flagActivityTestSchema = z.object({
   lastStage: z.number().min(1).max(21).nullable().optional(),
 });
 
+export const activityTestFlagFormSchema = z
+  .object({
+    assessmentId: z.enum(["none", ...ASSESSMENT_IDS]),
+    lastStage: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.assessmentId !== "beep-test") return;
+    const parsed = Number(data.lastStage);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 21) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["lastStage"],
+        message: "Enter a stage between 1 and 21.",
+      });
+    }
+  });
+
+export type ActivityTestFlagFormValues = z.infer<typeof activityTestFlagFormSchema>;
+
 export type AssessmentsData = {
   signedIn: boolean;
   tsb: number;

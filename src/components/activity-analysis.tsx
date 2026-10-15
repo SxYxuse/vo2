@@ -4,7 +4,17 @@ import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import { formatDistanceToNow } from "date-fns";
-import { SparklesIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  GaugeIcon,
+  HeartPulseIcon,
+  MountainIcon,
+  PenLineIcon,
+  SparklesIcon,
+  TriangleAlertIcon,
+  WavesIcon,
+  type LucideIcon,
+} from "lucide-react";
 
 import {
   parseCoachMarkdown,
@@ -30,16 +40,40 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@/components/ui/trace";
 
-const TOOL_LABELS: Record<string, string> = {
-  get_activity_overview: "Reading activity stats",
-  detect_elevation_segments: "Finding climbs and descents",
-  correlate_streams: "Correlating elevation, heart rate, and speed",
-  summarize_effort_phases: "Splitting effort by grade",
+const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
+  get_activity_overview: {
+    running: "Reading activity stats",
+    done: "Read activity stats",
+    icon: ActivityIcon,
+  },
+  detect_elevation_segments: {
+    running: "Finding climbs and descents",
+    done: "Found climbs and descents",
+    icon: MountainIcon,
+  },
+  correlate_streams: {
+    running: "Correlating elevation, heart rate, and speed",
+    done: "Correlated elevation, heart rate, and speed",
+    icon: HeartPulseIcon,
+  },
+  summarize_effort_phases: {
+    running: "Splitting effort by grade",
+    done: "Split effort by grade",
+    icon: GaugeIcon,
+  },
 };
 
 const ANALYZE_PROMPT =
@@ -119,6 +153,82 @@ function CoachWriteup({ markdown }: { markdown: string }) {
   );
 }
 
+type ToolCallPart = {
+  id?: string;
+  name?: string;
+  state?: string;
+};
+
+function toolStep(part: ToolCallPart) {
+  return (
+    TOOL_STEPS[part.name ?? ""] ?? {
+      running: part.name ?? "Running tool",
+      done: part.name ?? "Ran tool",
+      icon: SparklesIcon,
+    }
+  );
+}
+
+function AnalysisWorkTrace({
+  toolParts,
+  writing,
+}: {
+  toolParts: readonly ToolCallPart[];
+  writing: boolean;
+}) {
+  const toolsStarted = toolParts.length > 0;
+  return (
+    <Trace aria-live="polite">
+      <TraceCollapsible defaultOpen>
+        <TraceCollapsibleTrigger>
+          <TraceLine status="running">
+            <TraceIcon>
+              <SparklesIcon />
+            </TraceIcon>
+            <TraceTitle>Analyzing this activity</TraceTitle>
+          </TraceLine>
+        </TraceCollapsibleTrigger>
+        <TraceCollapsibleContent keepMounted>
+          <Trace>
+            {!toolsStarted ? (
+              <TraceLine status="running">
+                <TraceIcon>
+                  <WavesIcon />
+                </TraceIcon>
+                <TraceTitle>Reading streams</TraceTitle>
+              </TraceLine>
+            ) : null}
+            {toolParts.map((part, index) => {
+              const done = part.state === "complete";
+              const step = toolStep(part);
+              const Icon = step.icon;
+              return (
+                <TraceLine
+                  key={part.id ?? `${part.name}-${index}`}
+                  status={done ? undefined : "running"}
+                >
+                  <TraceIcon>
+                    <Icon />
+                  </TraceIcon>
+                  <TraceTitle>{done ? step.done : step.running}</TraceTitle>
+                </TraceLine>
+              );
+            })}
+            {writing ? (
+              <TraceLine status="running">
+                <TraceIcon>
+                  <PenLineIcon />
+                </TraceIcon>
+                <TraceTitle>Writing coach note</TraceTitle>
+              </TraceLine>
+            ) : null}
+          </Trace>
+        </TraceCollapsibleContent>
+      </TraceCollapsible>
+    </Trace>
+  );
+}
+
 export function ActivityAnalysisCard({
   activityId,
   hasStreams,
@@ -160,20 +270,27 @@ export function ActivityAnalysisCard({
   const saved = savedQuery.data;
   const body = isLoading ? liveBody : liveBody || saved?.body || "";
   const mocked = saved?.mocked ?? statusQuery.data?.mocked ?? false;
+  const toolsRunning = toolParts.some((part) => part.state !== "complete");
+  const writing = isLoading && (Boolean(liveBody) || (toolParts.length > 0 && !toolsRunning));
 
   return (
-    <Card>
+    <Card aria-busy={isLoading}>
       <CardHeader className="border-b">
-        <CardTitle>AI analysis</CardTitle>
+        <CardTitle className={isLoading ? "shimmer" : undefined}>
+          {isLoading ? "Analyzing" : "AI analysis"}
+        </CardTitle>
         <CardDescription>
-          {saved && !isLoading
-            ? `Saved ${formatDistanceToNow(new Date(saved.updatedAt), { addSuffix: true })}. Run again only if you want a fresh read.`
-            : "Coach note of intensity, pacing, and terrain. Runs only when you ask."}
+          {isLoading
+            ? "Working through stream tools, then writing the coach note."
+            : saved
+              ? `Saved ${formatDistanceToNow(new Date(saved.updatedAt), { addSuffix: true })}. Run again only if you want a fresh read.`
+              : "Coach note of intensity, pacing, and terrain. Runs only when you ask."}
         </CardDescription>
         <CardAction className="flex items-center gap-2">
           {mocked ? <Badge variant="warning">Mocked</Badge> : null}
           {isLoading ? (
             <Button variant="outline" onClick={() => stop()}>
+              <Spinner data-icon="inline-start" />
               Stop
             </Button>
           ) : (
@@ -223,34 +340,7 @@ export function ActivityAnalysisCard({
           </Empty>
         ) : (
           <div className="flex flex-col gap-3 py-1">
-            {isLoading ? (
-              <div className="flex flex-col gap-1.5">
-                {toolParts.length === 0 ? (
-                  <Marker>
-                    <MarkerIcon>
-                      <Spinner />
-                    </MarkerIcon>
-                    <MarkerContent>Reading streams…</MarkerContent>
-                  </Marker>
-                ) : null}
-                {toolParts.map((part, index) => {
-                  const done = part.state === "complete";
-                  return (
-                    <Marker key={`${part.id}-${index}`}>
-                      {done ? null : (
-                        <MarkerIcon>
-                          <Spinner />
-                        </MarkerIcon>
-                      )}
-                      <MarkerContent>
-                        {TOOL_LABELS[part.name] ?? part.name}
-                        {done ? " · done" : "…"}
-                      </MarkerContent>
-                    </Marker>
-                  );
-                })}
-              </div>
-            ) : null}
+            {isLoading ? <AnalysisWorkTrace toolParts={toolParts} writing={writing} /> : null}
             {body ? <CoachWriteup markdown={body} /> : null}
           </div>
         )}

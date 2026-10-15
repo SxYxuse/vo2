@@ -8,7 +8,7 @@ import { cn } from "cn";
 import { ClipboardListIcon, HeartOffIcon, Settings2Icon, TimerIcon } from "lucide-react";
 
 import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
-import { readIsDesktop, useIsDesktop } from "#/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
 import {
   DEFAULT_CALENDAR_SETTINGS,
   formatSportType,
@@ -61,6 +61,7 @@ import type {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -468,9 +469,11 @@ export function ActivityCalendar({
   const [settings, setSettings] = useState<CalendarSettings>(() =>
     mergeCalendarSettings(initialSettings, sportTypeNames),
   );
-  const isDesktop = useIsDesktop();
-  const [view, setView] = useState<CalendarView>(() => (readIsDesktop() ? "month" : "week"));
-  const viewTouched = useRef(false);
+  const isDesktopMedia = useDesktopMedia();
+  const layoutReady = isDesktopMedia !== null;
+  const isDesktop = isDesktopMedia === true;
+  const [view, setView] = useState<CalendarView | null>(null);
+  const activeView = view ?? (isDesktop ? "month" : "week");
   const [settingsTab, setSettingsTab] = useState("view");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -489,7 +492,8 @@ export function ActivityCalendar({
       setSaveError(caught instanceof Error ? caught.message : "Could not save settings");
     },
   });
-  const isTimeGridView = view === "day" || view === "days" || (view === "week" && isDesktop);
+  const isTimeGridView =
+    activeView === "day" || activeView === "days" || (activeView === "week" && isDesktop);
 
   useEffect(() => {
     setSettings((current) => {
@@ -504,11 +508,6 @@ export function ActivityCalendar({
       return JSON.stringify(current) === JSON.stringify(next) ? current : next;
     });
   }, [initialSettings.sportGroupShares, initialSettings.sportTypes, sportTypeNames]);
-
-  useEffect(() => {
-    if (viewTouched.current) return;
-    setView(isDesktop ? "month" : "week");
-  }, [isDesktop]);
 
   useEffect(() => {
     if (!isTimeGridView && settingsTab === "time") {
@@ -584,202 +583,163 @@ export function ActivityCalendar({
   return (
     <Card className="flex min-h-80 flex-1 flex-col py-0 md:h-[720px] md:flex-none">
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-        <EventCalendar
-          events={events}
-          view={view}
-          views={isDesktop ? DESKTOP_CALENDAR_VIEWS : MOBILE_CALENDAR_VIEWS}
-          onViewChange={(next) => {
-            viewTouched.current = true;
-            setView(next);
-          }}
-          locale={enUS}
-          timeZone={timeZone}
-          i18n={{
-            functions: {
-              formatEventAriaLabel: (title) => title,
-            },
-          }}
-          renderEvent={({ occurrence }) => {
-            const activity = occurrence.event.data as CalendarActivity | undefined;
-            return (
-              <span
-                className="contents"
-                onPointerEnter={() => {
-                  void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
-                }}
-              >
-                <span
-                  aria-hidden
-                  data-slot="event-calendar-event-dot"
-                  className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
-                />
-                <span className="hidden truncate font-medium sm:inline">
-                  {occurrence.event.title}
-                </span>
-                {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-              </span>
-            );
-          }}
-          renderEventTooltip={({ occurrence }) => {
-            const activity = occurrence.event.data as CalendarActivity | undefined;
-            if (!activity) return occurrence.event.title;
-            const when = formatActivityClockRange(activity.start, activity.end);
-            return (
-              <span className="flex flex-col gap-0.5">
-                <span className="flex items-center gap-1.5">
-                  <span className="font-medium">{activity.title}</span>
-                  {isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-                </span>
-                {when ? <span>{when}</span> : null}
-                {isMissingHeartrate(activity) ? <span>No heart rate</span> : null}
-              </span>
-            );
-          }}
-          renderAgendaEvent={({ occurrence }) => {
-            const activity = occurrence.event.data as CalendarActivity | undefined;
-            const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
-            const meta = activity
-              ? [
-                  when,
-                  formatDuration(activity.movingTime),
-                  activity.distance != null ? formatDistanceKm(activity.distance) : null,
-                  formatSportType(activity.sportType),
-                ].filter(Boolean)
-              : [];
-            return (
-              <>
-                <span
-                  aria-hidden
-                  data-slot="event-calendar-agenda-dot"
-                  className="size-2 shrink-0 rounded-full bg-(--ec-event-color)"
-                />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-1">
-                    <span className="truncate text-sm font-medium">{occurrence.event.title}</span>
-                    {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-                  </span>
-                  {meta.length ? (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {meta.join(" · ")}
-                    </span>
-                  ) : null}
-                </span>
-              </>
-            );
-          }}
-          viewSettings={settings.viewSettings}
-          onViewSettingsChange={(viewSettings) =>
-            patch({
-              viewSettings: {
-                weekends: viewSettings.weekends ?? true,
-                weekNumbers: viewSettings.weekNumbers ?? false,
-                nowIndicator: viewSettings.nowIndicator ?? true,
-                offDays: viewSettings.offDays ?? false,
+        {layoutReady ? (
+          <EventCalendar
+            events={events}
+            view={activeView}
+            views={isDesktop ? DESKTOP_CALENDAR_VIEWS : MOBILE_CALENDAR_VIEWS}
+            onViewChange={setView}
+            locale={enUS}
+            timeZone={timeZone}
+            i18n={{
+              functions: {
+                formatEventAriaLabel: (title) => title,
               },
-            })
-          }
-          interactions={DISABLED_INTERACTIONS}
-          onEventClick={(occurrence, event) => {
-            event.preventDefault();
-            void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
-            onSelectActivity(occurrence.event.id);
-          }}
-          weekStartsOn={settings.weekStartsOn}
-          dayStartHour={settings.dayStartHour}
-          dayEndHour={settings.dayEndHour}
-          interval={settings.interval}
-          snapDuration={settings.snapDuration}
-          eventTooltip
-          showDayAddButton={false}
-          offDays
-          className="h-full min-h-80 w-full min-w-0 flex-1"
-        >
-          <div className="flex flex-wrap items-center gap-2 px-1 sm:pe-2">
-            <EventCalendarNav className="min-w-0 flex-1" />
-            <div className="flex shrink-0 items-center gap-2">
-              {training ? (
-                <Sheet>
-                  <SheetTrigger
-                    render={<Button variant="outline" size="sm" aria-label="This week" />}
-                  >
-                    <ClipboardListIcon data-icon="inline-start" />
-                    <span className="hidden sm:inline">This week</span>
-                    {remainingCount ? <Badge variant="warning">{remainingCount}</Badge> : null}
-                  </SheetTrigger>
-                  <SheetContent
-                    side={isDesktop ? "right" : "bottom"}
-                    className={
-                      isDesktop
-                        ? "sm:max-w-md"
-                        : "flex max-h-[85dvh] flex-col overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))]"
-                    }
-                  >
-                    <WeekPlanBucket
-                      sessions={plannedSessions}
-                      weekStart={weekStart}
-                      today={today}
-                      plan={training}
-                      loggedMinutes={loggedMinutes}
-                      pending={planWeek.isPending}
-                      error={planError}
-                      onFillWeek={() => planWeek.mutate()}
-                      onSelectSession={setSelectedPlanId}
-                    />
-                  </SheetContent>
-                </Sheet>
-              ) : null}
-              <PeriodTrainingTotal activities={activities} sportTypes={settings.sportTypes} />
-              <EventCalendarToolbar>
-                {isDesktop ? (
-                  <Popover>
-                    <PopoverTrigger
-                      render={<Button variant="outline" size="sm" aria-label="Settings" />}
-                    >
-                      <Settings2Icon data-icon="inline-start" />
-                      <span className="hidden sm:inline">Settings</span>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="end"
-                      className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
-                    >
-                      <PopoverTitle>Calendar settings</PopoverTitle>
-                      <CalendarSettingsForm
-                        settings={settings}
-                        settingsTab={settingsTab}
-                        isTimeGridView={isTimeGridView}
-                        saveError={saveError}
-                        onSettingsTabChange={setSettingsTab}
-                        patch={patch}
-                        onReset={() =>
-                          setSettings(
-                            mergeCalendarSettings(
-                              {
-                                ...DEFAULT_CALENDAR_SETTINGS,
-                                sportTypes: settings.sportTypes,
-                                sportGroupShares: settings.sportGroupShares,
-                              },
-                              sportTypeNames,
-                            ),
-                          )
-                        }
-                      />
-                    </PopoverContent>
-                  </Popover>
-                ) : (
+            }}
+            renderEvent={({ occurrence }) => {
+              const activity = occurrence.event.data as CalendarActivity | undefined;
+              return (
+                <span
+                  className="contents"
+                  onPointerEnter={() => {
+                    void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    data-slot="event-calendar-event-dot"
+                    className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
+                  />
+                  <span className="hidden truncate font-medium sm:inline">
+                    {occurrence.event.title}
+                  </span>
+                  {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+                </span>
+              );
+            }}
+            renderEventTooltip={({ occurrence }) => {
+              const activity = occurrence.event.data as CalendarActivity | undefined;
+              if (!activity) return occurrence.event.title;
+              const when = formatActivityClockRange(activity.start, activity.end);
+              return (
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-medium">{activity.title}</span>
+                    {isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+                  </span>
+                  {when ? <span>{when}</span> : null}
+                  {isMissingHeartrate(activity) ? <span>No heart rate</span> : null}
+                </span>
+              );
+            }}
+            renderAgendaEvent={({ occurrence }) => {
+              const activity = occurrence.event.data as CalendarActivity | undefined;
+              const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
+              const meta = activity
+                ? [
+                    when,
+                    formatDuration(activity.movingTime),
+                    activity.distance != null ? formatDistanceKm(activity.distance) : null,
+                    formatSportType(activity.sportType),
+                  ].filter(Boolean)
+                : [];
+              return (
+                <>
+                  <span
+                    aria-hidden
+                    data-slot="event-calendar-agenda-dot"
+                    className="size-2 shrink-0 rounded-full bg-(--ec-event-color)"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span className="truncate text-sm font-medium">{occurrence.event.title}</span>
+                      {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+                    </span>
+                    {meta.length ? (
+                      <span className="text-muted-foreground truncate text-xs">
+                        {meta.join(" · ")}
+                      </span>
+                    ) : null}
+                  </span>
+                </>
+              );
+            }}
+            viewSettings={settings.viewSettings}
+            onViewSettingsChange={(viewSettings) =>
+              patch({
+                viewSettings: {
+                  weekends: viewSettings.weekends ?? true,
+                  weekNumbers: viewSettings.weekNumbers ?? false,
+                  nowIndicator: viewSettings.nowIndicator ?? true,
+                  offDays: viewSettings.offDays ?? false,
+                },
+              })
+            }
+            interactions={DISABLED_INTERACTIONS}
+            onEventClick={(occurrence, event) => {
+              event.preventDefault();
+              void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
+              onSelectActivity(occurrence.event.id);
+            }}
+            weekStartsOn={settings.weekStartsOn}
+            dayStartHour={settings.dayStartHour}
+            dayEndHour={settings.dayEndHour}
+            interval={settings.interval}
+            snapDuration={settings.snapDuration}
+            eventTooltip
+            showDayAddButton={false}
+            offDays
+            className="h-full min-h-80 w-full min-w-0 flex-1"
+          >
+            <div className="flex flex-wrap items-center gap-2 px-1 sm:pe-2">
+              <EventCalendarNav className="min-w-0 flex-1" />
+              <div className="flex shrink-0 items-center gap-2">
+                {training ? (
                   <Sheet>
                     <SheetTrigger
-                      render={<Button variant="outline" size="sm" aria-label="Settings" />}
+                      render={<Button variant="outline" size="sm" aria-label="This week" />}
                     >
-                      <Settings2Icon data-icon="inline-start" />
+                      <ClipboardListIcon data-icon="inline-start" />
+                      <span className="hidden sm:inline">This week</span>
+                      {remainingCount ? <Badge variant="warning">{remainingCount}</Badge> : null}
                     </SheetTrigger>
                     <SheetContent
-                      side="bottom"
-                      className="max-h-[85dvh] overflow-auto pb-[max(1rem,env(safe-area-inset-bottom))]"
+                      side={isDesktop ? "right" : "bottom"}
+                      className={
+                        isDesktop
+                          ? "sm:max-w-md"
+                          : "flex max-h-[85dvh] flex-col overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))]"
+                      }
                     >
-                      <SheetHeader>
-                        <SheetTitle>Calendar settings</SheetTitle>
-                      </SheetHeader>
-                      <div className="flex flex-col gap-3 px-6 pb-2">
+                      <WeekPlanBucket
+                        sessions={plannedSessions}
+                        weekStart={weekStart}
+                        today={today}
+                        plan={training}
+                        loggedMinutes={loggedMinutes}
+                        pending={planWeek.isPending}
+                        error={planError}
+                        onFillWeek={() => planWeek.mutate()}
+                        onSelectSession={setSelectedPlanId}
+                      />
+                    </SheetContent>
+                  </Sheet>
+                ) : null}
+                <PeriodTrainingTotal activities={activities} sportTypes={settings.sportTypes} />
+                <EventCalendarToolbar>
+                  {isDesktop ? (
+                    <Popover>
+                      <PopoverTrigger
+                        render={<Button variant="outline" size="sm" aria-label="Settings" />}
+                      >
+                        <Settings2Icon data-icon="inline-start" />
+                        <span className="hidden sm:inline">Settings</span>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="end"
+                        className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
+                      >
+                        <PopoverTitle>Calendar settings</PopoverTitle>
                         <CalendarSettingsForm
                           settings={settings}
                           settingsTab={settingsTab}
@@ -800,25 +760,65 @@ export function ActivityCalendar({
                             )
                           }
                         />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                )}
-              </EventCalendarToolbar>
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <Sheet>
+                      <SheetTrigger
+                        render={<Button variant="outline" size="sm" aria-label="Settings" />}
+                      >
+                        <Settings2Icon data-icon="inline-start" />
+                      </SheetTrigger>
+                      <SheetContent
+                        side="bottom"
+                        className="max-h-[85dvh] overflow-auto pb-[max(1rem,env(safe-area-inset-bottom))]"
+                      >
+                        <SheetHeader>
+                          <SheetTitle>Calendar settings</SheetTitle>
+                        </SheetHeader>
+                        <div className="flex flex-col gap-3 px-6 pb-2">
+                          <CalendarSettingsForm
+                            settings={settings}
+                            settingsTab={settingsTab}
+                            isTimeGridView={isTimeGridView}
+                            saveError={saveError}
+                            onSettingsTabChange={setSettingsTab}
+                            patch={patch}
+                            onReset={() =>
+                              setSettings(
+                                mergeCalendarSettings(
+                                  {
+                                    ...DEFAULT_CALENDAR_SETTINGS,
+                                    sportTypes: settings.sportTypes,
+                                    sportGroupShares: settings.sportGroupShares,
+                                  },
+                                  sportTypeNames,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                  )}
+                </EventCalendarToolbar>
+              </div>
             </div>
-          </div>
-          <div
-            className={cn(
-              "flex min-h-0 min-w-0 flex-1 flex-col",
-              isTimeGridView && "overflow-x-auto",
-            )}
-          >
-            <EventCalendarContent
-              className={cn(isTimeGridView && "min-w-[40rem]")}
-              components={!isDesktop ? { week: ActivityWeekListView } : undefined}
-            />
-          </div>
-        </EventCalendar>
+            <div
+              className={cn(
+                "flex min-h-0 min-w-0 flex-1 flex-col",
+                isTimeGridView && "overflow-x-auto",
+              )}
+            >
+              <EventCalendarContent
+                className={cn(isTimeGridView && "min-w-[40rem]")}
+                components={!isDesktop ? { week: ActivityWeekListView } : undefined}
+              />
+            </div>
+          </EventCalendar>
+        ) : (
+          <Skeleton className="min-h-80 flex-1 rounded-none md:min-h-[720px]" />
+        )}
         {selectedActivityId ? (
           <Suspense fallback={null}>
             <ActivityDetailDialog
