@@ -5,7 +5,7 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { ThemeProvider } from "#/components/theme-provider.tsx";
-import { APP_NAME, APP_TITLE } from "#/lib/brand.ts";
+import { APP_NAME } from "#/lib/brand.ts";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
@@ -24,7 +24,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: APP_TITLE },
+      { title: APP_NAME },
       { name: "theme-color", content: "#171717" },
       { name: "apple-mobile-web-app-title", content: APP_NAME },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
@@ -35,6 +35,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         href: appCss,
       },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", href: "/icon-32.png", type: "image/png", sizes: "32x32" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],

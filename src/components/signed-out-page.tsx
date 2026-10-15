@@ -5,7 +5,7 @@ import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
+import { Vo2Wordmark } from "#/components/vo2-mark.tsx";
 import { APP_NAME } from "#/lib/brand.ts";
 import { Button } from "@/components/ui/button";
 
@@ -19,8 +19,7 @@ export function SignedOutPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="flex h-12 shrink-0 items-center justify-between px-4 pt-[max(0px,env(safe-area-inset-top))] sm:px-6">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Vo2Mark className="size-4" />
+        <div className="flex items-center text-lg font-semibold">
           <Vo2Wordmark />
         </div>
         <ThemeCycleButton />

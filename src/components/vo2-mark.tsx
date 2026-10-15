@@ -5,15 +5,15 @@ type Vo2MarkProps = {
   className?: string;
 };
 
-/** App icon: VO₂ lab formula on the dark tile. */
+/** App icon tile. Use only in collapsed chrome; the wordmark is the expanded brand. */
 export function Vo2Mark({ className }: Vo2MarkProps) {
   return (
     <img
       src="/icon-192.png"
       alt=""
-      width={16}
-      height={16}
-      className={cn("size-4 shrink-0 rounded-[5px]", className)}
+      width={32}
+      height={32}
+      className={cn("size-8 shrink-0 rounded-md", className)}
     />
   );
 }
@@ -25,7 +25,7 @@ export function Vo2Wordmark({ className }: Vo2MarkProps) {
       <span className="sr-only">{APP_NAME}</span>
       <span aria-hidden="true">
         VO
-        <span className="relative top-[0.32em] -ml-px text-[0.62em] font-semibold text-ds-blue-700">
+        <span className="relative top-[0.28em] -ml-px text-[0.7em] font-semibold text-ds-blue-700">
           2
         </span>
       </span>

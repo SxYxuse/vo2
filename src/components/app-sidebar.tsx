@@ -95,9 +95,9 @@ export function AppSidebar() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip={APP_NAME} render={<Link to="/" />}>
-                <Vo2Mark />
-                <Vo2Wordmark />
+              <SidebarMenuButton size="lg" tooltip={APP_NAME} render={<Link to="/" />}>
+                <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
+                <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
