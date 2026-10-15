@@ -36,14 +36,14 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogClose,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "#/components/responsive-dialog.tsx";
 import {
   Empty,
   EmptyDescription,
@@ -235,7 +235,7 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
   }, [data, normalized, series]);
 
   return (
-    <ChartContainer config={CHART_CONFIG} className="aspect-auto h-52 w-full sm:h-72 lg:h-80">
+    <ChartContainer config={CHART_CONFIG} className="aspect-auto h-44 w-full sm:h-72 lg:h-80">
       <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -530,11 +530,13 @@ export function ActivityDetailDialog({
   const missingHeartrate = preview ? isMissingHeartrate(preview) : false;
 
   return (
-    <Dialog open={Boolean(activityId)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-dvh max-h-dvh w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl">
-        <DialogHeader className="bg-background shrink-0 border-b px-4 py-3 pe-12 sm:px-6 sm:py-4">
+    <ResponsiveDialog open={Boolean(activityId)} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="flex h-[min(52rem,calc(100dvh-0.75rem))] max-h-[calc(100dvh-0.75rem)] w-full max-w-none flex-col gap-0 overflow-hidden p-0 [--drawer-content-height:min(52rem,calc(100dvh-0.75rem))] sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl">
+        <ResponsiveDialogHeader className="bg-background shrink-0 border-b px-4 py-3 pe-12 group-data-[swipe-axis=y]/drawer-popup:text-left sm:px-6 sm:py-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <DialogTitle className="min-w-0 truncate text-base">{title}</DialogTitle>
+            <ResponsiveDialogTitle className="min-w-0 truncate text-base">
+              {title}
+            </ResponsiveDialogTitle>
             {sportType ? (
               <Badge variant="outline" className="gap-1.5">
                 {color ? (
@@ -560,12 +562,12 @@ export function ActivityDetailDialog({
               </Badge>
             ) : null}
           </div>
-          <DialogDescription>
+          <ResponsiveDialogDescription>
             {start ? formatActivitySchedule(start, end ?? start) : "Activity streams"}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <div className="flex-1 overflow-auto px-4 py-3 sm:px-6 sm:py-4 [scrollbar-color:rgb(120_120_120/0.4)_transparent] [scrollbar-width:thin]">
+        <div className="min-h-0 flex-1 overflow-auto px-4 py-3 sm:px-6 sm:py-4 [scrollbar-color:rgb(120_120_120/0.4)_transparent] [scrollbar-width:thin]">
           {loading ? (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -598,12 +600,12 @@ export function ActivityDetailDialog({
           )}
         </div>
 
-        <DialogFooter className="bg-background shrink-0 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-          <DialogClose render={<Button variant="outline" className="w-full sm:w-auto" />}>
+        <ResponsiveDialogFooter className="bg-background shrink-0 border-t px-4 py-3 sm:px-6 sm:py-4">
+          <ResponsiveDialogClose render={<Button variant="outline" className="w-full sm:w-auto" />}>
             Close
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </ResponsiveDialogClose>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

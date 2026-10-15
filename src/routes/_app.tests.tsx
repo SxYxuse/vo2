@@ -30,10 +30,10 @@ function TestsPage() {
     <>
       <div className="flex flex-col gap-2">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <FlaskConicalIcon aria-hidden className="size-5 text-ds-purple-700" />
+          <FlaskConicalIcon aria-hidden className="size-5" />
           Field tests
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Published field tests for FTP, VO2max, and lactate-threshold heart rate. Suggested when
           form allows — never mixed into the weekly workout bucket. After you do one, open the
           Strava activity and flag it as that test so the result is stored. Turn protocols on or off
@@ -47,7 +47,7 @@ function TestsPage() {
           <Empty className="min-h-64 border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <FlaskConicalIcon className="text-ds-purple-700" />
+                <FlaskConicalIcon />
               </EmptyMedia>
               <EmptyTitle>Sign in to see suggested tests</EmptyTitle>
               <EmptyDescription>

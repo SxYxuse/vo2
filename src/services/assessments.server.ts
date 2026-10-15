@@ -2,6 +2,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, activityStreams, athleteMetrics, fieldTests } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
 import { ageFromBirthDate } from "./app-settings.types.ts";
 import {
@@ -105,12 +106,19 @@ async function ensureOpenSuggestions(userId: string, suggestedIds: AssessmentId[
       suggestedAt: now,
       updatedAt: now,
     }));
-  if (inserts.length) await db.insert(fieldTests).values(inserts);
+  if (inserts.length) {
+    logger.info("assessments.suggestions_opened", {
+      count: inserts.length,
+      ids: inserts.map((row) => row.assessmentId),
+    });
+    await db.insert(fieldTests).values(inserts);
+  }
 }
 
 export async function loadAssessmentsImpl(): Promise<AssessmentsData> {
   const session = await getOptionalSession();
   if (!session) {
+    logger.debug("assessments.anonymous");
     return {
       signedIn: false,
       tsb: 0,
@@ -166,6 +174,7 @@ export async function loadAssessmentsImpl(): Promise<AssessmentsData> {
     tests.filter((test) => test.status === "suggested").map((test) => test.id),
   );
 
+  logger.debug("assessments.loaded", { tsb: pmc.tsb, testCount: tests.length });
   return {
     signedIn: true,
     tsb: pmc.tsb,
@@ -282,6 +291,7 @@ export async function flagActivityTestImpl(input: {
 
   if (!input.assessmentId) {
     if (existing) {
+      logger.info("assessments.unflagged", { activityId: input.activityId });
       await db.delete(fieldTests).where(eq(fieldTests.id, existing.id));
     }
     return null;
@@ -341,5 +351,9 @@ export async function flagActivityTestImpl(input: {
     });
 
   await applyAthleteMetrics(session.user.id, input.assessmentId, result);
+  logger.info("assessments.flagged", {
+    activityId: input.activityId,
+    assessmentId: input.assessmentId,
+  });
   return { assessmentId: input.assessmentId, title: catalogTitle, result };
 }

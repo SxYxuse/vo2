@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -72,7 +73,7 @@ function Kpi({
           </Tooltip>
         </CardDescription>
         <CardTitle className="font-mono text-base tabular-nums sm:text-lg">{value}</CardTitle>
-        {hint ? <CardDescription>{hint}</CardDescription> : null}
+        {hint ? <CardDescription className="line-clamp-2">{hint}</CardDescription> : null}
       </CardHeader>
     </Card>
   );
@@ -264,54 +265,56 @@ export function HeartRateZones({
                   ) : null,
                 )}
               </div>
-              <div className="flex flex-col gap-3">
+              <ItemGroup className="gap-3">
                 {zoneShare.map((zone) => (
-                  <div key={zone.id} className="flex flex-col gap-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: zone.def.color }}
-                      />
-                      <span className="font-medium">
-                        {zone.def.label} · {zone.def.name}
-                      </span>
-                      <Badge variant="outline">{formatZoneBpm(zone, zone.id === "z5")}</Badge>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              aria-label={`About ${zone.def.label}`}
-                            />
-                          }
-                        >
-                          <InfoIcon />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-72">{zone.def.info}</TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground w-14 shrink-0 font-mono text-xs tabular-nums">
-                        {formatHmm(zone.seconds)}
-                      </span>
-                      <span className="bg-muted h-1 min-w-0 flex-1 overflow-hidden rounded-md">
+                  <Item key={zone.id} size="sm" className="flex-col items-stretch gap-1.5 px-0">
+                    <ItemContent className="gap-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className="block h-full rounded-md"
-                          style={{
-                            width: `${Math.max(zone.pct, zone.seconds > 0 ? 0.5 : 0)}%`,
-                            backgroundColor: zone.def.color,
-                          }}
+                          className="size-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: zone.def.color }}
                         />
-                      </span>
-                      <span className="text-muted-foreground w-8 shrink-0 text-right font-mono text-xs tabular-nums">
-                        {Math.round(zone.pct)}%
-                      </span>
-                    </div>
-                  </div>
+                        <ItemTitle>
+                          {zone.def.label} · {zone.def.name}
+                        </ItemTitle>
+                        <Badge variant="outline">{formatZoneBpm(zone, zone.id === "z5")}</Badge>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={`About ${zone.def.label}`}
+                              />
+                            }
+                          >
+                            <InfoIcon />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-72">{zone.def.info}</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ItemDescription className="w-14 shrink-0 font-mono tabular-nums">
+                          {formatHmm(zone.seconds)}
+                        </ItemDescription>
+                        <span className="bg-muted h-1 min-w-0 flex-1 overflow-hidden rounded-md">
+                          <span
+                            className="block h-full rounded-md"
+                            style={{
+                              width: `${Math.max(zone.pct, zone.seconds > 0 ? 0.5 : 0)}%`,
+                              backgroundColor: zone.def.color,
+                            }}
+                          />
+                        </span>
+                        <ItemDescription className="w-8 shrink-0 text-right font-mono tabular-nums">
+                          {Math.round(zone.pct)}%
+                        </ItemDescription>
+                      </div>
+                    </ItemContent>
+                  </Item>
                 ))}
-              </div>
+              </ItemGroup>
             </>
           )}
         </CardContent>

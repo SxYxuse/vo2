@@ -9,6 +9,7 @@ import {
   type SummaryActivity,
 } from "#/integrations/strava/client.ts";
 import { StravaDailyLimitError, StravaShortLimitError } from "#/integrations/strava/rate-limit.ts";
+import { errorFields, logger } from "#/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
 import { getStravaAccessToken } from "#/lib/strava-token.server.ts";
 import { buildChartPreview } from "./activity-detail.types.ts";
@@ -30,17 +31,19 @@ const STREAM_BATCH_SIZE = 25;
 /** Re-pull this many already-stored activities so title/sport edits land after a late Strava change. */
 const RECENT_REFRESH_COUNT = 3;
 
-function toCalendarActivity(row: {
-  id: string;
-  name: string;
-  sportType: string;
-  startDate: Date;
-  elapsedTime: number;
-  movingTime: number;
-  distance: number | null;
-  streamsSyncedAt: Date | null;
-  hasHeartrate: boolean;
-}): CalendarActivity {
+function toCalendarActivity(
+  row: {
+    id: string;
+    name: string;
+    sportType: string;
+    startDate: Date;
+    elapsedTime: number;
+    movingTime: number;
+    distance: number | null;
+    hasHeartrate: boolean;
+  },
+  hasStreams: boolean,
+): CalendarActivity {
   return {
     id: row.id,
     title: row.name,
@@ -49,7 +52,7 @@ function toCalendarActivity(row: {
     sportType: row.sportType,
     distance: row.distance,
     movingTime: row.movingTime,
-    hasStreams: Boolean(row.streamsSyncedAt),
+    hasStreams,
     hasHeartrate: row.hasHeartrate,
   };
 }
@@ -57,6 +60,7 @@ function toCalendarActivity(row: {
 export async function loadHomeDataImpl(): Promise<HomeData> {
   const session = await getOptionalSession();
   if (!session) {
+    logger.debug("home.anonymous");
     return {
       signedIn: false,
       activities: [],
@@ -70,36 +74,44 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
   }
 
   const plannedFrom = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
-  const [rows, storedSettings, run, profile, training, planned] = await Promise.all([
-    db
-      .select({
-        id: activities.id,
-        name: activities.name,
-        sportType: activities.sportType,
-        startDate: activities.startDate,
-        elapsedTime: activities.elapsedTime,
-        movingTime: activities.movingTime,
-        distance: activities.distance,
-        streamsSyncedAt: activities.streamsSyncedAt,
-        hasHeartrate: activities.hasHeartrate,
-        trainingLoad: activities.trainingLoad,
-        loadSource: activities.loadSource,
-      })
-      .from(activities)
-      .where(eq(activities.userId, session.user.id))
-      .orderBy(activities.startDate),
-    getCalendarSettingsForUser(session.user.id),
-    db.select().from(syncRuns).where(eq(syncRuns.userId, session.user.id)).limit(1),
-    getProfileSettingsForUser(session.user.id),
-    getTrainingPlanForUser(session.user.id),
-    listPlannedSessions(session.user.id, plannedFrom),
-  ]);
+  const [rows, storedSettings, run, profile, training, planned, streamedWithoutFlag] =
+    await Promise.all([
+      db
+        .select({
+          id: activities.id,
+          name: activities.name,
+          sportType: activities.sportType,
+          startDate: activities.startDate,
+          elapsedTime: activities.elapsedTime,
+          movingTime: activities.movingTime,
+          distance: activities.distance,
+          streamsSyncedAt: activities.streamsSyncedAt,
+          hasHeartrate: activities.hasHeartrate,
+          trainingLoad: activities.trainingLoad,
+          loadSource: activities.loadSource,
+        })
+        .from(activities)
+        .where(eq(activities.userId, session.user.id))
+        .orderBy(activities.startDate),
+      getCalendarSettingsForUser(session.user.id),
+      db.select().from(syncRuns).where(eq(syncRuns.userId, session.user.id)).limit(1),
+      getProfileSettingsForUser(session.user.id),
+      getTrainingPlanForUser(session.user.id),
+      listPlannedSessions(session.user.id, plannedFrom),
+      db
+        .select({ activityId: activityStreams.activityId })
+        .from(activities)
+        .innerJoin(activityStreams, eq(activityStreams.activityId, activities.id))
+        .where(and(eq(activities.userId, session.user.id), isNull(activities.streamsSyncedAt))),
+    ]);
 
+  const hasStoredStreams = new Set(streamedWithoutFlag.map((row) => row.activityId));
   let streamsPending = 0;
   const calendarActivities: CalendarActivity[] = [];
   const fitnessLoads = rows.map((row) => {
-    if (!row.streamsSyncedAt) streamsPending += 1;
-    calendarActivities.push(toCalendarActivity(row));
+    const hasStreams = Boolean(row.streamsSyncedAt) || hasStoredStreams.has(row.id);
+    if (!hasStreams) streamsPending += 1;
+    calendarActivities.push(toCalendarActivity(row, hasStreams));
     return toFitnessLoad(
       row.startDate,
       row.trainingLoad ?? 0,
@@ -107,6 +119,14 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       row.movingTime,
     );
   });
+
+  logger.debug("home.loaded", {
+    activityCount: calendarActivities.length,
+    streamsPending,
+    plannedCount: planned.length,
+  });
+
+  const pausedUntil = activePause(run[0]?.pausedUntil);
 
   return {
     signedIn: true,
@@ -122,9 +142,9 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     status: {
       activityCount: rows.length,
       streamsPending,
-      status: run[0]?.status ?? "idle",
-      pausedUntil: run[0]?.pausedUntil?.toISOString() ?? null,
-      lastError: run[0]?.lastError ?? null,
+      status: pausedUntil ? "paused" : "idle",
+      pausedUntil: pausedUntil?.toISOString() ?? null,
+      lastError: pausedUntil ? (run[0]?.lastError ?? null) : null,
       shortLimitRemaining: run[0]?.shortLimitRemaining ?? null,
       dailyLimitRemaining: run[0]?.dailyLimitRemaining ?? null,
       updatedAt: run[0]?.updatedAt?.toISOString() ?? null,
@@ -134,6 +154,8 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
 
 export async function syncStravaImpl(): Promise<SyncResult> {
   const session = await getRequiredSession();
+  logger.info("sync.start");
+  await stampStoredStreams(session.user.id);
   const accessToken = await getStravaAccessToken(session.user.id);
   const api = new StravaApi(accessToken);
   let activitiesUpserted = 0;
@@ -148,11 +170,14 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     if (error instanceof StravaDailyLimitError) {
       pausedUntil = startOfNextUtcDay();
       lastError = error.message;
+      logger.warn("sync.daily_limit", { pausedUntil: pausedUntil.toISOString() });
     } else if (error instanceof StravaShortLimitError) {
       pausedUntil = new Date(api.rateLimit.snapshot().nextWindowAt);
       lastError = error.message;
+      logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
     } else {
       lastError = error instanceof Error ? error.message : "Sync failed";
+      logger.error("sync.failed", errorFields(error));
     }
   }
 
@@ -160,8 +185,8 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   if (activitiesUpserted > 0) {
     try {
       await adaptPlannedWeek(session.user.id);
-    } catch {
-      // Keep sync results even if the week plan cannot be rebuilt.
+    } catch (error) {
+      logger.warn("sync.adapt_week_failed", errorFields(error));
     }
   }
 
@@ -176,11 +201,12 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     pausedUntil = new Date(snapshot.nextWindowAt);
   }
 
+  const status = pausedUntil ? "paused" : "idle";
   await db
     .insert(syncRuns)
     .values({
       userId: session.user.id,
-      status: done ? "idle" : pausedUntil ? "paused" : "running",
+      status,
       activitiesUpserted,
       streamsFetched,
       streamsPending,
@@ -193,7 +219,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     .onConflictDoUpdate({
       target: syncRuns.userId,
       set: {
-        status: done ? "idle" : pausedUntil ? "paused" : "running",
+        status,
         activitiesUpserted,
         streamsFetched,
         streamsPending,
@@ -208,6 +234,17 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   if (lastError && !pausedUntil) {
     throw new Error(lastError);
   }
+
+  logger.info("sync.end", {
+    activitiesUpserted,
+    streamsFetched,
+    streamsPending,
+    done,
+    pausedUntil: pausedUntil?.toISOString() ?? null,
+    lastError,
+    shortRemaining: snapshot.shortRemaining,
+    dailyRemaining: snapshot.dailyRemaining,
+  });
 
   return {
     activitiesUpserted,
@@ -249,6 +286,7 @@ async function upsertAllActivities(api: StravaApi, userId: string, fallbackAthle
       after,
     });
     if (pageItems.length === 0) break;
+    logger.debug("sync.activities_page", { page, count: pageItems.length, after: after ?? null });
     const rows = pageItems.flatMap((activity) => {
       const row = activityInsertRow(userId, activity, fallbackAthleteId);
       return row ? [row] : [];
@@ -343,6 +381,7 @@ async function syncPendingStreams(api: StravaApi, userId: string) {
     .orderBy(desc(activities.startDate))
     .limit(STREAM_BATCH_SIZE);
 
+  logger.debug("sync.streams_batch", { pending: pending.length });
   let fetched = 0;
   for (const row of pending) {
     if (api.rateLimit.shortRemaining <= 5) break;
@@ -415,4 +454,20 @@ async function storeStreams(activityId: string, streams: StreamSet) {
 
 function startOfNextUtcDay(now = new Date()) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+}
+
+function activePause(pausedUntil: Date | null | undefined) {
+  if (!pausedUntil || pausedUntil.getTime() <= Date.now()) return null;
+  return pausedUntil;
+}
+
+async function stampStoredStreams(userId: string) {
+  await db.execute(sql`
+    UPDATE activities AS a
+    SET streams_synced_at = s.synced_at
+    FROM activity_streams AS s
+    WHERE a.id = s.activity_id
+      AND a.user_id = ${userId}
+      AND a.streams_synced_at IS NULL
+  `);
 }

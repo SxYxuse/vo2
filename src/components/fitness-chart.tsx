@@ -1,9 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "cn";
 import { InfoIcon } from "lucide-react";
-import { Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import { readIsDesktop, useIsDesktop } from "#/components/responsive-dialog.tsx";
 
 import {
   FITNESS_PERIODS,
@@ -36,6 +48,13 @@ const CHART_CONFIG = {
   atl: { label: "Fatigue (ATL)", color: "var(--color-ds-amber-700)" },
   tsb: { label: "Form (TSB)", color: "var(--color-ds-green-700)" },
 } satisfies ChartConfig;
+
+const SERIES_SHORT_LABEL = {
+  load: "Load",
+  ctl: "CTL",
+  atl: "ATL",
+  tsb: "TSB",
+} as const;
 
 const SERIES_INFO = {
   ctl: "42-day training load. This is fitness: it climbs with consistent work and fades slowly if you rest. A steady rise over months is the goal.",
@@ -79,6 +98,40 @@ function rampTone(ramp: number) {
   return "text-destructive";
 }
 
+function Sparkline({
+  data,
+  dataKey,
+}: {
+  data: Array<{ ctl: number; atl: number; tsb: number }>;
+  dataKey: "ctl" | "atl" | "tsb";
+}) {
+  const rawId = useId();
+  const gradientId = `spark-${dataKey}-${rawId.replace(/:/g, "")}`;
+  return (
+    <ChartContainer
+      config={{ [dataKey]: CHART_CONFIG[dataKey] }}
+      className="aspect-auto h-8 w-full"
+    >
+      <AreaChart data={data} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={`var(--color-${dataKey})`} stopOpacity={0.4} />
+            <stop offset="100%" stopColor={`var(--color-${dataKey})`} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area
+          dataKey={dataKey}
+          type="monotone"
+          stroke={`var(--color-${dataKey})`}
+          strokeWidth={1.5}
+          fill={`url(#${gradientId})`}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ChartContainer>
+  );
+}
+
 function Kpi({
   label,
   value,
@@ -87,6 +140,7 @@ function Kpi({
   color,
   hintClassName,
   valueClassName,
+  sparkline,
 }: {
   label: string;
   value: string;
@@ -95,6 +149,7 @@ function Kpi({
   color?: string;
   hintClassName?: string;
   valueClassName?: string;
+  sparkline?: ReactNode;
 }) {
   return (
     <Card size="sm" className="gap-1 py-3">
@@ -128,6 +183,7 @@ function Kpi({
           {value}
         </CardTitle>
         {hint ? <CardDescription className={hintClassName}>{hint}</CardDescription> : null}
+        {sparkline}
       </CardHeader>
     </Card>
   );
@@ -135,8 +191,15 @@ function Kpi({
 
 export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const [period, setPeriod] = useState<FitnessPeriod>("3m");
+  const isDesktop = useIsDesktop();
+  const periodTouched = useRef(false);
+  const [period, setPeriod] = useState<FitnessPeriod>(() => (readIsDesktop() ? "3m" : "7d"));
   const [visible, setVisible] = useState<string[]>(() => [...SERIES_KEYS]);
+
+  useEffect(() => {
+    if (periodTouched.current) return;
+    setPeriod(isDesktop ? "3m" : "7d");
+  }, [isDesktop]);
   const pmc = useMemo(() => buildPmc(loads, timeZone), [loads, timeZone]);
   const series = useMemo(() => slicePmc(pmc, period, timeZone), [pmc, period, timeZone]);
   const latest = series.at(-1);
@@ -164,7 +227,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   return (
     <Card>
       <CardHeader className="gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
+        <div className="hidden min-w-0 flex-col gap-1 sm:flex">
           <div className="flex items-center gap-1">
             <CardTitle>Fitness and form</CardTitle>
             <Tooltip>
@@ -195,6 +258,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
           onValueChange={(next) => {
             const value = next[0];
             if (FITNESS_PERIODS.some((item) => item.id === value)) {
+              periodTouched.current = true;
               setPeriod(value as FitnessPeriod);
             }
           }}
@@ -202,7 +266,8 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
         >
           {FITNESS_PERIODS.map((item) => (
             <ToggleGroupItem key={item.id} value={item.id}>
-              {item.label}
+              <span className="sm:hidden">{item.shortLabel}</span>
+              <span className="hidden sm:inline">{item.label}</span>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -225,12 +290,14 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                 value={roundLoad(latest.ctl).toFixed(1)}
                 info={SERIES_INFO.ctl}
                 color={CHART_CONFIG.ctl.color}
+                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="ctl" />}
               />
               <Kpi
                 label="Fatigue (ATL)"
                 value={roundLoad(latest.atl).toFixed(1)}
                 info={SERIES_INFO.atl}
                 color={CHART_CONFIG.atl.color}
+                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="atl" />}
               />
               <Kpi
                 label="Form (TSB)"
@@ -239,6 +306,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                 info={SERIES_INFO.tsb}
                 color={CHART_CONFIG.tsb.color}
                 hintClassName={formTone(latest.tsb)}
+                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="tsb" />}
               />
               <Kpi
                 label="Ramp (7d)"
@@ -290,14 +358,15 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                     className="size-2 rounded-full"
                     style={{ backgroundColor: CHART_CONFIG[key].color }}
                   />
-                  {CHART_CONFIG[key].label}
+                  <span className="sm:hidden">{SERIES_SHORT_LABEL[key]}</span>
+                  <span className="hidden sm:inline">{CHART_CONFIG[key].label}</span>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
             {showLoad || showPmc ? (
               <ChartContainer
                 config={CHART_CONFIG}
-                className="aspect-auto h-56 w-full sm:h-72 lg:h-80"
+                className="aspect-auto h-44 w-full sm:h-72 lg:h-80"
               >
                 <ComposedChart data={series} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
                   <CartesianGrid vertical={false} />
@@ -305,25 +374,27 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                     dataKey="t"
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={48}
+                    minTickGap={isDesktop ? 48 : 24}
                     tickFormatter={(value) => tickFormatter.format(new Date(Number(value)))}
                   />
                   {showPmc ? (
                     <YAxis
                       yAxisId="pmc"
+                      hide={!isDesktop}
                       tickLine={false}
                       axisLine={false}
-                      width={36}
+                      width={isDesktop ? 36 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}
                   {showLoad ? (
                     <YAxis
                       yAxisId="load"
+                      hide={!isDesktop}
                       orientation="right"
                       tickLine={false}
                       axisLine={false}
-                      width={32}
+                      width={isDesktop ? 32 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}

@@ -164,8 +164,8 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-3">
         <ToggleGroup
           size="sm"
           variant="outline"
@@ -201,9 +201,9 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
           )}
         </p>
       </div>
-      <Card className="overflow-hidden py-0">
-        <CardContent className="p-0">
-          <div className="h-[min(48rem,calc(100dvh-16rem))] w-full">
+      <Card className="min-h-80 flex-1 overflow-hidden py-0">
+        <CardContent className="h-full min-h-80 p-0">
+          <div className="h-full min-h-80 w-full">
             {visibleTracks.length && viewport ? (
               <MapView center={viewport.center} zoom={viewport.zoom}>
                 <FitTracks bounds={viewport.bounds} center={viewport.center} zoom={viewport.zoom} />

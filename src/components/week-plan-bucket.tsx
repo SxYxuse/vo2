@@ -91,7 +91,7 @@ export function WeekPlanBucket({
 
   return (
     <>
-      <SheetHeader className="pe-12">
+      <SheetHeader className="shrink-0 pe-12">
         <div className="flex flex-wrap items-center gap-2">
           <SheetTitle>This week’s bucket</SheetTitle>
           <Badge variant="outline">{weekRangeLabel(weekStart)}</Badge>
@@ -238,7 +238,7 @@ export function WeekPlanBucket({
           </div>
         ) : null}
       </div>
-      <SheetFooter>
+      <SheetFooter className="shrink-0">
         <Button type="button" variant="outline" disabled={pending} onClick={onFillWeek}>
           {pending ? (
             <Spinner data-icon="inline-start" />

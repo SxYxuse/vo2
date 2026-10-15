@@ -18,4 +18,6 @@ export const serverEnv = {
   stravaClientId: () => readEnv("STRAVA_CLIENT_ID"),
   stravaClientSecret: () => readEnv("STRAVA_CLIENT_SECRET"),
   openRouterApiKey: () => readEnv("OPENROUTER_API_KEY"),
+  appEnv: () => readEnv("APP_ENV") ?? process.env.NODE_ENV ?? "development",
+  lokiHost: () => readEnv("LOKI_HOST"),
 };

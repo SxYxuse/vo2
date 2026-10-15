@@ -1,3 +1,4 @@
+import { errorFields, logger } from "#/lib/logger.server.ts";
 import { StravaDailyLimitError, StravaRateLimit, StravaShortLimitError } from "./rate-limit.ts";
 import type { components, operations } from "./strava.types.ts";
 
@@ -74,6 +75,7 @@ export class StravaApi {
     } catch (error) {
       // Manual and some indoor activities have no stream data.
       if (error instanceof StravaApiError && error.status === 404) {
+        logger.debug("strava.streams_missing", { activityId });
         return {};
       }
       throw error;
@@ -90,8 +92,20 @@ export class StravaApi {
       headers,
     });
     this.rateLimit.updateFromHeaders(response.headers);
+    const snapshot = this.rateLimit.snapshot();
+    logger.debug("strava.http", {
+      path,
+      status: response.status,
+      shortRemaining: snapshot.shortRemaining,
+      dailyRemaining: snapshot.dailyRemaining,
+    });
 
     if (response.status === 429) {
+      logger.warn("strava.rate_limited", {
+        path,
+        dailyRemaining: snapshot.dailyRemaining,
+        shortRemaining: snapshot.shortRemaining,
+      });
       if (this.rateLimit.dailyRemaining <= 0) {
         throw new StravaDailyLimitError();
       }
@@ -105,11 +119,13 @@ export class StravaApi {
       } catch {
         body = await response.text();
       }
-      throw new StravaApiError(
+      const error = new StravaApiError(
         `Strava request failed (${response.status}) ${path}`,
         response.status,
         body,
       );
+      logger.error("strava.http_failed", { path, status: response.status, ...errorFields(error) });
+      throw error;
     }
 
     return (await response.json()) as T;

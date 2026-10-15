@@ -2,6 +2,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, athleteMetrics } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import {
   activityTrainingLoad,
@@ -82,6 +83,7 @@ async function refreshTrainingLoads(userId: string) {
     return { id: row.id, load, source };
   });
   await writeLoads(updates);
+  logger.info("training_load.refreshed", { activityCount: updates.length, ftp, lthr });
 }
 
 export async function refreshTrainingLoadsForUser(userId: string) {
@@ -93,7 +95,10 @@ export async function loadFitnessDataImpl(): Promise<{
   fitnessLoads: FitnessLoad[];
 }> {
   const session = await getOptionalSession();
-  if (!session) return { signedIn: false, fitnessLoads: [] };
+  if (!session) {
+    logger.debug("fitness.anonymous");
+    return { signedIn: false, fitnessLoads: [] };
+  }
 
   const rows = await db
     .select({
@@ -106,6 +111,7 @@ export async function loadFitnessDataImpl(): Promise<{
     .where(eq(activities.userId, session.user.id))
     .orderBy(activities.startDate);
 
+  logger.debug("fitness.loaded", { activityCount: rows.length });
   return {
     signedIn: true,
     fitnessLoads: rows.map((row) =>
@@ -126,6 +132,7 @@ export async function refreshTrainingLoadsIfNeeded(userId: string) {
     .where(and(eq(activities.userId, userId), isNull(activities.trainingLoad)))
     .limit(1);
   if (pending.length > 0) {
+    logger.debug("training_load.refresh_needed");
     await refreshTrainingLoads(userId);
   }
 }

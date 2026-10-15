@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
+import { OnboardingDialog } from "#/components/onboarding-dialog.tsx";
 import { SettingsDialog } from "#/components/settings-dialog.tsx";
 import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
 import { APP_NAME } from "#/lib/brand.ts";
@@ -64,11 +65,11 @@ const THEME_OPTIONS = [
 ] as const;
 
 const NAV_ITEMS = [
-  { title: "Calendar", to: "/", icon: CalendarDaysIcon, tone: "text-ds-blue-700" },
-  { title: "Map", to: "/map", icon: MapIcon, tone: "text-ds-green-700" },
-  { title: "Fitness", to: "/fitness", icon: TrendingUpIcon, tone: "text-ds-teal-700" },
-  { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon, tone: "text-ds-red-700" },
-  { title: "Tests", to: "/tests", icon: FlaskConicalIcon, tone: "text-ds-purple-700" },
+  { title: "Calendar", to: "/", icon: CalendarDaysIcon },
+  { title: "Map", to: "/map", icon: MapIcon },
+  { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
+  { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
+  { title: "Tests", to: "/tests", icon: FlaskConicalIcon },
 ] as const;
 
 export function AppSidebar() {
@@ -77,6 +78,7 @@ export function AppSidebar() {
   const { data: session } = authClient.useSession();
   const user = session?.user;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const { data: shell } = useQuery({
     ...appShellQueryOptions,
     enabled: Boolean(user),
@@ -86,7 +88,7 @@ export function AppSidebar() {
   );
 
   useEffect(() => {
-    if (trainingMissing) setSettingsOpen(true);
+    if (trainingMissing) setOnboardingOpen(true);
   }, [trainingMissing]);
 
   return (
@@ -121,7 +123,7 @@ export function AppSidebar() {
                         />
                       }
                     >
-                      <item.icon className={item.tone} />
+                      <item.icon />
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -136,7 +138,14 @@ export function AppSidebar() {
         <SidebarRail />
       </Sidebar>
       {user ? (
-        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} userName={user.name} />
+        <>
+          <OnboardingDialog
+            open={onboardingOpen}
+            onOpenChange={setOnboardingOpen}
+            userName={user.name}
+          />
+          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} userName={user.name} />
+        </>
       ) : null}
     </>
   );

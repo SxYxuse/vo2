@@ -2,19 +2,25 @@
 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addDays } from "date-fns";
+import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ClipboardListIcon, HeartOffIcon, Settings2Icon, TimerIcon } from "lucide-react";
 
 import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import { readIsDesktop, useIsDesktop } from "#/components/responsive-dialog.tsx";
 import {
   DEFAULT_CALENDAR_SETTINGS,
+  formatSportType,
   mergeCalendarSettings,
   saveCalendarSettings,
   type CalendarSettings,
 } from "#/services/calendar-settings.ts";
-import { formatActivityClockRange } from "#/services/activity-detail.ts";
+import {
+  formatActivityClockRange,
+  formatDistanceKm,
+  formatDuration,
+} from "#/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "#/services/strava-sync.types.ts";
 import { WeekPlanBucket } from "#/components/week-plan-bucket.tsx";
 import {
@@ -28,21 +34,35 @@ import {
 } from "#/services/training-plan.ts";
 import {
   EventCalendar,
+  EventCalendarViewContext,
+  useEventCalendar,
   useEventCalendarNavigation,
+  useEventCalendarSelector,
+  useEventCalendarSettings,
+  useEventCalendarViewConfig,
 } from "@/components/reui/event-calendar/event-calendar";
 import { EventCalendarContent } from "@/components/reui/event-calendar/event-calendar-content";
+import { EventCalendarEvent } from "@/components/reui/event-calendar/event-calendar-event";
 import {
   EventCalendarNav,
   EventCalendarToolbar,
 } from "@/components/reui/event-calendar/event-calendar-nav";
-import { zonedStartOfDay } from "@/components/reui/event-calendar/event-calendar-lib";
+import {
+  getDayKey,
+  getRangeKey,
+  toZoned,
+  zonedStartOfDay,
+} from "@/components/reui/event-calendar/event-calendar-lib";
 import type {
   CalendarEvent,
   CalendarView,
+  EventCalendarDateRange,
 } from "@/components/reui/event-calendar/event-calendar-types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -53,7 +73,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -115,6 +135,100 @@ function MissingHeartrateMark() {
       className="text-warning size-2.5 shrink-0"
       aria-hidden
     />
+  );
+}
+
+const MOBILE_CALENDAR_VIEWS: CalendarView[] = ["week", "agenda", "month", "day"];
+const DESKTOP_CALENDAR_VIEWS: CalendarView[] = ["month", "week", "day", "days", "agenda"];
+
+/** Vertical week list: ReUI agenda rows plus rest days, for phone widths. */
+function ActivityWeekListView() {
+  const instance = useEventCalendar();
+  const settings = useEventCalendarSettings();
+  const viewConfig = useEventCalendarViewConfig();
+  const visibleRange = useEventCalendarSelector<unknown, EventCalendarDateRange>(
+    (state) => state.visibleRange,
+    {
+      isEqual: (a, b) => getRangeKey(a) === getRangeKey(b),
+    },
+  );
+  useEventCalendarSelector((state) => state.events);
+
+  const days = useMemo(() => {
+    const result: Date[] = [];
+    let cursor = zonedStartOfDay(visibleRange.start, settings.timeZone);
+    while (cursor < visibleRange.end) {
+      result.push(cursor);
+      cursor = zonedStartOfDay(addDays(toZoned(cursor, settings.timeZone), 1), settings.timeZone);
+    }
+    return result;
+  }, [visibleRange, settings.timeZone]);
+
+  const index = instance.internals.getIndex();
+  const native = viewConfig.scrollbars === "native";
+
+  const body = (
+    <div className="flex flex-col [&>*:last-child>*:last-child]:border-b-0">
+      {days.map((day) => {
+        const bucket = index.byDay.get(getDayKey(day, settings.timeZone));
+        const items = [...(bucket?.allDay ?? []), ...(bucket?.timed ?? [])];
+        const zoned = toZoned(day, settings.timeZone);
+        const weekday = format(zoned, "EEE", { locale: settings.locale });
+        const dayDate = format(zoned, "MMM d", { locale: settings.locale });
+        const today =
+          getDayKey(day, settings.timeZone) === getDayKey(new Date(), settings.timeZone);
+        return (
+          <div
+            key={day.getTime()}
+            role="group"
+            aria-label={`${weekday}, ${dayDate}`}
+            data-today={today || undefined}
+          >
+            <div
+              className={cn(
+                "bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2",
+                !native && "me-2.5",
+              )}
+            >
+              <span className={cn("font-semibold", today && "text-primary")}>{weekday}</span>
+              <span className="text-muted-foreground font-medium tabular-nums">{dayDate}</span>
+            </div>
+            {items.length === 0 ? (
+              <ItemGroup className="gap-0">
+                <Item size="xs" className="rounded-none border-b px-4 py-2">
+                  <ItemContent>
+                    <ItemTitle className="text-muted-foreground font-normal">Rest</ItemTitle>
+                  </ItemContent>
+                </Item>
+              </ItemGroup>
+            ) : (
+              items.map((segment) => (
+                <EventCalendarEvent
+                  key={segment.occurrence.key}
+                  segment={segment}
+                  className="hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5"
+                />
+              ))
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <EventCalendarViewContext.Provider value={{ view: "agenda" }}>
+      <div
+        data-slot="event-calendar-week-list"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden border-t"
+      >
+        {native ? (
+          <div className="h-full overflow-y-auto">{body}</div>
+        ) : (
+          <ScrollArea className="h-full">{body}</ScrollArea>
+        )}
+      </div>
+    </EventCalendarViewContext.Provider>
   );
 }
 
@@ -183,6 +297,151 @@ function SettingsSelect({
   );
 }
 
+function CalendarSettingsForm({
+  settings,
+  settingsTab,
+  isTimeGridView,
+  saveError,
+  onSettingsTabChange,
+  patch,
+  onReset,
+}: {
+  settings: CalendarSettings;
+  settingsTab: string;
+  isTimeGridView: boolean;
+  saveError: string | null;
+  onSettingsTabChange: (tab: string) => void;
+  patch: (partial: Partial<CalendarSettings>) => void;
+  onReset: () => void;
+}) {
+  return (
+    <>
+      <Tabs
+        value={settingsTab}
+        onValueChange={(next) => {
+          if (next == null) return;
+          onSettingsTabChange(String(next));
+        }}
+      >
+        <TabsList className="h-auto w-full flex-wrap">
+          <TabsTrigger value="view">View</TabsTrigger>
+          {isTimeGridView ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
+          <TabsTrigger value="region">Region</TabsTrigger>
+        </TabsList>
+        <TabsContent value="view">
+          <FieldGroup className="gap-3">
+            <SettingsSwitch
+              id="ec-set-weekends"
+              label="Weekends"
+              checked={settings.viewSettings.weekends ?? true}
+              onCheckedChange={(weekends) =>
+                patch({ viewSettings: { ...settings.viewSettings, weekends } })
+              }
+            />
+            <SettingsSwitch
+              id="ec-set-week-numbers"
+              label="Week numbers"
+              checked={settings.viewSettings.weekNumbers ?? false}
+              onCheckedChange={(weekNumbers) =>
+                patch({ viewSettings: { ...settings.viewSettings, weekNumbers } })
+              }
+            />
+            <SettingsSwitch
+              id="ec-set-now"
+              label="Now indicator"
+              checked={settings.viewSettings.nowIndicator ?? true}
+              onCheckedChange={(nowIndicator) =>
+                patch({ viewSettings: { ...settings.viewSettings, nowIndicator } })
+              }
+            />
+            <SettingsSwitch
+              id="ec-set-off-days"
+              label="Mark off days"
+              checked={settings.viewSettings.offDays ?? false}
+              onCheckedChange={(offDays) =>
+                patch({ viewSettings: { ...settings.viewSettings, offDays } })
+              }
+            />
+            <SettingsSelect
+              id="ec-set-week-start"
+              label="Week starts"
+              value={settings.weekStartsOn}
+              options={[
+                { value: 0, label: "Sunday" },
+                { value: 1, label: "Monday" },
+              ]}
+              onValueChange={(weekStartsOn) =>
+                patch({ weekStartsOn: Number(weekStartsOn) as 0 | 1 })
+              }
+            />
+          </FieldGroup>
+        </TabsContent>
+        <TabsContent value="time">
+          <FieldGroup className="gap-3">
+            <SettingsSelect
+              id="ec-set-day-start"
+              label="Day starts"
+              value={settings.dayStartHour}
+              options={[
+                { value: 0, label: "00:00" },
+                { value: 6, label: "06:00" },
+                { value: 8, label: "08:00" },
+              ]}
+              onValueChange={(dayStartHour) => patch({ dayStartHour: Number(dayStartHour) })}
+            />
+            <SettingsSelect
+              id="ec-set-day-end"
+              label="Day ends"
+              value={settings.dayEndHour}
+              options={[
+                { value: 18, label: "18:00" },
+                { value: 20, label: "20:00" },
+                { value: 24, label: "24:00" },
+              ]}
+              onValueChange={(dayEndHour) => patch({ dayEndHour: Number(dayEndHour) })}
+            />
+            <SettingsSelect
+              id="ec-set-interval"
+              label="Grid interval"
+              value={settings.interval}
+              options={[
+                { value: 30, label: "30 min" },
+                { value: 60, label: "60 min" },
+              ]}
+              onValueChange={(interval) => patch({ interval: Number(interval) })}
+            />
+          </FieldGroup>
+        </TabsContent>
+        <TabsContent value="region">
+          <FieldGroup className="gap-3">
+            <SettingsSelect
+              id="ec-set-language"
+              label="Language"
+              value="en"
+              options={[{ value: "en", label: "English" }]}
+              onValueChange={() => undefined}
+              disabled
+            />
+            <SettingsSelect
+              id="ec-set-timezone"
+              label="Time zone"
+              value="browser"
+              options={[{ value: "browser", label: "Browser" }]}
+              onValueChange={() => undefined}
+              disabled
+            />
+            <FieldDescription>Language is English. Time zone follows the browser.</FieldDescription>
+          </FieldGroup>
+        </TabsContent>
+      </Tabs>
+      {saveError ? <p className="text-destructive text-xs">{saveError}</p> : null}
+      <Button variant="outline" size="sm" className="w-full" onClick={onReset}>
+        Reset to defaults
+      </Button>
+    </>
+  );
+}
+
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
   plannedSessions: PlannedSession[];
@@ -209,7 +468,9 @@ export function ActivityCalendar({
   const [settings, setSettings] = useState<CalendarSettings>(() =>
     mergeCalendarSettings(initialSettings, sportTypeNames),
   );
-  const [view, setView] = useState<CalendarView>("month");
+  const isDesktop = useIsDesktop();
+  const [view, setView] = useState<CalendarView>(() => (readIsDesktop() ? "month" : "week"));
+  const viewTouched = useRef(false);
   const [settingsTab, setSettingsTab] = useState("view");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -228,7 +489,7 @@ export function ActivityCalendar({
       setSaveError(caught instanceof Error ? caught.message : "Could not save settings");
     },
   });
-  const isTimeGridView = view !== "month" && view !== "agenda";
+  const isTimeGridView = view === "day" || view === "days" || (view === "week" && isDesktop);
 
   useEffect(() => {
     setSettings((current) => {
@@ -243,6 +504,11 @@ export function ActivityCalendar({
       return JSON.stringify(current) === JSON.stringify(next) ? current : next;
     });
   }, [initialSettings.sportGroupShares, initialSettings.sportTypes, sportTypeNames]);
+
+  useEffect(() => {
+    if (viewTouched.current) return;
+    setView(isDesktop ? "month" : "week");
+  }, [isDesktop]);
 
   useEffect(() => {
     if (!isTimeGridView && settingsTab === "time") {
@@ -316,12 +582,16 @@ export function ActivityCalendar({
   }, [activities, settings.sportTypes, timeZone]);
 
   return (
-    <Card className="py-0">
-      <CardContent className="p-0">
+    <Card className="flex min-h-80 flex-1 flex-col py-0 md:h-[720px] md:flex-none">
+      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         <EventCalendar
           events={events}
-          defaultView="month"
-          onViewChange={setView}
+          view={view}
+          views={isDesktop ? DESKTOP_CALENDAR_VIEWS : MOBILE_CALENDAR_VIEWS}
+          onViewChange={(next) => {
+            viewTouched.current = true;
+            setView(next);
+          }}
           locale={enUS}
           timeZone={timeZone}
           i18n={{
@@ -343,7 +613,9 @@ export function ActivityCalendar({
                   data-slot="event-calendar-event-dot"
                   className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
                 />
-                <span className="truncate font-medium">{occurrence.event.title}</span>
+                <span className="hidden truncate font-medium sm:inline">
+                  {occurrence.event.title}
+                </span>
                 {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
               </span>
             );
@@ -365,6 +637,15 @@ export function ActivityCalendar({
           }}
           renderAgendaEvent={({ occurrence }) => {
             const activity = occurrence.event.data as CalendarActivity | undefined;
+            const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
+            const meta = activity
+              ? [
+                  when,
+                  formatDuration(activity.movingTime),
+                  activity.distance != null ? formatDistanceKm(activity.distance) : null,
+                  formatSportType(activity.sportType),
+                ].filter(Boolean)
+              : [];
             return (
               <>
                 <span
@@ -372,8 +653,17 @@ export function ActivityCalendar({
                   data-slot="event-calendar-agenda-dot"
                   className="size-2 shrink-0 rounded-full bg-(--ec-event-color)"
                 />
-                <span className="truncate text-sm">{occurrence.event.title}</span>
-                {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="truncate text-sm font-medium">{occurrence.event.title}</span>
+                    {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+                  </span>
+                  {meta.length ? (
+                    <span className="text-muted-foreground truncate text-xs">
+                      {meta.join(" · ")}
+                    </span>
+                  ) : null}
+                </span>
               </>
             );
           }}
@@ -402,7 +692,7 @@ export function ActivityCalendar({
           eventTooltip
           showDayAddButton={false}
           offDays
-          className="h-[min(40rem,calc(100dvh-12rem))] w-full min-w-0 md:h-[720px]"
+          className="h-full min-h-80 w-full min-w-0 flex-1"
         >
           <div className="flex flex-wrap items-center gap-2 px-1 sm:pe-2">
             <EventCalendarNav className="min-w-0 flex-1" />
@@ -416,7 +706,14 @@ export function ActivityCalendar({
                     <span className="hidden sm:inline">This week</span>
                     {remainingCount ? <Badge variant="warning">{remainingCount}</Badge> : null}
                   </SheetTrigger>
-                  <SheetContent side="right" className="sm:max-w-md">
+                  <SheetContent
+                    side={isDesktop ? "right" : "bottom"}
+                    className={
+                      isDesktop
+                        ? "sm:max-w-md"
+                        : "flex max-h-[85dvh] flex-col overflow-hidden pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    }
+                  >
                     <WeekPlanBucket
                       sessions={plannedSessions}
                       weekStart={weekStart}
@@ -433,164 +730,80 @@ export function ActivityCalendar({
               ) : null}
               <PeriodTrainingTotal activities={activities} sportTypes={settings.sportTypes} />
               <EventCalendarToolbar>
-                <Popover>
-                  <PopoverTrigger
-                    render={<Button variant="outline" size="sm" aria-label="Settings" />}
-                  >
-                    <Settings2Icon data-icon="inline-start" />
-                    <span className="hidden sm:inline">Settings</span>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="end"
-                    className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
-                  >
-                    <PopoverTitle>Calendar settings</PopoverTitle>
-                    <Tabs
-                      value={settingsTab}
-                      onValueChange={(next) => {
-                        if (next == null) return;
-                        setSettingsTab(String(next));
-                      }}
+                {isDesktop ? (
+                  <Popover>
+                    <PopoverTrigger
+                      render={<Button variant="outline" size="sm" aria-label="Settings" />}
                     >
-                      <TabsList className="h-auto w-full flex-wrap">
-                        <TabsTrigger value="view">View</TabsTrigger>
-                        {isTimeGridView ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
-                        <TabsTrigger value="region">Region</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="view">
-                        <FieldGroup className="gap-3">
-                          <SettingsSwitch
-                            id="ec-set-weekends"
-                            label="Weekends"
-                            checked={settings.viewSettings.weekends ?? true}
-                            onCheckedChange={(weekends) =>
-                              patch({ viewSettings: { ...settings.viewSettings, weekends } })
-                            }
-                          />
-                          <SettingsSwitch
-                            id="ec-set-week-numbers"
-                            label="Week numbers"
-                            checked={settings.viewSettings.weekNumbers ?? false}
-                            onCheckedChange={(weekNumbers) =>
-                              patch({ viewSettings: { ...settings.viewSettings, weekNumbers } })
-                            }
-                          />
-                          <SettingsSwitch
-                            id="ec-set-now"
-                            label="Now indicator"
-                            checked={settings.viewSettings.nowIndicator ?? true}
-                            onCheckedChange={(nowIndicator) =>
-                              patch({ viewSettings: { ...settings.viewSettings, nowIndicator } })
-                            }
-                          />
-                          <SettingsSwitch
-                            id="ec-set-off-days"
-                            label="Mark off days"
-                            checked={settings.viewSettings.offDays ?? false}
-                            onCheckedChange={(offDays) =>
-                              patch({ viewSettings: { ...settings.viewSettings, offDays } })
-                            }
-                          />
-                          <SettingsSelect
-                            id="ec-set-week-start"
-                            label="Week starts"
-                            value={settings.weekStartsOn}
-                            options={[
-                              { value: 0, label: "Sunday" },
-                              { value: 1, label: "Monday" },
-                            ]}
-                            onValueChange={(weekStartsOn) =>
-                              patch({ weekStartsOn: Number(weekStartsOn) as 0 | 1 })
-                            }
-                          />
-                        </FieldGroup>
-                      </TabsContent>
-                      <TabsContent value="time">
-                        <FieldGroup className="gap-3">
-                          <SettingsSelect
-                            id="ec-set-day-start"
-                            label="Day starts"
-                            value={settings.dayStartHour}
-                            options={[
-                              { value: 0, label: "00:00" },
-                              { value: 6, label: "06:00" },
-                              { value: 8, label: "08:00" },
-                            ]}
-                            onValueChange={(dayStartHour) =>
-                              patch({ dayStartHour: Number(dayStartHour) })
-                            }
-                          />
-                          <SettingsSelect
-                            id="ec-set-day-end"
-                            label="Day ends"
-                            value={settings.dayEndHour}
-                            options={[
-                              { value: 18, label: "18:00" },
-                              { value: 20, label: "20:00" },
-                              { value: 24, label: "24:00" },
-                            ]}
-                            onValueChange={(dayEndHour) =>
-                              patch({ dayEndHour: Number(dayEndHour) })
-                            }
-                          />
-                          <SettingsSelect
-                            id="ec-set-interval"
-                            label="Grid interval"
-                            value={settings.interval}
-                            options={[
-                              { value: 30, label: "30 min" },
-                              { value: 60, label: "60 min" },
-                            ]}
-                            onValueChange={(interval) => patch({ interval: Number(interval) })}
-                          />
-                        </FieldGroup>
-                      </TabsContent>
-                      <TabsContent value="region">
-                        <FieldGroup className="gap-3">
-                          <SettingsSelect
-                            id="ec-set-language"
-                            label="Language"
-                            value="en"
-                            options={[{ value: "en", label: "English" }]}
-                            onValueChange={() => undefined}
-                            disabled
-                          />
-                          <SettingsSelect
-                            id="ec-set-timezone"
-                            label="Time zone"
-                            value="browser"
-                            options={[{ value: "browser", label: "Browser" }]}
-                            onValueChange={() => undefined}
-                            disabled
-                          />
-                          <FieldDescription>
-                            Language is English. Time zone follows the browser.
-                          </FieldDescription>
-                        </FieldGroup>
-                      </TabsContent>
-                    </Tabs>
-                    {saveError ? <p className="text-destructive text-xs">{saveError}</p> : null}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() =>
-                        setSettings(
-                          mergeCalendarSettings(
-                            {
-                              ...DEFAULT_CALENDAR_SETTINGS,
-                              sportTypes: settings.sportTypes,
-                              sportGroupShares: settings.sportGroupShares,
-                            },
-                            sportTypeNames,
-                          ),
-                        )
-                      }
+                      <Settings2Icon data-icon="inline-start" />
+                      <span className="hidden sm:inline">Settings</span>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
                     >
-                      Reset to defaults
-                    </Button>
-                  </PopoverContent>
-                </Popover>
+                      <PopoverTitle>Calendar settings</PopoverTitle>
+                      <CalendarSettingsForm
+                        settings={settings}
+                        settingsTab={settingsTab}
+                        isTimeGridView={isTimeGridView}
+                        saveError={saveError}
+                        onSettingsTabChange={setSettingsTab}
+                        patch={patch}
+                        onReset={() =>
+                          setSettings(
+                            mergeCalendarSettings(
+                              {
+                                ...DEFAULT_CALENDAR_SETTINGS,
+                                sportTypes: settings.sportTypes,
+                                sportGroupShares: settings.sportGroupShares,
+                              },
+                              sportTypeNames,
+                            ),
+                          )
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <Sheet>
+                    <SheetTrigger
+                      render={<Button variant="outline" size="sm" aria-label="Settings" />}
+                    >
+                      <Settings2Icon data-icon="inline-start" />
+                    </SheetTrigger>
+                    <SheetContent
+                      side="bottom"
+                      className="max-h-[85dvh] overflow-auto pb-[max(1rem,env(safe-area-inset-bottom))]"
+                    >
+                      <SheetHeader>
+                        <SheetTitle>Calendar settings</SheetTitle>
+                      </SheetHeader>
+                      <div className="flex flex-col gap-3 px-6 pb-2">
+                        <CalendarSettingsForm
+                          settings={settings}
+                          settingsTab={settingsTab}
+                          isTimeGridView={isTimeGridView}
+                          saveError={saveError}
+                          onSettingsTabChange={setSettingsTab}
+                          patch={patch}
+                          onReset={() =>
+                            setSettings(
+                              mergeCalendarSettings(
+                                {
+                                  ...DEFAULT_CALENDAR_SETTINGS,
+                                  sportTypes: settings.sportTypes,
+                                  sportGroupShares: settings.sportGroupShares,
+                                },
+                                sportTypeNames,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                )}
               </EventCalendarToolbar>
             </div>
           </div>
@@ -600,7 +813,10 @@ export function ActivityCalendar({
               isTimeGridView && "overflow-x-auto",
             )}
           >
-            <EventCalendarContent className={cn(isTimeGridView && "min-w-[40rem]")} />
+            <EventCalendarContent
+              className={cn(isTimeGridView && "min-w-[40rem]")}
+              components={!isDesktop ? { week: ActivityWeekListView } : undefined}
+            />
           </div>
         </EventCalendar>
         {selectedActivityId ? (

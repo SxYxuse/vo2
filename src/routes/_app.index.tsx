@@ -3,7 +3,6 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "#/components/activity-calendar.tsx";
-import { SyncPanel } from "#/components/sync-panel.tsx";
 import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -40,7 +39,7 @@ function CalendarPage() {
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { activity } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { signedIn, activities, status, settings, plannedSessions, training } = data;
+  const { signedIn, activities, settings, plannedSessions, training } = data;
 
   function selectActivity(id: string | null) {
     void navigate({
@@ -54,27 +53,18 @@ function CalendarPage() {
   }
 
   return (
-    <>
-      <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-2">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <CalendarDaysIcon aria-hidden className="size-5 text-ds-blue-700" />
+          <CalendarDaysIcon aria-hidden className="size-5" />
           Activity calendar
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Import Strava activities and streams into local Postgres, then browse them by day. Open
           This week for a bucket of suggested workouts to fill when you have time. Field tests live
           on Tests.
         </p>
       </div>
-      <SyncPanel
-        activityCount={status?.activityCount ?? activities.length}
-        streamsPending={status?.streamsPending ?? 0}
-        status={status?.status ?? "idle"}
-        pausedUntil={status?.pausedUntil ?? null}
-        lastError={status?.lastError ?? null}
-        shortLimitRemaining={status?.shortLimitRemaining ?? null}
-        dailyLimitRemaining={status?.dailyLimitRemaining ?? null}
-      />
       <ActivityCalendar
         activities={activities}
         plannedSessions={plannedSessions}
@@ -84,7 +74,7 @@ function CalendarPage() {
         selectedActivityId={activity ?? null}
         onSelectActivity={selectActivity}
       />
-    </>
+    </div>
   );
 }
 
@@ -93,7 +83,6 @@ function CalendarPending() {
     <>
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-4 w-full max-w-xl" />
-      <Skeleton className="h-10 w-40" />
       <Skeleton className="h-[40rem] w-full rounded-xl" />
     </>
   );

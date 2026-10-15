@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { calendarSettings } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getRequiredSession } from "#/lib/session.server.ts";
 import {
   calendarSettingsSchema,
@@ -40,5 +41,9 @@ export async function saveCalendarSettingsImpl(value: CalendarSettings): Promise
       },
     });
 
+  logger.info("calendar_settings.saved", {
+    weekStartsOn: settings.weekStartsOn,
+    sportTypeCount: Object.keys(settings.sportTypes).length,
+  });
   return settings;
 }

@@ -35,10 +35,10 @@ function FitnessPage() {
     <>
       <div className="flex flex-col gap-2">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <TrendingUpIcon aria-hidden className="size-5 text-ds-teal-700" />
+          <TrendingUpIcon aria-hidden className="size-5" />
           Fitness and form
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Track fitness, fatigue, and form so you can keep building without overreaching.
         </p>
       </div>
@@ -51,7 +51,7 @@ function FitnessPage() {
           <Empty className="min-h-64 border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <TrendingUpIcon className="text-ds-teal-700" />
+                <TrendingUpIcon />
               </EmptyMedia>
               <EmptyTitle>Sign in to see fitness</EmptyTitle>
               <EmptyDescription>

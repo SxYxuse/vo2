@@ -30,10 +30,10 @@ function HeartRatePage() {
     <>
       <div className="flex flex-col gap-2">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <HeartPulseIcon aria-hidden className="size-5 text-ds-red-700" />
+          <HeartPulseIcon aria-hidden className="size-5" />
           Heart rate
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Max heart rate, estimated zones, and time in zone — overall and per sport.
         </p>
       </div>
@@ -44,7 +44,7 @@ function HeartRatePage() {
           <Empty className="min-h-64 border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <HeartPulseIcon className="text-ds-red-700" />
+                <HeartPulseIcon />
               </EmptyMedia>
               <EmptyTitle>Sign in to see heart rate</EmptyTitle>
               <EmptyDescription>

@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, athleteMetrics, fieldTests, plannedSessions } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getRequiredSession } from "#/lib/session.server.ts";
 import { parseAssessmentResult } from "./assessments-score.ts";
 import { familyCollectors } from "./calendar-settings.types.ts";
@@ -33,6 +34,11 @@ export async function getTrainingPlanForUser(userId: string): Promise<TrainingPl
 }
 
 export async function saveTrainingPlanForUser(userId: string, plan: TrainingPlan) {
+  logger.info("training_plan.saved", {
+    targetWeeklyHours: plan.targetWeeklyHours,
+    buildPace: plan.buildPace,
+    workoutStyle: plan.workoutStyle,
+  });
   await db
     .insert(athleteMetrics)
     .values({ userId, training: plan, updatedAt: new Date() })
@@ -167,8 +173,10 @@ function plannedFromCutoff() {
 
 export async function suggestWeekImpl(timeZone: string): Promise<PlannedSession[]> {
   const session = await getRequiredSession();
+  logger.info("training_plan.suggest", { timeZone });
   const plan = await getTrainingPlanForUser(session.user.id);
   if (!isTrainingPlanComplete(plan)) {
+    logger.warn("training_plan.suggest_incomplete");
     throw new Error("Set your training goal in Settings first.");
   }
   if (plan.timeZone !== timeZone) {
@@ -187,6 +195,7 @@ export async function adaptPlannedWeek(userId: string) {
     .where(eq(plannedSessions.userId, userId))
     .limit(1);
   if (!existing.length) return;
+  logger.info("training_plan.adapt");
   await rebuildWeek(userId, plan.timeZone, new Date(), "adapt");
 }
 
@@ -295,6 +304,11 @@ async function rebuildWeek(
   if (rows.length) {
     await db.insert(plannedSessions).values(rows);
   }
+  logger.info("training_plan.week_rebuilt", {
+    mode,
+    weekStart,
+    sessionCount: rows.length,
+  });
 
   return rows.map((row) =>
     toPlanned({

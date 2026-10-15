@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, activityStreams } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { mergeCalendarSettings } from "./calendar-settings.types.ts";
@@ -35,6 +36,7 @@ const EMPTY_OVERALL: HeartRateSport = {
 export async function loadHeartRateImpl(): Promise<HeartRateData> {
   const session = await getOptionalSession();
   if (!session) {
+    logger.debug("heart_rate.anonymous");
     return { signedIn: false, overall: EMPTY_OVERALL, sports: [], sportTypes: {} };
   }
 
@@ -104,6 +106,11 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     (sportType) => settings.sportTypes[sportType]?.visible !== false,
   );
 
+  logger.debug("heart_rate.loaded", {
+    activityCount: rows.length,
+    streamCount: streamIds.length,
+    sportCount: sports.length,
+  });
   return {
     signedIn: true,
     overall: overallFromSports(sports),

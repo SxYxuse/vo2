@@ -13,6 +13,7 @@ import { serverEnv } from "#/configs/env.ts";
 import { db } from "#/db/index.ts";
 import { activities, activityAnalyses, activityStreams, athleteMetrics } from "#/db/schema.ts";
 import { APP_NAME } from "#/lib/brand.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
 import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
 import {
@@ -207,6 +208,12 @@ export async function saveActivityAnalysisImpl(input: {
       updatedAt: activityAnalyses.updatedAt,
     });
   if (!row) return null;
+  logger.info("analysis.saved", {
+    activityId: row.activityId,
+    mocked: row.mocked,
+    model: row.model,
+    chars: row.body.length,
+  });
   return {
     activityId: row.activityId,
     body: row.body,
@@ -244,10 +251,16 @@ async function* persistCompletedAnalysis(
 
 export async function handleActivityAnalysis(request: Request) {
   const session = await getOptionalSession();
-  if (!session) return new Response("Unauthorized", { status: 401 });
+  if (!session) {
+    logger.warn("analysis.unauthorized");
+    return new Response("Unauthorized", { status: 401 });
+  }
 
   const activityId = new URL(request.url).searchParams.get("activityId");
-  if (!activityId) return new Response("Missing activityId", { status: 400 });
+  if (!activityId) {
+    logger.warn("analysis.missing_activity");
+    return new Response("Missing activityId", { status: 400 });
+  }
 
   const params = await chatParamsFromRequest(request);
   const apiKey = serverEnv.openRouterApiKey();
@@ -258,6 +271,8 @@ export async function handleActivityAnalysis(request: Request) {
         appTitle: APP_NAME,
       })
     : mockActivityAnalysisText();
+
+  logger.info("analysis.start", { activityId, mocked, model: mocked ? "mock" : ANALYSIS_MODEL });
 
   const stream = chat({
     adapter,

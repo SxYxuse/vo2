@@ -8,9 +8,13 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const config = defineConfig({
+  ssr: {
+    external: ["winston", "winston-loki"],
+  },
   fmt: {
     ignorePatterns: [
       "drizzle/meta/**",
+      "src/components/ui/**",
       "src/integrations/strava/strava.types.ts",
       "src/integrations/strava/openapi.json",
       "src/routeTree.gen.ts",
@@ -22,8 +26,7 @@ const config = defineConfig({
     options: { typeAware: true, typeCheck: true },
     ignorePatterns: [
       "src/components/reui/**",
-      "src/components/ui/chart.tsx",
-      "src/components/ui/map.tsx",
+      "src/components/ui/**",
       "src/integrations/strava/strava.types.ts",
       "src/integrations/strava/openapi.json",
     ],

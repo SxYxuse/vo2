@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities, activityStreams } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getRequiredSession } from "#/lib/session.server.ts";
 import {
   buildChartPreview,
@@ -38,12 +39,20 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     .where(and(eq(activities.id, id), eq(activities.userId, session.user.id)))
     .limit(1);
 
-  if (!row) return null;
+  if (!row) {
+    logger.warn("activity_detail.not_found", { activityId: id });
+    return null;
+  }
 
   const preview = isChartPreview(row.chartPreview)
     ? row.chartPreview
     : await loadAndStoreChartPreview(id, Boolean(row.streamsSyncedAt));
   const fieldTest = await fieldTestForActivity(session.user.id, id);
+  logger.debug("activity_detail.loaded", {
+    activityId: id,
+    hasStreams: Boolean(row.streamsSyncedAt),
+    hasFieldTest: Boolean(fieldTest),
+  });
 
   return {
     id: row.id,
@@ -98,6 +107,7 @@ async function loadAndStoreChartPreview(
   });
 
   if (streams) {
+    logger.debug("activity_detail.chart_preview_built", { activityId });
     await db
       .update(activityStreams)
       .set({ chartPreview: preview })

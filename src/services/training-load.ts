@@ -1,5 +1,5 @@
 import { TZDate } from "@date-fns/tz";
-import { addDays, startOfDay, subMonths, subYears } from "date-fns";
+import { addDays, startOfDay, subDays, subMonths, subYears } from "date-fns";
 import { createServerFn } from "@tanstack/react-start";
 
 const CTL_DAYS = 42;
@@ -7,14 +7,15 @@ const ATL_DAYS = 7;
 
 export type LoadSource = "power" | "heartRate" | "duration";
 
-export type FitnessPeriod = "1m" | "3m" | "6m" | "1y" | "all";
+export type FitnessPeriod = "7d" | "1m" | "3m" | "6m" | "1y" | "all";
 
-export const FITNESS_PERIODS: { id: FitnessPeriod; label: string }[] = [
-  { id: "1m", label: "1 month" },
-  { id: "3m", label: "3 months" },
-  { id: "6m", label: "6 months" },
-  { id: "1y", label: "1 year" },
-  { id: "all", label: "All" },
+export const FITNESS_PERIODS: { id: FitnessPeriod; label: string; shortLabel: string }[] = [
+  { id: "7d", label: "7 days", shortLabel: "7d" },
+  { id: "1m", label: "1 month", shortLabel: "1m" },
+  { id: "3m", label: "3 months", shortLabel: "3m" },
+  { id: "6m", label: "6 months", shortLabel: "6m" },
+  { id: "1y", label: "1 year", shortLabel: "1y" },
+  { id: "all", label: "All", shortLabel: "All" },
 ];
 
 export type LoadInputs = {
@@ -215,9 +216,11 @@ export function slicePmc(points: PmcPoint[], period: FitnessPeriod, timeZone: st
   if (!points.length || period === "all") return points;
   const end = zonedDayStart(new Date(), timeZone);
   const start =
-    period === "1y"
-      ? subYears(end, 1)
-      : subMonths(end, period === "1m" ? 1 : period === "3m" ? 3 : 6);
+    period === "7d"
+      ? subDays(end, 6)
+      : period === "1y"
+        ? subYears(end, 1)
+        : subMonths(end, period === "1m" ? 1 : period === "3m" ? 3 : 6);
   const startMs = start.getTime();
   return points.filter((point) => point.t >= startMs);
 }

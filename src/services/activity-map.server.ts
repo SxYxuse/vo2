@@ -2,6 +2,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { activities } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
@@ -16,7 +17,10 @@ const EMPTY_MAP: ActivityMapData = {
 
 export async function loadActivityMapImpl(): Promise<ActivityMapData> {
   const session = await getOptionalSession();
-  if (!session) return EMPTY_MAP;
+  if (!session) {
+    logger.debug("map.anonymous");
+    return EMPTY_MAP;
+  }
 
   const [rows, storedSettings] = await Promise.all([
     db
@@ -36,12 +40,15 @@ export async function loadActivityMapImpl(): Promise<ActivityMapData> {
     rows.map((row) => row.sportType),
   );
 
+  const tracks = rows.flatMap((row) => {
+    if (!row.polyline) return [];
+    return [{ id: row.id, title: row.title, sportType: row.sportType, polyline: row.polyline }];
+  });
+  logger.debug("map.loaded", { trackCount: tracks.length });
+
   return {
     signedIn: true,
-    tracks: rows.flatMap((row) => {
-      if (!row.polyline) return [];
-      return [{ id: row.id, title: row.title, sportType: row.sportType, polyline: row.polyline }];
-    }),
+    tracks,
     sportTypes: settings.sportTypes,
     sportGroupShares: settings.sportGroupShares,
   };

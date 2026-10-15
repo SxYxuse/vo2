@@ -32,20 +32,18 @@ function MapPage() {
   const { data } = useSuspenseQuery(activityMapQueryOptions);
 
   return (
-    <>
-      <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-2">
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <MapIcon aria-hidden className="size-5 text-ds-green-700" />
+          <MapIcon aria-hidden className="size-5" />
           Map
         </h1>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground hidden text-sm sm:block">
           Every GPS track on one map. Filter by sport.
         </p>
       </div>
       {data.signedIn ? (
-        <Suspense
-          fallback={<Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />}
-        >
+        <Suspense fallback={<Skeleton className="min-h-80 w-full flex-1 rounded-xl" />}>
           <ActivityMap
             tracks={data.tracks}
             sportTypes={data.sportTypes}
@@ -57,7 +55,7 @@ function MapPage() {
           <Empty className="min-h-64 border">
             <EmptyHeader>
               <EmptyMedia variant="icon">
-                <MapIcon className="text-ds-green-700" />
+                <MapIcon />
               </EmptyMedia>
               <EmptyTitle>Sign in to see your map</EmptyTitle>
               <EmptyDescription>
@@ -68,7 +66,7 @@ function MapPage() {
           <SignInPanel />
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -78,7 +76,7 @@ function MapPending() {
       <Skeleton className="h-8 w-32" />
       <Skeleton className="h-4 w-full max-w-xl" />
       <Skeleton className="h-9 w-full max-w-lg" />
-      <Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />
+      <Skeleton className="min-h-80 w-full flex-1 rounded-xl" />
     </>
   );
 }

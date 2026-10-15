@@ -170,9 +170,9 @@ export function AssessmentTests({ tests }: { tests: AssessmentView[] }) {
         return (
           <Card key={test.id}>
             <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2">
-                <SportIcon className={sportTone(test.family)} />
-                {test.title}
+              <CardTitle className="flex min-w-0 items-center gap-2 pe-2">
+                <SportIcon className={`${sportTone(test.family)} size-4 shrink-0`} />
+                <span className="min-w-0">{test.title}</span>
               </CardTitle>
               <CardDescription>
                 {formatHours(test.minutes / 60)} · {test.family === "cycling" ? "Ride" : "Run"} ·{" "}

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
 import { athleteMetrics, calendarSettings } from "#/db/schema.ts";
+import { logger } from "#/lib/logger.server.ts";
 import { getRequiredSession } from "#/lib/session.server.ts";
 import type { AppSettingsSave, ProfileSettings } from "./app-settings.types.ts";
 import { DEFAULT_PROFILE_SETTINGS } from "./app-settings.types.ts";
@@ -89,5 +90,6 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
     });
 
   const training = value.training ?? (await getTrainingPlanForUser(session.user.id));
+  logger.info("settings.saved", { hasTraining: Boolean(training) });
   return { profile: value.profile, settings: parsed, training };
 }

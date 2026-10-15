@@ -26,7 +26,7 @@ export function ActivityMap(props: ActivityMapProps) {
   }, []);
 
   if (!View) {
-    return <Skeleton className="h-[min(48rem,calc(100dvh-16rem))] w-full rounded-xl" />;
+    return <Skeleton className="min-h-80 w-full flex-1 rounded-xl" />;
   }
   return <View {...props} />;
 }
