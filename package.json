@@ -10,6 +10,7 @@
     "generate-routes": "tsr generate",
     "build": "vp build",
     "preview": "vp preview",
+    "start": "vp preview --host 0.0.0.0 --port 3000",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
