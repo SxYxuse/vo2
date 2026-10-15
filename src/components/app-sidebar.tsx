@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
-  BikeIcon,
   CalendarDaysIcon,
   FlaskConicalIcon,
   HeartPulseIcon,
@@ -19,6 +18,8 @@ import {
 import { useTheme } from "next-themes";
 
 import { SettingsDialog } from "#/components/settings-dialog.tsx";
+import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
+import { APP_NAME } from "#/lib/brand.ts";
 import { authClient } from "#/lib/auth-client.ts";
 import { appShellQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
@@ -94,9 +95,9 @@ export function AppSidebar() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="vo" render={<Link to="/" />}>
-                <BikeIcon className="text-ds-blue-700" />
-                <span>vo</span>
+              <SidebarMenuButton size="lg" tooltip={APP_NAME} render={<Link to="/" />}>
+                <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
+                <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

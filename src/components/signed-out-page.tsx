@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BikeIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
+import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { SignInPanel } from "#/components/sync-panel.tsx";
+import { Vo2Wordmark } from "#/components/vo2-mark.tsx";
+import { APP_NAME } from "#/lib/brand.ts";
 import { Button } from "@/components/ui/button";
 
 const THEME_CYCLE = [
@@ -17,9 +19,8 @@ export function SignedOutPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       <header className="flex h-12 shrink-0 items-center justify-between px-4 pt-[max(0px,env(safe-area-inset-top))] sm:px-6">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <BikeIcon aria-hidden className="size-4 text-ds-blue-700" />
-          vo
+        <div className="flex items-center text-lg font-semibold">
+          <Vo2Wordmark />
         </div>
         <ThemeCycleButton />
       </header>
@@ -30,8 +31,8 @@ export function SignedOutPage() {
               Sign in with Strava
             </h1>
             <p className="text-muted-foreground text-sm">
-              vo imports your activities, then you can use the calendar, map, fitness, heart rate,
-              and tests.
+              {APP_NAME} imports your activities, then you can use the calendar, map, fitness, heart
+              rate, and tests.
             </p>
           </div>
           <SignInPanel description={false} />
