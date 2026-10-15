@@ -4,6 +4,7 @@ import { getActivityAnalysis, getAnalysisStatus } from "#/services/activity-anal
 import { getActivityDetail } from "#/services/activity-detail.ts";
 import { loadActivityMap } from "#/services/activity-map.ts";
 import { loadAppShell } from "#/services/app-shell.ts";
+import { loadSettingsSnapshot } from "#/services/app-settings.ts";
 import { loadAssessments } from "#/services/assessments.ts";
 import { loadHeartRate } from "#/services/heart-rate.ts";
 import { loadHomeData } from "#/services/strava-sync.ts";
@@ -18,6 +19,12 @@ export const appShellQueryOptions = queryOptions({
 export const homeQueryOptions = queryOptions({
   queryKey: ["home"],
   queryFn: () => loadHomeData(),
+  staleTime: 30_000,
+});
+
+export const settingsSnapshotQueryOptions = queryOptions({
+  queryKey: ["settings-snapshot"],
+  queryFn: () => loadSettingsSnapshot(),
   staleTime: 30_000,
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, type CSSProperties, type ReactNode } from "react";
+import { createContext, use, useMemo, type CSSProperties, type ReactNode } from "react";
 import {
   useEventCalendar,
   useEventCalendarSelector,
@@ -109,7 +109,7 @@ const EventCalendarChipContext =
 
 /** The chip's subject; usable inside renderEvent content and chip children. */
 function useEventCalendarEventChip<TData = unknown>(): EventCalendarChipContextValue<TData> {
-  const ctx = useContext(EventCalendarChipContext);
+  const ctx = use(EventCalendarChipContext);
   if (!ctx) {
     throw new Error("useEventCalendarEventChip must be used within <EventCalendarEvent>");
   }

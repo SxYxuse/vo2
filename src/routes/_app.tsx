@@ -8,13 +8,12 @@ import { appShellQueryOptions } from "#/lib/queries.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
-  beforeLoad: async ({ context, location }) => {
+  loader: async ({ context, location }) => {
     const shell = await context.queryClient.ensureQueryData(appShellQueryOptions);
     if (!shell.signedIn && location.pathname !== "/") {
       throw redirect({ to: "/" });
     }
   },
-  loader: ({ context }) => context.queryClient.ensureQueryData(appShellQueryOptions),
   component: AppLayout,
 });
 

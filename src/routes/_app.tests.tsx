@@ -1,9 +1,12 @@
+import { lazy, Suspense } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { FlaskConicalIcon } from "lucide-react";
 
-import { AssessmentTests } from "#/components/assessment-tests.tsx";
+const AssessmentTests = lazy(() =>
+  import("#/components/assessment-tests.tsx").then((mod) => ({ default: mod.AssessmentTests })),
+);
 import { SignInPanel } from "#/components/sync-panel.tsx";
 import { assessmentsQueryOptions } from "#/lib/queries.ts";
 import {
@@ -41,7 +44,9 @@ function TestsPage() {
         </p>
       </div>
       {data.signedIn ? (
-        <AssessmentTests tests={data.tests} />
+        <Suspense fallback={<Skeleton className="h-80 w-full rounded-xl" />}>
+          <AssessmentTests tests={data.tests} />
+        </Suspense>
       ) : (
         <>
           <Empty className="min-h-64 border">
@@ -65,8 +70,18 @@ function TestsPage() {
 function TestsPending() {
   return (
     <>
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-4 w-full max-w-xl" />
+      <div className="flex flex-col gap-2">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <FlaskConicalIcon aria-hidden className="size-5" />
+          Field tests
+        </h1>
+        <p className="text-muted-foreground hidden text-sm sm:block">
+          Published field tests for FTP, VO2max, and lactate-threshold heart rate. Suggested when
+          form allows — never mixed into the weekly workout bucket. After you do one, open the
+          Strava activity and flag it as that test so the result is stored. Turn protocols on or off
+          in Settings.
+        </p>
+      </div>
       <Skeleton className="h-80 w-full rounded-xl" />
     </>
   );

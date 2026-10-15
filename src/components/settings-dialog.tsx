@@ -12,6 +12,7 @@ import {
   assessmentsQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
+  settingsSnapshotQueryOptions,
 } from "#/lib/queries.ts";
 import {
   profileFromForm,
@@ -46,6 +47,7 @@ import {
   ProfileFields,
   TrainingPaceFields,
   TrainingStyleFields,
+  TrainingDoubleDaysField,
   TrainingWeekFields,
 } from "#/components/settings-fields.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -118,24 +120,29 @@ export function SettingsDialog({
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const { data } = useQuery({ ...homeQueryOptions, enabled: open });
+  const { data } = useQuery({ ...settingsSnapshotQueryOptions, enabled: open });
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const avgHours = useMemo(
     () => (data ? recentAverageWeeklyHours(data.fitnessLoads, timeZone) : 0),
-    [data, timeZone],
+    [data?.fitnessLoads, timeZone],
   );
   const [section, setSection] = useState<SettingsSection>("profile");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const emptyDefaults = useMemo(
+    () =>
+      settingsFormDefaults({
+        profile: null,
+        training: null,
+        sportTypes: {},
+        sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
+        avgHours: 5,
+        timeZone,
+      }),
+    [timeZone],
+  );
   const form = useForm<SettingsFormInput, unknown, SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
-    defaultValues: settingsFormDefaults({
-      profile: null,
-      training: null,
-      sportTypes: {},
-      sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
-      avgHours: 5,
-      timeZone,
-    }),
+    defaultValues: emptyDefaults,
     mode: "onSubmit",
     reValidateMode: "onChange",
   });
@@ -156,7 +163,7 @@ export function SettingsDialog({
         timeZone,
       }),
     );
-  }, [open, data, timeZone, form]);
+  }, [open, data?.profile, data?.training, data?.settings, data?.fitnessLoads, timeZone, form]);
 
   const sortedSports = useMemo(() => sortSportTypeKeys(sportTypes), [sportTypes]);
   const shareableGroups = useMemo(
@@ -172,6 +179,9 @@ export function SettingsDialog({
     mutationFn: saveAppSettings,
     onSuccess: (saved) => {
       queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
+        current ? { ...current, settings: saved.settings, training: saved.training } : current,
+      );
+      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
         current
           ? {
               ...current,
@@ -186,6 +196,7 @@ export function SettingsDialog({
       );
       void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
+      void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
@@ -266,6 +277,7 @@ export function SettingsDialog({
                         setValue={form.setValue}
                         avgHours={avgHours}
                       />
+                      <TrainingDoubleDaysField idPrefix="settings" control={form.control} />
                       <TrainingStyleFields
                         idPrefix="settings"
                         control={form.control}

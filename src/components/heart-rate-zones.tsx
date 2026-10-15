@@ -121,13 +121,6 @@ export function HeartRateZones({
     selectedType === ALL_SPORTS
       ? overall
       : (sports.find((sport) => sport.sportType === selectedType) ?? overall);
-  const totalSeconds = selected.sampleSeconds;
-  const zoneShare = selected.zones.map((zone) => ({
-    ...zone,
-    def: HR_ZONES.find((item) => item.id === zone.id) ?? HR_ZONES[0],
-    pct: totalSeconds > 0 ? (zone.seconds / totalSeconds) * 100 : 0,
-  }));
-
   if (!data.overall.activityCount) {
     return (
       <Empty className="min-h-64 border">
@@ -154,6 +147,13 @@ export function HeartRateZones({
       </Empty>
     );
   }
+
+  const totalSeconds = selected.sampleSeconds;
+  const zoneShare = selected.zones.map((zone) => ({
+    ...zone,
+    def: HR_ZONES.find((item) => item.id === zone.id) ?? HR_ZONES[0],
+    pct: totalSeconds > 0 ? (zone.seconds / totalSeconds) * 100 : 0,
+  }));
 
   return (
     <div className="flex flex-col gap-4">

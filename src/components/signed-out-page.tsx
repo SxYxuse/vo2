@@ -35,7 +35,7 @@ export function SignedOutPage() {
               rate, and tests.
             </p>
           </div>
-          <SignInPanel description={false} />
+          <SignInPanel />
         </div>
       </main>
     </div>

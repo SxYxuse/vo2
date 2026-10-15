@@ -110,6 +110,8 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
                 // (and hear how full one is) instead of arrowing every row.
                 role="group"
                 aria-label={`${weekday}, ${dayDate}, ${settings.i18n.labels.events(items.length)}`}
+                className="content-visibility-auto"
+                style={{ contentVisibility: "auto", containIntrinsicSize: "auto 8rem" }}
               >
                 {/* Group header: weekday (leading) + full date (trailing) */}
                 <div

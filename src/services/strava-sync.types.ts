@@ -1,6 +1,4 @@
-import type { ProfileSettings } from "./app-settings.types.ts";
 import type { CalendarSettings } from "./calendar-settings.types.ts";
-import type { FitnessLoad } from "./training-load.ts";
 import type { PlannedSession, TrainingPlan } from "./training-plan.types.ts";
 
 export type CalendarActivity = {
@@ -35,10 +33,7 @@ export type SyncStatus = {
 export type HomeData = {
   signedIn: boolean;
   activities: CalendarActivity[];
-  fitnessLoads: FitnessLoad[];
-  status: SyncStatus | null;
   settings: CalendarSettings;
-  profile: ProfileSettings;
   training: TrainingPlan | null;
   plannedSessions: PlannedSession[];
 };

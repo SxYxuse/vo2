@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
@@ -17,8 +17,13 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import { OnboardingDialog } from "#/components/onboarding-dialog.tsx";
-import { SettingsDialog } from "#/components/settings-dialog.tsx";
+const OnboardingDialog = lazy(() =>
+  import("#/components/onboarding-dialog.tsx").then((mod) => ({ default: mod.OnboardingDialog })),
+);
+const SettingsDialog = lazy(() =>
+  import("#/components/settings-dialog.tsx").then((mod) => ({ default: mod.SettingsDialog })),
+);
+
 import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
 import { APP_NAME } from "#/lib/brand.ts";
 import { authClient } from "#/lib/auth-client.ts";
@@ -72,6 +77,17 @@ const NAV_ITEMS = [
   { title: "Tests", to: "/tests", icon: FlaskConicalIcon },
 ] as const;
 
+function preloadSettingsDialog() {
+  void import("#/components/onboarding-dialog.tsx");
+  void import("#/components/settings-dialog.tsx");
+}
+
+function preloadRouteChunk(to: (typeof NAV_ITEMS)[number]["to"]) {
+  if (to === "/map") void import("#/components/activity-map.tsx");
+  if (to === "/fitness") void import("#/components/fitness-chart.tsx");
+  if (to === "/tests") void import("#/components/assessment-tests.tsx");
+}
+
 export function AppSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { isMobile, setOpenMobile } = useSidebar();
@@ -88,7 +104,9 @@ export function AppSidebar() {
   );
 
   useEffect(() => {
-    if (trainingMissing) setOnboardingOpen(true);
+    if (!trainingMissing) return;
+    preloadSettingsDialog();
+    setOnboardingOpen(true);
   }, [trainingMissing]);
 
   return (
@@ -117,6 +135,8 @@ export function AppSidebar() {
                       render={
                         <Link
                           to={item.to}
+                          onMouseEnter={() => preloadRouteChunk(item.to)}
+                          onFocus={() => preloadRouteChunk(item.to)}
                           onClick={() => {
                             if (isMobile) setOpenMobile(false);
                           }}
@@ -133,25 +153,42 @@ export function AppSidebar() {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarUserMenu onOpenSettings={() => setSettingsOpen(true)} />
+          <SidebarUserMenu
+            onOpenSettings={() => setSettingsOpen(true)}
+            onHoverSettings={preloadSettingsDialog}
+          />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
-      {user ? (
-        <>
-          <OnboardingDialog
-            open={onboardingOpen}
-            onOpenChange={setOnboardingOpen}
-            userName={user.name}
-          />
-          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} userName={user.name} />
-        </>
+      {user && (onboardingOpen || settingsOpen) ? (
+        <Suspense fallback={null}>
+          {onboardingOpen ? (
+            <OnboardingDialog
+              open={onboardingOpen}
+              onOpenChange={setOnboardingOpen}
+              userName={user.name}
+            />
+          ) : null}
+          {settingsOpen ? (
+            <SettingsDialog
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              userName={user.name}
+            />
+          ) : null}
+        </Suspense>
       ) : null}
     </>
   );
 }
 
-function SidebarUserMenu({ onOpenSettings }: { onOpenSettings: () => void }) {
+function SidebarUserMenu({
+  onOpenSettings,
+  onHoverSettings,
+}: {
+  onOpenSettings: () => void;
+  onHoverSettings: () => void;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isMobile } = useSidebar();
@@ -250,6 +287,8 @@ function SidebarUserMenu({ onOpenSettings }: { onOpenSettings: () => void }) {
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem
+                      onMouseEnter={onHoverSettings}
+                      onFocus={onHoverSettings}
                       onClick={() => {
                         onOpenSettings();
                       }}

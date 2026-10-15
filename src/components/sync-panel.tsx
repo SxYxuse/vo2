@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
@@ -12,6 +12,7 @@ import {
   fitnessQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
+  settingsSnapshotQueryOptions,
 } from "#/lib/queries.ts";
 import { syncStrava } from "#/services/strava-sync.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,12 +29,15 @@ export function SyncPanel() {
       setError(null);
       while (true) {
         const result = await syncStrava();
-        await queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
-        await queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
-        await queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
-        await queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
-        await queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey });
-        await router.invalidate();
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey }),
+          queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
+          queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey }),
+          queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey }),
+          queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey }),
+          queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
+          router.invalidate(),
+        ]);
         if (result.done) return result;
         if (result.pausedUntil) {
           setError(
@@ -65,7 +69,9 @@ export function SyncPanel() {
       disabled={sync.isPending}
     >
       {sync.isPending ? (
-        <Loader2Icon data-icon="inline-start" className="animate-spin" />
+        <span data-icon="inline-start" className="inline-flex animate-spin">
+          <Loader2Icon />
+        </span>
       ) : (
         <RefreshCwIcon data-icon="inline-start" />
       )}
@@ -74,18 +80,13 @@ export function SyncPanel() {
   );
 }
 
-export function SignInPanel({ description = true }: { description?: boolean } = {}) {
+export function SignInPanel({ children }: { children?: ReactNode } = {}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col items-start gap-3">
-      {description ? (
-        <p className="text-muted-foreground max-w-xl text-sm">
-          Connect Strava to import every activity and its streams into local Postgres. Rate limits
-          are respected automatically.
-        </p>
-      ) : null}
+      {children}
       <Button
         className="w-full sm:w-auto"
         disabled={pending}

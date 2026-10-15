@@ -1,6 +1,16 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  startTransition,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
@@ -40,6 +50,7 @@ import {
   useEventCalendarSelector,
   useEventCalendarSettings,
   useEventCalendarViewConfig,
+  type EventCalendarRenderEventProps,
 } from "@/components/reui/event-calendar/event-calendar";
 import { EventCalendarContent } from "@/components/reui/event-calendar/event-calendar-content";
 import { EventCalendarEvent } from "@/components/reui/event-calendar/event-calendar-event";
@@ -136,6 +147,89 @@ function MissingHeartrateMark() {
       className="text-warning size-2.5 shrink-0"
       aria-hidden
     />
+  );
+}
+
+function prefetchActivityDetail(queryClient: ReturnType<typeof useQueryClient>, id: string) {
+  void queryClient.prefetchQuery(activityDetailQueryOptions(id));
+  void import("#/components/activity-detail-dialog.tsx");
+}
+
+function CalendarEventChip({
+  occurrence,
+}: {
+  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+}) {
+  const queryClient = useQueryClient();
+  const activity = occurrence.event.data;
+  return (
+    <span
+      className="contents"
+      onPointerEnter={() => prefetchActivityDetail(queryClient, occurrence.event.id)}
+    >
+      <span
+        aria-hidden
+        data-slot="event-calendar-event-dot"
+        className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
+      />
+      <span className="hidden truncate font-medium sm:inline">{occurrence.event.title}</span>
+      {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+    </span>
+  );
+}
+
+function renderCalendarEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+  return <CalendarEventChip occurrence={occurrence} />;
+}
+
+function renderCalendarEventTooltip({
+  occurrence,
+}: {
+  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+}) {
+  const activity = occurrence.event.data;
+  if (!activity) return occurrence.event.title;
+  const when = formatActivityClockRange(activity.start, activity.end);
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium">{activity.title}</span>
+        {isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+      </span>
+      {when ? <span>{when}</span> : null}
+      {isMissingHeartrate(activity) ? <span>No heart rate</span> : null}
+    </span>
+  );
+}
+
+function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+  const activity = occurrence.event.data;
+  const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
+  const meta = activity
+    ? [
+        when,
+        formatDuration(activity.movingTime),
+        activity.distance != null ? formatDistanceKm(activity.distance) : null,
+        formatSportType(activity.sportType),
+      ].filter(Boolean)
+    : [];
+  return (
+    <>
+      <span
+        aria-hidden
+        data-slot="event-calendar-agenda-dot"
+        className="size-2 shrink-0 rounded-full bg-(--ec-event-color)"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-1">
+          <span className="truncate text-sm font-medium">{occurrence.event.title}</span>
+          {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
+        </span>
+        {meta.length ? (
+          <span className="text-muted-foreground truncate text-xs">{meta.join(" · ")}</span>
+        ) : null}
+      </span>
+    </>
   );
 }
 
@@ -298,10 +392,57 @@ function SettingsSelect({
   );
 }
 
+function CalendarTimeGridFields({
+  settings,
+  patch,
+}: {
+  settings: CalendarSettings;
+  patch: (partial: Partial<CalendarSettings>) => void;
+}) {
+  return (
+    <TabsContent value="time">
+      <FieldGroup className="gap-3">
+        <SettingsSelect
+          id="ec-set-day-start"
+          label="Day starts"
+          value={settings.dayStartHour}
+          options={[
+            { value: 0, label: "00:00" },
+            { value: 6, label: "06:00" },
+            { value: 8, label: "08:00" },
+          ]}
+          onValueChange={(dayStartHour) => patch({ dayStartHour: Number(dayStartHour) })}
+        />
+        <SettingsSelect
+          id="ec-set-day-end"
+          label="Day ends"
+          value={settings.dayEndHour}
+          options={[
+            { value: 18, label: "18:00" },
+            { value: 20, label: "20:00" },
+            { value: 24, label: "24:00" },
+          ]}
+          onValueChange={(dayEndHour) => patch({ dayEndHour: Number(dayEndHour) })}
+        />
+        <SettingsSelect
+          id="ec-set-interval"
+          label="Grid interval"
+          value={settings.interval}
+          options={[
+            { value: 30, label: "30 min" },
+            { value: 60, label: "60 min" },
+          ]}
+          onValueChange={(interval) => patch({ interval: Number(interval) })}
+        />
+      </FieldGroup>
+    </TabsContent>
+  );
+}
+
 function CalendarSettingsForm({
   settings,
   settingsTab,
-  isTimeGridView,
+  timeGrid,
   saveError,
   onSettingsTabChange,
   patch,
@@ -309,7 +450,7 @@ function CalendarSettingsForm({
 }: {
   settings: CalendarSettings;
   settingsTab: string;
-  isTimeGridView: boolean;
+  timeGrid?: ReactNode;
   saveError: string | null;
   onSettingsTabChange: (tab: string) => void;
   patch: (partial: Partial<CalendarSettings>) => void;
@@ -326,7 +467,7 @@ function CalendarSettingsForm({
       >
         <TabsList className="h-auto w-full flex-wrap">
           <TabsTrigger value="view">View</TabsTrigger>
-          {isTimeGridView ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
+          {timeGrid ? <TabsTrigger value="time">Time grid</TabsTrigger> : null}
           <TabsTrigger value="region">Region</TabsTrigger>
         </TabsList>
         <TabsContent value="view">
@@ -377,42 +518,7 @@ function CalendarSettingsForm({
             />
           </FieldGroup>
         </TabsContent>
-        <TabsContent value="time">
-          <FieldGroup className="gap-3">
-            <SettingsSelect
-              id="ec-set-day-start"
-              label="Day starts"
-              value={settings.dayStartHour}
-              options={[
-                { value: 0, label: "00:00" },
-                { value: 6, label: "06:00" },
-                { value: 8, label: "08:00" },
-              ]}
-              onValueChange={(dayStartHour) => patch({ dayStartHour: Number(dayStartHour) })}
-            />
-            <SettingsSelect
-              id="ec-set-day-end"
-              label="Day ends"
-              value={settings.dayEndHour}
-              options={[
-                { value: 18, label: "18:00" },
-                { value: 20, label: "20:00" },
-                { value: 24, label: "24:00" },
-              ]}
-              onValueChange={(dayEndHour) => patch({ dayEndHour: Number(dayEndHour) })}
-            />
-            <SettingsSelect
-              id="ec-set-interval"
-              label="Grid interval"
-              value={settings.interval}
-              options={[
-                { value: 30, label: "30 min" },
-                { value: 60, label: "60 min" },
-              ]}
-              onValueChange={(interval) => patch({ interval: Number(interval) })}
-            />
-          </FieldGroup>
-        </TabsContent>
+        {timeGrid}
         <TabsContent value="region">
           <FieldGroup className="gap-3">
             <SettingsSelect
@@ -580,6 +686,33 @@ export function ActivityCalendar({
       });
   }, [activities, settings.sportTypes, timeZone]);
 
+  const resetSettings = useCallback(() => {
+    setSettings((current) =>
+      mergeCalendarSettings(
+        {
+          ...DEFAULT_CALENDAR_SETTINGS,
+          sportTypes: current.sportTypes,
+          sportGroupShares: current.sportGroupShares,
+        },
+        sportTypeNames,
+      ),
+    );
+  }, [sportTypeNames]);
+
+  const settingsForm = (
+    <CalendarSettingsForm
+      settings={settings}
+      settingsTab={settingsTab}
+      timeGrid={
+        isTimeGridView ? <CalendarTimeGridFields settings={settings} patch={patch} /> : null
+      }
+      saveError={saveError}
+      onSettingsTabChange={setSettingsTab}
+      patch={patch}
+      onReset={resetSettings}
+    />
+  );
+
   return (
     <Card className="flex min-h-80 flex-1 flex-col py-0 md:h-[720px] md:flex-none">
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
@@ -588,7 +721,7 @@ export function ActivityCalendar({
             events={events}
             view={activeView}
             views={isDesktop ? DESKTOP_CALENDAR_VIEWS : MOBILE_CALENDAR_VIEWS}
-            onViewChange={setView}
+            onViewChange={(next) => startTransition(() => setView(next))}
             locale={enUS}
             timeZone={timeZone}
             i18n={{
@@ -596,74 +729,9 @@ export function ActivityCalendar({
                 formatEventAriaLabel: (title) => title,
               },
             }}
-            renderEvent={({ occurrence }) => {
-              const activity = occurrence.event.data as CalendarActivity | undefined;
-              return (
-                <span
-                  className="contents"
-                  onPointerEnter={() => {
-                    void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    data-slot="event-calendar-event-dot"
-                    className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
-                  />
-                  <span className="hidden truncate font-medium sm:inline">
-                    {occurrence.event.title}
-                  </span>
-                  {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-                </span>
-              );
-            }}
-            renderEventTooltip={({ occurrence }) => {
-              const activity = occurrence.event.data as CalendarActivity | undefined;
-              if (!activity) return occurrence.event.title;
-              const when = formatActivityClockRange(activity.start, activity.end);
-              return (
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-1.5">
-                    <span className="font-medium">{activity.title}</span>
-                    {isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-                  </span>
-                  {when ? <span>{when}</span> : null}
-                  {isMissingHeartrate(activity) ? <span>No heart rate</span> : null}
-                </span>
-              );
-            }}
-            renderAgendaEvent={({ occurrence }) => {
-              const activity = occurrence.event.data as CalendarActivity | undefined;
-              const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
-              const meta = activity
-                ? [
-                    when,
-                    formatDuration(activity.movingTime),
-                    activity.distance != null ? formatDistanceKm(activity.distance) : null,
-                    formatSportType(activity.sportType),
-                  ].filter(Boolean)
-                : [];
-              return (
-                <>
-                  <span
-                    aria-hidden
-                    data-slot="event-calendar-agenda-dot"
-                    className="size-2 shrink-0 rounded-full bg-(--ec-event-color)"
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="flex min-w-0 items-center gap-1">
-                      <span className="truncate text-sm font-medium">{occurrence.event.title}</span>
-                      {activity && isMissingHeartrate(activity) ? <MissingHeartrateMark /> : null}
-                    </span>
-                    {meta.length ? (
-                      <span className="text-muted-foreground truncate text-xs">
-                        {meta.join(" · ")}
-                      </span>
-                    ) : null}
-                  </span>
-                </>
-              );
-            }}
+            renderEvent={renderCalendarEvent}
+            renderEventTooltip={renderCalendarEventTooltip}
+            renderAgendaEvent={renderAgendaEvent}
             viewSettings={settings.viewSettings}
             onViewSettingsChange={(viewSettings) =>
               patch({
@@ -678,7 +746,7 @@ export function ActivityCalendar({
             interactions={DISABLED_INTERACTIONS}
             onEventClick={(occurrence, event) => {
               event.preventDefault();
-              void queryClient.prefetchQuery(activityDetailQueryOptions(occurrence.event.id));
+              prefetchActivityDetail(queryClient, occurrence.event.id);
               onSelectActivity(occurrence.event.id);
             }}
             weekStartsOn={settings.weekStartsOn}
@@ -687,7 +755,6 @@ export function ActivityCalendar({
             interval={settings.interval}
             snapDuration={settings.snapDuration}
             eventTooltip
-            showDayAddButton={false}
             offDays
             className="h-full min-h-80 w-full min-w-0 flex-1"
           >
@@ -740,26 +807,7 @@ export function ActivityCalendar({
                         className="w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden"
                       >
                         <PopoverTitle>Calendar settings</PopoverTitle>
-                        <CalendarSettingsForm
-                          settings={settings}
-                          settingsTab={settingsTab}
-                          isTimeGridView={isTimeGridView}
-                          saveError={saveError}
-                          onSettingsTabChange={setSettingsTab}
-                          patch={patch}
-                          onReset={() =>
-                            setSettings(
-                              mergeCalendarSettings(
-                                {
-                                  ...DEFAULT_CALENDAR_SETTINGS,
-                                  sportTypes: settings.sportTypes,
-                                  sportGroupShares: settings.sportGroupShares,
-                                },
-                                sportTypeNames,
-                              ),
-                            )
-                          }
-                        />
+                        {settingsForm}
                       </PopoverContent>
                     </Popover>
                   ) : (
@@ -776,28 +824,7 @@ export function ActivityCalendar({
                         <SheetHeader>
                           <SheetTitle>Calendar settings</SheetTitle>
                         </SheetHeader>
-                        <div className="flex flex-col gap-3 px-6 pb-2">
-                          <CalendarSettingsForm
-                            settings={settings}
-                            settingsTab={settingsTab}
-                            isTimeGridView={isTimeGridView}
-                            saveError={saveError}
-                            onSettingsTabChange={setSettingsTab}
-                            patch={patch}
-                            onReset={() =>
-                              setSettings(
-                                mergeCalendarSettings(
-                                  {
-                                    ...DEFAULT_CALENDAR_SETTINGS,
-                                    sportTypes: settings.sportTypes,
-                                    sportGroupShares: settings.sportGroupShares,
-                                  },
-                                  sportTypeNames,
-                                ),
-                              )
-                            }
-                          />
-                        </div>
+                        <div className="flex flex-col gap-3 px-6 pb-2">{settingsForm}</div>
                       </SheetContent>
                     </Sheet>
                   )}
@@ -820,7 +847,7 @@ export function ActivityCalendar({
           <Skeleton className="min-h-80 flex-1 rounded-none md:min-h-[720px]" />
         )}
         {selectedActivityId ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
             <ActivityDetailDialog
               activityId={selectedActivityId}
               preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
@@ -832,7 +859,7 @@ export function ActivityCalendar({
           </Suspense>
         ) : null}
         {selectedPlanId ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
             <PlannedSessionDialog
               session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
               onOpenChange={(open) => {

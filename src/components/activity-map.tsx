@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ComponentType } from "react";
+import { lazy, Suspense } from "react";
 
 import type { CalendarSettings } from "#/services/calendar-settings.types.ts";
 import type { ActivityMapTrack } from "#/services/activity-map.types.ts";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export type ActivityMapProps = {
@@ -12,21 +13,27 @@ export type ActivityMapProps = {
   sportGroupShares: CalendarSettings["sportGroupShares"];
 };
 
+const ActivityMapView = lazy(() =>
+  import("./activity-map-view.tsx").then((mod) => ({ default: mod.ActivityMapView })),
+);
+
 export function ActivityMap(props: ActivityMapProps) {
-  const [View, setView] = useState<ComponentType<ActivityMapProps> | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void import("./activity-map-view.tsx").then((mod) => {
-      if (!cancelled) setView(() => mod.ActivityMapView);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (!View) {
-    return <Skeleton className="min-h-80 w-full flex-1 rounded-xl" />;
+  if (props.tracks.length === 0) {
+    return (
+      <Empty className="min-h-80 border">
+        <EmptyHeader>
+          <EmptyTitle>No GPS tracks yet</EmptyTitle>
+          <EmptyDescription>
+            Sync outdoor activities from Strava that include a map. Indoor sessions without a GPS
+            path stay off this view.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
   }
-  return <View {...props} />;
+  return (
+    <Suspense fallback={<Skeleton className="min-h-80 w-full flex-1 rounded-xl" />}>
+      <ActivityMapView {...props} />
+    </Suspense>
+  );
 }

@@ -44,10 +44,12 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     return null;
   }
 
-  const preview = isChartPreview(row.chartPreview)
-    ? row.chartPreview
-    : await loadAndStoreChartPreview(id, Boolean(row.streamsSyncedAt));
-  const fieldTest = await fieldTestForActivity(session.user.id, id);
+  const [preview, fieldTest] = await Promise.all([
+    isChartPreview(row.chartPreview)
+      ? row.chartPreview
+      : loadAndStoreChartPreview(id, Boolean(row.streamsSyncedAt)),
+    fieldTestForActivity(session.user.id, id),
+  ]);
   logger.debug("activity_detail.loaded", {
     activityId: id,
     hasStreams: Boolean(row.streamsSyncedAt),

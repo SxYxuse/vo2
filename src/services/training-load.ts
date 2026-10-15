@@ -108,28 +108,44 @@ function durationIntensity(sportType: string) {
   return 0.55;
 }
 
+export function estimateFtpAndLthr(activities: LoadInputs[]) {
+  const ftpSamples: number[] = [];
+  const hrAverages: number[] = [];
+  let peak = 0;
+  for (const activity of activities) {
+    const maxHr = activity.maxHeartrate ?? 0;
+    if (maxHr > peak) peak = maxHr;
+    if (activity.averageHeartrate != null && activity.averageHeartrate > 80) {
+      hrAverages.push(activity.averageHeartrate);
+    }
+    if (
+      CYCLING_SPORTS.has(activity.sportType) &&
+      activity.deviceWatts &&
+      activity.movingTime >= 40 * 60
+    ) {
+      const watts = activity.weightedAverageWatts ?? activity.averageWatts;
+      if (watts != null && watts > 50) ftpSamples.push(watts);
+    }
+  }
+  const ftpEstimate = percentile(ftpSamples, 0.9);
+  return {
+    ftp: ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null,
+    lthr:
+      peak >= 140
+        ? Math.round(peak * 0.85)
+        : (() => {
+            const p90 = percentile(hrAverages, 0.9);
+            return p90 ? Math.round(p90 * 1.05) : null;
+          })(),
+  };
+}
+
 export function estimateFtp(activities: LoadInputs[]) {
-  const samples = activities
-    .filter(
-      (activity) =>
-        CYCLING_SPORTS.has(activity.sportType) &&
-        activity.deviceWatts &&
-        activity.movingTime >= 40 * 60,
-    )
-    .map((activity) => activity.weightedAverageWatts ?? activity.averageWatts)
-    .filter((value): value is number => value != null && value > 50);
-  const estimate = percentile(samples, 0.9);
-  return estimate && estimate > 80 ? estimate : null;
+  return estimateFtpAndLthr(activities).ftp;
 }
 
 export function estimateLthr(activities: LoadInputs[]) {
-  const peak = Math.max(0, ...activities.map((activity) => activity.maxHeartrate ?? 0));
-  if (peak >= 140) return Math.round(peak * 0.85);
-  const averages = activities
-    .map((activity) => activity.averageHeartrate)
-    .filter((value): value is number => value != null && value > 80);
-  const p90 = percentile(averages, 0.9);
-  return p90 ? Math.round(p90 * 1.05) : null;
+  return estimateFtpAndLthr(activities).lthr;
 }
 
 export function activityTrainingLoad(
@@ -185,8 +201,11 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
     byDay.set(key, current);
   }
 
-  const starts = loads.map((sample) => zonedDayStart(new Date(sample.start), timeZone));
-  const first = starts.reduce((min, day) => (day < min ? day : min));
+  let first = zonedDayStart(new Date(loads[0].start), timeZone);
+  for (let index = 1; index < loads.length; index += 1) {
+    const day = zonedDayStart(new Date(loads[index].start), timeZone);
+    if (day < first) first = day;
+  }
   const last = zonedDayStart(new Date(), timeZone);
 
   const points: PmcPoint[] = [];

@@ -330,11 +330,15 @@ export function buildActivitySamples(input: {
 }
 
 function availableStreams(samples: ActivitySample[]): AnalysisStreamKey[] {
-  const present: AnalysisStreamKey[] = [];
-  for (const key of ANALYSIS_STREAMS) {
-    if (samples.some((sample) => sampleValueFor(sample, key) != null)) present.push(key);
+  const present = new Set<AnalysisStreamKey>();
+  for (const sample of samples) {
+    for (const key of ANALYSIS_STREAMS) {
+      if (present.has(key)) continue;
+      if (sampleValueFor(sample, key) != null) present.add(key);
+    }
+    if (present.size === ANALYSIS_STREAMS.length) break;
   }
-  return present;
+  return ANALYSIS_STREAMS.filter((key) => present.has(key));
 }
 
 export function sampleValueFor(sample: ActivitySample, key: AnalysisStreamKey) {
@@ -381,18 +385,16 @@ function segmentStats(
   const slice = samples.slice(start, end + 1);
   const first = slice[0];
   const last = slice[end - start];
-  const hrs = slice
-    .map((sample) => sample.heartrate)
-    .filter((value): value is number => value != null);
-  const speeds = slice
-    .map((sample) => sample.speedKmh)
-    .filter((value): value is number => value != null);
-  const watts = slice
-    .map((sample) => sample.watts)
-    .filter((value): value is number => value != null && value > 0);
-  const grades = slice
-    .map((sample) => sample.gradePct)
-    .filter((value): value is number => value != null);
+  const hrs: number[] = [];
+  const speeds: number[] = [];
+  const watts: number[] = [];
+  const grades: number[] = [];
+  for (const sample of slice) {
+    if (sample.heartrate != null) hrs.push(sample.heartrate);
+    if (sample.speedKmh != null) speeds.push(sample.speedKmh);
+    if (sample.watts != null && sample.watts > 0) watts.push(sample.watts);
+    if (sample.gradePct != null) grades.push(sample.gradePct);
+  }
   const lookbackT = first.t - 45;
   const before = samples.filter(
     (sample) => sample.t >= lookbackT && sample.t < first.t && sample.heartrate != null,
@@ -456,22 +458,9 @@ function withoutIndexes(segment: IndexedSegment): TerrainSegment {
   return rest;
 }
 
-export function detectElevationSegments(
-  samples: ActivitySample[],
-  sportType?: string,
-): ElevationSegmentsReport {
-  const notes: string[] = [];
+function indexedTerrainSegments(samples: ActivitySample[], sportType?: string) {
   if (!samples.some((sample) => sample.altitudeM != null || sample.gradePct != null)) {
-    return {
-      climbs: [],
-      descents: [],
-      climbCount: 0,
-      otherClimbCount: 0,
-      hikeClimbCount: 0,
-      descentCount: 0,
-      climbGainM: 0,
-      notes: ["No elevation or grade stream."],
-    };
+    return [] as IndexedSegment[];
   }
   const raw: IndexedSegment[] = [];
   let start = 0;
@@ -487,7 +476,36 @@ export function detectElevationSegments(
     if (keep) raw.push(segment);
     start = index;
   }
-  const merged = mergeNearbyClimbs(raw, samples, sportType);
+  return mergeNearbyClimbs(raw, samples, sportType);
+}
+
+function indexedElevationClimbs(samples: ActivitySample[], sportType?: string) {
+  return indexedTerrainSegments(samples, sportType)
+    .filter((segment) => segment.kind === "climb")
+    .sort((a, b) => b.elevationDeltaM - a.elevationDeltaM);
+}
+
+export function detectElevationSegments(
+  samples: ActivitySample[],
+  sportType?: string,
+): ElevationSegmentsReport {
+  const notes: string[] = [];
+  const merged = indexedTerrainSegments(samples, sportType);
+  if (
+    !merged.length &&
+    !samples.some((sample) => sample.altitudeM != null || sample.gradePct != null)
+  ) {
+    return {
+      climbs: [],
+      descents: [],
+      climbCount: 0,
+      otherClimbCount: 0,
+      hikeClimbCount: 0,
+      descentCount: 0,
+      climbGainM: 0,
+      notes: ["No elevation or grade stream."],
+    };
+  }
   const climbs = merged
     .filter((segment) => segment.kind === "climb")
     .sort((a, b) => b.elevationDeltaM - a.elevationDeltaM)
@@ -672,37 +690,48 @@ function percentile(values: number[], p: number) {
   return sorted[low] * (high - index) + sorted[high] * (index - low);
 }
 
+function bandIndexForGrade(grade: number) {
+  for (let index = 0; index < GRADE_BANDS.length; index += 1) {
+    const band = GRADE_BANDS[index];
+    if (grade >= band.min && grade < band.max) return index;
+  }
+  return -1;
+}
+
 export function summarizeEffort(samples: ActivitySample[]): EffortReport {
   const notes: string[] = [];
-  const gradeBuckets: GradeBucket[] = GRADE_BANDS.map((band) => {
-    const slice: ActivitySample[] = [];
-    let durationSec = 0;
-    for (let index = 0; index < samples.length; index += 1) {
-      const sample = samples[index];
-      const grade = sample.gradePct;
-      if (grade == null || grade < band.min || grade >= band.max) continue;
-      slice.push(sample);
-      const next = samples[index + 1];
-      if (next) durationSec += Math.max(0, next.t - sample.t);
-    }
-    return {
-      label: band.label,
-      minGrade: band.min,
-      maxGrade: band.max,
-      durationSec,
-      avgHeartrate: mean(
-        slice.map((sample) => sample.heartrate).filter((value): value is number => value != null),
-      ),
-      avgSpeedKmh: mean(
-        slice.map((sample) => sample.speedKmh).filter((value): value is number => value != null),
-      ),
-      avgWatts: mean(
-        slice
-          .map((sample) => sample.watts)
-          .filter((value): value is number => value != null && value > 0),
-      ),
-    };
-  }).filter((bucket) => bucket.durationSec >= 20);
+  const buckets = GRADE_BANDS.map((band) => ({
+    label: band.label,
+    minGrade: band.min,
+    maxGrade: band.max,
+    durationSec: 0,
+    hrs: [] as number[],
+    speeds: [] as number[],
+    watts: [] as number[],
+  }));
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index];
+    if (sample.gradePct == null) continue;
+    const bandIndex = bandIndexForGrade(sample.gradePct);
+    if (bandIndex < 0) continue;
+    const bucket = buckets[bandIndex];
+    const next = samples[index + 1];
+    if (next) bucket.durationSec += Math.max(0, next.t - sample.t);
+    if (sample.heartrate != null) bucket.hrs.push(sample.heartrate);
+    if (sample.speedKmh != null) bucket.speeds.push(sample.speedKmh);
+    if (sample.watts != null && sample.watts > 0) bucket.watts.push(sample.watts);
+  }
+  const gradeBuckets: GradeBucket[] = buckets
+    .filter((bucket) => bucket.durationSec >= 20)
+    .map((bucket) => ({
+      label: bucket.label,
+      minGrade: bucket.minGrade,
+      maxGrade: bucket.maxGrade,
+      durationSec: bucket.durationSec,
+      avgHeartrate: mean(bucket.hrs),
+      avgSpeedKmh: mean(bucket.speeds),
+      avgWatts: mean(bucket.watts),
+    }));
 
   const hrs = samples
     .map((sample) => sample.heartrate)
@@ -713,15 +742,12 @@ export function summarizeEffort(samples: ActivitySample[]): EffortReport {
   }
   const high = percentile(hrs, 0.75) ?? 0;
   const low = percentile(hrs, 0.4) ?? 0;
-  const climbTimes = new Set(
-    detectElevationSegments(samples).climbs.flatMap((segment) => {
-      const times: number[] = [];
-      for (const sample of samples) {
-        if (sample.t >= segment.startSec && sample.t <= segment.endSec) times.push(sample.t);
-      }
-      return times;
-    }),
-  );
+  const climbTimes = new Set<number>();
+  for (const segment of indexedElevationClimbs(samples)) {
+    for (let index = segment.startIndex; index <= segment.endIndex; index += 1) {
+      climbTimes.add(samples[index].t);
+    }
+  }
   const phases: EffortPhase[] = [];
   let start = 0;
   const kindAt = (index: number): EffortPhase["kind"] => {

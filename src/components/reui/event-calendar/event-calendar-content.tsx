@@ -1,32 +1,49 @@
 "use client";
 
-import { type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import {
   useEventCalendarSelector,
   useEventCalendarViewConfig,
 } from "@/components/reui/event-calendar/event-calendar";
-import { EventCalendarAgendaView } from "@/components/reui/event-calendar/event-calendar-agenda-view";
-import { EventCalendarMonthView } from "@/components/reui/event-calendar/event-calendar-month-view";
-import { EventCalendarResourceView } from "@/components/reui/event-calendar/event-calendar-resource-view";
-import {
-  EventCalendarDaysView,
-  EventCalendarDayView,
-  EventCalendarWeekView,
-} from "@/components/reui/event-calendar/event-calendar-time-grid";
 import type { CalendarView } from "@/components/reui/event-calendar/event-calendar-types";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 
 import { cn } from "cn";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const DEFAULT_VIEW_COMPONENTS: Record<CalendarView, ComponentType> = {
-  month: EventCalendarMonthView,
-  week: EventCalendarWeekView,
-  day: EventCalendarDayView,
-  days: EventCalendarDaysView,
-  agenda: EventCalendarAgendaView,
-  resource: EventCalendarResourceView,
-};
+const DEFAULT_VIEW_COMPONENTS = {
+  month: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-month-view").then((mod) => ({
+      default: mod.EventCalendarMonthView,
+    })),
+  ),
+  week: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-time-grid").then((mod) => ({
+      default: mod.EventCalendarWeekView,
+    })),
+  ),
+  day: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-time-grid").then((mod) => ({
+      default: mod.EventCalendarDayView,
+    })),
+  ),
+  days: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-time-grid").then((mod) => ({
+      default: mod.EventCalendarDaysView,
+    })),
+  ),
+  agenda: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-agenda-view").then((mod) => ({
+      default: mod.EventCalendarAgendaView,
+    })),
+  ),
+  resource: lazy(() =>
+    import("@/components/reui/event-calendar/event-calendar-resource-view").then((mod) => ({
+      default: mod.EventCalendarResourceView,
+    })),
+  ),
+} as Record<CalendarView, ComponentType>;
 
 interface EventCalendarContentProps extends Omit<useRender.ComponentProps<"div">, "children"> {
   /** Swap individual view implementations. */
@@ -65,7 +82,11 @@ function EventCalendarContent({
       viewConfig.classNames?.content,
       className,
     ),
-    children: children ?? <ActiveView />,
+    children: children ?? (
+      <Suspense fallback={<Skeleton className="min-h-80 flex-1 rounded-none" />}>
+        <ActiveView />
+      </Suspense>
+    ),
   };
 
   return useRender({

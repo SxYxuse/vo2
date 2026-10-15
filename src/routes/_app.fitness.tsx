@@ -69,8 +69,15 @@ function FitnessPage() {
 function FitnessPending() {
   return (
     <>
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-4 w-full max-w-xl" />
+      <div className="flex flex-col gap-2">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <TrendingUpIcon aria-hidden className="size-5" />
+          Fitness and form
+        </h1>
+        <p className="text-muted-foreground hidden text-sm sm:block">
+          Track fitness, fatigue, and form so you can keep building without overreaching.
+        </p>
+      </div>
       <Skeleton className="h-80 w-full rounded-xl" />
     </>
   );

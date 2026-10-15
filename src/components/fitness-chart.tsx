@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "cn";
 import { InfoIcon } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { readIsDesktop, useIsDesktop } from "#/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
 
 import {
   FITNESS_PERIODS,
@@ -36,6 +36,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -191,17 +192,17 @@ function Kpi({
 
 export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const isDesktop = useIsDesktop();
+  const isDesktop = useDesktopMedia();
   const periodTouched = useRef(false);
-  const [period, setPeriod] = useState<FitnessPeriod>(() => (readIsDesktop() ? "3m" : "7d"));
+  const [chosenPeriod, setChosenPeriod] = useState<FitnessPeriod | null>(null);
   const [visible, setVisible] = useState<string[]>(() => [...SERIES_KEYS]);
+  const period: FitnessPeriod = chosenPeriod ?? (isDesktop === true ? "3m" : "7d");
 
-  useEffect(() => {
-    if (periodTouched.current) return;
-    setPeriod(isDesktop ? "3m" : "7d");
-  }, [isDesktop]);
-  const pmc = useMemo(() => buildPmc(loads, timeZone), [loads, timeZone]);
-  const series = useMemo(() => slicePmc(pmc, period, timeZone), [pmc, period, timeZone]);
+  const pmc = useMemo(() => (loads.length ? buildPmc(loads, timeZone) : []), [loads, timeZone]);
+  const series = useMemo(
+    () => (pmc.length && isDesktop !== null ? slicePmc(pmc, period, timeZone) : []),
+    [pmc, period, timeZone, isDesktop],
+  );
   const latest = series.at(-1);
   const weekAgo = series.length > 7 ? series[series.length - 8] : series[0];
   const ramp = latest && weekAgo ? latest.ctl - weekAgo.ctl : 0;
@@ -259,7 +260,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
             const value = next[0];
             if (FITNESS_PERIODS.some((item) => item.id === value)) {
               periodTouched.current = true;
-              setPeriod(value as FitnessPeriod);
+              setChosenPeriod(value as FitnessPeriod);
             }
           }}
           className="flex-wrap"
@@ -273,7 +274,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
         </ToggleGroup>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {!loads.length || !latest ? (
+        {!loads.length ? (
           <Empty className="min-h-48 border">
             <EmptyHeader>
               <EmptyTitle>No training load yet</EmptyTitle>
@@ -282,6 +283,8 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
+        ) : isDesktop === null || !latest ? (
+          <Skeleton className="h-80 w-full rounded-lg" />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -290,14 +293,18 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                 value={roundLoad(latest.ctl).toFixed(1)}
                 info={SERIES_INFO.ctl}
                 color={CHART_CONFIG.ctl.color}
-                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="ctl" />}
+                sparkline={
+                  isDesktop === true ? undefined : <Sparkline data={series} dataKey="ctl" />
+                }
               />
               <Kpi
                 label="Fatigue (ATL)"
                 value={roundLoad(latest.atl).toFixed(1)}
                 info={SERIES_INFO.atl}
                 color={CHART_CONFIG.atl.color}
-                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="atl" />}
+                sparkline={
+                  isDesktop === true ? undefined : <Sparkline data={series} dataKey="atl" />
+                }
               />
               <Kpi
                 label="Form (TSB)"
@@ -306,7 +313,9 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                 info={SERIES_INFO.tsb}
                 color={CHART_CONFIG.tsb.color}
                 hintClassName={formTone(latest.tsb)}
-                sparkline={isDesktop ? undefined : <Sparkline data={series} dataKey="tsb" />}
+                sparkline={
+                  isDesktop === true ? undefined : <Sparkline data={series} dataKey="tsb" />
+                }
               />
               <Kpi
                 label="Ramp (7d)"
@@ -374,27 +383,27 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                     dataKey="t"
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={isDesktop ? 48 : 24}
+                    minTickGap={isDesktop === true ? 48 : 24}
                     tickFormatter={(value) => tickFormatter.format(new Date(Number(value)))}
                   />
                   {showPmc ? (
                     <YAxis
                       yAxisId="pmc"
-                      hide={!isDesktop}
+                      hide={isDesktop !== true}
                       tickLine={false}
                       axisLine={false}
-                      width={isDesktop ? 36 : 0}
+                      width={isDesktop === true ? 36 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}
                   {showLoad ? (
                     <YAxis
                       yAxisId="load"
-                      hide={!isDesktop}
+                      hide={isDesktop !== true}
                       orientation="right"
                       tickLine={false}
                       axisLine={false}
-                      width={isDesktop ? 32 : 0}
+                      width={isDesktop === true ? 32 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}

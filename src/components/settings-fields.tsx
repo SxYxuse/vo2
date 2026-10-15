@@ -265,18 +265,61 @@ export function TrainingPaceFields<T extends TrainingFormInput>({
   );
 }
 
+export function TrainingDoubleDaysField<T extends TrainingFormInput>({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<T>;
+}) {
+  return (
+    <Controller
+      name={"maxDoubleDays" as FieldPath<T>}
+      control={control}
+      render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor={`${idPrefix}-double-days`}>Days with two sessions</FieldLabel>
+          <Select
+            value={String(field.value)}
+            onValueChange={(next) => {
+              if (next == null) return;
+              field.onChange(Number(next));
+            }}
+          >
+            <SelectTrigger id={`${idPrefix}-double-days`} aria-invalid={fieldState.invalid}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {DOUBLE_DAY_COUNTS.map((count) => (
+                  <SelectItem key={count} value={String(count)}>
+                    {count === 0 ? "None" : count === 1 ? "1 day" : `${count} days`}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription>
+            How many days you are OK stacking a ride and a run. The bucket does not assign those
+            days — you pick when to double up.
+          </FieldDescription>
+          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+        </Field>
+      )}
+    />
+  );
+}
+
 export function TrainingWeekFields<T extends TrainingFormInput>({
   idPrefix,
   control,
   setValue,
   avgHours,
-  includeDoubleDays = true,
 }: {
   idPrefix: string;
   control: Control<T>;
   setValue: UseFormSetValue<T>;
   avgHours: number;
-  includeDoubleDays?: boolean;
 }) {
   const maxRunSessions = useWatch({
     control,
@@ -367,42 +410,6 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
             )}
           />
         </div>
-        {includeDoubleDays ? (
-          <Controller
-            name={"maxDoubleDays" as FieldPath<T>}
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${idPrefix}-double-days`}>Days with two sessions</FieldLabel>
-                <Select
-                  value={String(field.value)}
-                  onValueChange={(next) => {
-                    if (next == null) return;
-                    field.onChange(Number(next));
-                  }}
-                >
-                  <SelectTrigger id={`${idPrefix}-double-days`} aria-invalid={fieldState.invalid}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {DOUBLE_DAY_COUNTS.map((count) => (
-                        <SelectItem key={count} value={String(count)}>
-                          {count === 0 ? "None" : count === 1 ? "1 day" : `${count} days`}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <FieldDescription>
-                  How many days you are OK stacking a ride and a run. The bucket does not assign
-                  those days — you pick when to double up.
-                </FieldDescription>
-                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-              </Field>
-            )}
-          />
-        ) : null}
       </FieldSet>
       <FieldSet>
         <FieldLegend>Weekly hours</FieldLegend>

@@ -43,36 +43,38 @@ export type AnalysisRuntime = {
 };
 
 async function loadActivityAnalysisSnapshot(activityId: string, userId: string) {
-  const [row] = await db
-    .select({
-      id: activities.id,
-      name: activities.name,
-      sportType: activities.sportType,
-      movingTime: activities.movingTime,
-      distance: activities.distance,
-      totalElevationGain: activities.totalElevationGain,
-      streamsSyncedAt: activities.streamsSyncedAt,
-      time: activityStreams.time,
-      distanceStream: activityStreams.distance,
-      altitude: activityStreams.altitude,
-      gradeSmooth: activityStreams.gradeSmooth,
-      heartrate: activityStreams.heartrate,
-      watts: activityStreams.watts,
-      velocitySmooth: activityStreams.velocitySmooth,
-      cadence: activityStreams.cadence,
-    })
-    .from(activities)
-    .leftJoin(activityStreams, eq(activityStreams.activityId, activities.id))
-    .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
-    .limit(1);
-
+  const [activityRows, metricsRows] = await Promise.all([
+    db
+      .select({
+        id: activities.id,
+        name: activities.name,
+        sportType: activities.sportType,
+        movingTime: activities.movingTime,
+        distance: activities.distance,
+        totalElevationGain: activities.totalElevationGain,
+        streamsSyncedAt: activities.streamsSyncedAt,
+        time: activityStreams.time,
+        distanceStream: activityStreams.distance,
+        altitude: activityStreams.altitude,
+        gradeSmooth: activityStreams.gradeSmooth,
+        heartrate: activityStreams.heartrate,
+        watts: activityStreams.watts,
+        velocitySmooth: activityStreams.velocitySmooth,
+        cadence: activityStreams.cadence,
+      })
+      .from(activities)
+      .leftJoin(activityStreams, eq(activityStreams.activityId, activities.id))
+      .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
+      .limit(1),
+    db
+      .select({ ftp: athleteMetrics.ftp, lthr: athleteMetrics.lthr })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, userId))
+      .limit(1),
+  ]);
+  const [row] = activityRows;
   if (!row) throw new Error("Activity not found");
-
-  const [metrics] = await db
-    .select({ ftp: athleteMetrics.ftp, lthr: athleteMetrics.lthr })
-    .from(athleteMetrics)
-    .where(eq(athleteMetrics.userId, userId))
-    .limit(1);
+  const [metrics] = metricsRows;
 
   const samples = row.streamsSyncedAt
     ? buildActivitySamples({

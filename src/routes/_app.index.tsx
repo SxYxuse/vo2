@@ -80,11 +80,20 @@ function CalendarPage() {
 
 function CalendarPending() {
   return (
-    <>
-      <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-4 w-full max-w-xl" />
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-2">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <CalendarDaysIcon aria-hidden className="size-5" />
+          Activity calendar
+        </h1>
+        <p className="text-muted-foreground hidden text-sm sm:block">
+          Import Strava activities and streams into local Postgres, then browse them by day. Open
+          This week for a bucket of suggested workouts to fill when you have time. Field tests live
+          on Tests.
+        </p>
+      </div>
       <Skeleton className="h-[40rem] w-full rounded-xl" />
-    </>
+    </div>
   );
 }
 

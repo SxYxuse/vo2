@@ -1,8 +1,9 @@
 "use client";
 
-import * as React from "react";
+import { createContext, use, type ComponentProps, type ReactNode } from "react";
 import { cn } from "cn";
 
+import { useIsDesktop } from "#/hooks/use-desktop-media.ts";
 import {
   Dialog,
   DialogClose,
@@ -22,39 +23,47 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-export const DESKTOP_MQ = "(min-width: 768px)";
+export {
+  DESKTOP_MQ,
+  readIsDesktop,
+  useDesktopMedia,
+  useIsDesktop,
+} from "#/hooks/use-desktop-media.ts";
 
-const useIsoLayoutEffect = typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+const desktopOverlay = {
+  Content: DialogContent,
+  Header: DialogHeader,
+  Footer: DialogFooter,
+  Title: DialogTitle,
+  Description: DialogDescription,
+  Close: DialogClose,
+};
 
-export function readIsDesktop() {
-  return typeof window !== "undefined" && window.matchMedia(DESKTOP_MQ).matches;
+const mobileOverlay = {
+  Content: DrawerContent,
+  Header: DrawerHeader,
+  Footer: DrawerFooter,
+  Title: DrawerTitle,
+  Description: DrawerDescription,
+  Close: DrawerClose,
+};
+
+type OverlayParts = typeof desktopOverlay | typeof mobileOverlay;
+
+const OverlayContext = createContext<OverlayParts | null>(null);
+
+function useOverlay() {
+  const overlay = use(OverlayContext);
+  if (!overlay) {
+    throw new Error("ResponsiveDialog parts must be used inside ResponsiveDialog");
+  }
+  return overlay;
 }
-
-/** `null` until the viewport is measured on the client, so SSR does not assume a layout. */
-export function useDesktopMedia() {
-  const [matches, setMatches] = React.useState<boolean | null>(null);
-
-  useIsoLayoutEffect(() => {
-    const mql = window.matchMedia(DESKTOP_MQ);
-    const onChange = () => setMatches(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-
-  return matches;
-}
-
-export function useIsDesktop() {
-  return useDesktopMedia() ?? false;
-}
-
-const DesktopContext = React.createContext(false);
 
 type OverlayRootProps = {
   open?: boolean;
   onOpenChange?: (open: boolean, details?: { cancel?: () => void }) => void;
-  children?: React.ReactNode;
+  children?: ReactNode;
   disablePointerDismissal?: boolean;
 };
 
@@ -64,9 +73,10 @@ export function ResponsiveDialog({
   ...props
 }: OverlayRootProps) {
   const isDesktop = useIsDesktop();
+  const overlay = isDesktop ? desktopOverlay : mobileOverlay;
 
   return (
-    <DesktopContext.Provider value={isDesktop}>
+    <OverlayContext value={overlay}>
       {isDesktop ? (
         <Dialog {...props}>{children}</Dialog>
       ) : (
@@ -79,7 +89,7 @@ export function ResponsiveDialog({
           {children}
         </Drawer>
       )}
-    </DesktopContext.Provider>
+    </OverlayContext>
   );
 }
 
@@ -88,9 +98,9 @@ export function ResponsiveDialogContent({
   children,
   showCloseButton,
   ...props
-}: React.ComponentProps<typeof DialogContent>) {
-  const isDesktop = React.useContext(DesktopContext);
-  if (isDesktop) {
+}: ComponentProps<typeof DialogContent>) {
+  const Overlay = useOverlay();
+  if (Overlay.Content === DialogContent) {
     return (
       <DialogContent className={className} showCloseButton={showCloseButton} {...props}>
         {children}
@@ -109,43 +119,38 @@ export function ResponsiveDialogContent({
   );
 }
 
-export function ResponsiveDialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  const isDesktop = React.useContext(DesktopContext);
-  const Comp = isDesktop ? DialogHeader : DrawerHeader;
-  return <Comp className={className} {...props} />;
+export function ResponsiveDialogHeader({ className, ...props }: ComponentProps<"div">) {
+  const Overlay = useOverlay();
+  return <Overlay.Header className={className} {...props} />;
 }
 
 export function ResponsiveDialogFooter({
   className,
   ...props
-}: React.ComponentProps<typeof DialogFooter>) {
-  const isDesktop = React.useContext(DesktopContext);
-  const Comp = isDesktop ? DialogFooter : DrawerFooter;
+}: ComponentProps<typeof DialogFooter>) {
+  const Overlay = useOverlay();
   return (
-    <Comp className={cn("pb-[max(0.75rem,env(safe-area-inset-bottom))]", className)} {...props} />
+    <Overlay.Footer
+      className={cn("pb-[max(0.75rem,env(safe-area-inset-bottom))]", className)}
+      {...props}
+    />
   );
 }
 
-export function ResponsiveDialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogTitle>) {
-  const isDesktop = React.useContext(DesktopContext);
-  const Comp = isDesktop ? DialogTitle : DrawerTitle;
-  return <Comp className={className} {...props} />;
+export function ResponsiveDialogTitle({ className, ...props }: ComponentProps<typeof DialogTitle>) {
+  const Overlay = useOverlay();
+  return <Overlay.Title className={className} {...props} />;
 }
 
 export function ResponsiveDialogDescription({
   className,
   ...props
-}: React.ComponentProps<typeof DialogDescription>) {
-  const isDesktop = React.useContext(DesktopContext);
-  const Comp = isDesktop ? DialogDescription : DrawerDescription;
-  return <Comp className={className} {...props} />;
+}: ComponentProps<typeof DialogDescription>) {
+  const Overlay = useOverlay();
+  return <Overlay.Description className={className} {...props} />;
 }
 
-export function ResponsiveDialogClose({ ...props }: React.ComponentProps<typeof DialogClose>) {
-  const isDesktop = React.useContext(DesktopContext);
-  const Comp = isDesktop ? DialogClose : DrawerClose;
-  return <Comp {...props} />;
+export function ResponsiveDialogClose({ ...props }: ComponentProps<typeof DialogClose>) {
+  const Overlay = useOverlay();
+  return <Overlay.Close {...props} />;
 }

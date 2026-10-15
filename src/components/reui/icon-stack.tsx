@@ -2,56 +2,6 @@ import { cn } from "cn";
 
 type IconStackProps = React.ComponentProps<"div">;
 
-function IconStack({ className, children, style, ...props }: IconStackProps) {
-  return (
-    <div
-      data-slot="icon-stack"
-      className={cn(
-        "text-foreground **:data-[slot=icon-stack-layer]:fill-background relative h-20 w-18",
-        className,
-      )}
-      style={
-        {
-          "--icon-stack-content-x": "71%",
-          "--icon-stack-content-y": "58%",
-          ...style,
-        } as React.CSSProperties
-      }
-      {...props}
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 72 81"
-        fill="none"
-        className="h-full w-full overflow-visible"
-      >
-        <ellipse
-          cx="36"
-          cy="76"
-          rx="30"
-          ry="7"
-          fill="currentColor"
-          fillOpacity="0.055"
-          className="blur-[4px]"
-        />
-
-        <IconStackLayer opacity="0.4" />
-        <IconStackLayer opacity="0.6" x={13.65} y={6.04} />
-        <IconStackLayer opacity="0.8" x={27.32} y={12.08} active />
-      </svg>
-
-      {children ? (
-        <div
-          data-slot="icon-stack-content"
-          className="text-muted-foreground pointer-events-none absolute top-[var(--icon-stack-content-y)] left-[var(--icon-stack-content-x)] flex -translate-x-1/2 -translate-y-1/2 scale-x-90 -skew-y-26 items-center justify-center"
-        >
-          {children}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function IconStackLayer({
   active = false,
   opacity,
@@ -84,6 +34,60 @@ function IconStackLayer({
         strokeLinejoin="round"
       />
     </g>
+  );
+}
+
+const ICON_STACK_SVG = (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 72 81"
+    fill="none"
+    className="h-full w-full overflow-visible"
+  >
+    <ellipse
+      cx="36"
+      cy="76"
+      rx="30"
+      ry="7"
+      fill="currentColor"
+      fillOpacity="0.055"
+      className="blur-[4px]"
+    />
+
+    <IconStackLayer opacity="0.4" />
+    <IconStackLayer opacity="0.6" x={13.65} y={6.04} />
+    <IconStackLayer opacity="0.8" x={27.32} y={12.08} active />
+  </svg>
+);
+
+function IconStack({ className, children, style, ...props }: IconStackProps) {
+  return (
+    <div
+      data-slot="icon-stack"
+      className={cn(
+        "text-foreground **:data-[slot=icon-stack-layer]:fill-background relative h-20 w-18",
+        className,
+      )}
+      style={
+        {
+          "--icon-stack-content-x": "71%",
+          "--icon-stack-content-y": "58%",
+          ...style,
+        } as React.CSSProperties
+      }
+      {...props}
+    >
+      {ICON_STACK_SVG}
+
+      {children ? (
+        <div
+          data-slot="icon-stack-content"
+          className="text-muted-foreground pointer-events-none absolute top-[var(--icon-stack-content-y)] left-[var(--icon-stack-content-x)] flex -translate-x-1/2 -translate-y-1/2 scale-x-90 -skew-y-26 items-center justify-center"
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

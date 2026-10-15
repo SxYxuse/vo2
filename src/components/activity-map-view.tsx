@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
 
 import { formatSportType } from "#/services/calendar-settings.types.ts";
@@ -50,15 +50,18 @@ function FitTracks({
 }) {
   const { map, isLoaded } = useMap();
   const boundsKey = bounds ? bounds.flat().join(",") : `${center.join(",")}:${zoom}`;
+  const camera = useRef({ bounds, center, zoom });
+  camera.current = { bounds, center, zoom };
 
   useEffect(() => {
     if (!isLoaded || !map) return;
-    if (bounds) {
-      map.fitBounds(bounds, { padding: 56, maxZoom: 14, duration: 400 });
+    const next = camera.current;
+    if (next.bounds) {
+      map.fitBounds(next.bounds, { padding: 56, maxZoom: 14, duration: 400 });
       return;
     }
-    map.jumpTo({ center, zoom });
-  }, [bounds, boundsKey, center, isLoaded, map, zoom]);
+    map.jumpTo({ center: next.center, zoom: next.zoom });
+  }, [boundsKey, isLoaded, map]);
 
   return null;
 }
@@ -173,7 +176,7 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
           value={[selectedType]}
           onValueChange={(next) => {
             const value = next[0];
-            if (value) setSportType(value);
+            if (value) startTransition(() => setSportType(value));
           }}
           className="flex-wrap"
         >

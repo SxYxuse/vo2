@@ -6,8 +6,7 @@ import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import {
   activityTrainingLoad,
-  estimateFtp,
-  estimateLthr,
+  estimateFtpAndLthr,
   toFitnessLoad,
   type FitnessLoad,
   type LoadInputs,
@@ -68,8 +67,7 @@ async function refreshTrainingLoads(userId: string) {
   const rows = await loadActivityRows(userId);
   if (!rows.length) return;
 
-  const ftp = estimateFtp(rows);
-  const lthr = estimateLthr(rows);
+  const { ftp, lthr } = estimateFtpAndLthr(rows);
   await db
     .insert(athleteMetrics)
     .values({ userId, ftp, lthr, updatedAt: new Date() })

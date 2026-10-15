@@ -259,7 +259,9 @@ async function applyAthleteMetrics(
       target: athleteMetrics.userId,
       set: { ftp, lthr, updatedAt: new Date() },
     });
-  await refreshTrainingLoadsForUser(userId);
+  void refreshTrainingLoadsForUser(userId).catch((error) => {
+    logger.error("assessments.load_refresh_failed", { userId, error });
+  });
 }
 
 export async function flagActivityTestImpl(input: {
@@ -283,13 +285,14 @@ export async function flagActivityTestImpl(input: {
     throw new Error("That test is not available for this sport.");
   }
 
-  const [existing] = await db
+  const existingQuery = db
     .select({ id: fieldTests.id })
     .from(fieldTests)
     .where(and(eq(fieldTests.userId, session.user.id), eq(fieldTests.activityId, input.activityId)))
     .limit(1);
 
   if (!input.assessmentId) {
+    const [existing] = await existingQuery;
     if (existing) {
       logger.info("assessments.unflagged", { activityId: input.activityId });
       await db.delete(fieldTests).where(eq(fieldTests.id, existing.id));
@@ -297,28 +300,30 @@ export async function flagActivityTestImpl(input: {
     return null;
   }
 
-  const [profile] = await db
-    .select({ birthDate: athleteMetrics.birthDate })
-    .from(athleteMetrics)
-    .where(eq(athleteMetrics.userId, session.user.id))
-    .limit(1);
+  const assessmentId = input.assessmentId;
+  const [[existing], [profile], [open]] = await Promise.all([
+    existingQuery,
+    db
+      .select({ birthDate: athleteMetrics.birthDate })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, session.user.id))
+      .limit(1),
+    db
+      .select({ id: fieldTests.id })
+      .from(fieldTests)
+      .where(
+        and(
+          eq(fieldTests.userId, session.user.id),
+          eq(fieldTests.assessmentId, assessmentId),
+          eq(fieldTests.status, "suggested"),
+        ),
+      )
+      .limit(1),
+  ]);
   const age = ageFromBirthDate(profile?.birthDate ?? null);
-  const result = await scoreActivity(input.activityId, input.assessmentId, input.lastStage, age);
+  const result = await scoreActivity(input.activityId, assessmentId, input.lastStage, age);
   const now = new Date();
-  const catalogTitle =
-    allowed.find((test) => test.id === input.assessmentId)?.title ?? input.assessmentId;
-
-  const [open] = await db
-    .select({ id: fieldTests.id })
-    .from(fieldTests)
-    .where(
-      and(
-        eq(fieldTests.userId, session.user.id),
-        eq(fieldTests.assessmentId, input.assessmentId),
-        eq(fieldTests.status, "suggested"),
-      ),
-    )
-    .limit(1);
+  const catalogTitle = allowed.find((test) => test.id === assessmentId)?.title ?? assessmentId;
 
   const targetId = existing?.id ?? open?.id ?? crypto.randomUUID();
   if (existing && open && existing.id !== open.id) {

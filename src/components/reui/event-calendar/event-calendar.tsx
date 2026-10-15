@@ -1,7 +1,7 @@
 import {
   createContext,
+  use,
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -906,7 +906,7 @@ const EventCalendarContext =
 
 /** The stable calendar instance; throws outside <EventCalendar>. */
 function useEventCalendar<TData = unknown>(): EventCalendarInstance<TData> {
-  const instance = useContext(EventCalendarContext);
+  const instance = use(EventCalendarContext);
   if (!instance) {
     throw new Error("useEventCalendar must be used within <EventCalendar>");
   }
@@ -923,7 +923,7 @@ function useEventCalendarSelector<TData = unknown, TSelected = unknown>(
   selector: (state: EventCalendarState<TData>) => TSelected,
   options?: UseEventCalendarSelectorOptions<TData, TSelected>,
 ): TSelected {
-  const contextInstance = useContext(EventCalendarContext);
+  const contextInstance = use(EventCalendarContext);
   const instance = options?.calendar ?? contextInstance;
   if (!instance) {
     throw new Error(
@@ -1571,7 +1571,7 @@ const EventCalendarViewConfigContext = createContext<
 
 /** Root-level display props + render overrides, for view components. */
 function useEventCalendarViewConfig<TData = unknown>(): EventCalendarViewConfig<TData> {
-  return useContext(EventCalendarViewConfigContext);
+  return use(EventCalendarViewConfigContext);
 }
 
 const VIEW_CONFIG_KEYS: Array<keyof EventCalendarViewConfig> = [
@@ -1621,7 +1621,7 @@ const VIEW_CONFIG_KEYS: Array<keyof EventCalendarViewConfig> = [
 
 /** The rendering view of the nearest view component ("month", "week", ...). */
 function useEventCalendarViewContext(): { view: CalendarView } {
-  const ctx = useContext(EventCalendarViewContext);
+  const ctx = use(EventCalendarViewContext);
   if (!ctx) {
     throw new Error("useEventCalendarViewContext must be used inside a calendar view");
   }

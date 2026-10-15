@@ -12,6 +12,7 @@ import {
   assessmentsQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
+  settingsSnapshotQueryOptions,
 } from "#/lib/queries.ts";
 import {
   TRAINING_PACE_FIELDS,
@@ -74,18 +75,19 @@ export function OnboardingDialog({
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const { data } = useQuery({ ...homeQueryOptions, enabled: open });
+  const { data } = useQuery({ ...settingsSnapshotQueryOptions, enabled: open });
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const avgHours = useMemo(
     () => (data ? recentAverageWeeklyHours(data.fitnessLoads, timeZone) : 0),
-    [data, timeZone],
+    [data?.fitnessLoads, timeZone],
   );
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const hydrated = useRef(false);
+  const emptyDefaults = useMemo(() => trainingFormDefaults(null, 5, timeZone), [timeZone]);
   const form = useForm<TrainingFormInput, unknown, TrainingFormValues>({
     resolver: zodResolver(trainingFormSchema),
-    defaultValues: trainingFormDefaults(null, 5, timeZone),
+    defaultValues: emptyDefaults,
     mode: "onSubmit",
     reValidateMode: "onChange",
   });
@@ -100,7 +102,7 @@ export function OnboardingDialog({
     setStepIndex(0);
     setSaveError(null);
     form.reset(trainingFormDefaults(data.training, avgHours, timeZone));
-  }, [open, data, avgHours, timeZone, form]);
+  }, [open, data?.training, avgHours, timeZone, form]);
 
   const step = STEPS[stepIndex];
 
@@ -108,6 +110,9 @@ export function OnboardingDialog({
     mutationFn: saveAppSettings,
     onSuccess: (saved) => {
       queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
+        current ? { ...current, settings: saved.settings, training: saved.training } : current,
+      );
+      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
         current
           ? {
               ...current,
@@ -122,6 +127,7 @@ export function OnboardingDialog({
       );
       void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
+      void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
@@ -135,8 +141,7 @@ export function OnboardingDialog({
 
   function goToStep(next: number) {
     if (next < 0 || next >= STEPS.length) return;
-    if (next > stepIndex) return;
-    setStepIndex(next);
+    setStepIndex((current) => (next > current ? current : next));
   }
 
   async function continueStep() {
@@ -239,7 +244,6 @@ export function OnboardingDialog({
                   control={form.control}
                   setValue={form.setValue}
                   avgHours={avgHours}
-                  includeDoubleDays={false}
                 />
               ) : (
                 <Empty className="min-h-64 border-0">

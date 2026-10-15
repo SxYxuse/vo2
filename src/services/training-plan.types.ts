@@ -274,10 +274,13 @@ export type SessionActivityMatch = {
   date: string;
 };
 
+const QUALITY_SESSION_RE = /\bvo2\b|threshold|tempo|sweet-spot/;
+const LONG_SESSION_RE = /\blong\b/;
+
 export function sessionRole(title: string): "quality" | "long" | "easy" {
   const normalized = title.trim().toLowerCase();
-  if (/\bvo2\b|threshold|tempo|sweet-spot/.test(normalized)) return "quality";
-  if (/\blong\b/.test(normalized)) return "long";
+  if (QUALITY_SESSION_RE.test(normalized)) return "quality";
+  if (LONG_SESSION_RE.test(normalized)) return "long";
   return "easy";
 }
 

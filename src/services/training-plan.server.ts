@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
@@ -24,14 +25,16 @@ import {
   type TrainingPlan,
 } from "./training-plan.types.ts";
 
-export async function getTrainingPlanForUser(userId: string): Promise<TrainingPlan | null> {
-  const [row] = await db
-    .select({ training: athleteMetrics.training })
-    .from(athleteMetrics)
-    .where(eq(athleteMetrics.userId, userId))
-    .limit(1);
-  return parseTrainingPlan(row?.training);
-}
+export const getTrainingPlanForUser = cache(
+  async (userId: string): Promise<TrainingPlan | null> => {
+    const [row] = await db
+      .select({ training: athleteMetrics.training })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, userId))
+      .limit(1);
+    return parseTrainingPlan(row?.training);
+  },
+);
 
 export async function saveTrainingPlanForUser(userId: string, plan: TrainingPlan) {
   logger.info("training_plan.saved", {
@@ -179,10 +182,11 @@ export async function suggestWeekImpl(timeZone: string): Promise<PlannedSession[
     logger.warn("training_plan.suggest_incomplete");
     throw new Error("Set your training goal in Settings first.");
   }
-  if (plan.timeZone !== timeZone) {
-    await saveTrainingPlanForUser(session.user.id, { ...plan, timeZone });
+  const nextPlan = plan.timeZone === timeZone ? plan : { ...plan, timeZone };
+  if (nextPlan !== plan) {
+    await saveTrainingPlanForUser(session.user.id, nextPlan);
   }
-  await rebuildWeek(session.user.id, timeZone, new Date(), "suggest");
+  await rebuildWeek(session.user.id, timeZone, new Date(), "suggest", nextPlan);
   return listPlannedSessions(session.user.id, plannedFromCutoff());
 }
 
@@ -196,7 +200,7 @@ export async function adaptPlannedWeek(userId: string) {
     .limit(1);
   if (!existing.length) return;
   logger.info("training_plan.adapt");
-  await rebuildWeek(userId, plan.timeZone, new Date(), "adapt");
+  await rebuildWeek(userId, plan.timeZone, new Date(), "adapt", plan);
 }
 
 async function rebuildWeek(
@@ -204,16 +208,42 @@ async function rebuildWeek(
   timeZone: string,
   now: Date,
   mode: "suggest" | "adapt",
+  plan: TrainingPlan,
 ): Promise<PlannedSession[]> {
-  const plan = await getTrainingPlanForUser(userId);
-  if (!plan) return [];
   const today = dayKey(now, timeZone);
   const weekStart = weekStartKey(now, timeZone);
   const weekEnd = addDate(weekStart, 6);
-  const loads = await fitnessLoadsForUser(userId);
+  const [loads, flagged, weekActivities, existing, settings, anchors] = await Promise.all([
+    fitnessLoadsForUser(userId),
+    flaggedActivityIds(userId),
+    weekActivitiesForUser(userId, weekStart, weekEnd, timeZone),
+    db
+      .select({
+        id: plannedSessions.id,
+        date: plannedSessions.date,
+        weekStart: plannedSessions.weekStart,
+        sportFamily: plannedSessions.sportFamily,
+        title: plannedSessions.title,
+        targetMinutes: plannedSessions.targetMinutes,
+        targetLoad: plannedSessions.targetLoad,
+        status: plannedSessions.status,
+        note: plannedSessions.note,
+        activityId: plannedSessions.activityId,
+      })
+      .from(plannedSessions)
+      .where(and(eq(plannedSessions.userId, userId), eq(plannedSessions.weekStart, weekStart))),
+    getCalendarSettingsForUser(userId),
+    mode === "suggest"
+      ? latestTestAnchors(userId)
+      : Promise.resolve({
+          ftpWatts: null,
+          cyclingLthr: null,
+          cyclingMaxHr: null,
+          runLthr: null,
+          runMaxHr: null,
+        } satisfies TestAnchors),
+  ]);
   const pmc = latestPmc(loads, timeZone);
-  const flagged = await flaggedActivityIds(userId);
-  const weekActivities = await weekActivitiesForUser(userId, weekStart, weekEnd, timeZone);
   const completed = weekActivities
     .filter((activity) => !flagged.has(activity.id))
     .map((activity) => ({
@@ -222,22 +252,6 @@ async function rebuildWeek(
       minutes: activity.minutes,
       load: activity.load,
     }));
-
-  const existing = await db
-    .select({
-      id: plannedSessions.id,
-      date: plannedSessions.date,
-      weekStart: plannedSessions.weekStart,
-      sportFamily: plannedSessions.sportFamily,
-      title: plannedSessions.title,
-      targetMinutes: plannedSessions.targetMinutes,
-      targetLoad: plannedSessions.targetLoad,
-      status: plannedSessions.status,
-      note: plannedSessions.note,
-      activityId: plannedSessions.activityId,
-    })
-    .from(plannedSessions)
-    .where(and(eq(plannedSessions.userId, userId), eq(plannedSessions.weekStart, weekStart)));
 
   const existingPlanned = existing.map((row) => toPlanned(row));
   const matches = assignActivitiesToSessions(
@@ -271,7 +285,6 @@ async function rebuildWeek(
       ),
     );
 
-  const settings = await getCalendarSettingsForUser(userId);
   const sportTypes = settings?.sportTypes ?? {};
   const drafts =
     mode === "suggest"
@@ -285,7 +298,7 @@ async function rebuildWeek(
             running: familyCollectors(sportTypes, "running"),
             cycling: familyCollectors(sportTypes, "cycling"),
           },
-          anchors: await latestTestAnchors(userId),
+          anchors,
         })
       : [];
 

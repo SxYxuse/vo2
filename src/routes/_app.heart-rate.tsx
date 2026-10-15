@@ -62,8 +62,15 @@ function HeartRatePage() {
 function HeartRatePending() {
   return (
     <>
-      <Skeleton className="h-8 w-56" />
-      <Skeleton className="h-4 w-full max-w-xl" />
+      <div className="flex flex-col gap-2">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <HeartPulseIcon aria-hidden className="size-5" />
+          Heart rate
+        </h1>
+        <p className="text-muted-foreground hidden text-sm sm:block">
+          Max heart rate, estimated zones, and time in zone — overall and per sport.
+        </p>
+      </div>
       <Skeleton className="h-80 w-full rounded-xl" />
     </>
   );
