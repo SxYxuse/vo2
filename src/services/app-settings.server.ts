@@ -65,6 +65,7 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
         movingTime: activities.movingTime,
         trainingLoad: activities.trainingLoad,
         loadSource: activities.loadSource,
+        sportType: activities.sportType,
       })
       .from(activities)
       .where(eq(activities.userId, session.user.id)),
@@ -72,7 +73,10 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
   return {
     signedIn: true,
     profile,
-    settings: storedSettings ?? DEFAULT_CALENDAR_SETTINGS,
+    settings: mergeCalendarSettings(
+      storedSettings,
+      loadRows.map((row) => row.sportType),
+    ),
     training,
     fitnessLoads: loadRows.map((row) =>
       toFitnessLoad(
@@ -91,14 +95,23 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
   training: TrainingPlan | null;
 }> {
   const session = await getRequiredSession();
-  const stored = (await getCalendarSettingsForUser(session.user.id)) ?? DEFAULT_CALENDAR_SETTINGS;
+  const [stored, sportTypeRows] = await Promise.all([
+    getCalendarSettingsForUser(session.user.id),
+    db
+      .select({ sportType: activities.sportType })
+      .from(activities)
+      .where(eq(activities.userId, session.user.id)),
+  ]);
   const settings = mergeCalendarSettings(
     {
-      ...stored,
-      sportTypes: value.sportTypes,
+      ...(stored ?? DEFAULT_CALENDAR_SETTINGS),
+      sportTypes: {
+        ...stored?.sportTypes,
+        ...value.sportTypes,
+      },
       sportGroupShares: value.sportGroupShares,
     },
-    Object.keys(value.sportTypes),
+    [...sportTypeRows.map((row) => row.sportType), ...Object.keys(value.sportTypes)],
   );
 
   const parsed = parseCalendarSettings(settings);
