@@ -1,4 +1,4 @@
-import { serverEnv } from "@/configs/env.ts";
+import { env } from "@/configs/env.ts";
 
 import type { StreamSet, SummaryActivity } from "./client.ts";
 
@@ -25,7 +25,7 @@ const RATE_LIMIT_HEADERS = {
 };
 
 export function handleMockStravaRequest(request: Request): Response {
-  if (!serverEnv.stravaMock()) return new Response("Not found", { status: 404 });
+  if (!env.STRAVA_MOCK) return new Response("Not found", { status: 404 });
 
   const url = new URL(request.url);
   const path = url.pathname.slice(url.pathname.indexOf(MOCK_STRAVA_PATH) + MOCK_STRAVA_PATH.length);
