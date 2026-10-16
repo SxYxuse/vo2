@@ -19,6 +19,7 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
+    "test": "vp test",
     "generate:strava-sdk": "openapi-typescript src/integrations/strava/openapi.json -o src/integrations/strava/strava.types.ts"
   },
   "dependencies": {
