@@ -106,15 +106,12 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
     {
       ...(stored ?? DEFAULT_CALENDAR_SETTINGS),
       sportTypes: {
-        ...(stored?.sportTypes ?? {}),
+        ...stored?.sportTypes,
         ...value.sportTypes,
       },
       sportGroupShares: value.sportGroupShares,
     },
-    [
-      ...sportTypeRows.map((row) => row.sportType),
-      ...Object.keys(value.sportTypes),
-    ],
+    [...sportTypeRows.map((row) => row.sportType), ...Object.keys(value.sportTypes)],
   );
 
   const parsed = parseCalendarSettings(settings);
