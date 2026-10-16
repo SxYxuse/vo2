@@ -17,6 +17,29 @@ function isNoisyPath(pathname: string) {
   return last.includes(".") && !pathname.startsWith("/api/");
 }
 
+type BunTimeoutRequest = Request & {
+  runtime?: {
+    bun?: {
+      server?: {
+        timeout?: (request: Request, seconds: number) => void;
+      };
+    };
+  };
+};
+
+function extendBunIdleTimeout(request: Request, seconds: number) {
+  (request as BunTimeoutRequest).runtime?.bun?.server?.timeout?.(request, seconds);
+}
+
+function isAbortError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name: unknown }).name === "AbortError"
+  );
+}
+
 const requestLogger = createMiddleware().server(async ({ next, request, pathname }) => {
   const { runWithLogContext } = await import("@/lib/log-context.server.ts");
   const { errorFields, logger } = await import("@/lib/logger.server.ts");
@@ -24,6 +47,11 @@ const requestLogger = createMiddleware().server(async ({ next, request, pathname
 
   return runWithLogContext({ requestId, method: request.method, path: pathname }, async () => {
     if (isNoisyPath(pathname)) return next();
+
+    if (pathname.startsWith("/_serverFn")) {
+      // Bun.serve defaults to a 10s idleTimeout, which kills long Strava copies.
+      extendBunIdleTimeout(request, 120);
+    }
 
     const started = Date.now();
     logger.info("request.start");
@@ -36,6 +64,13 @@ const requestLogger = createMiddleware().server(async ({ next, request, pathname
       });
       return result;
     } catch (error) {
+      if (isAbortError(error)) {
+        logger.warn("request.aborted", {
+          ...errorFields(error),
+          durationMs: Date.now() - started,
+        });
+        throw error;
+      }
       logger.error("request.failed", {
         ...errorFields(error),
         durationMs: Date.now() - started,

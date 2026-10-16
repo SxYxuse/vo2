@@ -80,3 +80,43 @@ export type SyncResult = {
     nextWindowAt: string;
   };
 };
+
+/**
+ * Return before Bun.serve's 10s idleTimeout (and typical preview proxies) close
+ * the request. The client loops until history and streams are caught up.
+ */
+export const SYNC_REQUEST_BUDGET_MS = 6_000;
+export const SYNC_POSTPROCESS_MIN_MS = 2_000;
+export const SYNC_TRANSIENT_RETRIES = 3;
+
+export function isOverSyncBudget(
+  startedAt: number,
+  now = Date.now(),
+  budgetMs = SYNC_REQUEST_BUDGET_MS,
+) {
+  return now - startedAt >= budgetMs;
+}
+
+export function remainingSyncBudgetMs(
+  startedAt: number,
+  now = Date.now(),
+  budgetMs = SYNC_REQUEST_BUDGET_MS,
+) {
+  return budgetMs - (now - startedAt);
+}
+
+export function isAbortError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name: unknown }).name === "AbortError"
+  );
+}
+
+export function isTransientSyncError(error: unknown) {
+  if (isAbortError(error)) return true;
+  if (!(error instanceof Error)) return false;
+  if (error.message === "The connection was closed.") return true;
+  return error.message === "Invariant failed" || error.message.startsWith("Invariant failed:");
+}

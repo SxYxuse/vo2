@@ -17,7 +17,14 @@ import { buildChartPreview } from "./activity-detail.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
 import type { CalendarActivity, HomeData, SyncResult, SyncStatus } from "./strava-sync.types.ts";
-import { deriveSyncKind, historyCompleteFromRun } from "./strava-sync.types.ts";
+import {
+  deriveSyncKind,
+  historyCompleteFromRun,
+  isAbortError,
+  isOverSyncBudget,
+  remainingSyncBudgetMs,
+  SYNC_POSTPROCESS_MIN_MS,
+} from "./strava-sync.types.ts";
 import {
   adaptPlannedWeek,
   getTrainingPlanForUser,
@@ -206,6 +213,7 @@ async function activityCopyCounts(userId: string) {
 export async function syncStravaImpl(): Promise<SyncResult> {
   const session = await getRequiredSession();
   logger.info("sync.start");
+  const startedAt = Date.now();
   const [, accessToken] = await Promise.all([
     stampStoredStreams(session.user.id),
     getStravaAccessToken(session.user.id),
@@ -218,11 +226,22 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   let pausedUntil: Date | null = null;
 
   try {
-    const newer = await upsertNewerActivities(api, session.user.id, String(session.user.id));
-    const older = await upsertOlderActivities(api, session.user.id, String(session.user.id));
-    activitiesUpserted = newer.upserted + older.upserted;
-    historyComplete = newer.caughtUp && older.caughtUp;
-    streamsFetched = await syncPendingStreams(api, session.user.id);
+    let newerCaughtUp = false;
+    let olderCaughtUp = false;
+    if (!isOverSyncBudget(startedAt)) {
+      const newer = await upsertNewerActivities(api, session.user.id, String(session.user.id));
+      activitiesUpserted += newer.upserted;
+      newerCaughtUp = newer.caughtUp;
+    }
+    if (!isOverSyncBudget(startedAt)) {
+      const older = await upsertOlderActivities(api, session.user.id, String(session.user.id));
+      activitiesUpserted += older.upserted;
+      olderCaughtUp = older.caughtUp;
+    }
+    historyComplete = newerCaughtUp && olderCaughtUp;
+    if (!isOverSyncBudget(startedAt)) {
+      streamsFetched = await syncPendingStreams(api, session.user.id, startedAt);
+    }
   } catch (error) {
     if (error instanceof StravaDailyLimitError) {
       pausedUntil = startOfNextUtcDay();
@@ -232,19 +251,25 @@ export async function syncStravaImpl(): Promise<SyncResult> {
       pausedUntil = new Date(api.rateLimit.snapshot().nextWindowAt);
       lastError = error.message;
       logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
+    } else if (isAbortError(error)) {
+      logger.warn("sync.request_aborted", errorFields(error));
     } else {
       lastError = error instanceof Error ? error.message : "Sync failed";
       logger.error("sync.failed", errorFields(error));
     }
   }
 
-  await refreshTrainingLoadsIfNeeded(session.user.id);
-  if (activitiesUpserted > 0) {
-    try {
-      await adaptPlannedWeek(session.user.id);
-    } catch (error) {
-      logger.warn("sync.adapt_week_failed", errorFields(error));
+  if (remainingSyncBudgetMs(startedAt) > SYNC_POSTPROCESS_MIN_MS) {
+    await refreshTrainingLoadsIfNeeded(session.user.id);
+    if (activitiesUpserted > 0) {
+      try {
+        await adaptPlannedWeek(session.user.id);
+      } catch (error) {
+        logger.warn("sync.adapt_week_failed", errorFields(error));
+      }
     }
+  } else {
+    logger.debug("sync.skip_postprocess_budget");
   }
 
   const { streamsPending } = await activityCopyCounts(session.user.id);
@@ -484,7 +509,7 @@ function metricsFromSummary(activity: SummaryActivity) {
   };
 }
 
-async function syncPendingStreams(api: StravaApi, userId: string) {
+async function syncPendingStreams(api: StravaApi, userId: string, startedAt: number) {
   const pending = await db
     .select({ id: activities.id, manual: activities.manual })
     .from(activities)
@@ -495,6 +520,10 @@ async function syncPendingStreams(api: StravaApi, userId: string) {
   logger.debug("sync.streams_batch", { pending: pending.length });
   let fetched = 0;
   for (const row of pending) {
+    if (isOverSyncBudget(startedAt)) {
+      logger.debug("sync.budget_stop", { fetched, pending: pending.length });
+      break;
+    }
     if (api.rateLimit.shortRemaining <= 5) break;
     const streams = row.manual ? {} : await fetchStreamsWithRetry(api, row.id);
     await storeStreams(row.id, streams);
