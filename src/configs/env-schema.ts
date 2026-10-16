@@ -15,20 +15,7 @@ function requiredString(name: string) {
 
 const optionalString = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 
-export type Env = {
-  DATABASE_URL: string;
-  BETTER_AUTH_SECRET: string;
-  BETTER_AUTH_URL: string;
-  APP_ENV: string;
-  STRAVA_MOCK: boolean;
-  STRAVA_BASE_URL: string;
-  STRAVA_CLIENT_ID: string;
-  STRAVA_CLIENT_SECRET: string;
-  OPENROUTER_API_KEY: string | undefined;
-  LOKI_HOST: string | undefined;
-};
-
-export const envSchema = z
+export const env$ = z
   .object({
     DATABASE_URL: requiredString("DATABASE_URL"),
     BETTER_AUTH_SECRET: requiredString("BETTER_AUTH_SECRET"),
@@ -63,7 +50,7 @@ export const envSchema = z
       });
     }
   })
-  .transform((raw): Env => {
+  .transform((raw) => {
     const appEnv = raw.APP_ENV ?? raw.NODE_ENV ?? "development";
     const stravaMock = raw.STRAVA_MOCK === "1" && appEnv !== "production";
     return {
@@ -82,8 +69,10 @@ export const envSchema = z
     };
   });
 
+export type Env = z.infer<typeof env$>;
+
 export function parseEnv(source: Record<string, string | undefined> = process.env): Env {
-  const result = envSchema.safeParse(source);
+  const result = env$.safeParse(source);
   if (!result.success) {
     throw new Error(`Invalid environment:\n${z.prettifyError(result.error)}`);
   }
