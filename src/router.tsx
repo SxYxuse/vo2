@@ -23,7 +23,7 @@ export function getRouter() {
     routeTree,
     context,
     scrollRestoration: true,
-    defaultPreload: "viewport",
+    defaultPreload: "intent",
     defaultPreloadDelay: 0,
     defaultPreloadStaleTime: 0,
     parseSearch: parseSearchWith(parseSearchValue),

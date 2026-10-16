@@ -5,7 +5,7 @@ import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "#/components/activity-calendar.tsx";
 import { prefetchActivityDetail } from "#/lib/prefetch.ts";
-import { homeQueryOptions } from "#/lib/queries.ts";
+import { homeQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import {
   Empty,
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_app/")({
   loaderDeps: ({ search }) => ({ activity: search.activity }),
   loader: ({ context, deps }) => {
     if (deps.activity) prefetchActivityDetail(context.queryClient, deps.activity);
-    return context.queryClient.ensureQueryData(homeQueryOptions);
+    return context.queryClient.query(loaderQuery(homeQueryOptions));
   },
   pendingMs: 200,
   pendingComponent: CalendarPending,

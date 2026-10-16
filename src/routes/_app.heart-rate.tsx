@@ -5,7 +5,7 @@ import { HeartPulseIcon } from "lucide-react";
 
 import { HeartRateZones } from "#/components/heart-rate-zones.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { heartRateQueryOptions } from "#/lib/queries.ts";
+import { heartRateQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -16,7 +16,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/heart-rate")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(heartRateQueryOptions),
+  loader: ({ context }) =>
+    context.queryClient.query(loaderQuery(heartRateQueryOptions)),
   pendingMs: 200,
   pendingComponent: HeartRatePending,
   errorComponent: HeartRateError,

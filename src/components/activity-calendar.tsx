@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  lazy,
   startTransition,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -17,12 +15,9 @@ import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ClipboardListIcon, HeartOffIcon, Settings2Icon, TimerIcon } from "lucide-react";
 
-import {
-  prefetchActivityDetail,
-  prefetchActivityDetails,
-  preloadActivityUi,
-  scheduleIdle,
-} from "#/lib/prefetch.ts";
+import { prefetchActivityDetail, prefetchActivityDetails, scheduleIdle } from "#/lib/prefetch.ts";
+import { ActivityDetailDialog } from "#/components/activity-detail-dialog.tsx";
+import { PlannedSessionDialog } from "#/components/planned-session-dialog.tsx";
 import { homeQueryOptions } from "#/lib/queries.ts";
 import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
 import {
@@ -96,18 +91,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const DISABLED_INTERACTIONS = { drag: false, resize: false, selectSlot: false } as const;
-
-const ActivityDetailDialog = lazy(() =>
-  import("#/components/activity-detail-dialog.tsx").then((mod) => ({
-    default: mod.ActivityDetailDialog,
-  })),
-);
-
-const PlannedSessionDialog = lazy(() =>
-  import("#/components/planned-session-dialog.tsx").then((mod) => ({
-    default: mod.PlannedSessionDialog,
-  })),
-);
 
 function formatTrainingHmm(seconds: number) {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
@@ -629,7 +612,6 @@ export function ActivityCalendar({
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    preloadActivityUi();
     return scheduleIdle(() => {
       prefetchActivityDetails(
         queryClient,
@@ -910,24 +892,20 @@ export function ActivityCalendar({
         ) : (
           <Skeleton className="min-h-80 flex-1 rounded-none md:min-h-[720px]" />
         )}
-        <Suspense fallback={null}>
-          <ActivityDetailDialog
-            activityId={selectedActivityId}
-            preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
-            color={events.find((event) => event.id === selectedActivityId)?.color}
-            onOpenChange={(open) => {
-              if (!open) onSelectActivity(null);
-            }}
-          />
-        </Suspense>
-        <Suspense fallback={null}>
-          <PlannedSessionDialog
-            session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
-            onOpenChange={(open) => {
-              if (!open) setSelectedPlanId(null);
-            }}
-          />
-        </Suspense>
+        <ActivityDetailDialog
+          activityId={selectedActivityId}
+          preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
+          color={events.find((event) => event.id === selectedActivityId)?.color}
+          onOpenChange={(open) => {
+            if (!open) onSelectActivity(null);
+          }}
+        />
+        <PlannedSessionDialog
+          session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPlanId(null);
+          }}
+        />
       </CardContent>
     </Card>
   );

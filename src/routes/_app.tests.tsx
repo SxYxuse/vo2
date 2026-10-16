@@ -1,14 +1,11 @@
-import { lazy, Suspense } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { FlaskConicalIcon } from "lucide-react";
 
-const AssessmentTests = lazy(() =>
-  import("#/components/assessment-tests.tsx").then((mod) => ({ default: mod.AssessmentTests })),
-);
+import { AssessmentTests } from "#/components/assessment-tests.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { assessmentsQueryOptions } from "#/lib/queries.ts";
+import { assessmentsQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -19,7 +16,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/tests")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(assessmentsQueryOptions),
+  loader: ({ context }) =>
+    context.queryClient.query(loaderQuery(assessmentsQueryOptions)),
   pendingMs: 200,
   pendingComponent: TestsPending,
   errorComponent: TestsError,
@@ -44,9 +42,7 @@ function TestsPage() {
         </p>
       </div>
       {data.signedIn ? (
-        <Suspense fallback={<Skeleton className="h-80 w-full rounded-xl" />}>
-          <AssessmentTests tests={data.tests} />
-        </Suspense>
+        <AssessmentTests tests={data.tests} />
       ) : (
         <>
           <Empty className="min-h-64 border">

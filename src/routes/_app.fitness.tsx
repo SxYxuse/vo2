@@ -1,11 +1,11 @@
-import { lazy, Suspense } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrendingUpIcon } from "lucide-react";
 
+import { FitnessChart } from "#/components/fitness-chart.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { fitnessQueryOptions } from "#/lib/queries.ts";
+import { fitnessQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -15,12 +15,9 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const FitnessChart = lazy(() =>
-  import("#/components/fitness-chart.tsx").then((mod) => ({ default: mod.FitnessChart })),
-);
-
 export const Route = createFileRoute("/_app/fitness")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(fitnessQueryOptions),
+  loader: ({ context }) =>
+    context.queryClient.query(loaderQuery(fitnessQueryOptions)),
   pendingMs: 200,
   pendingComponent: FitnessPending,
   errorComponent: FitnessError,
@@ -43,9 +40,7 @@ function FitnessPage() {
         </p>
       </div>
       {signedIn ? (
-        <Suspense fallback={<Skeleton className="h-80 w-full rounded-xl" />}>
-          <FitnessChart loads={fitnessLoads} />
-        </Suspense>
+        <FitnessChart loads={fitnessLoads} />
       ) : (
         <>
           <Empty className="min-h-64 border">

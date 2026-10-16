@@ -1,5 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
 
+/** Loader/preload read: use cached data if present, otherwise fetch once. */
+export function loaderQuery<T extends Record<string, unknown>>(options: T) {
+  return { ...options, staleTime: "static" as const, retry: 1 };
+}
+
 import { getActivityAnalysis, getAnalysisStatus } from "#/services/activity-analysis.ts";
 import { getActivityDetail } from "#/services/activity-detail.ts";
 import { loadActivityMap } from "#/services/activity-map.ts";

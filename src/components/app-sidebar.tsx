@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { noop, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
@@ -27,7 +27,6 @@ const SettingsDialog = lazy(() =>
 import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
 import { APP_NAME } from "#/lib/brand.ts";
 import { authClient } from "#/lib/auth-client.ts";
-import { warmRoute } from "#/lib/prefetch.ts";
 import { appShellQueryOptions, settingsSnapshotQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -81,7 +80,7 @@ const NAV_ITEMS = [
 function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) {
   void import("#/components/onboarding-dialog.tsx");
   void import("#/components/settings-dialog.tsx");
-  void queryClient?.prefetchQuery(settingsSnapshotQueryOptions);
+  void queryClient?.query(settingsSnapshotQueryOptions).catch(noop);
 }
 
 export function AppSidebar() {
@@ -112,19 +111,7 @@ export function AppSidebar() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                tooltip={APP_NAME}
-                render={
-                  <Link
-                    to="/"
-                    preload="viewport"
-                    onMouseEnter={() => warmRoute(queryClient, "/")}
-                    onFocus={() => warmRoute(queryClient, "/")}
-                    onPointerDown={() => warmRoute(queryClient, "/")}
-                  />
-                }
-              >
+              <SidebarMenuButton size="lg" tooltip={APP_NAME} render={<Link to="/" preload="viewport" />}>
                 <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
                 <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
@@ -145,9 +132,6 @@ export function AppSidebar() {
                         <Link
                           to={item.to}
                           preload="viewport"
-                          onMouseEnter={() => warmRoute(queryClient, item.to)}
-                          onFocus={() => warmRoute(queryClient, item.to)}
-                          onPointerDown={() => warmRoute(queryClient, item.to)}
                           onClick={() => {
                             if (isMobile) setOpenMobile(false);
                           }}

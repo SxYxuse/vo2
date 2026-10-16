@@ -1,17 +1,17 @@
 import { useEffect } from "react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 
 import { AppSidebar } from "#/components/app-sidebar.tsx";
 import { SignedOutPage } from "#/components/signed-out-page.tsx";
 import { SyncPanel } from "#/components/sync-panel.tsx";
-import { preloadAppChunks, prefetchSignedInQueries, scheduleIdle } from "#/lib/prefetch.ts";
-import { appShellQueryOptions } from "#/lib/queries.ts";
+import { scheduleIdle, warmApp } from "#/lib/prefetch.ts";
+import { appShellQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
   loader: async ({ context, location }) => {
-    const shell = await context.queryClient.ensureQueryData(appShellQueryOptions);
+    const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn && location.pathname !== "/") {
       throw redirect({ to: "/" });
     }
@@ -20,13 +20,11 @@ export const Route = createFileRoute("/_app")({
 });
 
 function SignedInPrefetch() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   useEffect(() => {
-    return scheduleIdle(() => {
-      preloadAppChunks();
-      void prefetchSignedInQueries(queryClient);
-    });
-  }, [queryClient]);
+    return scheduleIdle(() => warmApp(router, queryClient));
+  }, [queryClient, router]);
   return null;
 }
 
