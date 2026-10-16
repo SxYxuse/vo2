@@ -10,8 +10,9 @@ import {
   formatDistanceKm,
   formatDuration,
   formatElevation,
-  formatSpeed,
+  formatLocomotion,
   formatWatts,
+  locomotionFor,
   type ActivityDetail,
 } from "@/services/activity-detail.ts";
 import { formatSportType } from "@/services/calendar-settings.ts";
@@ -115,8 +116,8 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           color={SERIES_META.watts.color}
         />
         <KpiCard
-          label="Avg speed"
-          value={formatSpeed(detail.kpis.avgSpeed)}
+          label={locomotionFor(detail.sportType).kpiLabel}
+          value={formatLocomotion(detail.kpis.avgSpeed, detail.sportType)}
           color={SERIES_META.speed.color}
         />
       </div>

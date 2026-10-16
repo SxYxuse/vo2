@@ -2,8 +2,8 @@ import {
   formatBpm,
   formatDuration,
   formatElevation,
-  formatSpeed,
 } from "./activity-detail.types.ts";
+import { formatLocomotion } from "./locomotion.ts";
 import { formatSportType } from "./calendar-settings.types.ts";
 import {
   emptyHistogram,
@@ -149,6 +149,33 @@ export type EffortReport = {
   gradeBuckets: GradeBucket[];
   notes: string[];
 };
+
+function withLocomotion<T extends { avgSpeedKmh: number | null }>(row: T, sportType: string) {
+  return { ...row, avgLocomotion: formatLocomotion(row.avgSpeedKmh, sportType) };
+}
+
+export function presentOverviewForCoach(overview: ActivityOverview) {
+  return {
+    ...overview,
+    avgLocomotion: formatLocomotion(overview.avgSpeedKmh, overview.sportType),
+    thirds: overview.thirds.map((third) => withLocomotion(third, overview.sportType)),
+  };
+}
+
+export function presentElevationForCoach(report: ElevationSegmentsReport, sportType: string) {
+  return {
+    ...report,
+    climbs: report.climbs.map((segment) => withLocomotion(segment, sportType)),
+    descents: report.descents.map((segment) => withLocomotion(segment, sportType)),
+  };
+}
+
+export function presentEffortForCoach(report: EffortReport, sportType: string) {
+  return {
+    ...report,
+    gradeBuckets: report.gradeBuckets.map((bucket) => withLocomotion(bucket, sportType)),
+  };
+}
 
 export type ActivityAnalysisSnapshot = {
   overview: ActivityOverview;
@@ -1029,11 +1056,11 @@ export function composeMockAnalysis(results: {
   }
   if (hikeClimb) {
     lines.push(
-      `- On the steepest pitches you hiked (~${formatSpeed(hikeClimb.avgSpeedKmh)} at ${hikeClimb.avgGradePct}%). Treat that as the efficient choice, not a failed run. Plan hike breaks on walls this steep instead of forcing a shuffle.`,
+      `- On the steepest pitches you hiked (~${formatLocomotion(hikeClimb.avgSpeedKmh, overview.sportType)} at ${hikeClimb.avgGradePct}%). Treat that as the efficient choice, not a failed run. Plan hike breaks on walls this steep instead of forcing a shuffle.`,
     );
   } else if (climb) {
     lines.push(
-      `- Biggest climb: ${formatDuration(climb.durationSec)} at ~${climb.avgGradePct ?? "?"}% (${formatElevation(climb.elevationDeltaM)}), HR ${formatBpm(climb.avgHeartrate)} (${fmtHrDelta(climb.heartrateRise)}), ${formatSpeed(climb.avgSpeedKmh)}.`,
+      `- Biggest climb: ${formatDuration(climb.durationSec)} at ~${climb.avgGradePct ?? "?"}% (${formatElevation(climb.elevationDeltaM)}), HR ${formatBpm(climb.avgHeartrate)} (${fmtHrDelta(climb.heartrateRise)}), ${formatLocomotion(climb.avgSpeedKmh, overview.sportType)}.`,
     );
   }
   if ((results.elevation?.otherClimbCount ?? 0) > 0) {
@@ -1087,8 +1114,10 @@ Always call tools first. Never invent numbers. Prefer:
 Use athlete anchors from overview (LTHR, max HR, FTP, timeInZones). Compare average and peak HR to those zones. Say how much time was at or above threshold.
 
 Sport rules:
-- Running and trail: coach from pace, HR, grade, and hike vs run. If powerRole is "estimated", ignore watts — never tell a run-power story.
-- Cycling: power can lead when powerRole is "meter".
+- Running, trail, and walking: coach from pace, HR, grade, and hike vs run. Quote avgLocomotion and climb/grade avgLocomotion as already formatted (e.g. 4:32 /km). Never say km/h.
+- Swimming: quote avgLocomotion as min/100m (e.g. 1:45 /100m). Never say km/h.
+- Cycling and other sports: quote avgLocomotion in km/h. Power can lead when powerRole is "meter".
+- If powerRole is "estimated", ignore watts — never tell a run-power story.
 - likelyHike (slow and steep) is power-hiking. Do not call it easy because HR was lower. Lower HR plus much slower speed on a wall is a gait change.
 
 Climbs: discuss only the defining climbs the tool returns. If otherClimbCount is high, say the course was punchy — do not list every pitch or 25%+ GPS spike.
