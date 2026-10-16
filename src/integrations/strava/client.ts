@@ -1,3 +1,4 @@
+import { serverEnv } from "@/configs/env.ts";
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import { StravaDailyLimitError, StravaRateLimit, StravaShortLimitError } from "./rate-limit.ts";
 import type { components, operations } from "./strava.types.ts";
@@ -21,8 +22,6 @@ export const DEFAULT_STREAM_KEYS = [
   "moving",
   "grade_smooth",
 ] as const satisfies readonly StreamKey[];
-
-const STRAVA_API_BASE = "https://www.strava.com/api/v3";
 
 export class StravaApiError extends Error {
   constructor(
@@ -87,7 +86,7 @@ export class StravaApi {
     const headers = new Headers(init?.headers);
     headers.set("Accept", "application/json");
     headers.set("Authorization", `Bearer ${this.accessToken}`);
-    const response = await fetch(`${STRAVA_API_BASE}${path}`, {
+    const response = await fetch(`${serverEnv.stravaBaseUrl()}/api/v3${path}`, {
       ...init,
       headers,
     });
