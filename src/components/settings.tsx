@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ActivityIcon,
-  RefreshCwIcon,
-  Settings2Icon,
-  TargetIcon,
-  UserIcon,
-} from "lucide-react";
+import { ActivityIcon, RefreshCwIcon, Settings2Icon, TargetIcon, UserIcon } from "lucide-react";
 import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from "react-hook-form";
 
 import {
@@ -442,9 +436,7 @@ export function SettingsForm({ userName }: { userName: string }) {
                         {offersPower ? (
                           <Field orientation="horizontal">
                             <Controller
-                              name={
-                                `sportTypes.${sportType}.power` as FieldPath<SettingsFormInput>
-                              }
+                              name={`sportTypes.${sportType}.power` as FieldPath<SettingsFormInput>}
                               control={form.control}
                               render={({ field }) => (
                                 <Switch
