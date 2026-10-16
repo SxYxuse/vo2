@@ -12,7 +12,7 @@ import {
 const PREFETCH_BATCH = 4;
 const PREFETCH_VISIBLE_CAP = 40;
 
-const APP_ROUTES = ["/", "/map", "/fitness", "/heart-rate", "/tests"] as const;
+const APP_ROUTES = ["/", "/map", "/fitness", "/heart-rate", "/tests", "/settings"] as const;
 
 export function scheduleIdle(work: () => void) {
   if (typeof window === "undefined") return () => undefined;
@@ -24,7 +24,7 @@ export function scheduleIdle(work: () => void) {
   return () => window.clearTimeout(timer);
 }
 
-/** Run each signed-in route loader (and its query) plus settings that have no route. */
+/** Run each signed-in route loader (and its query). */
 export function warmApp(router: RegisteredRouter, queryClient: QueryClient) {
   for (const to of APP_ROUTES) {
     void router.preloadRoute({ to });

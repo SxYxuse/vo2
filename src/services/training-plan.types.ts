@@ -207,6 +207,13 @@ export function suggestedTargetHours(avgWeeklyHours: number, intent: HoursIntent
   return Math.round(base * factor * 10) / 10;
 }
 
+/** Last-3-month average below this is not a usable hours-intent baseline. */
+const THIN_WEEKLY_HOURS = 0.2;
+
+export function hasRecentWeeklyHours(avgHours: number) {
+  return avgHours > THIN_WEEKLY_HOURS;
+}
+
 export function recentAverageWeeklyHours(loads: FitnessLoad[], timeZone: string) {
   const pmc = buildPmc(loads, timeZone);
   const series = slicePmc(pmc, "3m", timeZone);

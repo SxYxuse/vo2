@@ -17,6 +17,7 @@ import {
   WEEKDAYS,
   WORKOUT_STYLES,
   formatHours,
+  hasRecentWeeklyHours,
   suggestedTargetHours,
   trainingConsistency,
   type HoursIntent,
@@ -212,9 +213,11 @@ export function ProfileFields<T extends ProfileFormValues>({
 export function TrainingPaceFields<T extends TrainingFormInput>({
   idPrefix,
   control,
+  hasActivityHistory = true,
 }: {
   idPrefix: string;
   control: Control<T>;
+  hasActivityHistory?: boolean;
 }) {
   return (
     <Controller
@@ -224,8 +227,9 @@ export function TrainingPaceFields<T extends TrainingFormInput>({
         <FieldSet data-invalid={fieldState.invalid}>
           <FieldLegend>Fitness and form</FieldLegend>
           <FieldDescription>
-            Keep building, or hold where you are. Faster ramps raise fitness quicker and sit you in
-            more fatigue.
+            {hasActivityHistory
+              ? "Keep building, or hold where you are. Faster ramps raise fitness quicker and sit you in more fatigue."
+              : "How hard this block should push. After activities are copied, faster ramps raise fitness quicker and sit you in more fatigue."}
           </FieldDescription>
           <RadioGroup
             name={field.name}
@@ -339,14 +343,16 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
     targetWeeklyHours,
   });
   const hoursMax = Math.min(30, Math.max(12, Math.ceil((avgHours || 5) * 1.5), targetWeeklyHours));
+  const hasHistory = hasRecentWeeklyHours(avgHours);
 
   return (
     <FieldGroup>
       <FieldSet>
         <FieldLegend>Weekly sessions</FieldLegend>
         <FieldDescription>
-          Caps for suggested run and ride sessions in the weekly bucket. Other sports still count
-          toward load.
+          {hasHistory
+            ? "Caps for suggested run and ride sessions in the week bucket. Other sports still count toward load."
+            : "How many runs and rides to put in the week bucket each week. Other sports still count toward load once activities are copied."}
         </FieldDescription>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Controller
@@ -414,43 +420,46 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
       <FieldSet>
         <FieldLegend>Weekly hours</FieldLegend>
         <FieldDescription>
-          Your last 3 months average {avgHours > 0.2 ? formatHours(avgHours) : "is still thin"}.
-          Choose whether to cut back, keep that volume, or add hours.
+          {hasHistory
+            ? `Your last 3 months average ${formatHours(avgHours)}. Choose whether to cut back, keep that volume, or add hours.`
+            : "No activities copied from Strava yet, so there is no recent-weeks baseline. Choose how many hours you want to train each week."}
         </FieldDescription>
-        <Controller
-          name={"hoursIntent" as FieldPath<T>}
-          control={control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <RadioGroup
-                name={field.name}
-                value={field.value as string}
-                onValueChange={(next) => {
-                  if (!next) return;
-                  field.onChange(next);
-                  setValue(
-                    "targetWeeklyHours" as FieldPath<T>,
-                    suggestedTargetHours(avgHours, next as HoursIntent) as never,
-                    { shouldValidate: true },
-                  );
-                }}
-              >
-                {HOURS_INTENTS.map((intent) => {
-                  const id = `${idPrefix}-hours-${intent.id}`;
-                  return (
-                    <Field key={intent.id} orientation="horizontal">
-                      <RadioGroupItem value={intent.id} id={id} />
-                      <FieldLabel htmlFor={id} className="font-normal">
-                        {intent.label}
-                      </FieldLabel>
-                    </Field>
-                  );
-                })}
-              </RadioGroup>
-              {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-            </Field>
-          )}
-        />
+        {hasHistory ? (
+          <Controller
+            name={"hoursIntent" as FieldPath<T>}
+            control={control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <RadioGroup
+                  name={field.name}
+                  value={field.value as string}
+                  onValueChange={(next) => {
+                    if (!next) return;
+                    field.onChange(next);
+                    setValue(
+                      "targetWeeklyHours" as FieldPath<T>,
+                      suggestedTargetHours(avgHours, next as HoursIntent) as never,
+                      { shouldValidate: true },
+                    );
+                  }}
+                >
+                  {HOURS_INTENTS.map((intent) => {
+                    const id = `${idPrefix}-hours-${intent.id}`;
+                    return (
+                      <Field key={intent.id} orientation="horizontal">
+                        <RadioGroupItem value={intent.id} id={id} />
+                        <FieldLabel htmlFor={id} className="font-normal">
+                          {intent.label}
+                        </FieldLabel>
+                      </Field>
+                    );
+                  })}
+                </RadioGroup>
+                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+              </Field>
+            )}
+          />
+        ) : null}
         <Controller
           name={"targetWeeklyHours" as FieldPath<T>}
           control={control}

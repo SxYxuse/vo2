@@ -1,7 +1,7 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
-import { noop, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
@@ -18,18 +18,10 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
-const OnboardingDialog = lazy(() =>
-  import("@/components/onboarding-dialog.tsx").then((mod) => ({ default: mod.OnboardingDialog })),
-);
-const SettingsDialog = lazy(() =>
-  import("@/components/settings-dialog.tsx").then((mod) => ({ default: mod.SettingsDialog })),
-);
-
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { authClient } from "@/lib/auth-client.ts";
-import { appShellQueryOptions, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
-import { isTrainingPlanComplete } from "@/services/training-plan.ts";
+import { appShellQueryOptions } from "@/lib/queries.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -95,7 +87,11 @@ function SidebarNavMenu({
       {items.map((item) => (
         <SidebarMenuItem key={item.to}>
           <SidebarMenuButton
-            isActive={pathname === item.to}
+            isActive={
+              item.to === "/"
+                ? pathname === "/" || pathname.startsWith("/activities/")
+                : pathname === item.to
+            }
             tooltip={item.title}
             render={
               <Link
@@ -116,103 +112,50 @@ function SidebarNavMenu({
   );
 }
 
-function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) {
-  void import("@/components/onboarding-dialog.tsx");
-  void import("@/components/settings-dialog.tsx");
-  void queryClient?.query(settingsSnapshotQueryOptions).catch(noop);
-}
-
 export function AppSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const queryClient = useQueryClient();
-  const { data: session } = authClient.useSession();
-  const user = session?.user;
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const { data: shell } = useQuery({
-    ...appShellQueryOptions,
-    enabled: Boolean(user),
-  });
-  const trainingMissing = Boolean(
-    user && shell?.signedIn && !isTrainingPlanComplete(shell.training),
-  );
-
-  useEffect(() => {
-    if (!trainingMissing) return;
-    preloadSettingsDialog(queryClient);
-    setOnboardingOpen(true);
-  }, [trainingMissing, queryClient]);
 
   return (
-    <>
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                tooltip={APP_NAME}
-                render={<Link to="/" preload="viewport" />}
-              >
-                <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
-                <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Training</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarUserMenu
-            onOpenSettings={() => setSettingsOpen(true)}
-            onHoverSettings={() => preloadSettingsDialog(queryClient)}
-          />
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-      {user && (onboardingOpen || settingsOpen) ? (
-        <Suspense fallback={null}>
-          {onboardingOpen ? (
-            <OnboardingDialog
-              open={onboardingOpen}
-              onOpenChange={setOnboardingOpen}
-              userName={user.name}
-            />
-          ) : null}
-          {settingsOpen ? (
-            <SettingsDialog
-              open={settingsOpen}
-              onOpenChange={setSettingsOpen}
-              userName={user.name}
-            />
-          ) : null}
-        </Suspense>
-      ) : null}
-    </>
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              tooltip={APP_NAME}
+              render={<Link to="/" preload="viewport" />}
+            >
+              <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
+              <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Training</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarUserMenu />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }
 
-function SidebarUserMenu({
-  onOpenSettings,
-  onHoverSettings,
-}: {
-  onOpenSettings: () => void;
-  onHoverSettings: () => void;
-}) {
+function SidebarUserMenu() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { data: session, isPending } = authClient.useSession();
   const [mounted, setMounted] = useState(false);
@@ -308,11 +251,15 @@ function SidebarUserMenu({
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
                     <DropdownMenuItem
-                      onMouseEnter={onHoverSettings}
-                      onFocus={onHoverSettings}
-                      onPointerDown={onHoverSettings}
+                      onMouseEnter={() => {
+                        void router.preloadRoute({ to: "/settings" });
+                      }}
+                      onFocus={() => {
+                        void router.preloadRoute({ to: "/settings" });
+                      }}
                       onClick={() => {
-                        onOpenSettings();
+                        if (isMobile) setOpenMobile(false);
+                        void router.navigate({ to: "/settings" });
                       }}
                     >
                       <Settings2Icon />

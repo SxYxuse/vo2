@@ -10,18 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppTestsRouteImport } from './routes/_app.tests'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
+import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -44,6 +52,11 @@ const AppMapRoute = AppMapRouteImport.update({
   path: '/map',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTestsRoute = AppTestsRouteImport.update({
   id: '/tests',
   path: '/tests',
@@ -59,6 +72,11 @@ const ApiActivityAnalysisRoute = ApiActivityAnalysisRouteImport.update({
   path: '/api/activity-analysis',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppActivitiesActivityIdRoute = AppActivitiesActivityIdRouteImport.update({
+  id: '/activities/$activityId',
+  path: '/activities/$activityId',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -72,36 +90,45 @@ const ApiMockStravaSplatRoute = ApiMockStravaSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/onboarding': typeof OnboardingRoute
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/settings': typeof AppSettingsRoute
   '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
+  '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
 }
 export interface FileRoutesByTo {
+  '/onboarding': typeof OnboardingRoute
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/settings': typeof AppSettingsRoute
   '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/': typeof AppIndexRoute
+  '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/onboarding': typeof OnboardingRoute
   '/_app/fitness': typeof AppFitnessRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
+  '/_app/settings': typeof AppSettingsRoute
   '/_app/tests': typeof AppTestsRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
 }
@@ -109,41 +136,51 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/onboarding'
     | '/fitness'
     | '/heart-rate'
     | '/map'
+    | '/settings'
     | '/tests'
     | '/week-bucket'
     | '/api/activity-analysis'
+    | '/activities/$activityId'
     | '/api/auth/$'
     | '/api/mock-strava/$'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/onboarding'
     | '/fitness'
     | '/heart-rate'
     | '/map'
+    | '/settings'
     | '/tests'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/'
+    | '/activities/$activityId'
     | '/api/auth/$'
     | '/api/mock-strava/$'
   id:
     | '__root__'
     | '/_app'
+    | '/onboarding'
     | '/_app/fitness'
     | '/_app/heart-rate'
     | '/_app/map'
+    | '/_app/settings'
     | '/_app/tests'
     | '/_app/week-bucket'
     | '/api/activity-analysis'
     | '/_app/'
+    | '/_app/activities/$activityId'
     | '/api/auth/$'
     | '/api/mock-strava/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  OnboardingRoute: typeof OnboardingRoute
   ApiActivityAnalysisRoute: typeof ApiActivityAnalysisRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMockStravaSplatRoute: typeof ApiMockStravaSplatRoute
@@ -156,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -186,6 +230,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMapRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/tests': {
       id: '/_app/tests'
       path: '/tests'
@@ -206,6 +257,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/activity-analysis'
       preLoaderRoute: typeof ApiActivityAnalysisRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/activities/$activityId': {
+      id: '/_app/activities/$activityId'
+      path: '/activities/$activityId'
+      fullPath: '/activities/$activityId'
+      preLoaderRoute: typeof AppActivitiesActivityIdRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -228,24 +286,29 @@ interface AppRouteChildren {
   AppFitnessRoute: typeof AppFitnessRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppTestsRoute: typeof AppTestsRoute
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppFitnessRoute: AppFitnessRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppTestsRoute: AppTestsRoute,
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
+  AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  OnboardingRoute: OnboardingRoute,
   ApiActivityAnalysisRoute: ApiActivityAnalysisRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMockStravaSplatRoute: ApiMockStravaSplatRoute,

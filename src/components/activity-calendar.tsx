@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
 import { addDays, format, parseISO } from "date-fns";
 import { enUS } from "date-fns/locale";
@@ -9,7 +10,6 @@ import { cn } from "cn";
 import { ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
 
 import { prefetchActivityDetail, prefetchActivityDetails, scheduleIdle } from "@/lib/prefetch.ts";
-import { ActivityDetailDialog } from "@/components/activity-detail-dialog.tsx";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import {
   formatSportType,
@@ -344,16 +344,9 @@ function DiaryNav({
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
   initialSettings: CalendarSettings;
-  selectedActivityId: string | null;
-  onSelectActivity: (id: string | null) => void;
 };
 
-export function ActivityCalendar({
-  activities,
-  initialSettings,
-  selectedActivityId,
-  onSelectActivity,
-}: ActivityCalendarProps) {
+export function ActivityCalendar({ activities, initialSettings }: ActivityCalendarProps) {
   const sportTypes = useMemo(
     () =>
       mergeCalendarSettings(
@@ -366,6 +359,8 @@ export function ActivityCalendar({
   const layoutReady = isDesktopMedia !== null;
   const isDesktop = isDesktopMedia === true;
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
   const [cursorWeek, setCursorWeek] = useState(currentWeek);
@@ -426,7 +421,12 @@ export function ActivityCalendar({
             onEventClick={(occurrence, event) => {
               event.preventDefault();
               warmActivity(queryClient, occurrence.event.id);
-              onSelectActivity(occurrence.event.id);
+              const activityId = occurrence.event.id;
+              void router.preloadRoute({
+                to: "/activities/$activityId",
+                params: { activityId },
+              });
+              void navigate({ to: "/activities/$activityId", params: { activityId } });
             }}
             onPointerOver={(event) => {
               const id = (event.target as HTMLElement | null)
@@ -462,14 +462,6 @@ export function ActivityCalendar({
         ) : (
           <Skeleton className="min-h-80 flex-1 rounded-none md:min-h-[720px]" />
         )}
-        <ActivityDetailDialog
-          activityId={selectedActivityId}
-          preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
-          color={events.find((event) => event.id === selectedActivityId)?.color}
-          onOpenChange={(open) => {
-            if (!open) onSelectActivity(null);
-          }}
-        />
       </CardContent>
     </Card>
   );
