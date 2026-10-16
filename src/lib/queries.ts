@@ -7,7 +7,7 @@ import { loadAppShell } from "@/services/app-shell.ts";
 import { loadSettingsSnapshot } from "@/services/app-settings.ts";
 import { loadAssessments } from "@/services/assessments.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
-import { loadHomeData } from "@/services/strava-sync.ts";
+import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 
 /** Loader/preload read: use cached data if present, otherwise fetch once. */
@@ -25,6 +25,12 @@ export const homeQueryOptions = queryOptions({
   queryKey: ["home"],
   queryFn: () => loadHomeData(),
   staleTime: 60_000,
+});
+
+export const syncStatusQueryOptions = queryOptions({
+  queryKey: ["sync-status"],
+  queryFn: () => loadSyncStatus(),
+  staleTime: 30_000,
 });
 
 export const settingsSnapshotQueryOptions = queryOptions({
