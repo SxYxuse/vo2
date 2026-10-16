@@ -26,6 +26,14 @@ _Avoid_: Sport, discipline
 A display grouping of related sport types: cycling, running, swimming, or walking.
 _Avoid_: Sport family (that term is reserved for planning)
 
+**Pace**:
+Time to cover a fixed distance. Running and walking use minutes per kilometre; swimming uses minutes per 100 metres.
+_Avoid_: Speed, build pace
+
+**Speed**:
+Distance covered per time, in km/h. Used for cycling and for sport types that are not running, walking, or swimming.
+_Avoid_: Pace, velocity, kph
+
 **Sport family**:
 The planning axis for remaining-week work: running or cycling only.
 _Avoid_: Sport group, sport type
@@ -38,7 +46,7 @@ _Avoid_: Program, schedule, calendar
 
 **Build pace**:
 How aggressively fitness should rise this block: hold, slow, steady, fast, or overreach.
-_Avoid_: Intensity, ramp rate
+_Avoid_: Intensity, ramp rate, Pace (time per distance)
 
 **Hours intent**:
 Whether this block should cut, keep, or add weekly volume relative to recent weeks.
