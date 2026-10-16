@@ -6,6 +6,7 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { ThemeProvider } from "@/components/theme-provider.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
+import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";
@@ -67,6 +68,7 @@ function RootDocument({ children }: { children: ReactNode }) {
                 ]}
               />
             ) : null}
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
         <Scripts />

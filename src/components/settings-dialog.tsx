@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ActivityIcon, TargetIcon, UserIcon } from "lucide-react";
+import { ActivityIcon, RefreshCwIcon, TargetIcon, UserIcon } from "lucide-react";
 import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from "react-hook-form";
 
 import {
@@ -50,6 +50,7 @@ import {
   TrainingDoubleDaysField,
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
+import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Field,
@@ -73,12 +74,13 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
-type SettingsSection = "profile" | "sports" | "training";
+type SettingsSection = "profile" | "sports" | "training" | "sync";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof UserIcon }[] = [
   { id: "profile", label: "Profile", icon: UserIcon },
   { id: "training", label: "Training", icon: TargetIcon },
   { id: "sports", label: "Sports", icon: ActivityIcon },
+  { id: "sync", label: "Sync", icon: RefreshCwIcon },
 ];
 
 const PROFILE_ERROR_KEYS = ["birthDate", "weightKg", "heightCm"] as const;
@@ -150,8 +152,11 @@ export function SettingsDialog({
     {}) as CalendarSettings["sportTypes"];
 
   useEffect(() => {
+    if (open) setSection("profile");
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !data) return;
-    setSection("profile");
     setSaveError(null);
     form.reset(
       settingsFormDefaults({
@@ -237,8 +242,7 @@ export function SettingsDialog({
           <ResponsiveDialogHeader className="border-b px-4 py-3 group-data-[swipe-axis=y]/drawer-popup:text-left">
             <ResponsiveDialogTitle>Settings</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              Profile, training goal, and sport types used across calendar, map, fitness, and heart
-              rate.
+              Profile, training goal, sport types, and the Strava copy of activities and streams.
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -284,6 +288,8 @@ export function SettingsDialog({
                         onOpenSports={() => setSection("sports")}
                       />
                     </FieldGroup>
+                  ) : section === "sync" ? (
+                    <SettingsSyncSection enabled={open} />
                   ) : sortedSports.length === 0 ? (
                     <Empty className="min-h-48 border">
                       <EmptyHeader>
