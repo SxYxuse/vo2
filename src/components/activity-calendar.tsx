@@ -23,12 +23,7 @@ import {
 } from "@/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
 import { weekStartKey } from "@/services/training-plan.ts";
-import {
-  DIARY_SCOPES,
-  diaryWindow,
-  stepDiaryWeek,
-  type DiaryScope,
-} from "@/services/diary-window.ts";
+import { diaryWindow, stepDiaryWeek } from "@/services/diary-window.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -58,11 +53,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const DISABLED_INTERACTIONS = { drag: false, resize: false, selectSlot: false } as const;
 const DIARY_VIEWS: CalendarView[] = ["days"];
 const MONDAY = 1;
+const DESKTOP_WEEKS = 4;
+const MOBILE_WEEKS = 1;
 
 function MissingHeartrateMark() {
   return (
@@ -309,17 +305,13 @@ function formatDiaryRange(start: string, end: string) {
 }
 
 function DiaryNav({
-  scope,
   range,
   atCurrentWeek,
-  onScopeChange,
   onStep,
   onToday,
 }: {
-  scope: DiaryScope;
   range: string;
   atCurrentWeek: boolean;
-  onScopeChange: (scope: DiaryScope) => void;
   onStep: (direction: 1 | -1) => void;
   onToday: () => void;
 }) {
@@ -328,23 +320,6 @@ function DiaryNav({
       <Button variant="ghost" size="sm" onClick={onToday}>
         Today
       </Button>
-      <ToggleGroup
-        size="sm"
-        variant="outline"
-        spacing={0}
-        value={[scope]}
-        onValueChange={(next) => {
-          const value = next[0];
-          if (value == null) return;
-          onScopeChange(value as DiaryScope);
-        }}
-      >
-        {DIARY_SCOPES.map((option) => (
-          <ToggleGroupItem key={option.value} value={option.value}>
-            {option.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
       <div className="flex items-center">
         <Button
           variant="ghost"
@@ -399,8 +374,7 @@ export function ActivityCalendar({
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
   const [cursorWeek, setCursorWeek] = useState(currentWeek);
-  const [scope, setScope] = useState<DiaryScope>("four-weeks");
-  const diary = diaryWindow(cursorWeek, scope);
+  const diary = diaryWindow(cursorWeek, isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS);
   const anchor = useMemo(() => dayKeyDate(diary.start, timeZone), [diary.start, timeZone]);
 
   useEffect(() => {
@@ -477,10 +451,8 @@ export function ActivityCalendar({
           >
             <VisibleActivitiesPrefetch activities={activities} />
             <DiaryNav
-              scope={scope}
               range={formatDiaryRange(diary.start, diary.end)}
               atCurrentWeek={cursorWeek >= currentWeek}
-              onScopeChange={setScope}
               onStep={(direction) =>
                 setCursorWeek((week) => stepDiaryWeek(week, direction, currentWeek))
               }
