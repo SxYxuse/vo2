@@ -67,6 +67,9 @@ export function defaultVisibleSeries(detail: {
   return detail.series.filter((key) => !offByDefault.has(key));
 }
 
+/** Below this speed a pace-sport Stream sample is not locomotion. */
+export const PACE_STOP_KMH = 1;
+
 export function paceSeconds(kmh: number | null, unit: PaceUnit): number | null {
   if (kmh == null || !(kmh > 0)) return null;
   const secondsPerUnit = unit === "/km" ? 3600 / kmh : 360 / kmh;
@@ -91,7 +94,8 @@ export function formatLocomotion(kmh: number | null, sportType: string) {
 export function chartLocomotionValue(kmh: number | undefined, sportType: string) {
   const loco = locomotionFor(sportType);
   if (loco.kind === "speed") return kmh;
-  const seconds = paceSeconds(kmh ?? null, loco.unit);
+  if (kmh == null || kmh < PACE_STOP_KMH) return undefined;
+  const seconds = paceSeconds(kmh, loco.unit);
   return seconds ?? undefined;
 }
 

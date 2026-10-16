@@ -69,6 +69,16 @@ describe("chartLocomotionValue", () => {
     expect(chartLocomotionValue(0, "Ride")).toBe(0);
     expect(chartLocomotionValue(32.2, "Ride")).toBe(32.2);
   });
+
+  it("gaps pace slower than 1 km/h as a stop, including GPS crawl", () => {
+    expect(chartLocomotionValue(0.2, "Run")).toBeUndefined();
+    expect(chartLocomotionValue(0.9, "TrailRun")).toBeUndefined();
+    expect(chartLocomotionValue(0.9, "Swim")).toBeUndefined();
+    expect(chartLocomotionValue(1, "Run")).toBe(3600);
+    expect(chartLocomotionValue(1, "Swim")).toBe(360);
+    expect(chartLocomotionValue(1.5, "Hike")).toBe(2400);
+    expect(chartLocomotionValue(0.2, "Ride")).toBe(0.2);
+  });
 });
 
 describe("normalizeSeriesPoint", () => {

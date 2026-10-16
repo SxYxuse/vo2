@@ -4,7 +4,6 @@ import { useId, useMemo, useState, type ComponentProps } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 import {
-  chartLocomotionValue,
   defaultVisibleSeries,
   formatBpm,
   formatCadence,
@@ -22,8 +21,10 @@ import {
 import { isCyclingSport } from "@/services/training-load.ts";
 import {
   chartConfigFor,
+  chartRowsFor,
   seriesMetaFor,
   streamAxisPlacement,
+  streamSeriesValues,
   streamYAxis,
 } from "@/components/activity-detail-series.ts";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -34,13 +35,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 type ChartLayout = "combined" | "separate";
 type ChartRow = ActivityChartPoint & Record<string, number | undefined>;
 type SeriesMeta = ReturnType<typeof seriesMetaFor>;
-
-function chartRowsFor(chart: ActivityChartPoint[], sportType: string): ChartRow[] {
-  return chart.map((point) => ({
-    ...point,
-    speed: chartLocomotionValue(point.speed, sportType),
-  }));
-}
 
 function formatSeriesValue(key: StreamSeriesKey, value: number, sportType: string, unit: string) {
   if (key === "speed") {
@@ -109,16 +103,18 @@ function StreamValueAxis({
   seriesKey,
   sportType,
   yAxisId,
+  values,
   orientation = "left",
   hide = false,
 }: {
   seriesKey: StreamSeriesKey;
   sportType: string;
   yAxisId: StreamSeriesKey;
+  values: readonly number[];
   orientation?: "left" | "right";
   hide?: boolean;
 }) {
-  const axis = streamYAxis(seriesKey, sportType);
+  const axis = streamYAxis(seriesKey, sportType, values);
   return (
     <YAxis
       yAxisId={yAxisId}
@@ -129,7 +125,10 @@ function StreamValueAxis({
       axisLine={false}
       width={hide ? 0 : axis.reversed ? 44 : 40}
       reversed={axis.reversed}
-      domain={axis.domain}
+      domain={[...axis.domain]}
+      ticks={axis.ticks}
+      interval={axis.ticks ? 0 : undefined}
+      allowDataOverflow={axis.allowDataOverflow}
       tickFormatter={(value) => axis.formatTick(Number(value))}
     />
   );
@@ -167,6 +166,7 @@ function CombinedStreamChart({
               seriesKey={key}
               sportType={sportType}
               yAxisId={key}
+              values={streamSeriesValues(data, key)}
               orientation={placement.orientation}
               hide={placement.hide}
             />
@@ -253,7 +253,12 @@ function StreamAreaChart({
           minTickGap={48}
           tickFormatter={(value) => formatElapsedTick(Number(value))}
         />
-        <StreamValueAxis seriesKey={seriesKey} sportType={sportType} yAxisId={seriesKey} />
+        <StreamValueAxis
+          seriesKey={seriesKey}
+          sportType={sportType}
+          yAxisId={seriesKey}
+          values={streamSeriesValues(data, seriesKey)}
+        />
         <ChartTooltip
           cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
           content={
