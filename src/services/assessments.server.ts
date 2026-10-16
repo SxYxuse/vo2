@@ -240,24 +240,52 @@ async function applyAthleteMetrics(
   result: AssessmentResult,
 ) {
   const [current] = await db
-    .select({ ftp: athleteMetrics.ftp, lthr: athleteMetrics.lthr })
+    .select({
+      ftp: athleteMetrics.ftp,
+      lthr: athleteMetrics.lthr,
+      cyclingLthr: athleteMetrics.cyclingLthr,
+      runLthr: athleteMetrics.runLthr,
+      swimLthr: athleteMetrics.swimLthr,
+      restHr: athleteMetrics.restHr,
+    })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
   const ftp =
     assessmentId === "ftp-20" ? (result.ftpWatts ?? current?.ftp ?? null) : (current?.ftp ?? null);
-  const lthr =
+  const cyclingLthr =
     assessmentId === "ftp-20"
-      ? (result.cyclingLthr ?? current?.lthr ?? null)
-      : assessmentId === "run-lthr"
-        ? (result.runLthr ?? current?.lthr ?? null)
-        : (current?.lthr ?? null);
+      ? (result.cyclingLthr ?? current?.cyclingLthr ?? current?.lthr ?? null)
+      : (current?.cyclingLthr ?? current?.lthr ?? null);
+  const runLthr =
+    assessmentId === "run-lthr"
+      ? (result.runLthr ?? current?.runLthr ?? null)
+      : (current?.runLthr ?? null);
+  const swimLthr = current?.swimLthr ?? null;
+  const restHr = current?.restHr ?? null;
   await db
     .insert(athleteMetrics)
-    .values({ userId, ftp, lthr, updatedAt: new Date() })
+    .values({
+      userId,
+      ftp,
+      lthr: cyclingLthr,
+      cyclingLthr,
+      runLthr,
+      swimLthr,
+      restHr,
+      updatedAt: new Date(),
+    })
     .onConflictDoUpdate({
       target: athleteMetrics.userId,
-      set: { ftp, lthr, updatedAt: new Date() },
+      set: {
+        ftp,
+        lthr: cyclingLthr,
+        cyclingLthr,
+        runLthr,
+        swimLthr,
+        restHr,
+        updatedAt: new Date(),
+      },
     });
   void refreshTrainingLoadsForUser(userId).catch((error) => {
     logger.error("assessments.load_refresh_failed", { userId, error });

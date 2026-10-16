@@ -6,6 +6,7 @@ import { sportGroupFor } from "./sport-groups.ts";
 import {
   averageWeeklyMovingSeconds,
   buildPmc,
+  CTL_DAYS,
   slicePmc,
   type FitnessLoad,
 } from "./training-load.ts";
@@ -151,7 +152,6 @@ export type CompletedSession = {
 };
 
 const TSS_PER_HOUR = 42;
-const CTL_DAYS = 42;
 
 function withPlanDefaults(value: unknown) {
   if (!value || typeof value !== "object") return value;
@@ -370,7 +370,7 @@ export function doneWeekSessions(sessions: PlannedSession[], weekStart: string) 
 
 function rampFor(plan: TrainingPlan, tsb: number) {
   let pace = plan.buildPace;
-  if (tsb < -25) pace = "hold";
+  if (tsb < -30) pace = "hold";
   else if (tsb < -10 && pace === "overreach") pace = "fast";
   else if (tsb < -18 && (pace === "fast" || pace === "overreach")) pace = "steady";
   return BUILD_PACES.find((item) => item.id === pace)?.ramp ?? 0;
@@ -380,7 +380,7 @@ function weeklyLoadTarget(ctl: number, ramp: number, hours: number) {
   const fromFitness = Math.max(0, 7 * ctl + CTL_DAYS * ramp);
   const fromHours = hours * TSS_PER_HOUR;
   if (ctl <= 5) return fromHours;
-  return fromFitness * 0.55 + fromHours * 0.45;
+  return Math.min(fromFitness, hours * 100);
 }
 
 type Draft = Omit<PlannedSession, "id">;
@@ -428,7 +428,7 @@ export function planRemainingWeek(input: {
   );
 
   let daysLeft = remainingDaysInWeek(input.today, weekEnd);
-  if (input.tsb < -25) daysLeft = Math.max(0, daysLeft - 1);
+  if (input.tsb < -30) daysLeft = Math.max(0, daysLeft - 1);
   const capacity = daysLeft + Math.min(input.plan.maxDoubleDays, daysLeft);
 
   const queue: Array<"running" | "cycling"> = [];
@@ -516,8 +516,8 @@ export function planRemainingWeek(input: {
 
 function qualityWork(plan: TrainingPlan, tsb: number): QualityKind | null {
   if (plan.workoutStyle !== "structured") return null;
-  if (plan.buildPace === "hold" || tsb < 5) return null;
-  if ((plan.buildPace === "fast" || plan.buildPace === "overreach") && tsb >= 10) return "vo2";
+  if (plan.buildPace === "hold" || tsb < -30) return null;
+  if ((plan.buildPace === "fast" || plan.buildPace === "overreach") && tsb >= -10) return "vo2";
   if (plan.buildPace === "slow") return "tempo";
   return "threshold";
 }
@@ -647,12 +647,12 @@ function sessionNote(
   const pace = BUILD_PACES.find((item) => item.id === plan.buildPace)?.label ?? plan.buildPace;
   if (isBrick)
     return "Shorter extra session. Stack it on a day you already train, and keep it easy.";
-  if (tsb < -20) return `Form is low. Kept this easy under your ${pace.toLowerCase()} goal.`;
   if (isQuality && kind) {
     const cue = intensityCue(kind, family, collectors, anchors);
     const mixed = collectors?.powerPartial ? mixedCollectorNote(kind, anchors) : "";
     return `15 min easy. ${mainSet(kind, family, minutes, cue)} 10 min easy.${mixed}`;
   }
+  if (tsb < -30) return `Form is low. Kept this easy under your ${pace.toLowerCase()} goal.`;
   if (isQuality)
     return `Quality session while form allows it (${pace.toLowerCase()}). Pick any day.`;
   if (isLong)
@@ -663,4 +663,13 @@ function sessionNote(
 export function latestPmc(loads: FitnessLoad[], timeZone: string) {
   const pmc = buildPmc(loads, timeZone);
   return pmc.at(-1) ?? { ctl: 0, atl: 0, tsb: 0, date: dayKey(new Date(), timeZone) };
+}
+
+export function formForRemainingWeek(
+  pmc: { ctl: number; atl: number; tsb: number },
+  today: string,
+  completed: Array<{ date: string; load: number }>,
+) {
+  const trainedToday = completed.some((session) => session.date === today && session.load > 0);
+  return trainedToday ? pmc.ctl - pmc.atl : pmc.tsb;
 }

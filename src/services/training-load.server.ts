@@ -1,14 +1,18 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
-import { activities, athleteMetrics } from "#/db/schema.ts";
+import { activities, activityStreams, athleteMetrics, fieldTests } from "#/db/schema.ts";
 import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import {
   activityTrainingLoad,
-  estimateFtpAndLthr,
+  estimateLoadAnchors,
+  isPowerCyclingSport,
+  mergeLoadAnchors,
+  pickLoadAnchorsFromTests,
   toFitnessLoad,
   type FitnessLoad,
+  type LoadAnchors,
   type LoadInputs,
   type LoadSource,
 } from "./training-load.ts";
@@ -45,6 +49,63 @@ async function loadActivityRows(userId: string): Promise<StoredLoadRow[]> {
   }));
 }
 
+async function attachPowerStreams(rows: StoredLoadRow[]) {
+  const missing = rows.filter(
+    (row) =>
+      isPowerCyclingSport(row.sportType) &&
+      row.deviceWatts &&
+      (row.weightedAverageWatts == null || row.weightedAverageWatts <= 0),
+  );
+  if (!missing.length) return rows;
+
+  const ids = missing.map((row) => row.id);
+  const streams: Array<{ activityId: string; watts: number[] | null; time: number[] | null }> = [];
+  const batchSize = 40;
+  for (let index = 0; index < ids.length; index += batchSize) {
+    const chunk = ids.slice(index, index + batchSize);
+    const batch = await db
+      .select({
+        activityId: activityStreams.activityId,
+        watts: activityStreams.watts,
+        time: activityStreams.time,
+      })
+      .from(activityStreams)
+      .where(inArray(activityStreams.activityId, chunk));
+    streams.push(...batch);
+  }
+
+  const byId = new Map(streams.map((stream) => [stream.activityId, stream]));
+  return rows.map((row) => {
+    const stream = byId.get(row.id);
+    if (!stream) return row;
+    return { ...row, wattsStream: stream.watts, timeStream: stream.time };
+  });
+}
+
+async function loadTestAnchors(userId: string) {
+  const rows = await db
+    .select({
+      assessmentId: fieldTests.assessmentId,
+      result: fieldTests.result,
+    })
+    .from(fieldTests)
+    .where(and(eq(fieldTests.userId, userId), eq(fieldTests.status, "completed")))
+    .orderBy(desc(fieldTests.completedAt));
+  return pickLoadAnchorsFromTests(rows);
+}
+
+function persistableAnchors(anchors: LoadAnchors) {
+  return {
+    ftp: anchors.ftp,
+    lthr: anchors.cyclingLthr,
+    cyclingLthr: anchors.cyclingLthr,
+    runLthr: anchors.runLthr,
+    swimLthr: anchors.swimLthr,
+    restHr: anchors.restHr,
+    updatedAt: new Date(),
+  };
+}
+
 async function writeLoads(updates: { id: string; load: number; source: LoadSource }[]) {
   if (!updates.length) return;
   const values = sql.join(
@@ -67,21 +128,30 @@ async function refreshTrainingLoads(userId: string) {
   const rows = await loadActivityRows(userId);
   if (!rows.length) return;
 
-  const { ftp, lthr } = estimateFtpAndLthr(rows);
+  const withStreams = await attachPowerStreams(rows);
+  const anchors = mergeLoadAnchors(estimateLoadAnchors(withStreams), await loadTestAnchors(userId));
+  const stored = persistableAnchors(anchors);
   await db
     .insert(athleteMetrics)
-    .values({ userId, ftp, lthr, updatedAt: new Date() })
+    .values({ userId, ...stored })
     .onConflictDoUpdate({
       target: athleteMetrics.userId,
-      set: { ftp, lthr, updatedAt: new Date() },
+      set: stored,
     });
 
-  const updates = rows.map((row) => {
-    const { load, source } = activityTrainingLoad(row, ftp, lthr);
+  const updates = withStreams.map((row) => {
+    const { load, source } = activityTrainingLoad(row, anchors);
     return { id: row.id, load, source };
   });
   await writeLoads(updates);
-  logger.info("training_load.refreshed", { activityCount: updates.length, ftp, lthr });
+  logger.info("training_load.refreshed", {
+    activityCount: updates.length,
+    ftp: anchors.ftp,
+    cyclingLthr: anchors.cyclingLthr,
+    runLthr: anchors.runLthr,
+    swimLthr: anchors.swimLthr,
+    restHr: anchors.restHr,
+  });
 }
 
 export async function refreshTrainingLoadsForUser(userId: string) {
@@ -97,6 +167,8 @@ export async function loadFitnessDataImpl(): Promise<{
     logger.debug("fitness.anonymous");
     return { signedIn: false, fitnessLoads: [] };
   }
+
+  await refreshTrainingLoadsIfNeeded(session.user.id);
 
   const rows = await db
     .select({
@@ -131,6 +203,16 @@ export async function refreshTrainingLoadsIfNeeded(userId: string) {
     .limit(1);
   if (pending.length > 0) {
     logger.debug("training_load.refresh_needed");
+    await refreshTrainingLoads(userId);
+    return;
+  }
+  const [metrics] = await db
+    .select({ restHr: athleteMetrics.restHr })
+    .from(athleteMetrics)
+    .where(eq(athleteMetrics.userId, userId))
+    .limit(1);
+  if (metrics?.restHr == null) {
+    logger.debug("training_load.anchors_refresh_needed");
     await refreshTrainingLoads(userId);
   }
 }
