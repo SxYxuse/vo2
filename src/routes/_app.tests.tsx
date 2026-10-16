@@ -16,8 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/tests")({
-  loader: ({ context }) =>
-    context.queryClient.query(loaderQuery(assessmentsQueryOptions)),
+  loader: ({ context }) => context.queryClient.query(loaderQuery(assessmentsQueryOptions)),
   pendingMs: 200,
   pendingComponent: TestsPending,
   errorComponent: TestsError,

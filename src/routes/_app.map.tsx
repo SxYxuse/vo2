@@ -21,8 +21,7 @@ if (typeof window !== "undefined") {
 
 export const Route = createFileRoute("/_app/map")({
   ssr: false,
-  loader: ({ context }) =>
-    context.queryClient.query(loaderQuery(activityMapQueryOptions)),
+  loader: ({ context }) => context.queryClient.query(loaderQuery(activityMapQueryOptions)),
   pendingMs: 200,
   pendingComponent: MapPending,
   errorComponent: MapError,

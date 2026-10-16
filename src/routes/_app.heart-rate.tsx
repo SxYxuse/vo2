@@ -16,8 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/heart-rate")({
-  loader: ({ context }) =>
-    context.queryClient.query(loaderQuery(heartRateQueryOptions)),
+  loader: ({ context }) => context.queryClient.query(loaderQuery(heartRateQueryOptions)),
   pendingMs: 200,
   pendingComponent: HeartRatePending,
   errorComponent: HeartRateError,

@@ -95,9 +95,7 @@ export function PlannedSessionDialog({
                     <CardTitle className="flex items-center gap-2 text-base">
                       <SportIcon
                         className={
-                          shown.sportFamily === "cycling"
-                            ? "text-ds-blue-700"
-                            : "text-ds-amber-700"
+                          shown.sportFamily === "cycling" ? "text-ds-blue-700" : "text-ds-amber-700"
                         }
                       />
                       {sportLabel(shown.sportFamily)}
@@ -105,9 +103,7 @@ export function PlannedSessionDialog({
                   </CardHeader>
                 </Card>
               </div>
-              {shown.note ? (
-                <p className="text-muted-foreground text-sm">{shown.note}</p>
-              ) : null}
+              {shown.note ? <p className="text-muted-foreground text-sm">{shown.note}</p> : null}
             </div>
           </div>
         ) : null}

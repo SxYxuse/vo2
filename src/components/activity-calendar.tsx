@@ -139,10 +139,7 @@ function MissingHeartrateMark() {
   );
 }
 
-function warmActivity(
-  queryClient: ReturnType<typeof useQueryClient>,
-  id: string,
-) {
+function warmActivity(queryClient: ReturnType<typeof useQueryClient>, id: string) {
   prefetchActivityDetail(queryClient, id);
 }
 

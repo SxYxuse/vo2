@@ -98,8 +98,10 @@ describe("training load", () => {
 
   test("run heart-rate load uses running LTHR, not cycling", () => {
     const runLoad = activityTrainingLoad(run(), ANCHORS).load;
-    const ifCopiedBike = activityTrainingLoad(run(), { ...ANCHORS, runLthr: ANCHORS.cyclingLthr })
-      .load;
+    const ifCopiedBike = activityTrainingLoad(run(), {
+      ...ANCHORS,
+      runLthr: ANCHORS.cyclingLthr,
+    }).load;
     expect(runLoad).toBeLessThan(ifCopiedBike);
     const intensity = (154 - 50) / (175 - 50);
     expect(runLoad).toBeCloseTo(100 * intensity * intensity, 5);
@@ -239,6 +241,11 @@ describe("labels and NP", () => {
 
   test("steady watts over 30s is NP", () => {
     const watts = Array.from({ length: 60 }, () => 200);
-    expect(normalizedPowerFromWatts(watts, watts.map((_, index) => index))).toBeCloseTo(200, 0);
+    expect(
+      normalizedPowerFromWatts(
+        watts,
+        watts.map((_, index) => index),
+      ),
+    ).toBeCloseTo(200, 0);
   });
 });

@@ -157,7 +157,10 @@ export type HeartRateSport = {
 };
 
 export type SportLthrAnchors = Partial<
-  Record<Exclude<HeartRateFamily, "walking" | "other">, { bpm: number; source: HeartRateLthrSource }>
+  Record<
+    Exclude<HeartRateFamily, "walking" | "other">,
+    { bpm: number; source: HeartRateLthrSource }
+  >
 >;
 
 export type HeartRateData = {
@@ -322,10 +325,7 @@ function familyLthr(
   return { lthr: estimated, source: estimated ? ("estimated-from-max" as const) : null };
 }
 
-export function toHeartRateSport(
-  bucket: SportBucket,
-  anchors?: SportLthrAnchors,
-): HeartRateSport {
+export function toHeartRateSport(bucket: SportBucket, anchors?: SportLthrAnchors): HeartRateSport {
   const family = heartRateFamily(bucket.sportType);
   const model = ZONE_MODELS[family];
   const fromSamples = histogramMaxBpm(bucket.histogram);

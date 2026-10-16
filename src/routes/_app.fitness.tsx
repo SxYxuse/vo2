@@ -16,8 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/fitness")({
-  loader: ({ context }) =>
-    context.queryClient.query(loaderQuery(fitnessQueryOptions)),
+  loader: ({ context }) => context.queryClient.query(loaderQuery(fitnessQueryOptions)),
   pendingMs: 200,
   pendingComponent: FitnessPending,
   errorComponent: FitnessError,

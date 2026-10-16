@@ -912,11 +912,7 @@ export function buildOverview(input: {
           ? (input.athlete?.swimLthr ?? null)
           : null;
   const lthr = storedLthr ?? estimatedLthr;
-  const lthrSource = storedLthr
-    ? "athlete"
-    : estimatedLthr
-      ? "estimated-from-session-max"
-      : null;
+  const lthrSource = storedLthr ? "athlete" : estimatedLthr ? "estimated-from-session-max" : null;
   const timeInZones = zoneSharesFromSamples(samples, input.sportType, maxHeartrate, lthr);
   const aboveThresholdSec = timeInZones
     .filter((zone) => zone.id === "z4" || zone.id === "z5")
