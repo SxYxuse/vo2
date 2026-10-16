@@ -5,7 +5,13 @@ import { CalendarDaysIcon } from "lucide-react";
 import { ActivityCalendar } from "#/components/activity-calendar.tsx";
 import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type HomeSearch = {
@@ -65,15 +71,29 @@ function CalendarPage() {
           on Tests.
         </p>
       </div>
-      <ActivityCalendar
-        activities={activities}
-        plannedSessions={plannedSessions}
-        training={isTrainingPlanComplete(training) ? training : null}
-        initialSettings={settings}
-        persist={signedIn}
-        selectedActivityId={activity ?? null}
-        onSelectActivity={selectActivity}
-      />
+      {signedIn && activities.length === 0 ? (
+        <Empty className="min-h-64 border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <CalendarDaysIcon />
+            </EmptyMedia>
+            <EmptyTitle>No activities yet</EmptyTitle>
+            <EmptyDescription>
+              Sync from Strava to fill the calendar with completed activities.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ActivityCalendar
+          activities={activities}
+          plannedSessions={plannedSessions}
+          training={isTrainingPlanComplete(training) ? training : null}
+          initialSettings={settings}
+          persist={signedIn}
+          selectedActivityId={activity ?? null}
+          onSelectActivity={selectActivity}
+        />
+      )}
     </div>
   );
 }
