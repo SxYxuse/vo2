@@ -24,7 +24,11 @@ describe("locomotionFor", () => {
   });
 
   it("keeps km/h speed for cycling and ungrouped sports", () => {
-    expect(locomotionFor("Ride")).toMatchObject({ kind: "speed", unit: "km/h", kpiLabel: "Avg speed" });
+    expect(locomotionFor("Ride")).toMatchObject({
+      kind: "speed",
+      unit: "km/h",
+      kpiLabel: "Avg speed",
+    });
     expect(locomotionFor("VirtualRide").kind).toBe("speed");
     expect(locomotionFor("EBikeRide").kind).toBe("speed");
     expect(locomotionFor("AlpineSki").kind).toBe("speed");

@@ -5,13 +5,21 @@ export type LocomotionKind = "pace" | "speed";
 
 export type PaceUnit = "/km" | "/100m";
 
-export type Locomotion = {
-  kind: LocomotionKind;
-  unit: "km/h" | PaceUnit;
-  label: "Pace" | "Speed";
-  shortLabel: "Pace" | "Speed";
-  kpiLabel: "Avg pace" | "Avg speed";
-};
+export type Locomotion =
+  | {
+      kind: "pace";
+      unit: PaceUnit;
+      label: "Pace";
+      shortLabel: "Pace";
+      kpiLabel: "Avg pace";
+    }
+  | {
+      kind: "speed";
+      unit: "km/h";
+      label: "Speed";
+      shortLabel: "Speed";
+      kpiLabel: "Avg speed";
+    };
 
 const PACE_KM: Locomotion = {
   kind: "pace",

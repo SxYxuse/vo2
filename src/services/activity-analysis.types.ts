@@ -1,8 +1,4 @@
-import {
-  formatBpm,
-  formatDuration,
-  formatElevation,
-} from "./activity-detail.types.ts";
+import { formatBpm, formatDuration, formatElevation } from "./activity-detail.types.ts";
 import { formatLocomotion } from "./locomotion.ts";
 import { formatSportType } from "./calendar-settings.types.ts";
 import {

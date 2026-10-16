@@ -38,12 +38,7 @@ function chartRowsFor(chart: ActivityChartPoint[], sportType: string): ChartRow[
   }));
 }
 
-function formatSeriesValue(
-  key: StreamSeriesKey,
-  value: number,
-  sportType: string,
-  unit: string,
-) {
+function formatSeriesValue(key: StreamSeriesKey, value: number, sportType: string, unit: string) {
   if (key === "speed") {
     const loco = locomotionFor(sportType);
     if (loco.kind === "pace") return `${formatPaceClock(value)} ${loco.unit}`;
