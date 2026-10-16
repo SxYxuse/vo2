@@ -34,8 +34,8 @@ export const auth = betterAuth({
           providerId: "strava",
           clientId: serverEnv.stravaClientId() ?? "",
           clientSecret: serverEnv.stravaClientSecret() ?? "",
-          authorizationUrl: "https://www.strava.com/oauth/authorize",
-          tokenUrl: "https://www.strava.com/oauth/token",
+          authorizationUrl: `${serverEnv.stravaBaseUrl()}/oauth/authorize`,
+          tokenUrl: `${serverEnv.stravaBaseUrl()}/oauth/token`,
           // Strava expects a comma-separated scope list, not spaces.
           scopes: ["read,profile:read_all,activity:read_all"],
           pkce: false,
@@ -44,7 +44,7 @@ export const auth = betterAuth({
             approval_prompt: "auto",
           },
           getUserInfo: async (tokens) => {
-            const response = await fetch("https://www.strava.com/api/v3/athlete", {
+            const response = await fetch(`${serverEnv.stravaBaseUrl()}/api/v3/athlete`, {
               headers: {
                 Authorization: `Bearer ${tokens.accessToken}`,
               },

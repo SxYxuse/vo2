@@ -40,6 +40,18 @@ vp run dev
 
 The app is at http://localhost:3000.
 
+### Mock Strava
+
+Agents (and anyone without a Strava app) can run the full app against a local mock that never calls strava.com:
+
+```bash
+vp run dev:mock
+```
+
+Or set `STRAVA_MOCK=1` in `.env.local`. Open http://localhost:3000, click **Connect Strava** (the OAuth redirect comes straight back, with no Strava login), finish the onboarding dialog (it blocks the page until saved), then click **Sync from Strava**. The mock athlete has about eight weeks of rides and runs, with GPS, heart rate, and power, so the calendar, map, fitness, heart-rate zones, and field tests all have data.
+
+The mock lives at `/api/mock-strava` and implements the parts of Strava's OAuth and v3 API that the app uses. Only the Strava base URL changes, so sign-in, token refresh, and sync run the same code as in production. `STRAVA_MOCK` is ignored in production.
+
 Local Postgres still uses the `vo` user, password, and database name so existing `.env` files and volumes keep working.
 
 ## Sync behavior
