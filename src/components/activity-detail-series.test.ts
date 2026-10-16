@@ -46,7 +46,8 @@ describe("streamYAxis", () => {
     const axis = streamYAxis("speed", "TrailRun", values);
     expect(Number(axis.domain[0])).toBeGreaterThan(0);
     expect(axis.formatTick(Number(axis.domain[0]))).not.toBe("0:00");
-    expect(axis.domain[1]).toBe(1200);
+    expect(Number(axis.domain[1])).toBeGreaterThan(1200);
+    expect(Number(axis.domain[1])).toBeLessThan(1800);
   });
 
   it("still clips a rare 40:00 wander when 95% of the run is the same pace", () => {
@@ -61,7 +62,7 @@ describe("streamYAxis", () => {
     expect(Number(axis.domain[1])).toBeLessThan(600);
   });
 
-  it("gives 800m reps headroom without a 0:00 tick and floors recoveries near 10:00", () => {
+  it("gives 800m reps headroom without a 0:00 tick and keeps 10:00 recoveries on-scale", () => {
     const values = [
       ...Array.from({ length: 60 }, () => 275),
       ...Array.from({ length: 40 }, () => 600),
@@ -70,8 +71,16 @@ describe("streamYAxis", () => {
     expect(Number(axis.domain[0])).toBeGreaterThan(0);
     expect(Number(axis.domain[0])).toBeLessThan(275);
     expect(axis.formatTick(Number(axis.domain[0]))).not.toBe("0:00");
-    expect(axis.domain[1]).toBe(600);
+    expect(Number(axis.domain[1])).toBeGreaterThan(600);
+    expect(Number(axis.domain[1])).toBeLessThan(900);
     expect(axis.ticks?.[0]).not.toBe(0);
+  });
+
+  it("pads past the 95th percentile so a normal easy-run trace is not glued to the floor", () => {
+    const values = Array.from({ length: 100 }, () => 450);
+    const axis = streamYAxis("speed", "Run", values);
+    expect(Number(axis.domain[1])).toBeGreaterThan(450);
+    expect(Number(axis.domain[1])).toBeLessThan(600);
   });
 
   it("keeps cycling speed as rounded km/h from 0", () => {

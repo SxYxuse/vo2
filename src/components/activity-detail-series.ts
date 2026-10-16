@@ -158,6 +158,7 @@ function paceScale(values: readonly number[]): {
   const floored = Math.floor(fastest / step) * step;
   const fast = Math.max(step, floored === 0 ? step : floored - step);
   let slow = Math.ceil(bulkSlow / step) * step;
+  if (slow <= bulkSlow) slow += step;
   if (slow <= fast) slow = fast + step;
   return { domain: [fast, slow], ticks: paceTicks(fast, slow, step) };
 }
