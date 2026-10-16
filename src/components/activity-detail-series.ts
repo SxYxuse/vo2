@@ -80,10 +80,7 @@ function chartLocomotionAt(
   return paceSeconds(meanKmh, loco.unit) ?? undefined;
 }
 
-function clipPaceToDomain(
-  rows: readonly ActivityChartPoint[],
-  slow: number,
-): ActivityChartPoint[] {
+function clipPaceToDomain(rows: readonly ActivityChartPoint[], slow: number): ActivityChartPoint[] {
   return rows.map((row) => ({
     ...row,
     speed: typeof row.speed === "number" ? Math.min(row.speed, slow) : row.speed,

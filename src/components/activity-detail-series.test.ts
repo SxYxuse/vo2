@@ -100,10 +100,7 @@ describe("streamYAxis", () => {
 
 describe("chartPointForStream", () => {
   it("gaps implausible heart rate and GPS crawl pace, keeping a 40:00 hike sample", () => {
-    const row = chartPointForStream(
-      { t: 25, heartrate: 0, speed: 0.2, altitude: 667 },
-      "Run",
-    );
+    const row = chartPointForStream({ t: 25, heartrate: 0, speed: 0.2, altitude: 667 }, "Run");
     expect(row.heartrate).toBeUndefined();
     expect(row.speed).toBeUndefined();
     expect(row.altitude).toBe(667);
@@ -173,14 +170,7 @@ describe("chartRowsFor", () => {
 describe("streamSeriesValues", () => {
   it("skips gapped pace samples when collecting axis values", () => {
     expect(
-      streamSeriesValues(
-        [
-          { t: 0, speed: 300 },
-          { t: 1 },
-          { t: 2, speed: 2400 },
-        ],
-        "speed",
-      ),
+      streamSeriesValues([{ t: 0, speed: 300 }, { t: 1 }, { t: 2, speed: 2400 }], "speed"),
     ).toEqual([300, 2400]);
   });
 });
