@@ -1,10 +1,8 @@
-import { startTransition } from "react";
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
-import { prefetchActivityDetail } from "@/lib/prefetch.ts";
 import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
@@ -28,11 +26,15 @@ export const Route = createFileRoute("/_app/")({
     }
     return {};
   },
-  loaderDeps: ({ search }) => ({ activity: search.activity }),
-  loader: ({ context, deps }) => {
-    if (deps.activity) prefetchActivityDetail(context.queryClient, deps.activity);
-    return context.queryClient.query(loaderQuery(homeQueryOptions));
+  beforeLoad: ({ search }) => {
+    if (search.activity) {
+      throw redirect({
+        to: "/activities/$activityId",
+        params: { activityId: search.activity },
+      });
+    }
   },
+  loader: ({ context }) => context.queryClient.query(loaderQuery(homeQueryOptions)),
   pendingMs: 200,
   pendingComponent: CalendarPending,
   errorComponent: CalendarError,
@@ -40,25 +42,8 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CalendarPage() {
-  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(homeQueryOptions);
-  const { activity } = Route.useSearch();
-  const navigate = Route.useNavigate();
   const { signedIn, activities, settings } = data;
-
-  function selectActivity(id: string | null) {
-    if (id) prefetchActivityDetail(queryClient, id);
-    startTransition(() => {
-      void navigate({
-        search: (prev) => {
-          if (id) return { ...prev, activity: id };
-          const { activity: _removed, ...rest } = prev;
-          return rest;
-        },
-        replace: !id,
-      });
-    });
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -85,12 +70,7 @@ function CalendarPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <ActivityCalendar
-          activities={activities}
-          initialSettings={settings}
-          selectedActivityId={activity ?? null}
-          onSelectActivity={selectActivity}
-        />
+        <ActivityCalendar activities={activities} initialSettings={settings} />
       )}
     </div>
   );

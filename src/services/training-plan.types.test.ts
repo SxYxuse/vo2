@@ -4,6 +4,7 @@ import {
   assignActivitiesToSessions,
   durationFitsPlan,
   formatHours,
+  hasRecentWeeklyHours,
   hoursStillToFill,
   type MatchableActivity,
   type PlannedSession,
@@ -144,5 +145,14 @@ describe("hoursStillToFill", () => {
   it("does not go below zero once the weekly hours target is met", () => {
     expect(hoursStillToFill(300, 300)).toBe(0);
     expect(hoursStillToFill(360, 300)).toBe(0);
+  });
+});
+
+describe("hasRecentWeeklyHours", () => {
+  it("is false until last-3-month average is a usable hours-intent baseline", () => {
+    expect(hasRecentWeeklyHours(0)).toBe(false);
+    expect(hasRecentWeeklyHours(0.2)).toBe(false);
+    expect(hasRecentWeeklyHours(0.21)).toBe(true);
+    expect(hasRecentWeeklyHours(6)).toBe(true);
   });
 });

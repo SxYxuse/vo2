@@ -1,19 +1,33 @@
 import { useEffect } from "react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Outlet, createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import {
+  Navigate,
+  Outlet,
+  createFileRoute,
+  redirect,
+  useRouter,
+  useRouterState,
+} from "@tanstack/react-router";
 
 import { AppSidebar } from "@/components/app-sidebar.tsx";
 import { SignedOutPage } from "@/components/signed-out-page.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
 import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
   loader: async ({ context, location }) => {
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
-    if (!shell.signedIn && location.pathname !== "/") {
-      throw redirect({ to: "/" });
+    if (!shell.signedIn) {
+      if (location.pathname !== "/") {
+        throw redirect({ to: "/" });
+      }
+      return;
+    }
+    if (!isTrainingPlanComplete(shell.training)) {
+      throw redirect({ to: "/onboarding" });
     }
   },
   component: AppLayout,
@@ -30,8 +44,15 @@ function SignedInPrefetch() {
 
 function AppLayout() {
   const { data } = useSuspenseQuery(appShellQueryOptions);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (!data.signedIn) {
+    if (pathname !== "/") {
+      return <Navigate to="/" replace />;
+    }
     return <SignedOutPage />;
+  }
+  if (!isTrainingPlanComplete(data.training)) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return (

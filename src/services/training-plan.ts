@@ -23,6 +23,7 @@ export {
   doneWeekSessions,
   durationFitsPlan,
   formatHours,
+  hasRecentWeeklyHours,
   hoursStillToFill,
   isTrainingPlanComplete,
   openWeekBucket,
