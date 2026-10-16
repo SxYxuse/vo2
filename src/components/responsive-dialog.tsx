@@ -110,8 +110,11 @@ export function ResponsiveDialogContent({
   return (
     <DrawerContent
       className={cn(
-        "max-h-[calc(100dvh-0.75rem)] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-0.75rem)]",
         className,
+        // Shared `w-full` is for the desktop dialog. On a vertical drawer it
+        // over-constrains inset-x-0 + --drawer-inset so `right` is ignored and
+        // the right border clips.
+        "w-auto!",
       )}
     >
       {children}
