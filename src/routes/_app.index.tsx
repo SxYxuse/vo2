@@ -6,7 +6,6 @@ import { CalendarDaysIcon } from "lucide-react";
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
 import { prefetchActivityDetail } from "@/lib/prefetch.ts";
 import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
-import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import {
   Empty,
   EmptyDescription,
@@ -45,7 +44,7 @@ function CalendarPage() {
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { activity } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const { signedIn, activities, settings, plannedSessions, training } = data;
+  const { signedIn, activities, settings } = data;
 
   function selectActivity(id: string | null) {
     if (id) prefetchActivityDetail(queryClient, id);
@@ -69,9 +68,8 @@ function CalendarPage() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Import Strava activities and streams into local Postgres, then browse them by day. Open
-          This week for a bucket of suggested workouts to fill when you have time. Field tests live
-          on Tests.
+          Completed Strava activities by training week. Planned sessions live in the Week bucket;
+          field tests live on Tests.
         </p>
       </div>
       {signedIn && activities.length === 0 ? (
@@ -89,10 +87,7 @@ function CalendarPage() {
       ) : (
         <ActivityCalendar
           activities={activities}
-          plannedSessions={plannedSessions}
-          training={isTrainingPlanComplete(training) ? training : null}
           initialSettings={settings}
-          persist={signedIn}
           selectedActivityId={activity ?? null}
           onSelectActivity={selectActivity}
         />
@@ -110,9 +105,8 @@ function CalendarPending() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Import Strava activities and streams into local Postgres, then browse them by day. Open
-          This week for a bucket of suggested workouts to fill when you have time. Field tests live
-          on Tests.
+          Completed Strava activities by training week. Planned sessions live in the Week bucket;
+          field tests live on Tests.
         </p>
       </div>
       <Skeleton className="h-[40rem] w-full rounded-xl" />

@@ -58,7 +58,7 @@ _Avoid_: Polarized, sweet-spot
 
 **Training week**:
 Monday through Sunday in the athlete's timezone. Planned work is scoped to the current week, not a season.
-_Avoid_: Microcycle, calendar week (the calendar may start on Sunday)
+_Avoid_: Microcycle, calendar week
 
 **Planned session**:
 A run or ride still to do this week, with a target duration and training load, not a clock time.

@@ -15,17 +15,6 @@ describe("mergeCalendarSettings", () => {
   it("keeps stored visibility and color for a type that still appears on activities", () => {
     const settings = mergeCalendarSettings(
       {
-        viewSettings: {
-          weekends: true,
-          weekNumbers: false,
-          nowIndicator: true,
-          offDays: false,
-        },
-        weekStartsOn: 1,
-        dayStartHour: 0,
-        dayEndHour: 24,
-        interval: 60,
-        snapDuration: 15,
         sportTypes: {
           Run: {
             visible: false,
