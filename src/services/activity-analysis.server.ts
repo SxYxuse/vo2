@@ -28,6 +28,9 @@ import {
   buildOverview,
   correlateStreams,
   detectElevationSegments,
+  presentEffortForCoach,
+  presentElevationForCoach,
+  presentOverviewForCoach,
   summarizeEffort,
   type ActivityAnalysisSnapshot,
   type AnalysisStreamKey,
@@ -126,11 +129,14 @@ export function createActivityAnalysisTools() {
   return [
     getActivityOverviewDef.server<AnalysisRuntime>(async (_input, ctx) => {
       const snapshot = await ctx.context.snapshot();
-      return snapshot.overview;
+      return presentOverviewForCoach(snapshot.overview);
     }),
     detectElevationSegmentsDef.server<AnalysisRuntime>(async (_input, ctx) => {
       const snapshot = await ctx.context.snapshot();
-      return detectElevationSegments(snapshot.samples, snapshot.overview.sportType);
+      return presentElevationForCoach(
+        detectElevationSegments(snapshot.samples, snapshot.overview.sportType),
+        snapshot.overview.sportType,
+      );
     }),
     correlateStreamsDef.server<AnalysisRuntime>(async (input, ctx) => {
       const snapshot = await ctx.context.snapshot();
@@ -139,7 +145,7 @@ export function createActivityAnalysisTools() {
     }),
     summarizeEffortPhasesDef.server<AnalysisRuntime>(async (_input, ctx) => {
       const snapshot = await ctx.context.snapshot();
-      return summarizeEffort(snapshot.samples);
+      return presentEffortForCoach(summarizeEffort(snapshot.samples), snapshot.overview.sportType);
     }),
   ];
 }

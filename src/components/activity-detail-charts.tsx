@@ -4,20 +4,24 @@ import { useId, useMemo, useState, type ComponentProps } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 import {
+  chartLocomotionValue,
+  defaultVisibleSeries,
   formatBpm,
   formatCadence,
   formatElapsedTick,
   formatElevation,
-  formatSpeed,
+  formatLocomotion,
+  formatPaceClock,
   formatWatts,
+  locomotionFor,
+  normalizeSeriesPoint,
   STREAM_SERIES,
   type ActivityChartPoint,
   type ActivityDetail,
   type StreamSeriesKey,
 } from "@/services/activity-detail.ts";
-import { sportGroupFor } from "@/services/sport-groups.ts";
 import { isCyclingSport } from "@/services/training-load.ts";
-import { CHART_CONFIG, SERIES_META } from "@/components/activity-detail-series.ts";
+import { chartConfigFor, seriesMetaFor } from "@/components/activity-detail-series.ts";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -25,18 +29,23 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type ChartLayout = "combined" | "separate";
 type ChartRow = ActivityChartPoint & Record<string, number | undefined>;
+type SeriesMeta = ReturnType<typeof seriesMetaFor>;
 
-function defaultVisibleSeries(detail: ActivityDetail) {
-  const offByDefault = new Set<StreamSeriesKey>(["cadence", "speed"]);
-  if (sportGroupFor(detail.sportType)?.id === "running") {
-    offByDefault.add("watts");
-  }
-  return detail.series.filter((key) => !offByDefault.has(key));
+function chartRowsFor(chart: ActivityChartPoint[], sportType: string): ChartRow[] {
+  return chart.map((point) => ({
+    ...point,
+    speed: chartLocomotionValue(point.speed, sportType),
+  }));
 }
 
-function formatSeriesValue(key: StreamSeriesKey, value: number) {
-  if (key === "speed" || key === "altitude") return value.toFixed(1);
-  return String(Math.round(value));
+function formatSeriesValue(key: StreamSeriesKey, value: number, sportType: string, unit: string) {
+  if (key === "speed") {
+    const loco = locomotionFor(sportType);
+    if (loco.kind === "pace") return `${formatPaceClock(value)} ${loco.unit}`;
+    return `${value.toFixed(1)} ${loco.unit}`;
+  }
+  if (key === "altitude") return `${value.toFixed(1)} ${unit}`;
+  return `${Math.round(value)} ${unit}`;
 }
 
 function numericValues(data: ChartRow[], keys: string[]) {
@@ -72,12 +81,16 @@ function seriesSummary(detail: ActivityDetail, key: StreamSeriesKey) {
     return `avg ${formatCadence(detail.kpis.avgCadence)}`;
   }
   if (key === "speed") {
-    return `avg ${formatSpeed(detail.kpis.avgSpeed)}`;
+    return `avg ${formatLocomotion(detail.kpis.avgSpeed, detail.sportType)}`;
   }
   return `gain ${formatElevation(detail.totalElevationGain)}`;
 }
 
-function StreamTooltip(props: ComponentProps<typeof ChartTooltipContent>) {
+function StreamTooltip({
+  meta,
+  sportType,
+  ...props
+}: ComponentProps<typeof ChartTooltipContent> & { meta: SeriesMeta; sportType: string }) {
   return (
     <ChartTooltipContent
       {...props}
@@ -85,19 +98,19 @@ function StreamTooltip(props: ComponentProps<typeof ChartTooltipContent>) {
       formatter={(value, name, item) => {
         const dataKey = String(item.dataKey ?? "").replace(/N$/, "");
         const key = dataKey as StreamSeriesKey;
-        const meta = SERIES_META[key];
+        const series = meta[key];
         const actual =
           (item.payload?.[dataKey] as number | undefined) ??
           (typeof value === "number" ? value : undefined);
-        if (!meta) return typeof name === "string" ? name : null;
+        if (!series) return typeof name === "string" ? name : null;
         return (
           <div className="flex w-full items-center justify-between gap-4">
             <span className="flex items-center gap-2">
-              <span className="size-2.5 rounded-[2px]" style={{ backgroundColor: meta.color }} />
-              <span className="text-muted-foreground">{meta.label}</span>
+              <span className="size-2.5 rounded-[2px]" style={{ backgroundColor: series.color }} />
+              <span className="text-muted-foreground">{series.label}</span>
             </span>
             <span className="font-mono font-medium tabular-nums">
-              {actual == null ? "—" : `${formatSeriesValue(key, actual)} ${meta.unit}`}
+              {actual == null ? "—" : formatSeriesValue(key, actual, sportType, series.unit)}
             </span>
           </div>
         );
@@ -106,7 +119,19 @@ function StreamTooltip(props: ComponentProps<typeof ChartTooltipContent>) {
   );
 }
 
-function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data: ChartRow[] }) {
+function CombinedStreamChart({
+  series,
+  data,
+  sportType,
+  meta,
+}: {
+  series: StreamSeriesKey[];
+  data: ChartRow[];
+  sportType: string;
+  meta: SeriesMeta;
+}) {
+  const invertPace = locomotionFor(sportType).kind === "pace";
+  const chartConfig = chartConfigFor(sportType);
   const normalized = series.length > 1;
   const chartData = useMemo(() => {
     if (!normalized) return data;
@@ -121,14 +146,18 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
         const range = ranges[key];
         const value = point[key];
         next[`${key}N`] =
-          value == null ? undefined : ((value - range.min) / (range.max - range.min)) * 100;
+          value == null
+            ? undefined
+            : normalizeSeriesPoint(value, range.min, range.max, key === "speed" && invertPace);
       }
       return next;
     });
-  }, [data, normalized, series]);
+  }, [data, invertPace, normalized, series]);
+
+  const singleIsPace = !normalized && series[0] === "speed" && invertPace;
 
   return (
-    <ChartContainer config={CHART_CONFIG} className="aspect-auto h-44 w-full sm:h-72 lg:h-80">
+    <ChartContainer config={chartConfig} className="aspect-auto h-44 w-full sm:h-72 lg:h-80">
       <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -142,14 +171,19 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
           hide={normalized}
           tickLine={false}
           axisLine={false}
-          width={40}
-          tickFormatter={(value) => String(Math.round(Number(value)))}
-          domain={series[0] === "altitude" ? ["auto", "auto"] : [0, "auto"]}
+          width={singleIsPace ? 44 : 40}
+          reversed={singleIsPace}
+          tickFormatter={(value) =>
+            singleIsPace ? formatPaceClock(Number(value)) : String(Math.round(Number(value)))
+          }
+          domain={series[0] === "altitude" || singleIsPace ? ["auto", "auto"] : [0, "auto"]}
         />
         <ChartTooltip
           cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
           content={
             <StreamTooltip
+              meta={meta}
+              sportType={sportType}
               labelFormatter={(_value, payload) => {
                 const elapsed = Number(payload?.[0]?.payload?.t);
                 return formatElapsedTick(elapsed);
@@ -167,8 +201,9 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
               fillOpacity={0.18}
               stroke={`var(--color-${key})`}
               strokeWidth={1.5}
-              name={SERIES_META[key].label}
+              name={meta[key].label}
               isAnimationActive={false}
+              connectNulls={false}
             />
           ) : (
             <Line
@@ -178,8 +213,9 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
               stroke={`var(--color-${key})`}
               strokeWidth={1.75}
               dot={false}
-              name={SERIES_META[key].label}
+              name={meta[key].label}
               isAnimationActive={false}
+              connectNulls={false}
             />
           ),
         )}
@@ -188,13 +224,25 @@ function CombinedStreamChart({ series, data }: { series: StreamSeriesKey[]; data
   );
 }
 
-function StreamAreaChart({ seriesKey, data }: { seriesKey: StreamSeriesKey; data: ChartRow[] }) {
+function StreamAreaChart({
+  seriesKey,
+  data,
+  sportType,
+  meta,
+}: {
+  seriesKey: StreamSeriesKey;
+  data: ChartRow[];
+  sportType: string;
+  meta: SeriesMeta;
+}) {
   const reactId = useId().replace(/:/g, "");
   const gradientId = `fill-${seriesKey}-${reactId}`;
-  const meta = SERIES_META[seriesKey];
+  const series = meta[seriesKey];
+  const invertPace = seriesKey === "speed" && locomotionFor(sportType).kind === "pace";
+  const chartConfig = chartConfigFor(sportType);
 
   return (
-    <ChartContainer config={CHART_CONFIG} className="aspect-auto h-36 w-full sm:h-40">
+    <ChartContainer config={chartConfig} className="aspect-auto h-36 w-full sm:h-40">
       <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -213,13 +261,22 @@ function StreamAreaChart({ seriesKey, data }: { seriesKey: StreamSeriesKey; data
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={40}
-          tickFormatter={(value) => String(Math.round(Number(value)))}
-          domain={seriesKey === "altitude" ? ["auto", "auto"] : [0, "auto"]}
+          width={invertPace ? 44 : 40}
+          reversed={invertPace}
+          tickFormatter={(value) =>
+            invertPace ? formatPaceClock(Number(value)) : String(Math.round(Number(value)))
+          }
+          domain={seriesKey === "altitude" || invertPace ? ["auto", "auto"] : [0, "auto"]}
         />
         <ChartTooltip
           cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
-          content={<StreamTooltip labelFormatter={(value) => formatElapsedTick(Number(value))} />}
+          content={
+            <StreamTooltip
+              meta={meta}
+              sportType={sportType}
+              labelFormatter={(value) => formatElapsedTick(Number(value))}
+            />
+          }
         />
         <Area
           dataKey={seriesKey}
@@ -227,8 +284,9 @@ function StreamAreaChart({ seriesKey, data }: { seriesKey: StreamSeriesKey; data
           fill={`url(#${gradientId})`}
           stroke={`var(--color-${seriesKey})`}
           strokeWidth={1.75}
-          name={meta.label}
+          name={series.label}
           isAnimationActive={false}
+          connectNulls={false}
         />
       </ComposedChart>
     </ChartContainer>
@@ -236,6 +294,11 @@ function StreamAreaChart({ seriesKey, data }: { seriesKey: StreamSeriesKey; data
 }
 
 export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
+  const meta = seriesMetaFor(detail.sportType);
+  const chartData = useMemo(
+    () => chartRowsFor(detail.chart, detail.sportType),
+    [detail.chart, detail.sportType],
+  );
   const [visible, setVisible] = useState<string[]>(() => defaultVisibleSeries(detail));
   const [chartLayout, setChartLayout] = useState<ChartLayout>("combined");
   const shown = useMemo(
@@ -260,9 +323,9 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
               <span
                 aria-hidden
                 className="size-2 rounded-full"
-                style={{ backgroundColor: SERIES_META[key].color }}
+                style={{ backgroundColor: meta[key].color }}
               />
-              {SERIES_META[key].shortLabel}
+              {meta[key].shortLabel}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
@@ -300,16 +363,21 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
                 <span
                   aria-hidden
                   className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: SERIES_META[key].color }}
+                  style={{ backgroundColor: meta[key].color }}
                 />
-                <span className="text-muted-foreground">{SERIES_META[key].label}</span>
+                <span className="text-muted-foreground">{meta[key].label}</span>
                 <span className="hidden font-mono tabular-nums sm:inline">
                   {seriesSummary(detail, key)}
                 </span>
               </span>
             ))}
           </div>
-          <CombinedStreamChart series={shown} data={detail.chart} />
+          <CombinedStreamChart
+            series={shown}
+            data={chartData}
+            sportType={detail.sportType}
+            meta={meta}
+          />
         </Card>
       ) : (
         shown.map((key) => (
@@ -319,15 +387,20 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
                 <span
                   aria-hidden
                   className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: SERIES_META[key].color }}
+                  style={{ backgroundColor: meta[key].color }}
                 />
-                <CardTitle>{SERIES_META[key].label}</CardTitle>
+                <CardTitle>{meta[key].label}</CardTitle>
               </div>
               <CardDescription className="font-mono tabular-nums sm:shrink-0">
                 {seriesSummary(detail, key)}
               </CardDescription>
             </div>
-            <StreamAreaChart seriesKey={key} data={detail.chart} />
+            <StreamAreaChart
+              seriesKey={key}
+              data={chartData}
+              sportType={detail.sportType}
+              meta={meta}
+            />
           </Card>
         ))
       )}

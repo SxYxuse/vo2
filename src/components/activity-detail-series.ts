@@ -1,5 +1,6 @@
 import type { ChartConfig } from "@/components/ui/chart";
 import { STREAM_SERIES, type StreamSeriesKey } from "@/services/activity-detail.ts";
+import { locomotionFor } from "@/services/locomotion.ts";
 
 export const SERIES_META: Record<
   StreamSeriesKey,
@@ -37,9 +38,22 @@ export const SERIES_META: Record<
   },
 };
 
-export const CHART_CONFIG = Object.fromEntries(
-  STREAM_SERIES.map((key) => [
-    key,
-    { label: SERIES_META[key].label, color: SERIES_META[key].color },
-  ]),
-) satisfies ChartConfig;
+export function seriesMetaFor(sportType: string) {
+  const loco = locomotionFor(sportType);
+  return {
+    ...SERIES_META,
+    speed: {
+      ...SERIES_META.speed,
+      label: loco.label,
+      shortLabel: loco.shortLabel,
+      unit: loco.unit,
+    },
+  };
+}
+
+export function chartConfigFor(sportType: string) {
+  const meta = seriesMetaFor(sportType);
+  return Object.fromEntries(
+    STREAM_SERIES.map((key) => [key, { label: meta[key].label, color: meta[key].color }]),
+  ) satisfies ChartConfig;
+}
