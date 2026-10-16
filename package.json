@@ -10,6 +10,7 @@
     "generate-routes": "tsr generate",
     "build": "vp build",
     "preview": "vp preview",
+    "test": "vp test",
     "start": "bun run db:migrate && bun run .output/server/index.mjs",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
