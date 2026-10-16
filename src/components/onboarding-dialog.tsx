@@ -186,7 +186,7 @@ export function OnboardingDialog({
     >
       <ResponsiveDialogContent
         showCloseButton={isReady}
-        className="flex h-[min(40rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 [--drawer-content-height:min(40rem,calc(100dvh-2rem))] sm:max-w-lg"
+        className="flex h-[min(40rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 [--drawer-content-height:min(40rem,calc(100dvh-2rem))] sm:max-w-lg"
       >
         <ResponsiveDialogHeader className="gap-2 border-b px-4 pt-4 pb-3 group-data-[swipe-axis=y]/drawer-popup:text-left">
           <div

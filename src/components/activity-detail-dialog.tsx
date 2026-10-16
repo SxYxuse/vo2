@@ -184,7 +184,7 @@ export function ActivityDetailDialog({
 
   return (
     <ResponsiveDialog open={Boolean(activityId)} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent className="flex h-[min(52rem,calc(100dvh-0.75rem))] max-h-[calc(100dvh-0.75rem)] w-full max-w-none flex-col gap-0 overflow-hidden p-0 [--drawer-content-height:min(52rem,calc(100dvh-0.75rem))] sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl">
+      <ResponsiveDialogContent className="flex h-[min(52rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-none flex-col gap-0 overflow-hidden p-0 [--drawer-content-height:min(52rem,calc(100dvh-2rem))] sm:h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:max-w-none sm:rounded-xl">
         <ResponsiveDialogHeader className="bg-background shrink-0 border-b px-4 py-3 pe-12 group-data-[swipe-axis=y]/drawer-popup:text-left sm:px-6 sm:py-4">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <ResponsiveDialogTitle className="min-w-0 truncate text-base">

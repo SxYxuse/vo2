@@ -47,7 +47,7 @@ export function PlannedSessionDialog({
 
   return (
     <ResponsiveDialog open={Boolean(session)} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+      <ResponsiveDialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
         <ResponsiveDialogHeader className="border-b px-4 py-3 pe-12 group-data-[swipe-axis=y]/drawer-popup:text-left">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <ResponsiveDialogTitle className="min-w-0 truncate">
