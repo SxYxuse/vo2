@@ -12,6 +12,7 @@ import {
   addDayKey,
   dayKey,
   formatHours,
+  hoursStillToFill,
   doneWeekSessions,
   openWeekBucket,
   sessionFitsWindow,
@@ -81,7 +82,7 @@ export function WeekPlanBucket({
   const bucket = useMemo(() => openWeekBucket(sessions, weekStart), [sessions, weekStart]);
   const done = useMemo(() => doneWeekSessions(sessions, weekStart), [sessions, weekStart]);
   const targetMinutes = Math.round(plan.targetWeeklyHours * 60);
-  const remainingMinutes = bucket.reduce((sum, session) => sum + session.targetMinutes, 0);
+  const remainingMinutes = hoursStillToFill(loggedMinutes, targetMinutes);
   const filled =
     targetMinutes <= 0 ? 0 : Math.min(100, Math.round((loggedMinutes / targetMinutes) * 100));
   const ranked = useMemo(() => {

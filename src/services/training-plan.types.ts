@@ -222,6 +222,10 @@ export function formatHours(hours: number) {
   return `${h}h ${String(m).padStart(2, "0")}`;
 }
 
+export function hoursStillToFill(loggedMinutes: number, targetMinutes: number) {
+  return Math.max(0, targetMinutes - loggedMinutes);
+}
+
 export function sportFamilyOf(sportType: string): CompletedSession["family"] {
   const group = sportGroupFor(sportType)?.id;
   if (group === "running") return "running";

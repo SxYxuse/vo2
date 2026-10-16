@@ -3,6 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   assignActivitiesToSessions,
   durationFitsPlan,
+  formatHours,
+  hoursStillToFill,
   type MatchableActivity,
   type PlannedSession,
 } from "./training-plan.types.ts";
@@ -130,5 +132,17 @@ describe("assignActivitiesToSessions", () => {
     expect(matches).toEqual([
       { sessionId: "quality", activityId: "shared-activity", date: "2026-10-13" },
     ]);
+  });
+});
+
+describe("hoursStillToFill", () => {
+  it("keeps remaining hours even when the week bucket is empty", () => {
+    expect(hoursStillToFill(246, 300)).toBe(54);
+    expect(formatHours(hoursStillToFill(246, 300) / 60)).toBe("54 min");
+  });
+
+  it("does not go below zero once the weekly hours target is met", () => {
+    expect(hoursStillToFill(300, 300)).toBe(0);
+    expect(hoursStillToFill(360, 300)).toBe(0);
   });
 });
