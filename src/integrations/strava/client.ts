@@ -1,4 +1,4 @@
-import { serverEnv } from "@/configs/env.ts";
+import { env } from "@/configs/env.ts";
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import { StravaDailyLimitError, StravaRateLimit, StravaShortLimitError } from "./rate-limit.ts";
 import type { components, operations } from "./strava.types.ts";
@@ -86,7 +86,7 @@ export class StravaApi {
     const headers = new Headers(init?.headers);
     headers.set("Accept", "application/json");
     headers.set("Authorization", `Bearer ${this.accessToken}`);
-    const response = await fetch(`${serverEnv.stravaBaseUrl()}/api/v3${path}`, {
+    const response = await fetch(`${env.STRAVA_BASE_URL}/api/v3${path}`, {
       ...init,
       headers,
     });

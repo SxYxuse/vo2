@@ -9,7 +9,7 @@ import {
 } from "@tanstack/ai";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
-import { serverEnv } from "@/configs/env.ts";
+import { env } from "@/configs/env.ts";
 import { db } from "@/db/index.ts";
 import { activities, activityAnalyses, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { APP_NAME } from "@/lib/brand.ts";
@@ -151,7 +151,7 @@ export function createActivityAnalysisTools() {
 }
 
 export function isAnalysisMocked() {
-  return !serverEnv.openRouterApiKey();
+  return !env.OPENROUTER_API_KEY;
 }
 
 export async function getActivityAnalysisImpl(
@@ -282,11 +282,11 @@ export async function handleActivityAnalysis(request: Request) {
   }
 
   const params = await chatParamsFromRequest(request);
-  const apiKey = serverEnv.openRouterApiKey();
+  const apiKey = env.OPENROUTER_API_KEY;
   const mocked = !apiKey;
   const adapter = apiKey
     ? createOpenRouterText(ANALYSIS_MODEL, apiKey, {
-        httpReferer: serverEnv.betterAuthUrl(),
+        httpReferer: env.BETTER_AUTH_URL,
         appTitle: APP_NAME,
       })
     : mockActivityAnalysisText();

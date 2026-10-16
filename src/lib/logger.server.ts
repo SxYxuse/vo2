@@ -1,12 +1,12 @@
 import winston from "winston";
 import LokiTransport from "winston-loki";
 
-import { serverEnv } from "@/configs/env.ts";
+import { env } from "@/configs/env.ts";
 import { tryGetLogContext } from "@/lib/log-context.server.ts";
 
 const appLabel = "vo";
-const appEnv = serverEnv.appEnv();
-const lokiHost = serverEnv.lokiHost();
+const appEnv = env.APP_ENV;
+const lokiHost = env.LOKI_HOST;
 const isDev = appEnv === "development";
 
 /**

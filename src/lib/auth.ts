@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 
-import { serverEnv } from "@/configs/env.ts";
+import { env } from "@/configs/env.ts";
 import { db } from "@/db/index.ts";
 import * as schema from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
@@ -18,8 +18,8 @@ type StravaAthlete = {
 };
 
 export const auth = betterAuth({
-  baseURL: serverEnv.betterAuthUrl(),
-  secret: serverEnv.betterAuthSecret(),
+  baseURL: env.BETTER_AUTH_URL,
+  secret: env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -32,10 +32,10 @@ export const auth = betterAuth({
       config: [
         {
           providerId: "strava",
-          clientId: serverEnv.stravaClientId() ?? "",
-          clientSecret: serverEnv.stravaClientSecret() ?? "",
-          authorizationUrl: `${serverEnv.stravaBaseUrl()}/oauth/authorize`,
-          tokenUrl: `${serverEnv.stravaBaseUrl()}/oauth/token`,
+          clientId: env.STRAVA_CLIENT_ID,
+          clientSecret: env.STRAVA_CLIENT_SECRET,
+          authorizationUrl: `${env.STRAVA_BASE_URL}/oauth/authorize`,
+          tokenUrl: `${env.STRAVA_BASE_URL}/oauth/token`,
           // Strava expects a comma-separated scope list, not spaces.
           scopes: ["read,profile:read_all,activity:read_all"],
           pkce: false,
@@ -44,7 +44,7 @@ export const auth = betterAuth({
             approval_prompt: "auto",
           },
           getUserInfo: async (tokens) => {
-            const response = await fetch(`${serverEnv.stravaBaseUrl()}/api/v3/athlete`, {
+            const response = await fetch(`${env.STRAVA_BASE_URL}/api/v3/athlete`, {
               headers: {
                 Authorization: `Bearer ${tokens.accessToken}`,
               },
