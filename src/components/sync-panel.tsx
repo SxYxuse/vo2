@@ -57,7 +57,7 @@ export function SignInPanel({ children }: { children?: ReactNode } = {}) {
               if (result.error) {
                 setError(
                   result.error.message ??
-                    "Strava sign-in failed. Add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET to .env.local.",
+                    "Strava sign-in failed. Add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET to .env.",
                 );
                 setPending(false);
               }
