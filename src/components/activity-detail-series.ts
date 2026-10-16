@@ -1,6 +1,34 @@
 import type { ChartConfig } from "@/components/ui/chart";
 import { STREAM_SERIES, type StreamSeriesKey } from "@/services/activity-detail.ts";
-import { locomotionFor } from "@/services/locomotion.ts";
+import { formatPaceClock, locomotionFor } from "@/services/locomotion.ts";
+
+export type StreamYAxis = {
+  reversed: boolean;
+  domain: readonly [number | "auto", number | "auto"];
+  formatTick: (value: number) => string;
+};
+
+export type StreamAxisPlacement = {
+  orientation: "left" | "right";
+  hide: boolean;
+};
+
+const FITTED_DOMAIN = ["auto", "auto"] as const;
+const FROM_ZERO_DOMAIN = [0, "auto"] as const;
+
+export function streamYAxis(key: StreamSeriesKey, sportType: string): StreamYAxis {
+  const invertPace = key === "speed" && locomotionFor(sportType).kind === "pace";
+  return {
+    reversed: invertPace,
+    domain: key === "altitude" || invertPace ? FITTED_DOMAIN : FROM_ZERO_DOMAIN,
+    formatTick: (value) => (invertPace ? formatPaceClock(value) : String(Math.round(value))),
+  };
+}
+
+export function streamAxisPlacement(index: number): StreamAxisPlacement {
+  if (index === 1) return { orientation: "right", hide: false };
+  return { orientation: "left", hide: index > 1 };
+}
 
 export const SERIES_META: Record<
   StreamSeriesKey,
