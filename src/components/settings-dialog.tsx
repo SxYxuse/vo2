@@ -468,7 +468,7 @@ export function SettingsDialog({
             <ResponsiveDialogClose render={<Button type="button" variant="outline" />}>
               Cancel
             </ResponsiveDialogClose>
-            <Button type="submit" disabled={save.isPending}>
+            <Button type="submit" disabled={!data || save.isPending}>
               {save.isPending ? <Spinner data-icon="inline-start" /> : null}
               Save
             </Button>
