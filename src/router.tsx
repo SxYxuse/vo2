@@ -23,7 +23,8 @@ export function getRouter() {
     routeTree,
     context,
     scrollRestoration: true,
-    defaultPreload: "intent",
+    defaultPreload: "viewport",
+    defaultPreloadDelay: 0,
     defaultPreloadStaleTime: 0,
     parseSearch: parseSearchWith(parseSearchValue),
     stringifySearch: stringifySearchWith((value) => {

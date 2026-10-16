@@ -17,7 +17,13 @@ import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ClipboardListIcon, HeartOffIcon, Settings2Icon, TimerIcon } from "lucide-react";
 
-import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import {
+  prefetchActivityDetail,
+  prefetchActivityDetails,
+  preloadActivityUi,
+  scheduleIdle,
+} from "#/lib/prefetch.ts";
+import { homeQueryOptions } from "#/lib/queries.ts";
 import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
 import {
   DEFAULT_CALENDAR_SETTINGS,
@@ -150,9 +156,11 @@ function MissingHeartrateMark() {
   );
 }
 
-function prefetchActivityDetail(queryClient: ReturnType<typeof useQueryClient>, id: string) {
-  void queryClient.prefetchQuery(activityDetailQueryOptions(id));
-  void import("#/components/activity-detail-dialog.tsx");
+function warmActivity(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+) {
+  prefetchActivityDetail(queryClient, id);
 }
 
 function CalendarEventChip({
@@ -165,7 +173,9 @@ function CalendarEventChip({
   return (
     <span
       className="contents"
-      onPointerEnter={() => prefetchActivityDetail(queryClient, occurrence.event.id)}
+      onPointerEnter={() => warmActivity(queryClient, occurrence.event.id)}
+      onPointerDown={() => warmActivity(queryClient, occurrence.event.id)}
+      onFocus={() => warmActivity(queryClient, occurrence.event.id)}
     >
       <span
         aria-hidden
@@ -202,7 +212,12 @@ function renderCalendarEventTooltip({
   );
 }
 
-function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+function AgendaEventRow({
+  occurrence,
+}: {
+  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+}) {
+  const queryClient = useQueryClient();
   const activity = occurrence.event.data;
   const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
   const meta = activity
@@ -214,7 +229,12 @@ function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<Calenda
       ].filter(Boolean)
     : [];
   return (
-    <>
+    <span
+      className="contents"
+      onPointerEnter={() => warmActivity(queryClient, occurrence.event.id)}
+      onPointerDown={() => warmActivity(queryClient, occurrence.event.id)}
+      onFocus={() => warmActivity(queryClient, occurrence.event.id)}
+    >
       <span
         aria-hidden
         data-slot="event-calendar-agenda-dot"
@@ -229,8 +249,29 @@ function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<Calenda
           <span className="text-muted-foreground truncate text-xs">{meta.join(" · ")}</span>
         ) : null}
       </span>
-    </>
+    </span>
   );
+}
+
+function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+  return <AgendaEventRow occurrence={occurrence} />;
+}
+
+function VisibleActivitiesPrefetch({ activities }: { activities: CalendarActivity[] }) {
+  const queryClient = useQueryClient();
+  const { activeRange } = useEventCalendarNavigation();
+  useEffect(() => {
+    const startMs = activeRange.start.getTime();
+    const endMs = activeRange.end.getTime();
+    const ids = activities
+      .filter((activity) => {
+        const startedAt = new Date(activity.start).getTime();
+        return startedAt >= startMs && startedAt < endMs;
+      })
+      .map((activity) => activity.id);
+    prefetchActivityDetails(queryClient, ids);
+  }, [activities, activeRange.end, activeRange.start, queryClient]);
+  return null;
 }
 
 const MOBILE_CALENDAR_VIEWS: CalendarView[] = ["week", "agenda", "month", "day"];
@@ -586,6 +627,16 @@ export function ActivityCalendar({
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const skipSave = useRef(true);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    preloadActivityUi();
+    return scheduleIdle(() => {
+      prefetchActivityDetails(
+        queryClient,
+        activities.map((activity) => activity.id),
+      );
+    });
+  }, [activities, queryClient]);
   const saveSettings = useMutation({
     mutationFn: (next: CalendarSettings) => saveCalendarSettings({ data: next }),
     onSuccess: (saved) => {
@@ -746,8 +797,20 @@ export function ActivityCalendar({
             interactions={DISABLED_INTERACTIONS}
             onEventClick={(occurrence, event) => {
               event.preventDefault();
-              prefetchActivityDetail(queryClient, occurrence.event.id);
+              warmActivity(queryClient, occurrence.event.id);
               onSelectActivity(occurrence.event.id);
+            }}
+            onPointerOver={(event) => {
+              const id = (event.target as HTMLElement | null)
+                ?.closest?.("[data-event-id]")
+                ?.getAttribute("data-event-id");
+              if (id) warmActivity(queryClient, id);
+            }}
+            onPointerDownCapture={(event) => {
+              const id = (event.target as HTMLElement | null)
+                ?.closest?.("[data-event-id]")
+                ?.getAttribute("data-event-id");
+              if (id) warmActivity(queryClient, id);
             }}
             weekStartsOn={settings.weekStartsOn}
             dayStartHour={settings.dayStartHour}
@@ -758,6 +821,7 @@ export function ActivityCalendar({
             offDays
             className="h-full min-h-80 w-full min-w-0 flex-1"
           >
+            <VisibleActivitiesPrefetch activities={activities} />
             <div className="flex flex-wrap items-center gap-2 px-1 sm:pe-2">
               <EventCalendarNav className="min-w-0 flex-1" />
               <div className="flex shrink-0 items-center gap-2">
@@ -846,28 +910,24 @@ export function ActivityCalendar({
         ) : (
           <Skeleton className="min-h-80 flex-1 rounded-none md:min-h-[720px]" />
         )}
-        {selectedActivityId ? (
-          <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
-            <ActivityDetailDialog
-              activityId={selectedActivityId}
-              preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
-              color={events.find((event) => event.id === selectedActivityId)?.color}
-              onOpenChange={(open) => {
-                if (!open) onSelectActivity(null);
-              }}
-            />
-          </Suspense>
-        ) : null}
-        {selectedPlanId ? (
-          <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
-            <PlannedSessionDialog
-              session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
-              onOpenChange={(open) => {
-                if (!open) setSelectedPlanId(null);
-              }}
-            />
-          </Suspense>
-        ) : null}
+        <Suspense fallback={null}>
+          <ActivityDetailDialog
+            activityId={selectedActivityId}
+            preview={activities.find((activity) => activity.id === selectedActivityId) ?? null}
+            color={events.find((event) => event.id === selectedActivityId)?.color}
+            onOpenChange={(open) => {
+              if (!open) onSelectActivity(null);
+            }}
+          />
+        </Suspense>
+        <Suspense fallback={null}>
+          <PlannedSessionDialog
+            session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
+            onOpenChange={(open) => {
+              if (!open) setSelectedPlanId(null);
+            }}
+          />
+        </Suspense>
       </CardContent>
     </Card>
   );

@@ -1,9 +1,11 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { startTransition } from "react";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "#/components/activity-calendar.tsx";
-import { activityDetailQueryOptions, homeQueryOptions } from "#/lib/queries.ts";
+import { prefetchActivityDetail } from "#/lib/prefetch.ts";
+import { homeQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import {
   Empty,
@@ -28,13 +30,10 @@ export const Route = createFileRoute("/_app/")({
     return {};
   },
   loaderDeps: ({ search }) => ({ activity: search.activity }),
-  loader: ({ context, deps }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(homeQueryOptions),
-      deps.activity
-        ? context.queryClient.ensureQueryData(activityDetailQueryOptions(deps.activity))
-        : null,
-    ]),
+  loader: ({ context, deps }) => {
+    if (deps.activity) prefetchActivityDetail(context.queryClient, deps.activity);
+    return context.queryClient.ensureQueryData(homeQueryOptions);
+  },
   pendingMs: 200,
   pendingComponent: CalendarPending,
   errorComponent: CalendarError,
@@ -42,19 +41,23 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CalendarPage() {
+  const queryClient = useQueryClient();
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { activity } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { signedIn, activities, settings, plannedSessions, training } = data;
 
   function selectActivity(id: string | null) {
-    void navigate({
-      search: (prev) => {
-        if (id) return { ...prev, activity: id };
-        const { activity: _removed, ...rest } = prev;
-        return rest;
-      },
-      replace: !id,
+    if (id) prefetchActivityDetail(queryClient, id);
+    startTransition(() => {
+      void navigate({
+        search: (prev) => {
+          if (id) return { ...prev, activity: id };
+          const { activity: _removed, ...rest } = prev;
+          return rest;
+        },
+        replace: !id,
+      });
     });
   }
 

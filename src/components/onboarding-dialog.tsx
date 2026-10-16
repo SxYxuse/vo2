@@ -75,7 +75,7 @@ export function OnboardingDialog({
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const { data } = useQuery({ ...settingsSnapshotQueryOptions, enabled: open });
+  const { data } = useQuery(settingsSnapshotQueryOptions);
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const avgHours = useMemo(
     () => (data ? recentAverageWeeklyHours(data.fitnessLoads, timeZone) : 0),

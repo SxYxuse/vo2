@@ -19,25 +19,25 @@ export const appShellQueryOptions = queryOptions({
 export const homeQueryOptions = queryOptions({
   queryKey: ["home"],
   queryFn: () => loadHomeData(),
-  staleTime: 30_000,
+  staleTime: 60_000,
 });
 
 export const settingsSnapshotQueryOptions = queryOptions({
   queryKey: ["settings-snapshot"],
   queryFn: () => loadSettingsSnapshot(),
-  staleTime: 30_000,
+  staleTime: 60_000,
 });
 
 export const activityMapQueryOptions = queryOptions({
   queryKey: ["activity-map"],
   queryFn: () => loadActivityMap(),
-  staleTime: 30_000,
+  staleTime: 60_000,
 });
 
 export const fitnessQueryOptions = queryOptions({
   queryKey: ["fitness"],
   queryFn: () => loadFitnessData(),
-  staleTime: 30_000,
+  staleTime: 60_000,
 });
 
 export const heartRateQueryOptions = queryOptions({
@@ -49,7 +49,7 @@ export const heartRateQueryOptions = queryOptions({
 export const assessmentsQueryOptions = queryOptions({
   queryKey: ["assessments"],
   queryFn: () => loadAssessments(),
-  staleTime: 30_000,
+  staleTime: 60_000,
 });
 
 export const analysisStatusQueryOptions = queryOptions({
@@ -63,6 +63,7 @@ export function activityAnalysisQueryOptions(activityId: string) {
     queryKey: ["activity-analysis", activityId] as const,
     queryFn: () => getActivityAnalysis({ data: { activityId } }),
     staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
 
@@ -71,5 +72,6 @@ export function activityDetailQueryOptions(id: string) {
     queryKey: ["activity", id] as const,
     queryFn: () => getActivityDetail({ data: { id } }),
     staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 }
