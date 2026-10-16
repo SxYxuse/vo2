@@ -2,8 +2,8 @@
 
 import { lazy, Suspense } from "react";
 
-import type { CalendarSettings } from "#/services/calendar-settings.types.ts";
-import type { ActivityMapTrack } from "#/services/activity-map.types.ts";
+import type { CalendarSettings } from "@/services/calendar-settings.types.ts";
+import type { ActivityMapTrack } from "@/services/activity-map.types.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 

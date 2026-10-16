@@ -13,7 +13,7 @@ import {
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
-} from "#/lib/queries.ts";
+} from "@/lib/queries.ts";
 import {
   profileFromForm,
   settingsFormDefaults,
@@ -21,8 +21,8 @@ import {
   trainingFromForm,
   type SettingsFormInput,
   type SettingsFormValues,
-} from "#/lib/settings-form.ts";
-import { saveAppSettings } from "#/services/app-settings.ts";
+} from "@/lib/settings-form.ts";
+import { saveAppSettings } from "@/services/app-settings.ts";
 import {
   ACTIVITY_COLOR_OPTIONS,
   formatSportType,
@@ -30,9 +30,9 @@ import {
   sortSportTypeKeys,
   sportOffersPower,
   type CalendarSettings,
-} from "#/services/calendar-settings.ts";
-import { DEFAULT_SPORT_GROUP_SHARES, SPORT_GROUPS } from "#/services/sport-groups.ts";
-import { recentAverageWeeklyHours } from "#/services/training-plan.ts";
+} from "@/services/calendar-settings.ts";
+import { DEFAULT_SPORT_GROUP_SHARES, SPORT_GROUPS } from "@/services/sport-groups.ts";
+import { recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveDialog,
@@ -42,14 +42,14 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-} from "#/components/responsive-dialog.tsx";
+} from "@/components/responsive-dialog.tsx";
 import {
   ProfileFields,
   TrainingPaceFields,
   TrainingStyleFields,
   TrainingDoubleDaysField,
   TrainingWeekFields,
-} from "#/components/settings-fields.tsx";
+} from "@/components/settings-fields.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Field,

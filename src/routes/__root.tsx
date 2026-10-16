@@ -4,8 +4,8 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
-import { ThemeProvider } from "#/components/theme-provider.tsx";
-import { APP_NAME } from "#/lib/brand.ts";
+import { ThemeProvider } from "@/components/theme-provider.tsx";
+import { APP_NAME } from "@/lib/brand.ts";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import appCss from "../styles.css?url";

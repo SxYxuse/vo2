@@ -1,9 +1,9 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { activities } from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getOptionalSession } from "#/lib/session.server.ts";
+import { db } from "@/db/index.ts";
+import { activities } from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getOptionalSession } from "@/lib/session.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
 import type { ActivityMapData } from "./activity-map.types.ts";

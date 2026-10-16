@@ -3,7 +3,7 @@
 import { format, parseISO } from "date-fns";
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
-import type { AssessmentView } from "#/services/assessments.ts";
+import type { AssessmentView } from "@/services/assessments.ts";
 import {
   ChartContainer,
   ChartTooltip,

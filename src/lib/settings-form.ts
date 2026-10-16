@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-import { type ProfileSettings, profileSettingsSchema } from "#/services/app-settings.types.ts";
-import { calendarSettingsSchema } from "#/services/calendar-settings.types.ts";
-import { DEFAULT_SPORT_GROUP_SHARES } from "#/services/sport-groups.ts";
+import { type ProfileSettings, profileSettingsSchema } from "@/services/app-settings.types.ts";
+import { calendarSettingsSchema } from "@/services/calendar-settings.types.ts";
+import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   suggestedTargetHours,
   trainingConsistency,
   trainingPlanSchema,
   type TrainingPlan,
-} from "#/services/training-plan.types.ts";
+} from "@/services/training-plan.types.ts";
 
 const BUILD_PACES = ["hold", "slow", "steady", "fast", "overreach"] as const;
 

@@ -15,25 +15,25 @@ import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ClipboardListIcon, HeartOffIcon, Settings2Icon, TimerIcon } from "lucide-react";
 
-import { prefetchActivityDetail, prefetchActivityDetails, scheduleIdle } from "#/lib/prefetch.ts";
-import { ActivityDetailDialog } from "#/components/activity-detail-dialog.tsx";
-import { PlannedSessionDialog } from "#/components/planned-session-dialog.tsx";
-import { homeQueryOptions } from "#/lib/queries.ts";
-import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
+import { prefetchActivityDetail, prefetchActivityDetails, scheduleIdle } from "@/lib/prefetch.ts";
+import { ActivityDetailDialog } from "@/components/activity-detail-dialog.tsx";
+import { PlannedSessionDialog } from "@/components/planned-session-dialog.tsx";
+import { homeQueryOptions } from "@/lib/queries.ts";
+import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import {
   DEFAULT_CALENDAR_SETTINGS,
   formatSportType,
   mergeCalendarSettings,
   saveCalendarSettings,
   type CalendarSettings,
-} from "#/services/calendar-settings.ts";
+} from "@/services/calendar-settings.ts";
 import {
   formatActivityClockRange,
   formatDistanceKm,
   formatDuration,
-} from "#/services/activity-detail.ts";
-import { isMissingHeartrate, type CalendarActivity } from "#/services/strava-sync.types.ts";
-import { WeekPlanBucket } from "#/components/week-plan-bucket.tsx";
+} from "@/services/activity-detail.ts";
+import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
+import { WeekPlanBucket } from "@/components/week-plan-bucket.tsx";
 import {
   addDayKey,
   dayKey,
@@ -42,7 +42,7 @@ import {
   weekStartKey,
   type PlannedSession,
   type TrainingPlan,
-} from "#/services/training-plan.ts";
+} from "@/services/training-plan.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,

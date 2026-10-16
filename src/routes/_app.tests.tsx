@@ -3,9 +3,9 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 
 import { FlaskConicalIcon } from "lucide-react";
 
-import { AssessmentTests } from "#/components/assessment-tests.tsx";
-import { SignInPanel } from "#/components/sync-panel.tsx";
-import { assessmentsQueryOptions, loaderQuery } from "#/lib/queries.ts";
+import { AssessmentTests } from "@/components/assessment-tests.tsx";
+import { SignInPanel } from "@/components/sync-panel.tsx";
+import { assessmentsQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,

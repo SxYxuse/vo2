@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { TriangleAlertIcon } from "lucide-react";
 
-import { parseCoachMarkdown, type CoachSection } from "#/services/activity-analysis.ts";
+import { parseCoachMarkdown, type CoachSection } from "@/services/activity-analysis.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 

@@ -1,4 +1,4 @@
-import { useDesktopMedia } from "#/hooks/use-desktop-media.ts";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 
 export function useIsMobile() {
   const desktop = useDesktopMedia();

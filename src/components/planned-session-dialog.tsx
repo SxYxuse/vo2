@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { format, parseISO } from "date-fns";
 import { BikeIcon, FootprintsIcon } from "lucide-react";
 
-import { formatHours, type PlannedSession } from "#/services/training-plan.ts";
+import { formatHours, type PlannedSession } from "@/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-} from "#/components/responsive-dialog.tsx";
+} from "@/components/responsive-dialog.tsx";
 
 function statusLabel(status: PlannedSession["status"]) {
   if (status === "adapted") return "Updated plan";

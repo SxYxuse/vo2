@@ -1,7 +1,7 @@
 import { getRequestHeaders } from "@tanstack/react-start/server";
 
-import { auth } from "#/lib/auth.ts";
-import { logger } from "#/lib/logger.server.ts";
+import { auth } from "@/lib/auth.ts";
+import { logger } from "@/lib/logger.server.ts";
 
 export async function getStravaAccessToken(userId: string) {
   const headers = getRequestHeaders();

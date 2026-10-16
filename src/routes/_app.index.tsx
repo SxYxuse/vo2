@@ -3,10 +3,10 @@ import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
-import { ActivityCalendar } from "#/components/activity-calendar.tsx";
-import { prefetchActivityDetail } from "#/lib/prefetch.ts";
-import { homeQueryOptions, loaderQuery } from "#/lib/queries.ts";
-import { isTrainingPlanComplete } from "#/services/training-plan.ts";
+import { ActivityCalendar } from "@/components/activity-calendar.tsx";
+import { prefetchActivityDetail } from "@/lib/prefetch.ts";
+import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import {
   Empty,
   EmptyDescription,

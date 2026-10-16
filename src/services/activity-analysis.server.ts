@@ -9,12 +9,12 @@ import {
 } from "@tanstack/ai";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
-import { serverEnv } from "#/configs/env.ts";
-import { db } from "#/db/index.ts";
-import { activities, activityAnalyses, activityStreams, athleteMetrics } from "#/db/schema.ts";
-import { APP_NAME } from "#/lib/brand.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
+import { serverEnv } from "@/configs/env.ts";
+import { db } from "@/db/index.ts";
+import { activities, activityAnalyses, activityStreams, athleteMetrics } from "@/db/schema.ts";
+import { APP_NAME } from "@/lib/brand.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
 import {
   correlateStreamsDef,

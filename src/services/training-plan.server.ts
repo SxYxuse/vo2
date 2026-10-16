@@ -1,10 +1,10 @@
 import { cache } from "react";
 import { and, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { activities, athleteMetrics, fieldTests, plannedSessions } from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getRequiredSession } from "#/lib/session.server.ts";
+import { db } from "@/db/index.ts";
+import { activities, athleteMetrics, fieldTests, plannedSessions } from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getRequiredSession } from "@/lib/session.server.ts";
 import { parseAssessmentResult } from "./assessments-score.ts";
 import { familyCollectors } from "./calendar-settings.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";

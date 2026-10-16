@@ -1,5 +1,5 @@
-import { APP_NAME } from "#/lib/brand.ts";
-import { cn } from "#/lib/utils.ts";
+import { APP_NAME } from "@/lib/brand.ts";
+import { cn } from "@/lib/utils.ts";
 
 type Vo2MarkProps = {
   className?: string;

@@ -1,4 +1,4 @@
-import { errorFields, logger } from "#/lib/logger.server.ts";
+import { errorFields, logger } from "@/lib/logger.server.ts";
 import { StravaDailyLimitError, StravaRateLimit, StravaShortLimitError } from "./rate-limit.ts";
 import type { components, operations } from "./strava.types.ts";
 

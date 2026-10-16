@@ -2,13 +2,13 @@ import { lazy, Suspense } from "react";
 import { BikeIcon, FlaskConicalIcon, FootprintsIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
-import { formatHours } from "#/services/training-plan.ts";
+import { formatHours } from "@/services/training-plan.ts";
 import {
   formatAssessmentResult,
   type AssessmentHistoryRow,
   type AssessmentStatus,
   type AssessmentView,
-} from "#/services/assessments.ts";
+} from "@/services/assessments.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 
 const AssessmentHistoryChart = lazy(() =>
-  import("#/components/assessment-history-chart.tsx").then((mod) => ({
+  import("@/components/assessment-history-chart.tsx").then((mod) => ({
     default: mod.AssessmentHistoryChart,
   })),
 );

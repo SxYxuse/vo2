@@ -13,7 +13,7 @@ import {
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
-} from "#/lib/queries.ts";
+} from "@/lib/queries.ts";
 import {
   TRAINING_PACE_FIELDS,
   TRAINING_WEEK_FIELDS,
@@ -22,13 +22,13 @@ import {
   trainingFromForm,
   type TrainingFormInput,
   type TrainingFormValues,
-} from "#/lib/settings-form.ts";
-import { saveAppSettings } from "#/services/app-settings.ts";
-import { DEFAULT_SPORT_GROUP_SHARES, mergeSportGroupShares } from "#/services/sport-groups.ts";
-import { recentAverageWeeklyHours } from "#/services/training-plan.ts";
+} from "@/lib/settings-form.ts";
+import { saveAppSettings } from "@/services/app-settings.ts";
+import { DEFAULT_SPORT_GROUP_SHARES, mergeSportGroupShares } from "@/services/sport-groups.ts";
+import { recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
-import { TrainingPaceFields, TrainingWeekFields } from "#/components/settings-fields.tsx";
+import { TrainingPaceFields, TrainingWeekFields } from "@/components/settings-fields.tsx";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -36,7 +36,7 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-} from "#/components/responsive-dialog.tsx";
+} from "@/components/responsive-dialog.tsx";
 import { Button } from "@/components/ui/button";
 import {
   Empty,

@@ -14,10 +14,10 @@ import {
   type ActivityChartPoint,
   type ActivityDetail,
   type StreamSeriesKey,
-} from "#/services/activity-detail.ts";
-import { sportGroupFor } from "#/services/sport-groups.ts";
-import { isCyclingSport } from "#/services/training-load.ts";
-import { CHART_CONFIG, SERIES_META } from "#/components/activity-detail-series.ts";
+} from "@/services/activity-detail.ts";
+import { sportGroupFor } from "@/services/sport-groups.ts";
+import { isCyclingSport } from "@/services/training-load.ts";
+import { CHART_CONFIG, SERIES_META } from "@/components/activity-detail-series.ts";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";

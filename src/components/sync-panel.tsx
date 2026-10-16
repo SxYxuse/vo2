@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 
-import { authClient } from "#/lib/auth-client.ts";
+import { authClient } from "@/lib/auth-client.ts";
 import {
   activityMapQueryOptions,
   appShellQueryOptions,
@@ -13,8 +13,8 @@ import {
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
-} from "#/lib/queries.ts";
-import { syncStrava } from "#/services/strava-sync.ts";
+} from "@/lib/queries.ts";
+import { syncStrava } from "@/services/strava-sync.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 

@@ -1,19 +1,19 @@
 import { queryOptions } from "@tanstack/react-query";
 
+import { getActivityAnalysis, getAnalysisStatus } from "@/services/activity-analysis.ts";
+import { getActivityDetail } from "@/services/activity-detail.ts";
+import { loadActivityMap } from "@/services/activity-map.ts";
+import { loadAppShell } from "@/services/app-shell.ts";
+import { loadSettingsSnapshot } from "@/services/app-settings.ts";
+import { loadAssessments } from "@/services/assessments.ts";
+import { loadHeartRate } from "@/services/heart-rate.ts";
+import { loadHomeData } from "@/services/strava-sync.ts";
+import { loadFitnessData } from "@/services/training-load.ts";
+
 /** Loader/preload read: use cached data if present, otherwise fetch once. */
 export function loaderQuery<T extends Record<string, unknown>>(options: T) {
   return { ...options, staleTime: "static" as const, retry: 1 };
 }
-
-import { getActivityAnalysis, getAnalysisStatus } from "#/services/activity-analysis.ts";
-import { getActivityDetail } from "#/services/activity-detail.ts";
-import { loadActivityMap } from "#/services/activity-map.ts";
-import { loadAppShell } from "#/services/app-shell.ts";
-import { loadSettingsSnapshot } from "#/services/app-settings.ts";
-import { loadAssessments } from "#/services/assessments.ts";
-import { loadHeartRate } from "#/services/heart-rate.ts";
-import { loadHomeData } from "#/services/strava-sync.ts";
-import { loadFitnessData } from "#/services/training-load.ts";
 
 export const appShellQueryOptions = queryOptions({
   queryKey: ["app-shell"],
