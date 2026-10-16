@@ -2,8 +2,13 @@ import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay, subDays, subMonths, subYears } from "date-fns";
 import { createServerFn } from "@tanstack/react-start";
 
-const CTL_DAYS = 42;
-const ATL_DAYS = 7;
+import { parseAssessmentResult } from "./assessments-score.ts";
+import { estimateLthrFromMax, heartRateFamily, isPlausibleBpm } from "./heart-rate.ts";
+import { normalizedPowerFromWatts } from "./normalized-power.ts";
+
+export const CTL_DAYS = 42;
+export const ATL_DAYS = 7;
+export const DEFAULT_REST_HR = 60;
 
 export type LoadSource = "power" | "heartRate" | "duration";
 
@@ -26,6 +31,21 @@ export type LoadInputs = {
   averageWatts: number | null;
   weightedAverageWatts: number | null;
   deviceWatts: boolean;
+  wattsStream?: number[] | null;
+  timeStream?: number[] | null;
+};
+
+export type LoadAnchors = {
+  ftp: number | null;
+  cyclingLthr: number | null;
+  runLthr: number | null;
+  swimLthr: number | null;
+  restHr: number;
+  cyclingMaxHr: number | null;
+  runMaxHr: number | null;
+  swimMaxHr: number | null;
+  walkingMaxHr: number | null;
+  otherMaxHr: number | null;
 };
 
 export type FitnessLoad = {
@@ -35,7 +55,7 @@ export type FitnessLoad = {
   movingTime: number;
 };
 
-type PmcPoint = {
+export type PmcPoint = {
   date: string;
   t: number;
   load: number;
@@ -46,8 +66,6 @@ type PmcPoint = {
   tsb: number;
 };
 
-const HR_REST = 60;
-
 const CYCLING_SPORTS = new Set([
   "Ride",
   "VirtualRide",
@@ -55,6 +73,15 @@ const CYCLING_SPORTS = new Set([
   "MountainBikeRide",
   "EMountainBikeRide",
   "EBikeRide",
+  "Velomobile",
+  "Handcycle",
+]);
+
+const POWER_CYCLING_SPORTS = new Set([
+  "Ride",
+  "VirtualRide",
+  "GravelRide",
+  "MountainBikeRide",
   "Velomobile",
   "Handcycle",
 ]);
@@ -91,84 +118,182 @@ function hoursFromMoving(seconds: number) {
 }
 
 function trainingStress(hours: number, intensity: number) {
-  const factor = Math.min(1.2, Math.max(0.3, intensity));
-  return hours * 100 * factor * factor;
+  if (!Number.isFinite(intensity) || intensity <= 0) return 0;
+  return hours * 100 * intensity * intensity;
+}
+
+function clampRestHr(value: number) {
+  return Math.min(75, Math.max(40, Math.round(value)));
 }
 
 export function isCyclingSport(sportType: string) {
   return CYCLING_SPORTS.has(sportType);
 }
 
+export function isPowerCyclingSport(sportType: string) {
+  return POWER_CYCLING_SPORTS.has(sportType);
+}
+
 function durationIntensity(sportType: string) {
+  if (sportType === "EBikeRide" || sportType === "EMountainBikeRide") return 0.45;
   if (sportType === "Walk" || sportType === "Hike") return 0.45;
   if (sportType === "Run" || sportType === "TrailRun" || sportType === "VirtualRun") return 0.7;
   if (CYCLING_SPORTS.has(sportType)) return 0.65;
-  if (sportType === "Swim") return 0.65;
+  if (sportType === "Swim" || sportType === "OpenWaterSwim") return 0.65;
   if (sportType === "Workout" || sportType === "WeightTraining") return 0.5;
   return 0.55;
 }
 
-export function estimateFtpAndLthr(activities: LoadInputs[]) {
-  const ftpSamples: number[] = [];
-  const hrAverages: number[] = [];
-  let peak = 0;
+function sportMaxHr(sportType: string, anchors: LoadAnchors) {
+  const family = heartRateFamily(sportType);
+  if (family === "cycling") return anchors.cyclingMaxHr;
+  if (family === "running") return anchors.runMaxHr;
+  if (family === "swimming") return anchors.swimMaxHr;
+  if (family === "walking") return anchors.walkingMaxHr;
+  return anchors.otherMaxHr;
+}
+
+function sportLthr(sportType: string, anchors: LoadAnchors) {
+  const family = heartRateFamily(sportType);
+  if (family === "cycling") return anchors.cyclingLthr;
+  if (family === "running") return anchors.runLthr;
+  if (family === "swimming") return anchors.swimLthr;
+  return null;
+}
+
+function peakByFamily(activities: LoadInputs[]) {
+  const peaks: Record<"cycling" | "running" | "swimming" | "walking" | "other", number> = {
+    cycling: 0,
+    running: 0,
+    swimming: 0,
+    walking: 0,
+    other: 0,
+  };
   for (const activity of activities) {
     const maxHr = activity.maxHeartrate ?? 0;
-    if (maxHr > peak) peak = maxHr;
-    if (activity.averageHeartrate != null && activity.averageHeartrate > 80) {
-      hrAverages.push(activity.averageHeartrate);
-    }
-    if (
-      CYCLING_SPORTS.has(activity.sportType) &&
-      activity.deviceWatts &&
-      activity.movingTime >= 40 * 60
-    ) {
-      const watts = activity.weightedAverageWatts ?? activity.averageWatts;
-      if (watts != null && watts > 50) ftpSamples.push(watts);
-    }
+    if (!isPlausibleBpm(maxHr)) continue;
+    const family = heartRateFamily(activity.sportType);
+    if (maxHr > peaks[family]) peaks[family] = maxHr;
   }
-  const ftpEstimate = percentile(ftpSamples, 0.9);
+  const asNull = (value: number) => (value > 0 ? value : null);
   return {
-    ftp: ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null,
-    lthr:
-      peak >= 140
-        ? Math.round(peak * 0.85)
-        : (() => {
-            const p90 = percentile(hrAverages, 0.9);
-            return p90 ? Math.round(p90 * 1.05) : null;
-          })(),
+    cyclingMaxHr: asNull(peaks.cycling),
+    runMaxHr: asNull(peaks.running),
+    swimMaxHr: asNull(peaks.swimming),
+    walkingMaxHr: asNull(peaks.walking),
+    otherMaxHr: asNull(peaks.other),
   };
 }
 
-export function estimateFtp(activities: LoadInputs[]) {
-  return estimateFtpAndLthr(activities).ftp;
+function estimateRestHr(activities: LoadInputs[]) {
+  const easy: number[] = [];
+  for (const activity of activities) {
+    const avg = activity.averageHeartrate;
+    if (avg == null || avg < 40 || avg > 90) continue;
+    easy.push(avg);
+  }
+  const p10 = percentile(easy, 0.1);
+  return p10 ? clampRestHr(p10) : DEFAULT_REST_HR;
 }
 
-export function estimateLthr(activities: LoadInputs[]) {
-  return estimateFtpAndLthr(activities).lthr;
+function estimateFtp(activities: LoadInputs[]) {
+  const ftpSamples: number[] = [];
+  for (const activity of activities) {
+    if (
+      !isPowerCyclingSport(activity.sportType) ||
+      !activity.deviceWatts ||
+      activity.movingTime < 40 * 60
+    ) {
+      continue;
+    }
+    const watts =
+      activity.weightedAverageWatts ??
+      normalizedPowerFromWatts(activity.wattsStream, activity.timeStream);
+    if (watts != null && watts > 50) ftpSamples.push(watts);
+  }
+  const ftpEstimate = percentile(ftpSamples, 0.9);
+  return ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null;
+}
+
+export function estimateLoadAnchors(activities: LoadInputs[]): LoadAnchors {
+  const peaks = peakByFamily(activities);
+  return {
+    ftp: estimateFtp(activities),
+    cyclingLthr: estimateLthrFromMax(peaks.cyclingMaxHr, "cycling"),
+    runLthr: estimateLthrFromMax(peaks.runMaxHr, "running"),
+    swimLthr: estimateLthrFromMax(peaks.swimMaxHr, "swimming"),
+    restHr: estimateRestHr(activities),
+    ...peaks,
+  };
+}
+
+export function pickLoadAnchorsFromTests(
+  rows: Array<{ assessmentId: string; result: unknown }>,
+): Partial<LoadAnchors> {
+  const picked: Partial<LoadAnchors> = {};
+  for (const row of rows) {
+    const result = parseAssessmentResult(row.result);
+    if (row.assessmentId === "ftp-20") {
+      if (picked.ftp == null && result.ftpWatts != null) picked.ftp = result.ftpWatts;
+      if (picked.cyclingLthr == null && result.cyclingLthr != null) {
+        picked.cyclingLthr = result.cyclingLthr;
+      }
+      if (picked.cyclingMaxHr == null && result.peakHr != null) picked.cyclingMaxHr = result.peakHr;
+    }
+    if (row.assessmentId === "run-lthr" && picked.runLthr == null && result.runLthr != null) {
+      picked.runLthr = result.runLthr;
+    }
+    if (row.assessmentId === "beep-test" && picked.runMaxHr == null && result.peakHr != null) {
+      picked.runMaxHr = result.peakHr;
+    }
+  }
+  return picked;
+}
+
+export function mergeLoadAnchors(estimated: LoadAnchors, tests: Partial<LoadAnchors>): LoadAnchors {
+  return {
+    ftp: tests.ftp ?? estimated.ftp,
+    cyclingLthr: tests.cyclingLthr ?? estimated.cyclingLthr,
+    runLthr: tests.runLthr ?? estimated.runLthr,
+    swimLthr: tests.swimLthr ?? estimated.swimLthr,
+    restHr: tests.restHr ?? estimated.restHr,
+    cyclingMaxHr: tests.cyclingMaxHr ?? estimated.cyclingMaxHr,
+    runMaxHr: tests.runMaxHr ?? estimated.runMaxHr,
+    swimMaxHr: tests.swimMaxHr ?? estimated.swimMaxHr,
+    walkingMaxHr: tests.walkingMaxHr ?? estimated.walkingMaxHr,
+    otherMaxHr: tests.otherMaxHr ?? estimated.otherMaxHr,
+  };
+}
+
+function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
+  const avg = activity.averageHeartrate;
+  if (avg == null || avg <= 0) return null;
+  const rest = clampRestHr(anchors.restHr);
+  const lthr = sportLthr(activity.sportType, anchors);
+  const ceiling = lthr ?? sportMaxHr(activity.sportType, anchors);
+  if (ceiling == null || ceiling <= rest) return null;
+  return (avg - rest) / (ceiling - rest);
 }
 
 export function activityTrainingLoad(
   activity: LoadInputs,
-  ftp: number | null,
-  lthr: number | null,
+  anchors: LoadAnchors,
 ): { load: number; source: LoadSource } {
   const hours = hoursFromMoving(activity.movingTime);
   if (hours <= 0) return { load: 0, source: "duration" };
 
-  if (ftp && CYCLING_SPORTS.has(activity.sportType) && activity.deviceWatts) {
-    const normalized = activity.weightedAverageWatts ?? activity.averageWatts;
+  if (anchors.ftp && isPowerCyclingSport(activity.sportType) && activity.deviceWatts) {
+    const normalized =
+      activity.weightedAverageWatts ??
+      normalizedPowerFromWatts(activity.wattsStream, activity.timeStream);
     if (normalized && normalized > 0) {
-      return { load: trainingStress(hours, normalized / ftp), source: "power" };
+      return { load: trainingStress(hours, normalized / anchors.ftp), source: "power" };
     }
   }
 
-  if (lthr && activity.averageHeartrate && activity.averageHeartrate > 0) {
-    const reserve = Math.max(40, lthr - HR_REST);
-    return {
-      load: trainingStress(hours, (activity.averageHeartrate - HR_REST) / reserve),
-      source: "heartRate",
-    };
+  const intensity = hrIntensity(activity, anchors);
+  if (intensity != null) {
+    return { load: trainingStress(hours, intensity), source: "heartRate" };
   }
 
   return { load: trainingStress(hours, durationIntensity(activity.sportType)), source: "duration" };
@@ -215,6 +340,7 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
     const key = dayKey(cursor, timeZone);
     const day = byDay.get(key);
     const load = day?.load ?? 0;
+    const tsb = ctl - atl;
     ctl += (load - ctl) / CTL_DAYS;
     atl += (load - atl) / ATL_DAYS;
     points.push({
@@ -225,10 +351,21 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
       estimatedLoad: day?.estimated ?? 0,
       ctl,
       atl,
-      tsb: ctl - atl,
+      tsb,
     });
   }
   return points;
+}
+
+export function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
+  return point.ctl - point.atl;
+}
+
+export function ctlChange(points: PmcPoint[], days = 7) {
+  if (points.length < 2) return 0;
+  const latest = points[points.length - 1];
+  const prior = points[Math.max(0, points.length - 1 - days)];
+  return latest.ctl - prior.ctl;
 }
 
 export function slicePmc(points: PmcPoint[], period: FitnessPeriod, timeZone: string) {
@@ -261,10 +398,10 @@ export function averageWeeklyMovingSeconds(
 }
 
 export function formLabel(tsb: number) {
-  if (tsb >= 15) return "Very fresh";
+  if (tsb >= 25) return "Very fresh";
   if (tsb >= 5) return "Fresh";
   if (tsb >= -10) return "Neutral";
-  if (tsb >= -25) return "Fatigued";
+  if (tsb >= -30) return "Fatigued";
   return "Very fatigued";
 }
 

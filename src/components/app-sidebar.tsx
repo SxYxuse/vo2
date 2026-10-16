@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { noop, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
@@ -27,7 +27,7 @@ const SettingsDialog = lazy(() =>
 import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
 import { APP_NAME } from "#/lib/brand.ts";
 import { authClient } from "#/lib/auth-client.ts";
-import { appShellQueryOptions } from "#/lib/queries.ts";
+import { appShellQueryOptions, settingsSnapshotQueryOptions } from "#/lib/queries.ts";
 import { isTrainingPlanComplete } from "#/services/training-plan.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -77,19 +77,15 @@ const NAV_ITEMS = [
   { title: "Tests", to: "/tests", icon: FlaskConicalIcon },
 ] as const;
 
-function preloadSettingsDialog() {
+function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) {
   void import("#/components/onboarding-dialog.tsx");
   void import("#/components/settings-dialog.tsx");
-}
-
-function preloadRouteChunk(to: (typeof NAV_ITEMS)[number]["to"]) {
-  if (to === "/map") void import("#/components/activity-map.tsx");
-  if (to === "/fitness") void import("#/components/fitness-chart.tsx");
-  if (to === "/tests") void import("#/components/assessment-tests.tsx");
+  void queryClient?.query(settingsSnapshotQueryOptions).catch(noop);
 }
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const queryClient = useQueryClient();
   const { isMobile, setOpenMobile } = useSidebar();
   const { data: session } = authClient.useSession();
   const user = session?.user;
@@ -105,9 +101,9 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (!trainingMissing) return;
-    preloadSettingsDialog();
+    preloadSettingsDialog(queryClient);
     setOnboardingOpen(true);
-  }, [trainingMissing]);
+  }, [trainingMissing, queryClient]);
 
   return (
     <>
@@ -115,7 +111,11 @@ export function AppSidebar() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton size="lg" tooltip={APP_NAME} render={<Link to="/" />}>
+              <SidebarMenuButton
+                size="lg"
+                tooltip={APP_NAME}
+                render={<Link to="/" preload="viewport" />}
+              >
                 <Vo2Mark className="hidden group-data-[collapsible=icon]:block" />
                 <Vo2Wordmark className="text-lg font-semibold group-data-[collapsible=icon]:hidden" />
               </SidebarMenuButton>
@@ -135,8 +135,7 @@ export function AppSidebar() {
                       render={
                         <Link
                           to={item.to}
-                          onMouseEnter={() => preloadRouteChunk(item.to)}
-                          onFocus={() => preloadRouteChunk(item.to)}
+                          preload="viewport"
                           onClick={() => {
                             if (isMobile) setOpenMobile(false);
                           }}
@@ -155,7 +154,7 @@ export function AppSidebar() {
         <SidebarFooter>
           <SidebarUserMenu
             onOpenSettings={() => setSettingsOpen(true)}
-            onHoverSettings={preloadSettingsDialog}
+            onHoverSettings={() => preloadSettingsDialog(queryClient)}
           />
         </SidebarFooter>
         <SidebarRail />
@@ -289,6 +288,7 @@ function SidebarUserMenu({
                     <DropdownMenuItem
                       onMouseEnter={onHoverSettings}
                       onFocus={onHoverSettings}
+                      onPointerDown={onHoverSettings}
                       onClick={() => {
                         onOpenSettings();
                       }}

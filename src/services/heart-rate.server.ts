@@ -1,7 +1,7 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "#/db/index.ts";
-import { activities, activityStreams } from "#/db/schema.ts";
+import { activities, activityStreams, athleteMetrics, fieldTests } from "#/db/schema.ts";
 import { logger } from "#/lib/logger.server.ts";
 import { getOptionalSession } from "#/lib/session.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
@@ -15,7 +15,9 @@ import {
   overallFromSports,
   type HeartRateData,
   type HeartRateSport,
+  type SportLthrAnchors,
 } from "./heart-rate.ts";
+import { pickLoadAnchorsFromTests } from "./training-load.ts";
 
 const STREAM_BATCH = 40;
 
@@ -26,6 +28,7 @@ const EMPTY_OVERALL: HeartRateSport = {
   zoneModel: "Each sport uses its own zone model",
   maxHeartrate: null,
   lthr: null,
+  lthrSource: null,
   activityCount: 0,
   sampleSeconds: 0,
   peakActivityName: null,
@@ -40,7 +43,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     return { signedIn: false, overall: EMPTY_OVERALL, sports: [], sportTypes: {} };
   }
 
-  const [rows, storedSettings] = await Promise.all([
+  const [rows, storedSettings, metricsRows, testRows] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -53,6 +56,24 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
       .from(activities)
       .where(eq(activities.userId, session.user.id)),
     getCalendarSettingsForUser(session.user.id),
+    db
+      .select({
+        cyclingLthr: athleteMetrics.cyclingLthr,
+        runLthr: athleteMetrics.runLthr,
+        swimLthr: athleteMetrics.swimLthr,
+        lthr: athleteMetrics.lthr,
+      })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, session.user.id))
+      .limit(1),
+    db
+      .select({
+        assessmentId: fieldTests.assessmentId,
+        result: fieldTests.result,
+      })
+      .from(fieldTests)
+      .where(and(eq(fieldTests.userId, session.user.id), eq(fieldTests.status, "completed")))
+      .orderBy(desc(fieldTests.completedAt)),
   ]);
 
   const bySport = new Map<string, ReturnType<typeof createSportBucket>>();
@@ -100,10 +121,36 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     storedSettings,
     rows.map((row) => row.sportType),
   );
+  const tests = pickLoadAnchorsFromTests(testRows);
+  const metrics = metricsRows[0];
+  const lthrAnchors: SportLthrAnchors = {};
+  const cyclingLthr = tests.cyclingLthr ?? metrics?.cyclingLthr ?? metrics?.lthr ?? null;
+  const runLthr = tests.runLthr ?? metrics?.runLthr ?? null;
+  const swimLthr = tests.swimLthr ?? metrics?.swimLthr ?? null;
+  if (cyclingLthr) {
+    lthrAnchors.cycling = {
+      bpm: cyclingLthr,
+      source: tests.cyclingLthr ? "field-test" : "estimated-from-max",
+    };
+  }
+  if (runLthr) {
+    lthrAnchors.running = {
+      bpm: runLthr,
+      source: tests.runLthr ? "field-test" : "estimated-from-max",
+    };
+  }
+  if (swimLthr) {
+    lthrAnchors.swimming = {
+      bpm: swimLthr,
+      source: tests.swimLthr ? "field-test" : "estimated-from-max",
+    };
+  }
+
   const sports = collapseSportBuckets(
     bySport,
     settings.sportGroupShares,
     (sportType) => settings.sportTypes[sportType]?.visible !== false,
+    lthrAnchors,
   );
 
   logger.debug("heart_rate.loaded", {

@@ -24,6 +24,7 @@ export function getRouter() {
     context,
     scrollRestoration: true,
     defaultPreload: "intent",
+    defaultPreloadDelay: 0,
     defaultPreloadStaleTime: 0,
     parseSearch: parseSearchWith(parseSearchValue),
     stringifySearch: stringifySearchWith((value) => {

@@ -9,11 +9,13 @@ import { parseAssessmentResult } from "./assessments-score.ts";
 import { familyCollectors } from "./calendar-settings.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { toFitnessLoad } from "./training-load.ts";
+import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import {
   assignActivitiesToSessions,
   dayKey,
   isAssessmentSession,
   latestPmc,
+  formForRemainingWeek,
   isTrainingPlanComplete,
   parseTrainingPlan,
   planRemainingWeek,
@@ -212,6 +214,7 @@ async function rebuildWeek(
 ): Promise<PlannedSession[]> {
   const today = dayKey(now, timeZone);
   const weekStart = weekStartKey(now, timeZone);
+  await refreshTrainingLoadsIfNeeded(userId);
   const weekEnd = addDate(weekStart, 6);
   const [loads, flagged, weekActivities, existing, settings, anchors] = await Promise.all([
     fitnessLoadsForUser(userId),
@@ -292,7 +295,7 @@ async function rebuildWeek(
           plan: { ...plan, timeZone },
           today,
           ctl: pmc.ctl,
-          tsb: pmc.tsb,
+          tsb: formForRemainingWeek(pmc, today, completed),
           completed,
           collectors: {
             running: familyCollectors(sportTypes, "running"),

@@ -21,6 +21,7 @@ import {
   FITNESS_PERIODS,
   averageWeeklyMovingSeconds,
   buildPmc,
+  ctlChange,
   formLabel,
   roundLoad,
   slicePmc,
@@ -60,11 +61,11 @@ const SERIES_SHORT_LABEL = {
 const SERIES_INFO = {
   ctl: "42-day training load. This is fitness: it climbs with consistent work and fades slowly if you rest. A steady rise over months is the goal.",
   atl: "7-day training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
-  tsb: "Fitness minus fatigue. Positive means you are fresh (good for a hard session or event). Negative means you are carrying fatigue (better for easy work or rest).",
+  tsb: "Fitness minus fatigue at the start of the day, before today's training. Positive means you are fresh (good for a hard session or event). Negative means you are carrying fatigue (better for easy work or rest).",
 } as const;
 
 const GRAPH_GOAL_INFO =
-  "Use this to keep progressing without digging a hole: raise fitness over weeks, let fatigue come down after hard blocks, and go hard when form is near or above zero. Progress looks like a slowly rising fitness line, not a single huge week.";
+  "Use this to keep progressing without digging a hole: raise fitness over weeks, let fatigue come down after hard blocks, and keep quality work in the productive form band (about −10 to +15). Progress looks like a slowly rising fitness line, not a single huge week.";
 
 const RAMP_INFO =
   "How much fitness changed in the last 7 days. A small plus (about +2 to +8) is a productive build. A large plus often means you ramped too fast.";
@@ -88,7 +89,7 @@ const DATE_FULL = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 function formTone(tsb: number) {
   if (tsb >= 5) return "text-success";
   if (tsb >= -10) return "text-muted-foreground";
-  if (tsb >= -25) return "text-warning";
+  if (tsb >= -30) return "text-warning";
   return "text-destructive";
 }
 
@@ -204,8 +205,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
     [pmc, period, timeZone, isDesktop],
   );
   const latest = series.at(-1);
-  const weekAgo = series.length > 7 ? series[series.length - 8] : series[0];
-  const ramp = latest && weekAgo ? latest.ctl - weekAgo.ctl : 0;
+  const ramp = ctlChange(pmc);
   const estimatedShare =
     series.reduce((sum, point) => sum + point.estimatedLoad, 0) /
     Math.max(

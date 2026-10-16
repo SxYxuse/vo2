@@ -883,7 +883,12 @@ export function buildOverview(input: {
   distance: number | null;
   totalElevationGain: number | null;
   samples: ActivitySample[];
-  athlete?: { ftp: number | null; lthr: number | null };
+  athlete?: {
+    ftp: number | null;
+    cyclingLthr: number | null;
+    runLthr: number | null;
+    swimLthr: number | null;
+  };
 }): ActivityOverview {
   const samples = input.samples;
   const family = heartRateFamily(input.sportType);
@@ -898,16 +903,16 @@ export function buildOverview(input: {
     .filter((value): value is number => value != null);
   const maxHeartrate = hrs.length ? Math.max(...hrs) : null;
   const estimatedLthr = estimateLthrFromMax(maxHeartrate, family);
-  const storedLthr = input.athlete?.lthr ?? null;
-  const useStoredLthr = family === "cycling" && storedLthr != null;
-  const lthr = useStoredLthr ? storedLthr : (estimatedLthr ?? storedLthr);
-  const lthrSource = useStoredLthr
-    ? "athlete"
-    : estimatedLthr
-      ? "estimated-from-session-max"
-      : storedLthr
-        ? "athlete"
-        : null;
+  const storedLthr =
+    family === "cycling"
+      ? (input.athlete?.cyclingLthr ?? null)
+      : family === "running"
+        ? (input.athlete?.runLthr ?? null)
+        : family === "swimming"
+          ? (input.athlete?.swimLthr ?? null)
+          : null;
+  const lthr = storedLthr ?? estimatedLthr;
+  const lthrSource = storedLthr ? "athlete" : estimatedLthr ? "estimated-from-session-max" : null;
   const timeInZones = zoneSharesFromSamples(samples, input.sportType, maxHeartrate, lthr);
   const aboveThresholdSec = timeInZones
     .filter((zone) => zone.id === "z4" || zone.id === "z5")

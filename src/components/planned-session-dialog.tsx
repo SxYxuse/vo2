@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { format, parseISO } from "date-fns";
 import { BikeIcon, FootprintsIcon } from "lucide-react";
 
@@ -40,10 +41,13 @@ export function PlannedSessionDialog({
   session: PlannedSession | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const dateLabel = session
-    ? `This week · ${format(parseISO(`${session.weekStart}T12:00:00`), "MMM d")} start`
+  const lastSession = useRef(session);
+  if (session) lastSession.current = session;
+  const shown = session ?? lastSession.current;
+  const dateLabel = shown
+    ? `This week · ${format(parseISO(`${shown.weekStart}T12:00:00`), "MMM d")} start`
     : "";
-  const SportIcon = session?.sportFamily === "cycling" ? BikeIcon : FootprintsIcon;
+  const SportIcon = shown?.sportFamily === "cycling" ? BikeIcon : FootprintsIcon;
 
   return (
     <ResponsiveDialog open={Boolean(session)} onOpenChange={onOpenChange}>
@@ -51,21 +55,21 @@ export function PlannedSessionDialog({
         <ResponsiveDialogHeader className="border-b px-4 py-3 pe-12 group-data-[swipe-axis=y]/drawer-popup:text-left">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <ResponsiveDialogTitle className="min-w-0 truncate">
-              {session?.title ?? "Suggested session"}
+              {shown?.title ?? "Suggested session"}
             </ResponsiveDialogTitle>
-            <Badge variant={session ? statusVariant(session.status) : "outline"}>
-              {session ? statusLabel(session.status) : "Suggested"}
+            <Badge variant={shown ? statusVariant(shown.status) : "outline"}>
+              {shown ? statusLabel(shown.status) : "Suggested"}
             </Badge>
           </div>
           <ResponsiveDialogDescription>
-            {session?.status === "done" && session.activityTitle
-              ? `Logged as ${session.activityTitle} on ${format(parseISO(`${session.date}T12:00:00`), "MMM d")}.`
+            {shown?.status === "done" && shown.activityTitle
+              ? `Logged as ${shown.activityTitle} on ${format(parseISO(`${shown.date}T12:00:00`), "MMM d")}.`
               : dateLabel
                 ? `${dateLabel}. Not logged yet — pick any day that fits.`
                 : "Planned workout"}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-        {session ? (
+        {shown ? (
           <div className="min-h-0 flex-1 overflow-auto p-4">
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-2">
@@ -73,7 +77,7 @@ export function PlannedSessionDialog({
                   <CardHeader className="px-3">
                     <CardDescription>Duration</CardDescription>
                     <CardTitle className="font-mono text-base tabular-nums">
-                      {formatHours(session.targetMinutes / 60)}
+                      {formatHours(shown.targetMinutes / 60)}
                     </CardTitle>
                   </CardHeader>
                 </Card>
@@ -81,7 +85,7 @@ export function PlannedSessionDialog({
                   <CardHeader className="px-3">
                     <CardDescription>Target load</CardDescription>
                     <CardTitle className="font-mono text-base tabular-nums">
-                      {Math.round(session.targetLoad)}
+                      {Math.round(shown.targetLoad)}
                     </CardTitle>
                   </CardHeader>
                 </Card>
@@ -91,19 +95,15 @@ export function PlannedSessionDialog({
                     <CardTitle className="flex items-center gap-2 text-base">
                       <SportIcon
                         className={
-                          session.sportFamily === "cycling"
-                            ? "text-ds-blue-700"
-                            : "text-ds-amber-700"
+                          shown.sportFamily === "cycling" ? "text-ds-blue-700" : "text-ds-amber-700"
                         }
                       />
-                      {sportLabel(session.sportFamily)}
+                      {sportLabel(shown.sportFamily)}
                     </CardTitle>
                   </CardHeader>
                 </Card>
               </div>
-              {session.note ? (
-                <p className="text-muted-foreground text-sm">{session.note}</p>
-              ) : null}
+              {shown.note ? <p className="text-muted-foreground text-sm">{shown.note}</p> : null}
             </div>
           </div>
         ) : null}

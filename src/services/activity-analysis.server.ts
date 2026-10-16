@@ -67,7 +67,13 @@ async function loadActivityAnalysisSnapshot(activityId: string, userId: string) 
       .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
       .limit(1),
     db
-      .select({ ftp: athleteMetrics.ftp, lthr: athleteMetrics.lthr })
+      .select({
+        ftp: athleteMetrics.ftp,
+        cyclingLthr: athleteMetrics.cyclingLthr,
+        runLthr: athleteMetrics.runLthr,
+        swimLthr: athleteMetrics.swimLthr,
+        lthr: athleteMetrics.lthr,
+      })
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
@@ -97,7 +103,12 @@ async function loadActivityAnalysisSnapshot(activityId: string, userId: string) 
       distance: row.distance,
       totalElevationGain: row.totalElevationGain,
       samples,
-      athlete: { ftp: metrics?.ftp ?? null, lthr: metrics?.lthr ?? null },
+      athlete: {
+        ftp: metrics?.ftp ?? null,
+        cyclingLthr: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
+        runLthr: metrics?.runLthr ?? null,
+        swimLthr: metrics?.swimLthr ?? null,
+      },
     }),
     samples,
   } satisfies ActivityAnalysisSnapshot;

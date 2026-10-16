@@ -1,3 +1,5 @@
+import { normalizedPowerFromWatts } from "./normalized-power.ts";
+
 export const STREAM_SERIES = ["heartrate", "watts", "cadence", "speed", "altitude"] as const;
 
 export type StreamSeriesKey = (typeof STREAM_SERIES)[number];
@@ -99,26 +101,6 @@ function hasValues(values: number[] | null | undefined) {
   return Boolean(values?.some((value) => value > 0));
 }
 
-function normalizedPower(watts: number[] | null) {
-  const window = 30;
-  if (!watts || watts.length < window) return null;
-  let windowSum = 0;
-  let fourthSum = 0;
-  let count = 0;
-  for (let index = 0; index < watts.length; index += 1) {
-    windowSum += Math.max(0, watts[index] ?? 0);
-    if (index >= window) windowSum -= Math.max(0, watts[index - window] ?? 0);
-    if (index >= window - 1) {
-      const mean = windowSum / window;
-      fourthSum += mean * mean * mean * mean;
-      count += 1;
-    }
-  }
-  if (count === 0) return null;
-  const value = (fourthSum / count) ** 0.25;
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
-
 function pickIndexes(length: number, maxPoints: number) {
   if (length <= maxPoints) {
     return Array.from({ length }, (_, index) => index);
@@ -175,7 +157,7 @@ export function buildChartPreview(input: StreamChartInput): ActivityChartPreview
       avgHeartrate: meanPositive(heartrate),
       maxHeartrate: maxPositive(heartrate),
       avgWatts: meanPositive(watts),
-      normalizedWatts: normalizedPower(watts),
+      normalizedWatts: normalizedPowerFromWatts(watts, time),
       maxWatts: maxPositive(watts),
       avgCadence: meanPositive(cadence),
       avgSpeed: avgSpeedMs == null ? null : avgSpeedMs * 3.6,

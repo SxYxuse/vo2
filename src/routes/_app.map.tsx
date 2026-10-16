@@ -1,11 +1,11 @@
-import { lazy, Suspense } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { MapIcon } from "lucide-react";
 
+import { ActivityMap } from "#/components/activity-map.tsx";
 import { SignInPanel } from "#/components/sync-panel.tsx";
-import { activityMapQueryOptions } from "#/lib/queries.ts";
+import { activityMapQueryOptions, loaderQuery } from "#/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -15,15 +15,13 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const ActivityMap = lazy(() =>
-  import("#/components/activity-map.tsx").then((mod) => ({
-    default: mod.ActivityMap,
-  })),
-);
+if (typeof window !== "undefined") {
+  void import("#/components/activity-map-view.tsx");
+}
 
 export const Route = createFileRoute("/_app/map")({
   ssr: false,
-  loader: ({ context }) => context.queryClient.ensureQueryData(activityMapQueryOptions),
+  loader: ({ context }) => context.queryClient.query(loaderQuery(activityMapQueryOptions)),
   pendingMs: 200,
   pendingComponent: MapPending,
   errorComponent: MapError,
@@ -45,13 +43,11 @@ function MapPage() {
         </p>
       </div>
       {data.signedIn ? (
-        <Suspense fallback={<Skeleton className="min-h-80 w-full flex-1 rounded-xl" />}>
-          <ActivityMap
-            tracks={data.tracks}
-            sportTypes={data.sportTypes}
-            sportGroupShares={data.sportGroupShares}
-          />
-        </Suspense>
+        <ActivityMap
+          tracks={data.tracks}
+          sportTypes={data.sportTypes}
+          sportGroupShares={data.sportGroupShares}
+        />
       ) : (
         <>
           <Empty className="min-h-64 border">

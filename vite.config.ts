@@ -7,6 +7,8 @@ import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+const isTest = process.env.VITEST === "true";
+
 const config = defineConfig({
   ssr: {
     external: ["winston", "winston-loki"],
@@ -32,13 +34,18 @@ const config = defineConfig({
     ],
   },
   resolve: { tsconfigPaths: true },
-  plugins: lazyPlugins(() => [
-    devtools(),
-    tailwindcss(),
-    tanstackStart(),
-    nitro({ preset: "bun" }),
-    viteReact(),
-  ]),
+  test: {
+    include: ["src/**/*.test.ts"],
+  },
+  plugins: isTest
+    ? []
+    : lazyPlugins(() => [
+        devtools(),
+        tailwindcss(),
+        tanstackStart(),
+        nitro({ preset: "bun" }),
+        viteReact(),
+      ]),
 });
 
 export default config;

@@ -139,6 +139,8 @@ export type HeartRateZoneStat = {
   seconds: number;
 };
 
+export type HeartRateLthrSource = "field-test" | "estimated-from-max";
+
 export type HeartRateSport = {
   sportType: string;
   members: string[];
@@ -146,12 +148,20 @@ export type HeartRateSport = {
   zoneModel: string;
   maxHeartrate: number | null;
   lthr: number | null;
+  lthrSource: HeartRateLthrSource | null;
   activityCount: number;
   sampleSeconds: number;
   peakActivityName: string | null;
   peakActivityStart: string | null;
   zones: HeartRateZoneStat[];
 };
+
+export type SportLthrAnchors = Partial<
+  Record<
+    Exclude<HeartRateFamily, "walking" | "other">,
+    { bpm: number; source: HeartRateLthrSource }
+  >
+>;
 
 export type HeartRateData = {
   signedIn: boolean;
@@ -301,13 +311,27 @@ export function noteActivityPeak(
   bucket.peakActivityStart = input.start;
 }
 
-export function toHeartRateSport(bucket: SportBucket): HeartRateSport {
+function familyLthr(
+  family: HeartRateFamily,
+  maxHeartrate: number | null,
+  anchors: SportLthrAnchors | undefined,
+) {
+  if (family === "walking" || family === "other") {
+    return { lthr: estimateLthrFromMax(maxHeartrate, family), source: null };
+  }
+  const stored = anchors?.[family];
+  if (stored?.bpm) return { lthr: stored.bpm, source: stored.source };
+  const estimated = estimateLthrFromMax(maxHeartrate, family);
+  return { lthr: estimated, source: estimated ? ("estimated-from-max" as const) : null };
+}
+
+export function toHeartRateSport(bucket: SportBucket, anchors?: SportLthrAnchors): HeartRateSport {
   const family = heartRateFamily(bucket.sportType);
   const model = ZONE_MODELS[family];
   const fromSamples = histogramMaxBpm(bucket.histogram);
   const maxHeartrate =
     bucket.maxHeartrate > 0 ? Math.max(bucket.maxHeartrate, fromSamples ?? 0) : fromSamples;
-  const lthr = estimateLthrFromMax(maxHeartrate, family);
+  const { lthr, source } = familyLthr(family, maxHeartrate, anchors);
   return {
     sportType: bucket.sportType,
     members: [bucket.sportType],
@@ -315,6 +339,7 @@ export function toHeartRateSport(bucket: SportBucket): HeartRateSport {
     zoneModel: model.label,
     maxHeartrate,
     lthr,
+    lthrSource: source,
     activityCount: bucket.activityCount,
     sampleSeconds: histogramSeconds(bucket.histogram),
     peakActivityName: bucket.peakActivityName,
@@ -351,6 +376,7 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
     zoneModel: "Each sport uses its own zone model",
     maxHeartrate: peak?.maxHeartrate ?? null,
     lthr: null,
+    lthrSource: null,
     activityCount,
     sampleSeconds,
     peakActivityName: peak?.peakActivityName ?? null,
@@ -396,6 +422,7 @@ export function collapseSportBuckets(
   buckets: Map<string, SportBucket>,
   shares: Record<string, boolean> | null | undefined,
   isVisible: (sportType: string) => boolean,
+  anchors?: SportLthrAnchors,
 ): HeartRateSport[] {
   const remaining = new Map(buckets);
   const sports: HeartRateSport[] = [];
@@ -408,7 +435,7 @@ export function collapseSportBuckets(
       members.map((member) => remaining.get(member)!),
       group.canonical,
     );
-    const sport = toHeartRateSport(merged);
+    const sport = toHeartRateSport(merged, anchors);
     sport.members = members;
     sports.push(sport);
     for (const member of members) remaining.delete(member);
@@ -416,7 +443,7 @@ export function collapseSportBuckets(
 
   for (const bucket of remaining.values()) {
     if (!isVisible(bucket.sportType)) continue;
-    sports.push(toHeartRateSport(bucket));
+    sports.push(toHeartRateSport(bucket, anchors));
   }
 
   return sortHeartRateSports(sports.filter((sport) => sport.activityCount > 0));
@@ -438,6 +465,7 @@ export function formatZoneBpm(zone: HeartRateZoneStat, isLast: boolean) {
 export function lthrHint(sport: HeartRateSport) {
   if (!sport.family) return "varies by sport";
   if (!sport.lthr) return undefined;
+  if (sport.lthrSource === "field-test") return "from field test";
   const model = ZONE_MODELS[sport.family];
   const pct = Math.round(model.lthrFactor * 100);
   if (model.anchor === "lthr") return `${pct}% of ${sport.family} max`;
@@ -450,6 +478,9 @@ export function lthrInfo(sport: HeartRateSport) {
   }
   const model = ZONE_MODELS[sport.family];
   const pct = Math.round(model.lthrFactor * 100);
+  if (sport.lthrSource === "field-test") {
+    return `This sport's LTHR comes from a flagged field test. Zones still use ${sport.family} cuts of that number, never another sport's LTHR.`;
+  }
   if (model.anchor === "lthr") {
     return `Estimated lactate threshold as ${pct}% of this sport's max heart rate. Cycling, running, and swimming use different % of LTHR cuts.`;
   }

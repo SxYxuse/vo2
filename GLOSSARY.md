@@ -87,7 +87,7 @@ The short picture of training load: about one week of exponentially weighted loa
 _Avoid_: ATL used alone
 
 **Form**:
-Fitness minus fatigue. Positive means fresh; negative means carrying fatigue.
+Fitness minus fatigue at the start of the day, before today's training. Positive means fresh; negative means carrying fatigue.
 _Avoid_: TSB used alone, freshness, TSB score
 
 ## Anchors and tests
@@ -97,8 +97,12 @@ Estimated ~60-minute maximal cycling power, used as the cycling power anchor.
 _Avoid_: Threshold watts, FTP watts as a second term
 
 **LTHR**:
-Lactate-threshold heart rate. It is sport-specific: cycling LTHR and running LTHR are different numbers.
+Lactate-threshold heart rate. It is sport-specific: cycling LTHR, running LTHR, and swimming LTHR are different numbers.
 _Avoid_: Threshold HR, LT, copying one sport's LTHR onto another
+
+**Resting heart rate**:
+The heart rate used as the floor of heart-rate reserve when scoring training load. Estimated from easy days when the athlete has no measured value.
+_Avoid_: RHR as a second term, using 60 for everyone when an estimate exists
 
 **Max heart rate**:
 The highest heart rate used as a zone anchor when a sport has no LTHR model.

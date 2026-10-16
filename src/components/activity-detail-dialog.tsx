@@ -1,6 +1,6 @@
 "use client";
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ActivityIcon, FlaskConicalIcon, HeartOffIcon } from "lucide-react";
 
@@ -159,12 +159,19 @@ export function ActivityDetailDialog({
     void import("#/components/activity-detail-charts.tsx");
   }, []);
 
+  const lastActivityId = useRef(activityId);
+  const lastPreview = useRef(preview);
+  if (activityId) lastActivityId.current = activityId;
+  if (preview) lastPreview.current = preview;
+  const queryId = activityId ?? lastActivityId.current ?? "";
+  const shownPreview = preview ?? lastPreview.current;
+
   const detailQuery = useQuery({
-    ...activityDetailQueryOptions(activityId ?? ""),
-    enabled: Boolean(activityId),
+    ...activityDetailQueryOptions(queryId),
+    enabled: Boolean(queryId),
   });
   const detail = detailQuery.data ?? null;
-  const loading = detailQuery.isPending;
+  const loading = Boolean(activityId) && !detail && !detailQuery.isError;
   const error =
     detailQuery.error instanceof Error
       ? detailQuery.error.message
@@ -172,15 +179,15 @@ export function ActivityDetailDialog({
         ? "Could not load activity"
         : null;
 
-  const title = detail?.title ?? preview?.title ?? "Activity";
-  const sportType = detail?.sportType ?? preview?.sportType;
-  const start = detail?.start ?? preview?.start;
+  const title = detail?.title ?? shownPreview?.title ?? "Activity";
+  const sportType = detail?.sportType ?? shownPreview?.sportType;
+  const start = detail?.start ?? shownPreview?.start;
   const end =
-    preview?.end ??
+    shownPreview?.end ??
     (detail
       ? new Date(new Date(detail.start).getTime() + detail.elapsedTime * 1000).toISOString()
       : undefined);
-  const missingHeartrate = preview ? isMissingHeartrate(preview) : false;
+  const missingHeartrate = shownPreview ? isMissingHeartrate(shownPreview) : false;
 
   return (
     <ResponsiveDialog open={Boolean(activityId)} onOpenChange={onOpenChange}>
@@ -224,7 +231,21 @@ export function ActivityDetailDialog({
           {loading ? (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {Array.from({ length: 6 }).map((_, index) => (
+                {shownPreview ? (
+                  <>
+                    <KpiCard
+                      label="Distance"
+                      value={formatDistanceKm(shownPreview.distance)}
+                      color="var(--color-ds-teal-700)"
+                    />
+                    <KpiCard
+                      label="Moving time"
+                      value={formatDuration(shownPreview.movingTime)}
+                      color="var(--color-ds-purple-700)"
+                    />
+                  </>
+                ) : null}
+                {Array.from({ length: shownPreview ? 4 : 6 }).map((_, index) => (
                   <Skeleton key={index} className="h-20 rounded-lg" />
                 ))}
               </div>
