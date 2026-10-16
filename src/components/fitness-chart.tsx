@@ -64,6 +64,9 @@ const SERIES_INFO = {
   tsb: "Fitness minus fatigue at the start of the day, before today's training. Positive means you are fresh (good for a hard session or event). Negative means you are carrying fatigue (better for easy work or rest).",
 } as const;
 
+const PMC_Y_DOMAIN = ["auto", "auto"] as const;
+const LOAD_Y_DOMAIN = [0, "auto"] as const;
+
 const GRAPH_GOAL_INFO =
   "Use this to keep progressing without digging a hole: raise fitness over weeks, let fatigue come down after hard blocks, and keep quality work in the productive form band (about −10 to +15). Progress looks like a slowly rising fitness line, not a single huge week.";
 
@@ -389,21 +392,25 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                   {showPmc ? (
                     <YAxis
                       yAxisId="pmc"
+                      type="number"
+                      domain={PMC_Y_DOMAIN}
                       hide={isDesktop !== true}
                       tickLine={false}
                       axisLine={false}
-                      width={isDesktop === true ? 36 : 0}
+                      width={isDesktop === true ? 40 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}
                   {showLoad ? (
                     <YAxis
                       yAxisId="load"
+                      type="number"
+                      domain={LOAD_Y_DOMAIN}
                       hide={isDesktop !== true}
                       orientation="right"
                       tickLine={false}
                       axisLine={false}
-                      width={isDesktop === true ? 32 : 0}
+                      width={isDesktop === true ? 36 : 0}
                       tickFormatter={(value) => String(Math.round(Number(value)))}
                     />
                   ) : null}

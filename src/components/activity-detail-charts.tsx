@@ -14,14 +14,18 @@ import {
   formatPaceClock,
   formatWatts,
   locomotionFor,
-  normalizeSeriesPoint,
   STREAM_SERIES,
   type ActivityChartPoint,
   type ActivityDetail,
   type StreamSeriesKey,
 } from "@/services/activity-detail.ts";
 import { isCyclingSport } from "@/services/training-load.ts";
-import { chartConfigFor, seriesMetaFor } from "@/components/activity-detail-series.ts";
+import {
+  chartConfigFor,
+  seriesMetaFor,
+  streamAxisPlacement,
+  streamYAxis,
+} from "@/components/activity-detail-series.ts";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
@@ -46,24 +50,6 @@ function formatSeriesValue(key: StreamSeriesKey, value: number, sportType: strin
   }
   if (key === "altitude") return `${value.toFixed(1)} ${unit}`;
   return `${Math.round(value)} ${unit}`;
-}
-
-function numericValues(data: ChartRow[], keys: string[]) {
-  const values: number[] = [];
-  for (const point of data) {
-    for (const key of keys) {
-      const value = point[key];
-      if (typeof value === "number") values.push(value);
-    }
-  }
-  return values;
-}
-
-function seriesRange(data: ChartRow[], key: StreamSeriesKey) {
-  const values = numericValues(data, [key]);
-  const min = values.length ? Math.min(...values) : 0;
-  const max = values.length ? Math.max(...values) : 1;
-  return { min, max: max === min ? min + 1 : max };
 }
 
 function seriesSummary(detail: ActivityDetail, key: StreamSeriesKey) {
@@ -96,7 +82,7 @@ function StreamTooltip({
       {...props}
       indicator="line"
       formatter={(value, name, item) => {
-        const dataKey = String(item.dataKey ?? "").replace(/N$/, "");
+        const dataKey = String(item.dataKey ?? "");
         const key = dataKey as StreamSeriesKey;
         const series = meta[key];
         const actual =
@@ -119,6 +105,36 @@ function StreamTooltip({
   );
 }
 
+function StreamValueAxis({
+  seriesKey,
+  sportType,
+  yAxisId,
+  orientation = "left",
+  hide = false,
+}: {
+  seriesKey: StreamSeriesKey;
+  sportType: string;
+  yAxisId: StreamSeriesKey;
+  orientation?: "left" | "right";
+  hide?: boolean;
+}) {
+  const axis = streamYAxis(seriesKey, sportType);
+  return (
+    <YAxis
+      yAxisId={yAxisId}
+      orientation={orientation}
+      hide={hide}
+      type="number"
+      tickLine={false}
+      axisLine={false}
+      width={hide ? 0 : axis.reversed ? 44 : 40}
+      reversed={axis.reversed}
+      domain={axis.domain}
+      tickFormatter={(value) => axis.formatTick(Number(value))}
+    />
+  );
+}
+
 function CombinedStreamChart({
   series,
   data,
@@ -130,35 +146,11 @@ function CombinedStreamChart({
   sportType: string;
   meta: SeriesMeta;
 }) {
-  const invertPace = locomotionFor(sportType).kind === "pace";
   const chartConfig = chartConfigFor(sportType);
-  const normalized = series.length > 1;
-  const chartData = useMemo(() => {
-    if (!normalized) return data;
-    const ranges = Object.fromEntries(series.map((key) => [key, seriesRange(data, key)])) as Record<
-      StreamSeriesKey,
-      { min: number; max: number }
-    >;
-
-    return data.map((point) => {
-      const next: ChartRow = { ...point };
-      for (const key of series) {
-        const range = ranges[key];
-        const value = point[key];
-        next[`${key}N`] =
-          value == null
-            ? undefined
-            : normalizeSeriesPoint(value, range.min, range.max, key === "speed" && invertPace);
-      }
-      return next;
-    });
-  }, [data, invertPace, normalized, series]);
-
-  const singleIsPace = !normalized && series[0] === "speed" && invertPace;
 
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-44 w-full sm:h-72 lg:h-80">
-      <ComposedChart data={chartData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+      <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="t"
@@ -167,17 +159,19 @@ function CombinedStreamChart({
           minTickGap={48}
           tickFormatter={(value) => formatElapsedTick(Number(value))}
         />
-        <YAxis
-          hide={normalized}
-          tickLine={false}
-          axisLine={false}
-          width={singleIsPace ? 44 : 40}
-          reversed={singleIsPace}
-          tickFormatter={(value) =>
-            singleIsPace ? formatPaceClock(Number(value)) : String(Math.round(Number(value)))
-          }
-          domain={series[0] === "altitude" || singleIsPace ? ["auto", "auto"] : [0, "auto"]}
-        />
+        {series.map((key, index) => {
+          const placement = streamAxisPlacement(index);
+          return (
+            <StreamValueAxis
+              key={`axis-${key}`}
+              seriesKey={key}
+              sportType={sportType}
+              yAxisId={key}
+              orientation={placement.orientation}
+              hide={placement.hide}
+            />
+          );
+        })}
         <ChartTooltip
           cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
           content={
@@ -195,7 +189,8 @@ function CombinedStreamChart({
           key === "altitude" ? (
             <Area
               key={key}
-              dataKey={normalized ? `${key}N` : key}
+              yAxisId={key}
+              dataKey={key}
               type="monotone"
               fill={`var(--color-${key})`}
               fillOpacity={0.18}
@@ -208,7 +203,8 @@ function CombinedStreamChart({
           ) : (
             <Line
               key={key}
-              dataKey={normalized ? `${key}N` : key}
+              yAxisId={key}
+              dataKey={key}
               type="monotone"
               stroke={`var(--color-${key})`}
               strokeWidth={1.75}
@@ -238,7 +234,6 @@ function StreamAreaChart({
   const reactId = useId().replace(/:/g, "");
   const gradientId = `fill-${seriesKey}-${reactId}`;
   const series = meta[seriesKey];
-  const invertPace = seriesKey === "speed" && locomotionFor(sportType).kind === "pace";
   const chartConfig = chartConfigFor(sportType);
 
   return (
@@ -258,16 +253,7 @@ function StreamAreaChart({
           minTickGap={48}
           tickFormatter={(value) => formatElapsedTick(Number(value))}
         />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          width={invertPace ? 44 : 40}
-          reversed={invertPace}
-          tickFormatter={(value) =>
-            invertPace ? formatPaceClock(Number(value)) : String(Math.round(Number(value)))
-          }
-          domain={seriesKey === "altitude" || invertPace ? ["auto", "auto"] : [0, "auto"]}
-        />
+        <StreamValueAxis seriesKey={seriesKey} sportType={sportType} yAxisId={seriesKey} />
         <ChartTooltip
           cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
           content={
@@ -279,6 +265,7 @@ function StreamAreaChart({
           }
         />
         <Area
+          yAxisId={seriesKey}
           dataKey={seriesKey}
           type="monotone"
           fill={`url(#${gradientId})`}
