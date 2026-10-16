@@ -1,22 +1,37 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { BikeIcon, FootprintsIcon, SparklesIcon } from "lucide-react";
 
+import { PlannedSessionDialog } from "@/components/planned-session-dialog.tsx";
+import { homeQueryOptions } from "@/lib/queries.ts";
+import type { CalendarActivity } from "@/services/strava-sync.types.ts";
 import {
   addDayKey,
+  dayKey,
   formatHours,
   doneWeekSessions,
   openWeekBucket,
   sessionFitsWindow,
+  suggestWeek,
   TIME_WINDOWS,
   WEEKDAYS,
+  weekStartKey,
   type PlannedSession,
   type TrainingPlan,
 } from "@/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
   Item,
@@ -28,7 +43,6 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Progress, ProgressLabel } from "@/components/ui/progress";
-import { SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -90,19 +104,29 @@ export function WeekPlanBucket({
   const needsStack = bucket.length > remainingDays && remainingDays > 0;
 
   return (
-    <>
-      <SheetHeader className="shrink-0 pe-12">
-        <div className="flex flex-wrap items-center gap-2">
-          <SheetTitle>This week’s bucket</SheetTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          Remaining sessions
           <Badge variant="outline">{weekRangeLabel(weekStart)}</Badge>
-        </div>
-        <SheetDescription>
+        </CardTitle>
+        <CardDescription>
           Fill sessions whenever you have time. Preferred rest:{" "}
           {restLabel(plan.preferredRestWeekday)}.
           {needsStack ? " More sessions than days left — stack a couple if you can." : null}
-        </SheetDescription>
-      </SheetHeader>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-6 pb-2">
+        </CardDescription>
+        <CardAction>
+          <Button type="button" variant="outline" disabled={pending} onClick={onFillWeek}>
+            {pending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <SparklesIcon data-icon="inline-start" />
+            )}
+            {bucket.length ? "Refresh week" : "Fill week"}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
         {error ? <p className="text-destructive text-xs">{error}</p> : null}
         <Progress
           value={filled}
@@ -237,17 +261,66 @@ export function WeekPlanBucket({
             </ItemGroup>
           </div>
         ) : null}
-      </div>
-      <SheetFooter className="shrink-0">
-        <Button type="button" variant="outline" disabled={pending} onClick={onFillWeek}>
-          {pending ? (
-            <Spinner data-icon="inline-start" />
-          ) : (
-            <SparklesIcon data-icon="inline-start" />
-          )}
-          {bucket.length ? "Refresh week" : "Fill week"}
-        </Button>
-      </SheetFooter>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function WeekBucket({
+  activities,
+  plannedSessions,
+  plan,
+}: {
+  activities: CalendarActivity[];
+  plannedSessions: PlannedSession[];
+  plan: TrainingPlan;
+}) {
+  const queryClient = useQueryClient();
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const weekStart = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
+  const today = useMemo(() => dayKey(new Date(), timeZone), [timeZone]);
+  const loggedMinutes = useMemo(() => {
+    const weekEnd = addDayKey(weekStart, 6);
+    return activities.reduce((sum, activity) => {
+      const date = dayKey(new Date(activity.start), timeZone);
+      if (date < weekStart || date > weekEnd) return sum;
+      return sum + Math.round(activity.movingTime / 60);
+    }, 0);
+  }, [activities, timeZone, weekStart]);
+  const planWeek = useMutation({
+    mutationFn: () => suggestWeek({ data: { timeZone } }),
+    onSuccess: (sessions) => {
+      setPlanError(null);
+      queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
+        current ? { ...current, plannedSessions: sessions } : current,
+      );
+    },
+    onError: (caught) => {
+      setPlanError(caught instanceof Error ? caught.message : "Could not suggest this week");
+    },
+  });
+
+  return (
+    <>
+      <WeekPlanBucket
+        sessions={plannedSessions}
+        weekStart={weekStart}
+        today={today}
+        plan={plan}
+        loggedMinutes={loggedMinutes}
+        pending={planWeek.isPending}
+        error={planError}
+        onFillWeek={() => planWeek.mutate()}
+        onSelectSession={setSelectedPlanId}
+      />
+      <PlannedSessionDialog
+        session={plannedSessions.find((session) => session.id === selectedPlanId) ?? null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPlanId(null);
+        }}
+      />
     </>
   );
 }

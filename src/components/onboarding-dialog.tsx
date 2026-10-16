@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarDaysIcon, CheckIcon, ChevronLeftIcon } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { CheckIcon, ChevronLeftIcon, ClipboardListIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 import {
@@ -61,7 +62,7 @@ const STEPS = [
   {
     id: "ready",
     title: "You're set",
-    description: "Open the calendar to fill this week's bucket.",
+    description: "Open the week bucket to fill this week.",
   },
 ] as const;
 
@@ -75,6 +76,7 @@ export function OnboardingDialog({
   userName: string;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data } = useQuery(settingsSnapshotQueryOptions);
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const avgHours = useMemo(
@@ -255,7 +257,7 @@ export function OnboardingDialog({
                     </EmptyMedia>
                     <EmptyTitle>Ready to train</EmptyTitle>
                     <EmptyDescription>
-                      Your goal is saved. Open the calendar to fill this week, or change anything
+                      Your goal is saved. Open the week bucket to fill this week, or change anything
                       later from Settings.
                     </EmptyDescription>
                   </EmptyHeader>
@@ -271,10 +273,13 @@ export function OnboardingDialog({
               <Button
                 type="button"
                 className="w-full sm:w-auto"
-                onClick={() => onOpenChange(false)}
+                onClick={() => {
+                  onOpenChange(false);
+                  void navigate({ to: "/week-bucket" });
+                }}
               >
-                <CalendarDaysIcon data-icon="inline-start" />
-                Open calendar
+                <ClipboardListIcon data-icon="inline-start" />
+                Open week bucket
               </Button>
             ) : (
               <>

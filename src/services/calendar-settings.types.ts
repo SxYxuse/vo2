@@ -51,17 +51,6 @@ const sportTypeSettingSchema = z.object({
 });
 
 export const calendarSettingsSchema = z.object({
-  viewSettings: z.object({
-    weekends: z.boolean(),
-    weekNumbers: z.boolean(),
-    nowIndicator: z.boolean(),
-    offDays: z.boolean(),
-  }),
-  weekStartsOn: z.union([z.literal(0), z.literal(1)]),
-  dayStartHour: z.number().int().min(0).max(24),
-  dayEndHour: z.number().int().min(0).max(24),
-  interval: z.number().int().positive(),
-  snapDuration: z.number().int().positive(),
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
 });
@@ -137,17 +126,6 @@ export function familyCollectors(
 }
 
 export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
-  viewSettings: {
-    weekends: true,
-    weekNumbers: false,
-    nowIndicator: true,
-    offDays: false,
-  },
-  weekStartsOn: 1,
-  dayStartHour: 0,
-  dayEndHour: 24,
-  interval: 60,
-  snapDuration: 15,
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
 };
@@ -203,10 +181,6 @@ export function mergeCalendarSettings(
     ? {
         ...DEFAULT_CALENDAR_SETTINGS,
         ...stored,
-        viewSettings: {
-          ...DEFAULT_CALENDAR_SETTINGS.viewSettings,
-          ...stored.viewSettings,
-        },
         sportTypes: stored.sportTypes ?? {},
         sportGroupShares: mergeSportGroupShares(stored.sportGroupShares),
       }

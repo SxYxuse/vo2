@@ -5,6 +5,7 @@ import { noop, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
+  ClipboardListIcon,
   FlaskConicalIcon,
   HeartPulseIcon,
   LogOutIcon,
@@ -69,13 +70,51 @@ const THEME_OPTIONS = [
   { value: "system", label: "System", icon: MonitorIcon },
 ] as const;
 
-const NAV_ITEMS = [
+const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
+  { title: "Week bucket", to: "/week-bucket", icon: ClipboardListIcon },
+] as const;
+
+const NAV_ITEMS = [
   { title: "Map", to: "/map", icon: MapIcon },
   { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
   { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
   { title: "Tests", to: "/tests", icon: FlaskConicalIcon },
 ] as const;
+
+function SidebarNavMenu({
+  items,
+  pathname,
+}: {
+  items: ReadonlyArray<(typeof TRAINING_NAV_ITEMS)[number] | (typeof NAV_ITEMS)[number]>;
+  pathname: string;
+}) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenu>
+      {items.map((item) => (
+        <SidebarMenuItem key={item.to}>
+          <SidebarMenuButton
+            isActive={pathname === item.to}
+            tooltip={item.title}
+            render={
+              <Link
+                to={item.to}
+                preload="viewport"
+                onClick={() => {
+                  if (isMobile) setOpenMobile(false);
+                }}
+              />
+            }
+          >
+            <item.icon />
+            <span>{item.title}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+}
 
 function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) {
   void import("@/components/onboarding-dialog.tsx");
@@ -86,7 +125,6 @@ function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const queryClient = useQueryClient();
-  const { isMobile, setOpenMobile } = useSidebar();
   const { data: session } = authClient.useSession();
   const user = session?.user;
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -124,30 +162,14 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Navigate</SidebarGroupLabel>
+            <SidebarGroupLabel>Training</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {NAV_ITEMS.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      isActive={pathname === item.to}
-                      tooltip={item.title}
-                      render={
-                        <Link
-                          to={item.to}
-                          preload="viewport"
-                          onClick={() => {
-                            if (isMobile) setOpenMobile(false);
-                          }}
-                        />
-                      }
-                    >
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
+              <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
