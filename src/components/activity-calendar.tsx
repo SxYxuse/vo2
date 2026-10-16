@@ -222,7 +222,7 @@ function ActivityWeekListView() {
   const native = viewConfig.scrollbars === "native";
 
   const body = (
-    <div className="flex flex-col [&>*:last-child>*:last-child]:border-b-0">
+    <div className="isolate flex flex-col [&>*:last-child>*:last-child]:border-b-0">
       {days.map((day) => {
         const bucket = index.byDay.get(getDayKey(day, settings.timeZone));
         const items = [...(bucket?.allDay ?? []), ...(bucket?.timed ?? [])];
@@ -239,12 +239,7 @@ function ActivityWeekListView() {
             aria-label={`${weekday}, ${dayDate}`}
             data-today={today || undefined}
           >
-            <div
-              className={cn(
-                "bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2",
-                !native && "me-2.5",
-              )}
-            >
+            <div className="bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2">
               <span className={cn("font-semibold", today && "text-primary")}>{weekday}</span>
               <span className="text-muted-foreground font-medium tabular-nums">{dayDate}</span>
             </div>
