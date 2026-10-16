@@ -18,17 +18,17 @@ import {
 import { useTheme } from "next-themes";
 
 const OnboardingDialog = lazy(() =>
-  import("#/components/onboarding-dialog.tsx").then((mod) => ({ default: mod.OnboardingDialog })),
+  import("@/components/onboarding-dialog.tsx").then((mod) => ({ default: mod.OnboardingDialog })),
 );
 const SettingsDialog = lazy(() =>
-  import("#/components/settings-dialog.tsx").then((mod) => ({ default: mod.SettingsDialog })),
+  import("@/components/settings-dialog.tsx").then((mod) => ({ default: mod.SettingsDialog })),
 );
 
-import { Vo2Mark, Vo2Wordmark } from "#/components/vo2-mark.tsx";
-import { APP_NAME } from "#/lib/brand.ts";
-import { authClient } from "#/lib/auth-client.ts";
-import { appShellQueryOptions, settingsSnapshotQueryOptions } from "#/lib/queries.ts";
-import { isTrainingPlanComplete } from "#/services/training-plan.ts";
+import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
+import { APP_NAME } from "@/lib/brand.ts";
+import { authClient } from "@/lib/auth-client.ts";
+import { appShellQueryOptions, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
+import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -78,8 +78,8 @@ const NAV_ITEMS = [
 ] as const;
 
 function preloadSettingsDialog(queryClient?: ReturnType<typeof useQueryClient>) {
-  void import("#/components/onboarding-dialog.tsx");
-  void import("#/components/settings-dialog.tsx");
+  void import("@/components/onboarding-dialog.tsx");
+  void import("@/components/settings-dialog.tsx");
   void queryClient?.query(settingsSnapshotQueryOptions).catch(noop);
 }
 

@@ -3,7 +3,7 @@
 import { createContext, use, type ComponentProps, type ReactNode } from "react";
 import { cn } from "cn";
 
-import { useIsDesktop } from "#/hooks/use-desktop-media.ts";
+import { useIsDesktop } from "@/hooks/use-desktop-media.ts";
 import {
   Dialog,
   DialogClose,
@@ -28,7 +28,7 @@ export {
   readIsDesktop,
   useDesktopMedia,
   useIsDesktop,
-} from "#/hooks/use-desktop-media.ts";
+} from "@/hooks/use-desktop-media.ts";
 
 const desktopOverlay = {
   Content: DialogContent,

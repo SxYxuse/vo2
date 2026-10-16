@@ -5,8 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { SparklesIcon } from "lucide-react";
 
-import { activityAnalysisQueryOptions, analysisStatusQueryOptions } from "#/lib/queries.ts";
-import { CoachWriteup } from "#/components/activity-analysis-writeup.tsx";
+import { activityAnalysisQueryOptions, analysisStatusQueryOptions } from "@/lib/queries.ts";
+import { CoachWriteup } from "@/components/activity-analysis-writeup.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,13 +27,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ActivityAnalysisLive = lazy(() =>
-  import("#/components/activity-analysis-live.tsx").then((mod) => ({
+  import("@/components/activity-analysis-live.tsx").then((mod) => ({
     default: mod.ActivityAnalysisLive,
   })),
 );
 
 export function preloadActivityAnalysis() {
-  void import("#/components/activity-analysis-live.tsx");
+  void import("@/components/activity-analysis-live.tsx");
 }
 
 export function ActivityAnalysisCard({

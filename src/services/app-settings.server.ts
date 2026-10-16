@@ -1,10 +1,10 @@
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { activities, athleteMetrics, calendarSettings } from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
+import { db } from "@/db/index.ts";
+import { activities, athleteMetrics, calendarSettings } from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import type { AppSettingsSave, ProfileSettings } from "./app-settings.types.ts";
 import { DEFAULT_PROFILE_SETTINGS } from "./app-settings.types.ts";
 import {

@@ -3,9 +3,9 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 
 import { MapIcon } from "lucide-react";
 
-import { ActivityMap } from "#/components/activity-map.tsx";
-import { SignInPanel } from "#/components/sync-panel.tsx";
-import { activityMapQueryOptions, loaderQuery } from "#/lib/queries.ts";
+import { ActivityMap } from "@/components/activity-map.tsx";
+import { SignInPanel } from "@/components/sync-panel.tsx";
+import { activityMapQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -16,7 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 if (typeof window !== "undefined") {
-  void import("#/components/activity-map-view.tsx");
+  void import("@/components/activity-map-view.tsx");
 }
 
 export const Route = createFileRoute("/_app/map")({

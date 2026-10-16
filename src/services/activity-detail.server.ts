@@ -1,9 +1,9 @@
 import { and, eq } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { activities, activityStreams } from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getRequiredSession } from "#/lib/session.server.ts";
+import { db } from "@/db/index.ts";
+import { activities, activityStreams } from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getRequiredSession } from "@/lib/session.server.ts";
 import {
   buildChartPreview,
   type ActivityChartPreview,

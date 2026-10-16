@@ -3,14 +3,14 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
 
-import { formatSportType } from "#/services/calendar-settings.types.ts";
+import { formatSportType } from "@/services/calendar-settings.types.ts";
 import {
   ALL_SPORTS,
   focusBoundsOf,
   decodePolyline,
   mapSportOptions,
   type LngLat,
-} from "#/services/activity-map.types.ts";
+} from "@/services/activity-map.types.ts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";

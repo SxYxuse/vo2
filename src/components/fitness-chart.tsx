@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { useDesktopMedia } from "#/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 
 import {
   FITNESS_PERIODS,
@@ -27,7 +27,7 @@ import {
   slicePmc,
   type FitnessLoad,
   type FitnessPeriod,
-} from "#/services/training-load.ts";
+} from "@/services/training-load.ts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

@@ -18,8 +18,8 @@ function isNoisyPath(pathname: string) {
 }
 
 const requestLogger = createMiddleware().server(async ({ next, request, pathname }) => {
-  const { runWithLogContext } = await import("#/lib/log-context.server.ts");
-  const { errorFields, logger } = await import("#/lib/logger.server.ts");
+  const { runWithLogContext } = await import("@/lib/log-context.server.ts");
+  const { errorFields, logger } = await import("@/lib/logger.server.ts");
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
 
   return runWithLogContext({ requestId, method: request.method, path: pathname }, async () => {

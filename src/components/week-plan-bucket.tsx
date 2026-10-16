@@ -14,7 +14,7 @@ import {
   WEEKDAYS,
   type PlannedSession,
   type TrainingPlan,
-} from "#/services/training-plan.ts";
+} from "@/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";

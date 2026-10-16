@@ -1,10 +1,10 @@
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { calendarSettings } from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
-import { getRequiredSession } from "#/lib/session.server.ts";
+import { db } from "@/db/index.ts";
+import { calendarSettings } from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getRequiredSession } from "@/lib/session.server.ts";
 import {
   calendarSettingsSchema,
   parseCalendarSettings,

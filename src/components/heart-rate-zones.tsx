@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { InfoIcon } from "lucide-react";
 
-import { formatSportType, type CalendarSettings } from "#/services/calendar-settings.types.ts";
+import { formatSportType, type CalendarSettings } from "@/services/calendar-settings.types.ts";
 import {
   ALL_SPORTS,
   HR_ZONES,
@@ -14,7 +14,7 @@ import {
   overallFromSports,
   type HeartRateData,
   type HeartRateSport,
-} from "#/services/heart-rate.ts";
+} from "@/services/heart-rate.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

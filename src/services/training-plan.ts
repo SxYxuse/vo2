@@ -52,7 +52,7 @@ export function plannedSessionIdFromEvent(id: string) {
 export const saveTrainingPlan = createServerFn({ method: "POST" })
   .validator(trainingPlanSchema)
   .handler(async ({ data }): Promise<TrainingPlan> => {
-    const { getRequiredSession } = await import("#/lib/session.server.ts");
+    const { getRequiredSession } = await import("@/lib/session.server.ts");
     const { saveTrainingPlanForUser } = await import("./training-plan.server.ts");
     const session = await getRequiredSession();
     await saveTrainingPlanForUser(session.user.id, data);

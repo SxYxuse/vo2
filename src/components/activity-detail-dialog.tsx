@@ -13,13 +13,13 @@ import {
   formatSpeed,
   formatWatts,
   type ActivityDetail,
-} from "#/services/activity-detail.ts";
-import { formatSportType } from "#/services/calendar-settings.ts";
-import { activityDetailQueryOptions } from "#/lib/queries.ts";
-import { SERIES_META } from "#/components/activity-detail-series.ts";
-import { ActivityTestFlag } from "#/components/activity-test-flag.tsx";
-import { isCyclingSport } from "#/services/training-load.ts";
-import { isMissingHeartrate, type CalendarActivity } from "#/services/strava-sync.types.ts";
+} from "@/services/activity-detail.ts";
+import { formatSportType } from "@/services/calendar-settings.ts";
+import { activityDetailQueryOptions } from "@/lib/queries.ts";
+import { SERIES_META } from "@/components/activity-detail-series.ts";
+import { ActivityTestFlag } from "@/components/activity-test-flag.tsx";
+import { isCyclingSport } from "@/services/training-load.ts";
+import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,7 @@ import {
   ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-} from "#/components/responsive-dialog.tsx";
+} from "@/components/responsive-dialog.tsx";
 import {
   Empty,
   EmptyDescription,
@@ -43,13 +43,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ActivityAnalysisCard = lazy(() =>
-  import("#/components/activity-analysis.tsx").then((mod) => ({
+  import("@/components/activity-analysis.tsx").then((mod) => ({
     default: mod.ActivityAnalysisCard,
   })),
 );
 
 const ActivityStreamCharts = lazy(() =>
-  import("#/components/activity-detail-charts.tsx").then((mod) => ({
+  import("@/components/activity-detail-charts.tsx").then((mod) => ({
     default: mod.ActivityStreamCharts,
   })),
 );
@@ -154,9 +154,9 @@ export function ActivityDetailDialog({
   onOpenChange,
 }: ActivityDetailDialogProps) {
   useEffect(() => {
-    void import("#/components/activity-analysis.tsx");
-    void import("#/components/activity-analysis-live.tsx");
-    void import("#/components/activity-detail-charts.tsx");
+    void import("@/components/activity-analysis.tsx");
+    void import("@/components/activity-analysis-live.tsx");
+    void import("@/components/activity-detail-charts.tsx");
   }, []);
 
   const lastActivityId = useRef(activityId);

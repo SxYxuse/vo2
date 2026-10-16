@@ -12,7 +12,7 @@ import {
   fitnessQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
-} from "#/lib/queries.ts";
+} from "@/lib/queries.ts";
 import {
   activityTestFlagFormSchema,
   flagActivityTest,
@@ -20,8 +20,8 @@ import {
   testsForSportType,
   type ActivityTestFlagFormValues,
   type AssessmentId,
-} from "#/services/assessments.ts";
-import type { ActivityDetail } from "#/services/activity-detail.ts";
+} from "@/services/assessments.ts";
+import type { ActivityDetail } from "@/services/activity-detail.ts";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";

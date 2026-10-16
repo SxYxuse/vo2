@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import { SignInPanel } from "#/components/sync-panel.tsx";
-import { Vo2Wordmark } from "#/components/vo2-mark.tsx";
-import { APP_NAME } from "#/lib/brand.ts";
+import { SignInPanel } from "@/components/sync-panel.tsx";
+import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
+import { APP_NAME } from "@/lib/brand.ts";
 import { Button } from "@/components/ui/button";
 
 const THEME_CYCLE = [

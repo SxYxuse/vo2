@@ -1,5 +1,5 @@
 import type { ChartConfig } from "@/components/ui/chart";
-import { STREAM_SERIES, type StreamSeriesKey } from "#/services/activity-detail.ts";
+import { STREAM_SERIES, type StreamSeriesKey } from "@/services/activity-detail.ts";
 
 export const SERIES_META: Record<
   StreamSeriesKey,

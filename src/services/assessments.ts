@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { APP_NAME } from "#/lib/brand.ts";
+import { APP_NAME } from "@/lib/brand.ts";
 import type { AssessmentResult } from "./assessments-score.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";

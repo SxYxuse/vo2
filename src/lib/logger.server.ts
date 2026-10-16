@@ -1,8 +1,8 @@
 import winston from "winston";
 import LokiTransport from "winston-loki";
 
-import { serverEnv } from "#/configs/env.ts";
-import { tryGetLogContext } from "#/lib/log-context.server.ts";
+import { serverEnv } from "@/configs/env.ts";
+import { tryGetLogContext } from "@/lib/log-context.server.ts";
 
 const appLabel = "vo";
 const appEnv = serverEnv.appEnv();

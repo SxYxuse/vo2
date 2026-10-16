@@ -1,5 +1,5 @@
-import { logger } from "#/lib/logger.server.ts";
-import { getOptionalSession } from "#/lib/session.server.ts";
+import { logger } from "@/lib/logger.server.ts";
+import { getOptionalSession } from "@/lib/session.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import type { AppShellData } from "./app-shell.ts";
 

@@ -10,7 +10,7 @@ import {
   type UseFormSetValue,
 } from "react-hook-form";
 
-import { ageFromBirthDate, formatBirthDate, parseBirthDate } from "#/services/app-settings.ts";
+import { ageFromBirthDate, formatBirthDate, parseBirthDate } from "@/services/app-settings.ts";
 import {
   BUILD_PACES,
   HOURS_INTENTS,
@@ -20,8 +20,8 @@ import {
   suggestedTargetHours,
   trainingConsistency,
   type HoursIntent,
-} from "#/services/training-plan.ts";
-import type { ProfileFormValues, TrainingFormInput } from "#/lib/settings-form.ts";
+} from "@/services/training-plan.ts";
+import type { ProfileFormValues, TrainingFormInput } from "@/lib/settings-form.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";

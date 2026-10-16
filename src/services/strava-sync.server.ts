@@ -1,17 +1,17 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
-import { db } from "#/db/index.ts";
-import { activities, activityStreams, syncRuns } from "#/db/schema.ts";
+import { db } from "@/db/index.ts";
+import { activities, activityStreams, syncRuns } from "@/db/schema.ts";
 import {
   DEFAULT_STREAM_KEYS,
   StravaApi,
   type StreamSet,
   type SummaryActivity,
-} from "#/integrations/strava/client.ts";
-import { StravaDailyLimitError, StravaShortLimitError } from "#/integrations/strava/rate-limit.ts";
-import { errorFields, logger } from "#/lib/logger.server.ts";
-import { getOptionalSession, getRequiredSession } from "#/lib/session.server.ts";
-import { getStravaAccessToken } from "#/lib/strava-token.server.ts";
+} from "@/integrations/strava/client.ts";
+import { StravaDailyLimitError, StravaShortLimitError } from "@/integrations/strava/rate-limit.ts";
+import { errorFields, logger } from "@/lib/logger.server.ts";
+import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
+import { getStravaAccessToken } from "@/lib/strava-token.server.ts";
 import { buildChartPreview } from "./activity-detail.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";

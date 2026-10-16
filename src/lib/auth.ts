@@ -3,10 +3,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 
-import { serverEnv } from "#/configs/env.ts";
-import { db } from "#/db/index.ts";
-import * as schema from "#/db/schema.ts";
-import { logger } from "#/lib/logger.server.ts";
+import { serverEnv } from "@/configs/env.ts";
+import { db } from "@/db/index.ts";
+import * as schema from "@/db/schema.ts";
+import { logger } from "@/lib/logger.server.ts";
 
 type StravaAthlete = {
   id: number;

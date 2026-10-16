@@ -3,9 +3,9 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 
 import { TrendingUpIcon } from "lucide-react";
 
-import { FitnessChart } from "#/components/fitness-chart.tsx";
-import { SignInPanel } from "#/components/sync-panel.tsx";
-import { fitnessQueryOptions, loaderQuery } from "#/lib/queries.ts";
+import { FitnessChart } from "@/components/fitness-chart.tsx";
+import { SignInPanel } from "@/components/sync-panel.tsx";
+import { fitnessQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,

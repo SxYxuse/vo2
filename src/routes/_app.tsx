@@ -2,11 +2,11 @@ import { useEffect } from "react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Outlet, createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 
-import { AppSidebar } from "#/components/app-sidebar.tsx";
-import { SignedOutPage } from "#/components/signed-out-page.tsx";
-import { SyncPanel } from "#/components/sync-panel.tsx";
-import { scheduleIdle, warmApp } from "#/lib/prefetch.ts";
-import { appShellQueryOptions, loaderQuery } from "#/lib/queries.ts";
+import { AppSidebar } from "@/components/app-sidebar.tsx";
+import { SignedOutPage } from "@/components/signed-out-page.tsx";
+import { SyncPanel } from "@/components/sync-panel.tsx";
+import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
+import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({

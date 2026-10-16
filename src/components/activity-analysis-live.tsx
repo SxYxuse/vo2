@@ -14,8 +14,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { saveActivityAnalysis } from "#/services/activity-analysis.ts";
-import { activityAnalysisQueryOptions } from "#/lib/queries.ts";
+import { saveActivityAnalysis } from "@/services/activity-analysis.ts";
+import { activityAnalysisQueryOptions } from "@/lib/queries.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -28,7 +28,7 @@ import {
   TraceLine,
   TraceTitle,
 } from "@/components/ui/trace";
-import { CoachWriteup, assistantText } from "#/components/activity-analysis-writeup.tsx";
+import { CoachWriteup, assistantText } from "@/components/activity-analysis-writeup.tsx";
 
 const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
   get_activity_overview: {
