@@ -4,7 +4,8 @@ VO2 is a personal training companion: it copies an athlete's Strava activities, 
 
 Sign in with Strava, import every activity and its streams into Postgres, then:
 
-- browse them in a month/week/day calendar, with a **This week** week bucket of planned sessions
+- browse them in a calendar of the last four training weeks
+- pick planned sessions from the **Week bucket** when you have a time window
 - plot GPS tracks on a map
 - chart fitness, fatigue, and form
 - inspect sport-specific heart-rate zones
