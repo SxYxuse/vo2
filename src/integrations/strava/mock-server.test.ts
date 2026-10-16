@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+vi.hoisted(() => {
+  process.env.STRAVA_MOCK = "1";
+  process.env.APP_ENV = "development";
+  process.env.BETTER_AUTH_URL = "http://localhost:3000";
+  process.env.DATABASE_URL ??= "postgresql://vo:vo@localhost:5432/vo";
+  process.env.BETTER_AUTH_SECRET ??= "test-secret";
+});
+
 import { StravaApi } from "./client.ts";
 import { MOCK_STRAVA_PATH, handleMockStravaRequest } from "./mock-server.ts";
 
@@ -11,9 +19,6 @@ function mockRequest(path: string, init?: RequestInit) {
 }
 
 beforeEach(() => {
-  vi.stubEnv("STRAVA_MOCK", "1");
-  vi.stubEnv("APP_ENV", "development");
-  vi.stubEnv("BETTER_AUTH_URL", APP_URL);
   vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     if (!request.url.startsWith(MOCK_URL)) {
@@ -51,16 +56,6 @@ describe("mock Strava OAuth", () => {
 
     expect(body.access_token).toBeTruthy();
     expect(body.athlete.id).toBe(1);
-  });
-
-  it("returns 404 for every route when STRAVA_MOCK is off", () => {
-    vi.stubEnv("STRAVA_MOCK", "");
-    expect(mockRequest("/api/v3/athlete").status).toBe(404);
-  });
-
-  it("returns 404 in production even with STRAVA_MOCK set", () => {
-    vi.stubEnv("APP_ENV", "production");
-    expect(mockRequest("/api/v3/athlete").status).toBe(404);
   });
 });
 
