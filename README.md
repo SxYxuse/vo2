@@ -1,6 +1,15 @@
 # VO2
 
-Local Strava activity calendar. Sign in with Strava, import every activity and its streams into Postgres, then browse them in a month/week/day calendar.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and fills the rest of the week with planned sessions.
+
+Sign in with Strava, import every activity and its streams into Postgres, then:
+
+- browse them in a month/week/day calendar, with a **This week** week bucket of planned sessions
+- plot GPS tracks on a map
+- chart fitness, fatigue, and form
+- inspect sport-specific heart-rate zones
+- run field tests (never mixed into the week bucket)
+- optionally analyze an activity via OpenRouter (`OPENROUTER_API_KEY` in `.env.example`; mocked until set)
 
 Stack: **TanStack Start**, **Vite+**, **Bun**, **Better Auth**, **Drizzle**, **Docker Postgres**, **shadcn/ui**, **ReUI Event Calendar**.
 
