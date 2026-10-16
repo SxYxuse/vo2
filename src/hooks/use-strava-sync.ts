@@ -13,7 +13,11 @@ import {
   syncStatusQueryOptions,
 } from "@/lib/queries.ts";
 import { syncStrava } from "@/services/strava-sync.ts";
-import type { SyncResult } from "@/services/strava-sync.types.ts";
+import {
+  isTransientSyncError,
+  SYNC_TRANSIENT_RETRIES,
+  type SyncResult,
+} from "@/services/strava-sync.types.ts";
 import { toast } from "@/components/ui/toast";
 
 export const stravaSyncMutationKey = ["strava-sync"] as const;
@@ -78,9 +82,26 @@ export function useStravaSync() {
       });
       let activitiesUpserted = 0;
       let streamsFetched = 0;
+      let transientFailures = 0;
       try {
         while (true) {
-          const result = await syncStrava();
+          let result: SyncResult;
+          try {
+            result = await syncStrava();
+            transientFailures = 0;
+          } catch (caught) {
+            if (isTransientSyncError(caught) && transientFailures < SYNC_TRANSIENT_RETRIES) {
+              transientFailures += 1;
+              toast.update(toastId, {
+                type: "loading",
+                title: "Syncing from Strava",
+                description: "Connection dropped, retrying this copy.",
+                timeout: 0,
+              });
+              continue;
+            }
+            throw caught;
+          }
           activitiesUpserted += result.activitiesUpserted;
           streamsFetched += result.streamsFetched;
           await Promise.all([
@@ -108,7 +129,11 @@ export function useStravaSync() {
         toast.update(toastId, {
           type: "error",
           title: "Strava sync failed",
-          description: caught instanceof Error ? caught.message : "Sync failed",
+          description: isTransientSyncError(caught)
+            ? "The copy was interrupted. Progress is saved — sync again to continue."
+            : caught instanceof Error
+              ? caught.message
+              : "Sync failed",
           timeout: 10_000,
         });
         throw caught;

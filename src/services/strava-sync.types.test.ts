@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { deriveSyncKind, historyCompleteFromRun } from "./strava-sync.types.ts";
+import {
+  deriveSyncKind,
+  historyCompleteFromRun,
+  isAbortError,
+  isOverSyncBudget,
+  isTransientSyncError,
+  remainingSyncBudgetMs,
+  SYNC_REQUEST_BUDGET_MS,
+} from "./strava-sync.types.ts";
 
 describe("deriveSyncKind", () => {
   const base = {
@@ -65,5 +73,35 @@ describe("historyCompleteFromRun", () => {
 
   it("does not treat idle plus pending streams as a full success", () => {
     expect(historyCompleteFromRun("idle", 12)).toBe(false);
+  });
+});
+
+describe("sync request budget", () => {
+  it("yields once the copy has used its budget", () => {
+    expect(isOverSyncBudget(0, SYNC_REQUEST_BUDGET_MS - 1)).toBe(false);
+    expect(isOverSyncBudget(0, SYNC_REQUEST_BUDGET_MS)).toBe(true);
+    expect(remainingSyncBudgetMs(1_000, 4_000)).toBe(3_000);
+  });
+});
+
+describe("transient sync errors", () => {
+  it("treats a closed connection as retryable", () => {
+    const abort = new Error("The connection was closed.");
+    abort.name = "AbortError";
+    expect(isAbortError(abort)).toBe(true);
+    expect(isTransientSyncError(abort)).toBe(true);
+    expect(isTransientSyncError(new Error("The connection was closed."))).toBe(true);
+  });
+
+  it("treats TanStack Start's missing-response invariant as retryable", () => {
+    expect(isTransientSyncError(new Error("Invariant failed"))).toBe(true);
+    expect(
+      isTransientSyncError(new Error("Invariant failed: expected content-type header to be set")),
+    ).toBe(true);
+  });
+
+  it("does not retry a real Strava failure", () => {
+    expect(isTransientSyncError(new Error("Strava request failed (500) /activities"))).toBe(false);
+    expect(isAbortError(new Error("Strava request failed (500) /activities"))).toBe(false);
   });
 });
