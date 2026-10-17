@@ -5,7 +5,8 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { ThemeProvider } from "@/components/theme-provider.tsx";
-import { APP_NAME } from "@/lib/brand.ts";
+import { loadAppEnv } from "@/lib/app-env.ts";
+import { APP_NAME, appChrome } from "@/lib/brand.ts";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -18,29 +19,33 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1, viewport-fit=cover",
-      },
-      { title: APP_NAME },
-      { name: "theme-color", content: "#171717" },
-      { name: "apple-mobile-web-app-title", content: APP_NAME },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "icon", href: "/icon-32.png", type: "image/png", sizes: "32x32" },
-      { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
-    ],
-  }),
+  loader: () => loadAppEnv(),
+  head: ({ loaderData }) => {
+    const chrome = appChrome(loaderData?.appEnv ?? "development");
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1, viewport-fit=cover",
+        },
+        { title: APP_NAME },
+        { name: "theme-color", content: chrome.themeColor },
+        { name: "apple-mobile-web-app-title", content: APP_NAME },
+        { name: "apple-mobile-web-app-status-bar-style", content: "black" },
+      ],
+      links: [
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+        { rel: "manifest", href: chrome.manifest },
+        { rel: "icon", href: chrome.icon32, type: "image/png", sizes: "32x32" },
+        { rel: "icon", href: chrome.icon192, type: "image/png", sizes: "192x192" },
+        { rel: "apple-touch-icon", href: chrome.appleTouch },
+      ],
+    };
+  },
   shellComponent: RootDocument,
 });
 
