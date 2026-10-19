@@ -33,6 +33,9 @@ const config = defineConfig({
       "src/integrations/strava/openapi.json",
     ],
   },
+  staged: {
+    "*": "vp check --fix",
+  },
   resolve: { tsconfigPaths: true },
   test: {
     include: ["src/**/*.test.ts"],
