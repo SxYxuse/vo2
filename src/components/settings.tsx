@@ -9,7 +9,6 @@ import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from 
 import {
   activityMapQueryOptions,
   appShellQueryOptions,
-  assessmentsQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
@@ -209,7 +208,6 @@ export function SettingsForm({
       void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
       setSaveError(null);
       toast.add({ type: "success", title: "Settings saved" });
     },

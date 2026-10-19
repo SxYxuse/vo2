@@ -9,8 +9,6 @@ import {
   formAfterLoad,
   formLabel,
   pmcWithCurrentForm,
-  mergeLoadAnchors,
-  pickLoadAnchorsFromTests,
   type LoadAnchors,
   type LoadInputs,
 } from "./training-load.ts";
@@ -159,27 +157,6 @@ describe("PMC form", () => {
 });
 
 describe("anchors", () => {
-  test("field-test FTP and sport LTHR beat estimates", () => {
-    const estimated = estimateLoadAnchors([
-      ride({ movingTime: 50 * 60, weightedAverageWatts: 200, maxHeartrate: 185 }),
-      run({ maxHeartrate: 195, averageHeartrate: 150 }),
-    ]);
-    const merged = mergeLoadAnchors(
-      estimated,
-      pickLoadAnchorsFromTests([
-        {
-          assessmentId: "ftp-20",
-          result: { ftpWatts: 260, cyclingLthr: 168, peakHr: 188 },
-        },
-        { assessmentId: "run-lthr", result: { runLthr: 178 } },
-      ]),
-    );
-    expect(merged.ftp).toBe(260);
-    expect(merged.cyclingLthr).toBe(168);
-    expect(merged.runLthr).toBe(178);
-    expect(merged.cyclingLthr).not.toBe(merged.runLthr);
-  });
-
   test("estimates LTHR per sport from that sport's peak HR", () => {
     const estimated = estimateLoadAnchors([
       ride({ maxHeartrate: 180, deviceWatts: false }),
@@ -200,9 +177,6 @@ describe("remaining week", () => {
     workoutStyle: "structured" as const,
     targetWeeklyHours: 8,
     preferredRestWeekday: 0,
-    suggestFtpTest: true,
-    suggestBeepTest: true,
-    suggestRunLthrTest: true,
     timeZone: "UTC",
   };
 

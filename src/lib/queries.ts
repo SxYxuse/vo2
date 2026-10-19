@@ -5,7 +5,6 @@ import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadAppShell } from "@/services/app-shell.ts";
 import { loadSettingsSnapshot } from "@/services/app-settings.ts";
-import { loadAssessments } from "@/services/assessments.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
@@ -55,12 +54,6 @@ export const heartRateQueryOptions = queryOptions({
   queryKey: ["heart-rate"],
   queryFn: () => loadHeartRate(),
   staleTime: 5 * 60_000,
-});
-
-export const assessmentsQueryOptions = queryOptions({
-  queryKey: ["assessments"],
-  queryFn: () => loadAssessments(),
-  staleTime: 60_000,
 });
 
 export const analysisStatusQueryOptions = queryOptions({

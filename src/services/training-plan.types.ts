@@ -80,7 +80,7 @@ export type FamilyCollectors = {
   powerPartial: boolean;
 };
 
-export type TestAnchors = {
+export type PlanningAnchors = {
   ftpWatts: number | null;
   cyclingLthr: number | null;
   cyclingMaxHr: number | null;
@@ -116,9 +116,6 @@ export const trainingPlanSchema = z.object({
   workoutStyle: z.enum(["hours", "structured"]).default("hours"),
   targetWeeklyHours: z.number().min(0.5).max(30),
   preferredRestWeekday: z.number().int().min(0).max(6),
-  suggestFtpTest: z.boolean().default(true),
-  suggestBeepTest: z.boolean().default(true),
-  suggestRunLthrTest: z.boolean().default(true),
   timeZone: z.string().min(1),
 });
 
@@ -138,12 +135,6 @@ export type PlannedSession = {
   activityTitle: string | null;
 };
 
-const ASSESSMENT_TITLES = new Set(["ftp test", "ftp ramp", "ftp 20-min", "beep test", "run lthr"]);
-
-export function isAssessmentSession(session: { title: string }) {
-  return ASSESSMENT_TITLES.has(session.title.trim().toLowerCase());
-}
-
 export type CompletedSession = {
   date: string;
   family: "running" | "cycling" | "other";
@@ -160,9 +151,6 @@ function withPlanDefaults(value: unknown) {
     ...raw,
     maxDoubleDays:
       typeof raw.maxDoubleDays === "number" ? raw.maxDoubleDays : raw.allowDoubles === true ? 6 : 0,
-    suggestFtpTest: raw.suggestFtpTest !== false,
-    suggestBeepTest: raw.suggestBeepTest !== false,
-    suggestRunLthrTest: raw.suggestRunLthrTest !== false,
     workoutStyle: raw.workoutStyle === "structured" ? "structured" : "hours",
   };
 }
@@ -323,10 +311,7 @@ export function assignActivitiesToSessions(
     sessions.map((session) => session.activityId).filter((id): id is string => Boolean(id)),
   );
   const open = sessions
-    .filter(
-      (session) =>
-        session.status !== "done" && !session.activityId && !isAssessmentSession(session),
-    )
+    .filter((session) => session.status !== "done" && !session.activityId)
     .sort((left, right) => {
       const order = { quality: 0, long: 1, easy: 2 } as const;
       const byRole = order[sessionRole(left.title)] - order[sessionRole(right.title)];
@@ -357,23 +342,13 @@ export function assignActivitiesToSessions(
 
 export function openWeekBucket(sessions: PlannedSession[], weekStart: string) {
   return sessions
-    .filter(
-      (session) =>
-        session.weekStart === weekStart &&
-        session.status !== "done" &&
-        !isAssessmentSession(session),
-    )
+    .filter((session) => session.weekStart === weekStart && session.status !== "done")
     .sort((left, right) => right.targetMinutes - left.targetMinutes);
 }
 
 export function doneWeekSessions(sessions: PlannedSession[], weekStart: string) {
   return sessions
-    .filter(
-      (session) =>
-        session.weekStart === weekStart &&
-        session.status === "done" &&
-        !isAssessmentSession(session),
-    )
+    .filter((session) => session.weekStart === weekStart && session.status === "done")
     .sort(
       (left, right) => left.date.localeCompare(right.date) || left.title.localeCompare(right.title),
     );
@@ -410,7 +385,7 @@ export function planRemainingWeek(input: {
   tsb: number;
   completed: CompletedSession[];
   collectors?: { running: FamilyCollectors; cycling: FamilyCollectors };
-  anchors?: TestAnchors;
+  anchors?: PlanningAnchors;
 }): Draft[] {
   const weekStart = weekStartKey(new Date(`${input.today}T12:00:00`), input.plan.timeZone);
   const weekEnd = addDayKey(weekStart, 6);
@@ -542,11 +517,11 @@ function pctRange(anchor: number, lowPct: number, highPct: number, unit: string)
   return rangeLabel(Math.round(anchor * lowPct), Math.round(anchor * highPct), unit);
 }
 
-function familyLthr(family: "running" | "cycling", anchors: TestAnchors | undefined) {
+function familyLthr(family: "running" | "cycling", anchors: PlanningAnchors | undefined) {
   return family === "cycling" ? (anchors?.cyclingLthr ?? null) : (anchors?.runLthr ?? null);
 }
 
-function familyMaxHr(family: "running" | "cycling", anchors: TestAnchors | undefined) {
+function familyMaxHr(family: "running" | "cycling", anchors: PlanningAnchors | undefined) {
   return family === "cycling" ? (anchors?.cyclingMaxHr ?? null) : (anchors?.runMaxHr ?? null);
 }
 
@@ -564,7 +539,7 @@ function powerCue(kind: QualityKind, ftpWatts: number | null) {
 function heartCue(
   kind: QualityKind,
   family: "running" | "cycling",
-  anchors: TestAnchors | undefined,
+  anchors: PlanningAnchors | undefined,
 ) {
   const lthr = familyLthr(family, anchors);
   const maxHr = familyMaxHr(family, anchors);
@@ -584,7 +559,7 @@ function intensityCue(
   kind: QualityKind,
   family: "running" | "cycling",
   collectors: FamilyCollectors | undefined,
-  anchors: TestAnchors | undefined,
+  anchors: PlanningAnchors | undefined,
 ) {
   if (collectors?.power) return powerCue(kind, anchors?.ftpWatts ?? null);
   if (collectors?.heartRate) return heartCue(kind, family, anchors);
@@ -593,7 +568,7 @@ function intensityCue(
   return "at RPE 8, even effort";
 }
 
-function mixedCollectorNote(kind: QualityKind, anchors: TestAnchors | undefined) {
+function mixedCollectorNote(kind: QualityKind, anchors: PlanningAnchors | undefined) {
   const hr = heartCue(kind, "cycling", anchors);
   const numbered = /\d/.test(hr);
   if (numbered) {
@@ -653,7 +628,7 @@ function sessionNote(
   collectors: FamilyCollectors | undefined,
   minutes: number,
   family: "running" | "cycling",
-  anchors: TestAnchors | undefined,
+  anchors: PlanningAnchors | undefined,
 ) {
   const pace = BUILD_PACES.find((item) => item.id === plan.buildPace)?.label ?? plan.buildPace;
   if (isBrick)

@@ -4,7 +4,7 @@ Each activity gets one training-load number. Cycling with a power meter uses Cog
 
 Fitness and fatigue are the Coggan/TrainingPeaks PMC exponential averages: 42-day CTL and 7-day ATL. Form is morning TSB: yesterday's fitness minus yesterday's fatigue. That is a PMC chart, not Banister's 1975 impulse-response model (Banister uses ~50/15 day time constants and separate gain factors k1, k2).
 
-Anchors are sport-specific. Flagged field tests (Allen & Coggan 20-min FTP, Friel run LTHR) win over estimates. Cycling LTHR is never copied onto a run.
+Anchors are sport-specific estimates from recent activities. Cycling LTHR is never copied onto a run.
 
 Strava's own relative effort and "suffer score" stay out of this. Those numbers are opaque, not comparable across sports the way we need, and not something a remaining-week plan can target.
 

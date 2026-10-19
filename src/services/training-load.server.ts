@@ -1,15 +1,13 @@
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, activityStreams, athleteMetrics, fieldTests } from "@/db/schema.ts";
+import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import {
   activityTrainingLoad,
   estimateLoadAnchors,
   isPowerCyclingSport,
-  mergeLoadAnchors,
-  pickLoadAnchorsFromTests,
   toFitnessLoad,
   type FitnessLoad,
   type LoadAnchors,
@@ -82,18 +80,6 @@ async function attachPowerStreams(rows: StoredLoadRow[]) {
   });
 }
 
-async function loadTestAnchors(userId: string) {
-  const rows = await db
-    .select({
-      assessmentId: fieldTests.assessmentId,
-      result: fieldTests.result,
-    })
-    .from(fieldTests)
-    .where(and(eq(fieldTests.userId, userId), eq(fieldTests.status, "completed")))
-    .orderBy(desc(fieldTests.completedAt));
-  return pickLoadAnchorsFromTests(rows);
-}
-
 function persistableAnchors(anchors: LoadAnchors) {
   return {
     ftp: anchors.ftp,
@@ -129,7 +115,7 @@ async function refreshTrainingLoads(userId: string) {
   if (!rows.length) return;
 
   const withStreams = await attachPowerStreams(rows);
-  const anchors = mergeLoadAnchors(estimateLoadAnchors(withStreams), await loadTestAnchors(userId));
+  const anchors = estimateLoadAnchors(withStreams);
   const stored = persistableAnchors(anchors);
   await db
     .insert(athleteMetrics)

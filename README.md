@@ -9,7 +9,6 @@ Sign in with Strava, import every activity and its streams into Postgres, then:
 - plot GPS tracks on a map
 - chart fitness, fatigue, and form
 - inspect sport-specific heart-rate zones
-- run field tests (never mixed into the week bucket)
 - optionally analyze an activity via OpenRouter (`OPENROUTER_API_KEY` in `.env.example`; mocked until set)
 
 Stack: **TanStack Start**, **Vite+**, **Bun**, **Better Auth**, **Drizzle**, **Docker Postgres**, **shadcn/ui**, **ReUI Event Calendar**.
@@ -49,7 +48,7 @@ Agents (and anyone without a Strava app) can run the full app against a local mo
 vp run dev:mock
 ```
 
-Or set `STRAVA_MOCK=1` in `.env`. Open http://localhost:3000, click **Connect Strava** (the OAuth redirect comes straight back, with no Strava login), finish the onboarding dialog (it blocks the page until saved), then click **Sync from Strava**. The mock athlete has about eight weeks of rides and runs, with GPS, heart rate, and power, so the calendar, map, fitness, heart-rate zones, and field tests all have data.
+Or set `STRAVA_MOCK=1` in `.env`. Open http://localhost:3000, click **Connect Strava** (the OAuth redirect comes straight back, with no Strava login), finish the onboarding dialog (it blocks the page until saved), then click **Sync from Strava**. The mock athlete has about eight weeks of rides and runs, with GPS, heart rate, and power, so the calendar, map, fitness, and heart-rate zones all have data.
 
 The mock lives at `/api/mock-strava` and implements the parts of Strava's OAuth and v3 API that the app uses. Only the Strava base URL changes, so sign-in, token refresh, and sync run the same code as in production. `STRAVA_MOCK` is ignored in production.
 

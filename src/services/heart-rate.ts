@@ -139,7 +139,7 @@ export type HeartRateZoneStat = {
   seconds: number;
 };
 
-export type HeartRateLthrSource = "field-test" | "estimated-from-max";
+export type HeartRateLthrSource = "estimated-from-max";
 
 export type HeartRateSport = {
   sportType: string;
@@ -465,7 +465,6 @@ export function formatZoneBpm(zone: HeartRateZoneStat, isLast: boolean) {
 export function lthrHint(sport: HeartRateSport) {
   if (!sport.family) return "varies by sport";
   if (!sport.lthr) return undefined;
-  if (sport.lthrSource === "field-test") return "from field test";
   const model = ZONE_MODELS[sport.family];
   const pct = Math.round(model.lthrFactor * 100);
   if (model.anchor === "lthr") return `${pct}% of ${sport.family} max`;
@@ -478,9 +477,6 @@ export function lthrInfo(sport: HeartRateSport) {
   }
   const model = ZONE_MODELS[sport.family];
   const pct = Math.round(model.lthrFactor * 100);
-  if (sport.lthrSource === "field-test") {
-    return `This sport's LTHR comes from a flagged field test. Zones still use ${sport.family} cuts of that number, never another sport's LTHR.`;
-  }
   if (model.anchor === "lthr") {
     return `Estimated lactate threshold as ${pct}% of this sport's max heart rate. Cycling, running, and swimming use different % of LTHR cuts.`;
   }
