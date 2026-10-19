@@ -81,6 +81,22 @@ export class StravaApi {
     }
   }
 
+  /** Revokes VO2's access for this athlete; Strava echoes back the revoked token. */
+  async deauthorize() {
+    const response = await fetch(`${env.STRAVA_BASE_URL}/oauth/deauthorize`, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Bearer ${this.accessToken}` },
+    });
+    if (!response.ok) {
+      throw new StravaApiError(
+        `Strava deauthorize failed (${response.status})`,
+        response.status,
+        await response.text(),
+      );
+    }
+    return (await response.json()) as { access_token: string };
+  }
+
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     await this.rateLimit.waitIfNeeded();
     const headers = new Headers(init?.headers);
