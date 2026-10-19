@@ -1,3 +1,11 @@
+## Product constraints
+
+VO2 is a PWA first, installed to the athlete's home screen and used on a phone far more than a desktop. Design and build for that:
+
+- **PWA first:** every change should work as an installed standalone app (`public/manifest.webmanifest`, touch icons, offline-tolerant behavior). Don't add anything that assumes a browser tab, a URL bar, or a desktop-only window.
+- **Mobile first:** lay out for a narrow viewport first and scale up. Touch targets, safe-area insets, and thumb reach matter more than hover states or dense tables.
+- Prefer solutions that keep working when the app is backgrounded, resumed, or briefly offline.
+
 ## Agent skills
 
 ### Issue tracker
