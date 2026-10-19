@@ -375,6 +375,13 @@ export function ActivityCalendar({
   const cursorWeek = resolveDiaryCursorWeek(initialWeek, currentWeek);
   const diary = diaryWindow(cursorWeek, isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS);
   const anchor = useMemo(() => dayKeyDate(diary.start, timeZone), [diary.start, timeZone]);
+  // The current week stays out of the URL so a bare "/" keeps following today.
+  const showWeek = (week: string) =>
+    void navigate({
+      to: "/",
+      search: (previous) => ({ ...previous, week: week < currentWeek ? week : undefined }),
+      replace: true,
+    });
 
   useEffect(() => {
     return scheduleIdle(() => {
@@ -431,23 +438,15 @@ export function ActivityCalendar({
               event.preventDefault();
               warmActivity(queryClient, occurrence.event.id);
               const activityId = occurrence.event.id;
-              const activityWeek = weekStartKey(occurrence.event.start, timeZone);
               void router.preloadRoute({
                 to: "/activities/$activityId",
                 params: { activityId },
               });
               void navigate({
-                to: "/",
-                search: (previous) => ({ ...previous, week: activityWeek }),
-                replace: true,
-              })
-                .then(() =>
-                  navigate({
-                    to: "/activities/$activityId",
-                    params: { activityId },
-                    search: { week: activityWeek },
-                  }),
-                );
+                to: "/activities/$activityId",
+                params: { activityId },
+                search: { week: cursorWeek },
+              });
             }}
             onPointerOver={(event) => {
               const id = (event.target as HTMLElement | null)
@@ -469,23 +468,8 @@ export function ActivityCalendar({
             <DiaryNav
               range={formatDiaryRange(diary.start, diary.end)}
               atCurrentWeek={cursorWeek >= currentWeek}
-              onStep={(direction) =>
-                void navigate({
-                  to: "/",
-                  search: (previous) => ({
-                    ...previous,
-                    week: stepDiaryWeek(cursorWeek, direction, currentWeek),
-                  }),
-                  replace: true,
-                })
-              }
-              onToday={() =>
-                void navigate({
-                  to: "/",
-                  search: (previous) => ({ ...previous, week: currentWeek }),
-                  replace: true,
-                })
-              }
+              onStep={(direction) => showWeek(stepDiaryWeek(cursorWeek, direction, currentWeek))}
+              onToday={() => showWeek(currentWeek)}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <EventCalendarContent
