@@ -1,11 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
+import { createFileRoute, useParams, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { Settings2Icon } from "lucide-react";
 
-import { SettingsForm, SettingsHeading } from "@/components/settings.tsx";
+import { SettingsForm } from "@/components/settings.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
+import { isSettingsSection } from "@/lib/settings-sections.ts";
 import {
   Empty,
   EmptyDescription,
@@ -26,14 +27,16 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsPage() {
   useSuspenseQuery(settingsSnapshotQueryOptions);
   const { data: session } = authClient.useSession();
+  const { section } = useParams({ strict: false });
+  if (!section || !isSettingsSection(section)) return null;
 
-  return <SettingsForm userName={session?.user.name ?? ""} />;
+  return <SettingsForm section={section} userName={session?.user.name ?? ""} />;
 }
 
 function SettingsPending() {
   return (
     <>
-      <SettingsHeading />
+      <Skeleton className="h-8 w-40" />
       <Skeleton className="h-80 w-full rounded-xl" />
     </>
   );

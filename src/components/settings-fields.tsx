@@ -233,7 +233,7 @@ export function TrainingPaceFields<T extends TrainingFormInput>({
           </FieldDescription>
           <RadioGroup
             name={field.name}
-            value={(field.value as string) || undefined}
+            value={(field.value as string) || null}
             onValueChange={(next) => {
               if (!next) return;
               field.onChange(next);

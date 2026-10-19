@@ -12,7 +12,7 @@ import {
 const PREFETCH_BATCH = 4;
 const PREFETCH_VISIBLE_CAP = 40;
 
-const APP_ROUTES = ["/", "/map", "/fitness", "/heart-rate", "/tests", "/settings"] as const;
+const APP_ROUTES = ["/", "/map", "/fitness", "/heart-rate", "/tests"] as const;
 
 export function scheduleIdle(work: () => void) {
   if (typeof window === "undefined") return () => undefined;
@@ -29,6 +29,7 @@ export function warmApp(router: RegisteredRouter, queryClient: QueryClient) {
   for (const to of APP_ROUTES) {
     void router.preloadRoute({ to });
   }
+  void router.preloadRoute({ to: "/settings/$section", params: { section: "profile" } });
   void queryClient.query(settingsSnapshotQueryOptions).catch(noop);
   void queryClient.query(analysisStatusQueryOptions).catch(noop);
 }

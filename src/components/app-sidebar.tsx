@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
+  ArrowLeftIcon,
   CalendarDaysIcon,
   ClipboardListIcon,
   FlaskConicalIcon,
@@ -22,6 +23,7 @@ import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions } from "@/lib/queries.ts";
+import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
@@ -112,8 +114,50 @@ function SidebarNavMenu({
   );
 }
 
+function SettingsNavMenu({ pathname }: { pathname: string }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenu>
+      {SETTINGS_SECTIONS.map((item) => (
+        <SidebarMenuItem key={item.id}>
+          <SidebarMenuButton
+            isActive={pathname === `/settings/${item.id}`}
+            tooltip={item.label}
+            render={
+              <Link
+                to="/settings/$section"
+                params={{ section: item.id }}
+                onClick={() => {
+                  if (isMobile) setOpenMobile(false);
+                }}
+              />
+            }
+          >
+            <item.icon />
+            <span>{item.label}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+}
+
+/** Remembers the last page outside settings so Back can return to it. */
+function useLastHrefOutsideSettings() {
+  const location = useRouterState({ select: (state) => state.location });
+  const lastHref = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isSettingsPath(location.pathname)) lastHref.current = location.href;
+  }, [location.pathname, location.href]);
+  return lastHref;
+}
+
 export function AppSidebar() {
+  const router = useRouter();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const { isMobile, setOpenMobile } = useSidebar();
+  const lastHref = useLastHrefOutsideSettings();
+  const inSettings = isSettingsPath(pathname);
 
   return (
     <Sidebar collapsible="icon">
@@ -132,20 +176,57 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Training</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {inSettings ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SettingsNavMenu pathname={pathname} />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel>Training</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarUserMenu />
+      <SidebarFooter className="flex-row items-center group-data-[collapsible=icon]:flex-col">
+        {inSettings ? (
+          <SidebarMenuButton
+            tooltip="Back"
+            className="flex-1"
+            onClick={() => {
+              if (isMobile) setOpenMobile(false);
+              void router.navigate({ href: lastHref.current ?? "/" });
+            }}
+          >
+            <ArrowLeftIcon />
+            <span>Back</span>
+          </SidebarMenuButton>
+        ) : (
+          <SidebarMenuButton
+            tooltip="Settings"
+            aria-label="Settings"
+            className="w-auto"
+            render={
+              <Link to="/settings/$section" params={{ section: "profile" }} preload="intent" />
+            }
+          >
+            <Settings2Icon />
+          </SidebarMenuButton>
+        )}
+        <div className="ml-auto group-data-[collapsible=icon]:ml-0">
+          <SidebarUserMenu />
+        </div>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -155,7 +236,7 @@ export function AppSidebar() {
 function SidebarUserMenu() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { data: session, isPending } = authClient.useSession();
   const [mounted, setMounted] = useState(false);
@@ -186,7 +267,10 @@ function SidebarUserMenu() {
           >
             <DropdownMenuTrigger
               render={
-                <SidebarMenuButton className="data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center" />
+                <SidebarMenuButton
+                  aria-label={user?.name ?? "Account"}
+                  className="w-auto p-1 data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
+                />
               }
             >
               {isPending ? (
@@ -199,9 +283,6 @@ function SidebarUserMenu() {
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
               )}
-              <span className="truncate font-medium group-data-[collapsible=icon]:hidden">
-                {user?.name ?? "Guest"}
-              </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               side={isMobile ? "top" : "right"}
@@ -250,21 +331,6 @@ function SidebarUserMenu() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      onMouseEnter={() => {
-                        void router.preloadRoute({ to: "/settings" });
-                      }}
-                      onFocus={() => {
-                        void router.preloadRoute({ to: "/settings" });
-                      }}
-                      onClick={() => {
-                        if (isMobile) setOpenMobile(false);
-                        void router.navigate({ to: "/settings" });
-                      }}
-                    >
-                      <Settings2Icon />
-                      Settings
-                    </DropdownMenuItem>
                     <DropdownMenuItem
                       variant="destructive"
                       onClick={() => {

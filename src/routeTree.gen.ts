@@ -20,6 +20,8 @@ import { Route as AppTestsRouteImport } from './routes/_app.tests'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
+import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
 
@@ -77,6 +79,16 @@ const AppActivitiesActivityIdRoute = AppActivitiesActivityIdRouteImport.update({
   path: '/activities/$activityId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsSectionRoute = AppSettingsSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -94,27 +106,30 @@ export interface FileRoutesByFullPath {
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
-  '/settings': typeof AppSettingsRoute
+  '/settings': typeof AppSettingsRouteWithChildren
   '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
-  '/settings': typeof AppSettingsRoute
   '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,14 +138,16 @@ export interface FileRoutesById {
   '/_app/fitness': typeof AppFitnessRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
-  '/_app/settings': typeof AppSettingsRoute
+  '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/tests': typeof AppTestsRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/_app/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -145,22 +162,25 @@ export interface FileRouteTypes {
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/activities/$activityId'
+    | '/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/onboarding'
     | '/fitness'
     | '/heart-rate'
     | '/map'
-    | '/settings'
     | '/tests'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/'
     | '/activities/$activityId'
+    | '/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/settings'
   id:
     | '__root__'
     | '/_app'
@@ -174,8 +194,10 @@ export interface FileRouteTypes {
     | '/api/activity-analysis'
     | '/_app/'
     | '/_app/activities/$activityId'
+    | '/_app/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -265,6 +287,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppActivitiesActivityIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/$section': {
+      id: '/_app/settings/$section'
+      path: '/$section'
+      fullPath: '/settings/$section'
+      preLoaderRoute: typeof AppSettingsSectionRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -282,11 +318,25 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppSettingsRouteChildren {
+  AppSettingsSectionRoute: typeof AppSettingsSectionRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsSectionRoute: AppSettingsSectionRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
 interface AppRouteChildren {
   AppFitnessRoute: typeof AppFitnessRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
-  AppSettingsRoute: typeof AppSettingsRoute
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppTestsRoute: typeof AppTestsRoute
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -297,7 +347,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFitnessRoute: AppFitnessRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
-  AppSettingsRoute: AppSettingsRoute,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppTestsRoute: AppTestsRoute,
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
