@@ -607,6 +607,8 @@ async function storeStreams(activityId: string, streams: StreamSet) {
         moving: streams.moving?.data ?? null,
         gradeSmooth: streams.grade_smooth?.data ?? null,
         chartPreview,
+        // rebuilt from the fresh streams on the next detail view
+        rideAnalysis: null,
         raw: streams,
         syncedAt: now,
       },

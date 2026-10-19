@@ -2,7 +2,6 @@
 
 import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "cn";
-import { InfoIcon } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -29,6 +28,7 @@ import {
   type FitnessLoad,
   type FitnessPeriod,
 } from "@/services/training-load.ts";
+import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -40,8 +40,6 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
 
 const SERIES_KEYS = ["load", "ctl", "atl", "tsb"] as const;
 
@@ -169,21 +167,7 @@ function Kpi({
             />
           ) : null}
           <span className="min-w-0">{label}</span>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`About ${label}`}
-                />
-              }
-            >
-              <InfoIcon />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-72">{info}</TooltipContent>
-          </Tooltip>
+          <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
         </CardDescription>
         <CardTitle className={cn("font-mono text-base tabular-nums sm:text-lg", valueClassName)}>
           {value}
@@ -236,21 +220,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
         <div className="hidden min-w-0 flex-col gap-1 sm:flex">
           <div className="flex items-center gap-1">
             <CardTitle>Fitness and form</CardTitle>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="About this graph"
-                  />
-                }
-              >
-                <InfoIcon />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-72">{GRAPH_GOAL_INFO}</TooltipContent>
-            </Tooltip>
+            <InfoTooltip label="About this graph">{GRAPH_GOAL_INFO}</InfoTooltip>
           </div>
           <CardDescription>
             Track fitness, fatigue, and form so you can keep building without overreaching.
@@ -339,21 +309,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
             {estimatedShare > 0.05 ? (
               <Badge variant="info" className="w-fit gap-1">
                 {Math.round(estimatedShare * 100)}% of load in this period is duration-estimated
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label="About estimated load"
-                      />
-                    }
-                  >
-                    <InfoIcon />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-72">{ESTIMATED_INFO}</TooltipContent>
-                </Tooltip>
+                <InfoTooltip label="About estimated load">{ESTIMATED_INFO}</InfoTooltip>
               </Badge>
             ) : null}
             <ToggleGroup
