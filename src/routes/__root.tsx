@@ -4,6 +4,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { PullToRefresh } from "@/components/pull-to-refresh.tsx";
 import { ThemeProvider } from "@/components/theme-provider.tsx";
 import { loadAppEnv } from "@/lib/app-env.ts";
 import { APP_NAME, appChrome } from "@/lib/brand.ts";
@@ -74,6 +75,7 @@ function RootDocument({ children }: { children: ReactNode }) {
               />
             ) : null}
             <Toaster />
+            <PullToRefresh />
           </TooltipProvider>
         </ThemeProvider>
         <Scripts />
