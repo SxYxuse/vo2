@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
@@ -23,7 +23,11 @@ import {
 } from "@/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
 import { weekStartKey } from "@/services/training-plan.ts";
-import { diaryWindow, stepDiaryWeek } from "@/services/diary-window.ts";
+import {
+  diaryWindow,
+  resolveDiaryCursorWeek,
+  stepDiaryWeek,
+} from "@/services/diary-window.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -344,9 +348,14 @@ function DiaryNav({
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
   initialSettings: CalendarSettings;
+  initialWeek?: string;
 };
 
-export function ActivityCalendar({ activities, initialSettings }: ActivityCalendarProps) {
+export function ActivityCalendar({
+  activities,
+  initialSettings,
+  initialWeek,
+}: ActivityCalendarProps) {
   const sportTypes = useMemo(
     () =>
       mergeCalendarSettings(
@@ -363,7 +372,7 @@ export function ActivityCalendar({ activities, initialSettings }: ActivityCalend
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
-  const [cursorWeek, setCursorWeek] = useState(currentWeek);
+  const cursorWeek = resolveDiaryCursorWeek(initialWeek, currentWeek);
   const diary = diaryWindow(cursorWeek, isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS);
   const anchor = useMemo(() => dayKeyDate(diary.start, timeZone), [diary.start, timeZone]);
 
@@ -422,11 +431,23 @@ export function ActivityCalendar({ activities, initialSettings }: ActivityCalend
               event.preventDefault();
               warmActivity(queryClient, occurrence.event.id);
               const activityId = occurrence.event.id;
+              const activityWeek = weekStartKey(occurrence.event.start, timeZone);
               void router.preloadRoute({
                 to: "/activities/$activityId",
                 params: { activityId },
               });
-              void navigate({ to: "/activities/$activityId", params: { activityId } });
+              void navigate({
+                to: "/",
+                search: (previous) => ({ ...previous, week: activityWeek }),
+                replace: true,
+              })
+                .then(() =>
+                  navigate({
+                    to: "/activities/$activityId",
+                    params: { activityId },
+                    search: { week: activityWeek },
+                  }),
+                );
             }}
             onPointerOver={(event) => {
               const id = (event.target as HTMLElement | null)
@@ -449,9 +470,22 @@ export function ActivityCalendar({ activities, initialSettings }: ActivityCalend
               range={formatDiaryRange(diary.start, diary.end)}
               atCurrentWeek={cursorWeek >= currentWeek}
               onStep={(direction) =>
-                setCursorWeek((week) => stepDiaryWeek(week, direction, currentWeek))
+                void navigate({
+                  to: "/",
+                  search: (previous) => ({
+                    ...previous,
+                    week: stepDiaryWeek(cursorWeek, direction, currentWeek),
+                  }),
+                  replace: true,
+                })
               }
-              onToday={() => setCursorWeek(currentWeek)}
+              onToday={() =>
+                void navigate({
+                  to: "/",
+                  search: (previous) => ({ ...previous, week: currentWeek }),
+                  replace: true,
+                })
+              }
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <EventCalendarContent

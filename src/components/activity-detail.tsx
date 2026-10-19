@@ -130,20 +130,24 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   );
 }
 
-function CalendarBackLink() {
+function CalendarBackLink({ week }: { week: string }) {
   return (
-    <Link to="/" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "self-start")}>
+    <Link
+      to="/"
+      search={{ week }}
+      className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "self-start")}
+    >
       <ChevronLeftIcon />
       Calendar
     </Link>
   );
 }
 
-export function ActivityDetailPending() {
+export function ActivityDetailPending({ week }: { week?: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink />
+        {week ? <CalendarBackLink week={week} /> : null}
         <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-4 w-80 max-w-full" />
       </div>
@@ -158,7 +162,15 @@ export function ActivityDetailPending() {
   );
 }
 
-export function ActivityDetailView({ detail, color }: { detail: ActivityDetail; color?: string }) {
+export function ActivityDetailView({
+  detail,
+  color,
+  week,
+}: {
+  detail: ActivityDetail;
+  color?: string;
+  week: string;
+}) {
   useEffect(() => {
     void import("@/components/activity-analysis.tsx");
     void import("@/components/activity-analysis-live.tsx");
@@ -171,7 +183,7 @@ export function ActivityDetailView({ detail, color }: { detail: ActivityDetail; 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink />
+        <CalendarBackLink week={week} />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">
             {detail.title}
@@ -206,10 +218,10 @@ export function ActivityDetailView({ detail, color }: { detail: ActivityDetail; 
   );
 }
 
-export function ActivityDetailMissing() {
+export function ActivityDetailMissing({ week }: { week?: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <CalendarBackLink />
+      {week ? <CalendarBackLink week={week} /> : null}
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">
