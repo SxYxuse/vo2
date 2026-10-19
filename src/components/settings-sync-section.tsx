@@ -22,7 +22,7 @@ import {
 import { Progress, ProgressLabel } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 
-function statusBadge(status: SyncKind): {
+export function syncKindBadge(status: SyncKind): {
   label: string;
   variant: "success" | "warning" | "destructive" | "outline";
 } {
@@ -91,7 +91,7 @@ function SyncStatusCard({
   onRetry: () => void;
 }) {
   const kind = status?.status ?? "never";
-  const badge = statusBadge(kind);
+  const badge = syncKindBadge(kind);
   const copied = status?.streamsCopied ?? 0;
   const total = status?.activityCount ?? 0;
   const pending = status?.streamsPending ?? 0;

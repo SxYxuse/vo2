@@ -30,14 +30,22 @@ function syncCopiedDescription(activitiesUpserted: number, streamsFetched: numbe
   return `Copied ${countLabel(activitiesUpserted, "activity", "activities")} and ${countLabel(streamsFetched, "stream", "streams")}.`;
 }
 
+type SyncToast = Pick<typeof toast, "add" | "update">;
+
+const silentToast: SyncToast = {
+  add: () => "",
+  update: () => {},
+};
+
 function finishSyncToast(
+  notify: SyncToast,
   toastId: string,
   result: SyncResult,
   activitiesUpserted: number,
   streamsFetched: number,
 ) {
   if (result.done) {
-    toast.update(toastId, {
+    notify.update(toastId, {
       type: "success",
       title: "Strava sync finished",
       description: syncCopiedDescription(activitiesUpserted, streamsFetched),
@@ -46,7 +54,7 @@ function finishSyncToast(
     return;
   }
   if (result.pausedUntil) {
-    toast.update(toastId, {
+    notify.update(toastId, {
       type: "warning",
       title: "Strava sync paused",
       description: `Rate limit reached. Resume after ${new Date(result.pausedUntil).toLocaleString()}. ${result.rateLimit.dailyRemaining} daily reads remain.`,
@@ -54,7 +62,7 @@ function finishSyncToast(
     });
     return;
   }
-  toast.update(toastId, {
+  notify.update(toastId, {
     type: "error",
     title: "Strava sync failed",
     description: result.lastError ?? "Sync failed",
@@ -66,7 +74,8 @@ export function useStravaSyncPending() {
   return useIsMutating({ mutationKey: stravaSyncMutationKey }) > 0;
 }
 
-export function useStravaSync() {
+export function useStravaSync({ showToast = true }: { showToast?: boolean } = {}) {
+  const notify: SyncToast = showToast ? toast : silentToast;
   const router = useRouter();
   const queryClient = useQueryClient();
   const isPending = useStravaSyncPending();
@@ -74,7 +83,7 @@ export function useStravaSync() {
   const sync = useMutation({
     mutationKey: stravaSyncMutationKey,
     mutationFn: async () => {
-      const toastId = toast.add({
+      const toastId = notify.add({
         type: "loading",
         title: "Syncing from Strava",
         description: "Copying activities and streams.",
@@ -92,7 +101,7 @@ export function useStravaSync() {
           } catch (caught) {
             if (isTransientSyncError(caught) && transientFailures < SYNC_TRANSIENT_RETRIES) {
               transientFailures += 1;
-              toast.update(toastId, {
+              notify.update(toastId, {
                 type: "loading",
                 title: "Syncing from Strava",
                 description: "Connection dropped, retrying this copy.",
@@ -115,10 +124,10 @@ export function useStravaSync() {
             router.invalidate(),
           ]);
           if (result.done || result.pausedUntil || result.lastError) {
-            finishSyncToast(toastId, result, activitiesUpserted, streamsFetched);
+            finishSyncToast(notify, toastId, result, activitiesUpserted, streamsFetched);
             return result;
           }
-          toast.update(toastId, {
+          notify.update(toastId, {
             type: "loading",
             title: "Syncing from Strava",
             description: `${syncCopiedDescription(activitiesUpserted, streamsFetched)} ${countLabel(result.streamsPending, "stream", "streams")} still to copy.`,
@@ -126,7 +135,8 @@ export function useStravaSync() {
           });
         }
       } catch (caught) {
-        toast.update(toastId, {
+        void queryClient.invalidateQueries({ queryKey: syncStatusQueryOptions.queryKey });
+        notify.update(toastId, {
           type: "error",
           title: "Strava sync failed",
           description: isTransientSyncError(caught)
@@ -144,5 +154,7 @@ export function useStravaSync() {
   return {
     mutate: sync.mutate,
     isPending,
+    error: sync.error,
+    lastResult: sync.data,
   };
 }
