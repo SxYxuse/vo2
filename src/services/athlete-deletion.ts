@@ -22,6 +22,6 @@ export async function deleteAthlete(userId: string, ports: AthleteDeletionPorts)
 }
 
 export const deleteCurrentAthlete = createServerFn({ method: "POST" }).handler(async () => {
-  const { deleteAthleteImpl } = await import("./athlete-deletion.server.ts");
-  return deleteAthleteImpl();
+  const { deleteCurrentAthleteImpl } = await import("./athlete-deletion.server.ts");
+  return deleteCurrentAthleteImpl();
 });

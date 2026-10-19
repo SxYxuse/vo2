@@ -225,6 +225,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   let historyComplete = false;
   let lastError: string | null = null;
   let pausedUntil: Date | null = null;
+  let athleteDeleted = false;
 
   try {
     let newerCaughtUp = false;
@@ -255,13 +256,31 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     } else if (isAbortError(error)) {
       logger.warn("sync.request_aborted", errorFields(error));
     } else if (!(await athleteExists(session.user.id))) {
-      // Athlete deletion ran mid-sync; there is nothing left to write to.
-      logger.info("sync.stopped_athlete_deleted");
-      throw new Error("Athlete was deleted");
+      athleteDeleted = true;
     } else {
       lastError = error instanceof Error ? error.message : "Sync failed";
       logger.error("sync.failed", errorFields(error));
     }
+  }
+
+  // Athlete deletion ran mid-sync: stop quietly, there is nothing left to write to.
+  if (athleteDeleted || !(await athleteExists(session.user.id))) {
+    logger.info("sync.stopped_athlete_deleted");
+    const snapshot = api.rateLimit.snapshot();
+    return {
+      activitiesUpserted,
+      streamsFetched,
+      streamsPending: 0,
+      historyComplete: false,
+      done: false,
+      pausedUntil: null,
+      lastError: null,
+      rateLimit: {
+        shortRemaining: snapshot.shortRemaining,
+        dailyRemaining: snapshot.dailyRemaining,
+        nextWindowAt: snapshot.nextWindowAt,
+      },
+    };
   }
 
   if (remainingSyncBudgetMs(startedAt) > SYNC_POSTPROCESS_MIN_MS) {

@@ -8,7 +8,7 @@ import { getRequiredSession } from "@/lib/session.server.ts";
 import { getStravaAccessToken } from "@/lib/strava-token.server.ts";
 import { deleteAthlete } from "./athlete-deletion.ts";
 
-export async function deleteAthleteImpl() {
+export async function deleteCurrentAthleteImpl() {
   const session = await getRequiredSession();
   const result = await deleteAthlete(session.user.id, {
     revokeStrava: async (userId) => {

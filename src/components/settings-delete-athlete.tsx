@@ -22,7 +22,7 @@ export function SettingsDeleteAthlete() {
   const signOut = useSignOut();
   const deletion = useMutation({
     mutationFn: () => deleteCurrentAthlete(),
-    onSuccess: () => signOut(),
+    onSuccess: () => signOut({ ignoreBlocker: true }),
   });
 
   return (
