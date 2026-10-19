@@ -1,3 +1,4 @@
+import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -26,10 +27,25 @@ function formatNumber(value: number | null, digits = 0) {
   return value == null ? "—" : value.toFixed(digits);
 }
 
-function RideStat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+type RideStatProps = { label: string; value: string; hint?: string; info: string };
+
+const STAT_INFO = {
+  intensity:
+    "Intensity factor: normalized power divided by your FTP. 0.75 is endurance, 0.85–0.95 tempo to sweet spot, 1.0 is a one-hour all-out effort.",
+  tss: "Training stress score: how costly the ride was, from duration and intensity. One hour at FTP is 100. It feeds your fitness and fatigue.",
+  variability:
+    "Variability index: normalized power divided by average power. Near 1.00 is steady pacing, like a time trial; above 1.15 is surgy, like group rides, crits, or punchy terrain.",
+  coasting:
+    "Share of moving time with zero cadence: descents, drafting, and freewheeling. High coasting lowers average power but not the cost of the hard parts.",
+} as const;
+
+function RideStat({ label, value, hint, info }: RideStatProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-md bg-muted/50 px-3 py-2">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-md px-3 py-2">
+      <span className="flex items-center gap-1 text-muted-foreground">
+        {label}
+        <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
+      </span>
       <span className="font-mono text-base tabular-nums">{value}</span>
       {hint ? <span className="truncate text-muted-foreground">{hint}</span> : null}
     </div>
@@ -37,18 +53,29 @@ function RideStat({ label, value, hint }: { label: string; value: string; hint?:
 }
 
 function rideStats(ride: RideSummary) {
-  const stats: { label: string; value: string; hint?: string }[] = [];
+  const stats: RideStatProps[] = [];
   if (ride.intensityFactor != null) {
-    stats.push({ label: "Intensity", value: ride.intensityFactor.toFixed(2), hint: "NP ÷ FTP" });
+    stats.push({
+      label: "Intensity",
+      value: ride.intensityFactor.toFixed(2),
+      hint: "NP ÷ FTP",
+      info: STAT_INFO.intensity,
+    });
   }
   if (ride.tss != null) {
-    stats.push({ label: "TSS", value: String(Math.round(ride.tss)), hint: "Training stress" });
+    stats.push({
+      label: "TSS",
+      value: String(Math.round(ride.tss)),
+      hint: "Training stress",
+      info: STAT_INFO.tss,
+    });
   }
   if (ride.variabilityIndex != null) {
     stats.push({
       label: "Variability",
       value: ride.variabilityIndex.toFixed(2),
       hint: variabilityLabel(ride.variabilityIndex),
+      info: STAT_INFO.variability,
     });
   }
   if (ride.coastingPct != null) {
@@ -56,6 +83,7 @@ function rideStats(ride: RideSummary) {
       label: "Coasting",
       value: `${Math.round(ride.coastingPct)} %`,
       hint: "Moving, not pedaling",
+      info: STAT_INFO.coasting,
     });
   }
   return stats;

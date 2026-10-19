@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { InfoIcon } from "lucide-react";
 
 import { formatSportType, type CalendarSettings } from "@/services/calendar-settings.types.ts";
 import {
@@ -15,13 +14,12 @@ import {
   type HeartRateData,
   type HeartRateSport,
 } from "@/services/heart-rate.ts";
+import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DATE_MED = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
@@ -56,21 +54,7 @@ function Kpi({
             />
           ) : null}
           <span className="min-w-0">{label}</span>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={`About ${label}`}
-                />
-              }
-            >
-              <InfoIcon />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-72">{info}</TooltipContent>
-          </Tooltip>
+          <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
         </CardDescription>
         <CardTitle className="font-mono text-base tabular-nums sm:text-lg">{value}</CardTitle>
         {hint ? <CardDescription className="line-clamp-2">{hint}</CardDescription> : null}
@@ -216,25 +200,11 @@ export function HeartRateZones({
         <CardHeader className="gap-2">
           <div className="flex items-center gap-1">
             <CardTitle>Estimated zones</CardTitle>
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label="About estimated zones"
-                  />
-                }
-              >
-                <InfoIcon />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-72">
-                Cycling uses Coggan % of LTHR, running uses Friel % of LTHR, swimming uses swim LTHR
-                bands, walking uses % of max HR. All adds each sport&apos;s time in zone — it does
-                not re-bin every sample against one global max.
-              </TooltipContent>
-            </Tooltip>
+            <InfoTooltip label="About estimated zones">
+              Cycling uses Coggan % of LTHR, running uses Friel % of LTHR, swimming uses swim LTHR
+              bands, walking uses % of max HR. All adds each sport&apos;s time in zone — it does not
+              re-bin every sample against one global max.
+            </InfoTooltip>
           </div>
           <CardDescription>
             {sportLabel(selected)} · {selected.zoneModel}
@@ -278,21 +248,7 @@ export function HeartRateZones({
                           {zone.def.label} · {zone.def.name}
                         </ItemTitle>
                         <Badge variant="outline">{formatZoneBpm(zone, zone.id === "z5")}</Badge>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-xs"
-                                aria-label={`About ${zone.def.label}`}
-                              />
-                            }
-                          >
-                            <InfoIcon />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-72">{zone.def.info}</TooltipContent>
-                        </Tooltip>
+                        <InfoTooltip label={`About ${zone.def.label}`}>{zone.def.info}</InfoTooltip>
                       </div>
                       <div className="flex items-center gap-2">
                         <ItemDescription className="w-14 shrink-0 font-mono tabular-nums">
