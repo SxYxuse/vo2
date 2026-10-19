@@ -16,7 +16,6 @@ import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
-import { Route as AppTestsRouteImport } from './routes/_app.tests'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
@@ -57,11 +56,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTestsRoute = AppTestsRouteImport.update({
-  id: '/tests',
-  path: '/tests',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppWeekBucketRoute = AppWeekBucketRouteImport.update({
   id: '/week-bucket',
   path: '/week-bucket',
@@ -95,7 +89,6 @@ export interface FileRoutesByFullPath {
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
   '/settings': typeof AppSettingsRoute
-  '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
@@ -108,7 +101,6 @@ export interface FileRoutesByTo {
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
   '/settings': typeof AppSettingsRoute
-  '/tests': typeof AppTestsRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/': typeof AppIndexRoute
@@ -124,7 +116,6 @@ export interface FileRoutesById {
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
   '/_app/settings': typeof AppSettingsRoute
-  '/_app/tests': typeof AppTestsRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/_app/': typeof AppIndexRoute
@@ -141,7 +132,6 @@ export interface FileRouteTypes {
     | '/heart-rate'
     | '/map'
     | '/settings'
-    | '/tests'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/activities/$activityId'
@@ -154,7 +144,6 @@ export interface FileRouteTypes {
     | '/heart-rate'
     | '/map'
     | '/settings'
-    | '/tests'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/'
@@ -169,7 +158,6 @@ export interface FileRouteTypes {
     | '/_app/heart-rate'
     | '/_app/map'
     | '/_app/settings'
-    | '/_app/tests'
     | '/_app/week-bucket'
     | '/api/activity-analysis'
     | '/_app/'
@@ -237,13 +225,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/tests': {
-      id: '/_app/tests'
-      path: '/tests'
-      fullPath: '/tests'
-      preLoaderRoute: typeof AppTestsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/week-bucket': {
       id: '/_app/week-bucket'
       path: '/week-bucket'
@@ -287,7 +268,6 @@ interface AppRouteChildren {
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppTestsRoute: typeof AppTestsRoute
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
   AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
@@ -298,7 +278,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppTestsRoute: AppTestsRoute,
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
   AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,

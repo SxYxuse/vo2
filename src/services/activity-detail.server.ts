@@ -9,7 +9,6 @@ import {
   type ActivityChartPreview,
   type ActivityDetail,
 } from "./activity-detail.types.ts";
-import { fieldTestForActivity } from "./assessments.server.ts";
 import { isCyclingSport } from "./training-load.ts";
 
 function isChartPreview(value: unknown): value is ActivityChartPreview {
@@ -44,16 +43,12 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     return null;
   }
 
-  const [preview, fieldTest] = await Promise.all([
-    isChartPreview(row.chartPreview)
-      ? row.chartPreview
-      : loadAndStoreChartPreview(id, Boolean(row.streamsSyncedAt)),
-    fieldTestForActivity(session.user.id, id),
-  ]);
+  const preview = isChartPreview(row.chartPreview)
+    ? row.chartPreview
+    : await loadAndStoreChartPreview(id, Boolean(row.streamsSyncedAt));
   logger.debug("activity_detail.loaded", {
     activityId: id,
     hasStreams: Boolean(row.streamsSyncedAt),
-    hasFieldTest: Boolean(fieldTest),
   });
 
   return {
@@ -74,7 +69,6 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     },
     series: preview.series,
     chart: preview.chart,
-    fieldTest,
   };
 }
 

@@ -10,7 +10,6 @@ import { useForm } from "react-hook-form";
 import {
   activityMapQueryOptions,
   appShellQueryOptions,
-  assessmentsQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
@@ -123,7 +122,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
       void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: assessmentsQueryOptions.queryKey });
       setSaveError(null);
       setStepIndex(STEPS.length - 1);
     },

@@ -45,9 +45,6 @@ const trainingFormFields = trainingPlanSchema.extend({
     .pipe(z.enum(BUILD_PACES, { error: "Choose how hard you want to build fitness." })),
   maxDoubleDays: z.number().int().min(0).max(6),
   workoutStyle: z.enum(["hours", "structured"]),
-  suggestFtpTest: z.boolean(),
-  suggestBeepTest: z.boolean(),
-  suggestRunLthrTest: z.boolean(),
 });
 
 function withTrainingConsistency<Schema extends z.ZodType>(schema: Schema) {
@@ -120,9 +117,6 @@ export function trainingFormDefaults(
       workoutStyle: plan.workoutStyle,
       targetWeeklyHours: plan.targetWeeklyHours,
       preferredRestWeekday: plan.preferredRestWeekday,
-      suggestFtpTest: plan.suggestFtpTest,
-      suggestBeepTest: plan.suggestBeepTest,
-      suggestRunLthrTest: plan.suggestRunLthrTest,
       timeZone: plan.timeZone || timeZone,
     };
   }
@@ -135,9 +129,6 @@ export function trainingFormDefaults(
     workoutStyle: "hours",
     targetWeeklyHours: suggestedTargetHours(avgHours, "keep"),
     preferredRestWeekday: 0,
-    suggestFtpTest: true,
-    suggestBeepTest: true,
-    suggestRunLthrTest: true,
     timeZone,
   };
 }

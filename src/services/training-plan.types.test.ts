@@ -84,37 +84,6 @@ describe("assignActivitiesToSessions", () => {
     ]);
   });
 
-  it("field test planned sessions are never assigned an Activity", () => {
-    const matches = assignActivitiesToSessions(
-      [
-        completed({ id: "ride-1", family: "cycling", minutes: 75, load: 80 }),
-        completed({ id: "run-beep", family: "running", minutes: 20, load: 30 }),
-        completed({ id: "run-lthr", family: "running", minutes: 45, load: 55 }),
-      ],
-      [
-        planned({
-          id: "ftp",
-          sportFamily: "cycling",
-          title: "FTP 20-min",
-          targetMinutes: 75,
-        }),
-        planned({
-          id: "beep",
-          sportFamily: "running",
-          title: "Beep test",
-          targetMinutes: 20,
-        }),
-        planned({
-          id: "run-lthr",
-          sportFamily: "running",
-          title: "Run LTHR",
-          targetMinutes: 45,
-        }),
-      ],
-    );
-    expect(matches).toEqual([]);
-  });
-
   it("Activity already on a planned session is not assigned to another; quality is preferred over easy", () => {
     expect(
       assignActivitiesToSessions(

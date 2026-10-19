@@ -2,7 +2,6 @@ import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay, subDays, subMonths, subYears } from "date-fns";
 import { createServerFn } from "@tanstack/react-start";
 
-import { parseAssessmentResult } from "./assessments-score.ts";
 import { estimateLthrFromMax, heartRateFamily, isPlausibleBpm } from "./heart-rate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
@@ -224,44 +223,6 @@ export function estimateLoadAnchors(activities: LoadInputs[]): LoadAnchors {
     swimLthr: estimateLthrFromMax(peaks.swimMaxHr, "swimming"),
     restHr: estimateRestHr(activities),
     ...peaks,
-  };
-}
-
-export function pickLoadAnchorsFromTests(
-  rows: Array<{ assessmentId: string; result: unknown }>,
-): Partial<LoadAnchors> {
-  const picked: Partial<LoadAnchors> = {};
-  for (const row of rows) {
-    const result = parseAssessmentResult(row.result);
-    if (row.assessmentId === "ftp-20") {
-      if (picked.ftp == null && result.ftpWatts != null) picked.ftp = result.ftpWatts;
-      if (picked.cyclingLthr == null && result.cyclingLthr != null) {
-        picked.cyclingLthr = result.cyclingLthr;
-      }
-      if (picked.cyclingMaxHr == null && result.peakHr != null) picked.cyclingMaxHr = result.peakHr;
-    }
-    if (row.assessmentId === "run-lthr" && picked.runLthr == null && result.runLthr != null) {
-      picked.runLthr = result.runLthr;
-    }
-    if (row.assessmentId === "beep-test" && picked.runMaxHr == null && result.peakHr != null) {
-      picked.runMaxHr = result.peakHr;
-    }
-  }
-  return picked;
-}
-
-export function mergeLoadAnchors(estimated: LoadAnchors, tests: Partial<LoadAnchors>): LoadAnchors {
-  return {
-    ftp: tests.ftp ?? estimated.ftp,
-    cyclingLthr: tests.cyclingLthr ?? estimated.cyclingLthr,
-    runLthr: tests.runLthr ?? estimated.runLthr,
-    swimLthr: tests.swimLthr ?? estimated.swimLthr,
-    restHr: tests.restHr ?? estimated.restHr,
-    cyclingMaxHr: tests.cyclingMaxHr ?? estimated.cyclingMaxHr,
-    runMaxHr: tests.runMaxHr ?? estimated.runMaxHr,
-    swimMaxHr: tests.swimMaxHr ?? estimated.swimMaxHr,
-    walkingMaxHr: tests.walkingMaxHr ?? estimated.walkingMaxHr,
-    otherMaxHr: tests.otherMaxHr ?? estimated.otherMaxHr,
   };
 }
 

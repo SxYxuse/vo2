@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import { ActivityIcon, ChevronLeftIcon, FlaskConicalIcon, HeartOffIcon } from "lucide-react";
+import { ActivityIcon, ChevronLeftIcon, HeartOffIcon } from "lucide-react";
 
 import {
   formatActivitySchedule,
@@ -18,7 +18,6 @@ import {
 } from "@/services/activity-detail.ts";
 import { formatSportType } from "@/services/calendar-settings.ts";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
-import { ActivityTestFlag } from "@/components/activity-test-flag.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { weekStartKey } from "@/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
@@ -104,8 +103,6 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           color={SERIES_META.speed.color}
         />
       </div>
-
-      <ActivityTestFlag detail={detail} />
 
       {detail.hasStreams ? (
         <Suspense fallback={<Skeleton className="h-52 w-full rounded-lg sm:h-72" />}>
@@ -207,12 +204,6 @@ export function ActivityDetailView({
             <Badge variant="warning" className="gap-1.5">
               <HeartOffIcon />
               No heart rate
-            </Badge>
-          ) : null}
-          {detail.fieldTest ? (
-            <Badge variant="info" className="gap-1.5">
-              <FlaskConicalIcon />
-              {detail.fieldTest.title}
             </Badge>
           ) : null}
         </div>
