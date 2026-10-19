@@ -9,6 +9,7 @@ import {
   zonesFromHistogram,
   type HeartRateFamily,
 } from "./heart-rate.ts";
+import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 
 export const ANALYSIS_STREAMS = [
@@ -694,15 +695,6 @@ export function correlateStreams(
   return { pairs: usable.map(([x, y]) => correlatePair(samples, x, y)), notes };
 }
 
-const GRADE_BANDS: { label: string; min: number; max: number }[] = [
-  { label: "Steep descent", min: -100, max: -6 },
-  { label: "Descent", min: -6, max: -2.5 },
-  { label: "Flat / rolling", min: -2.5, max: 2.5 },
-  { label: "Climb", min: 2.5, max: 6 },
-  { label: "Steep climb", min: 6, max: 12 },
-  { label: "Very steep", min: 12, max: 100 },
-];
-
 function percentile(values: number[], p: number) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -711,14 +703,6 @@ function percentile(values: number[], p: number) {
   const high = Math.ceil(index);
   if (low === high) return sorted[low];
   return sorted[low] * (high - index) + sorted[high] * (index - low);
-}
-
-function bandIndexForGrade(grade: number) {
-  for (let index = 0; index < GRADE_BANDS.length; index += 1) {
-    const band = GRADE_BANDS[index];
-    if (grade >= band.min && grade < band.max) return index;
-  }
-  return -1;
 }
 
 export function summarizeEffort(samples: ActivitySample[]): EffortReport {

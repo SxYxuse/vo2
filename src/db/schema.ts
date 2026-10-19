@@ -83,6 +83,7 @@ export const activityStreams = pgTable("activity_streams", {
   moving: jsonb("moving").$type<boolean[]>(),
   gradeSmooth: jsonb("grade_smooth").$type<number[]>(),
   chartPreview: jsonb("chart_preview"),
+  rideAnalysis: jsonb("ride_analysis"),
   raw: jsonb("raw").notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });

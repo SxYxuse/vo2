@@ -1,4 +1,5 @@
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
+import type { RideSummary } from "./ride-analysis.ts";
 
 export const STREAM_SERIES = ["heartrate", "watts", "cadence", "speed", "altitude"] as const;
 
@@ -36,6 +37,8 @@ export type ActivityDetail = {
   kpis: ActivityKpis;
   series: StreamSeriesKey[];
   chart: ActivityChartPoint[];
+  /** Cycling only: terrain breakdown and ride-quality numbers. Null without power or cadence. */
+  ride: RideSummary | null;
 };
 
 export type ActivityChartPreview = {

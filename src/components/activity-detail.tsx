@@ -18,6 +18,7 @@ import {
 } from "@/services/activity-detail.ts";
 import { formatSportType } from "@/services/calendar-settings.ts";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
+import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { weekStartKey } from "@/services/training-plan.ts";
 import { Badge } from "@/components/ui/badge";
@@ -121,6 +122,7 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           </EmptyHeader>
         </Empty>
       )}
+      {detail.ride ? <ActivityRideAnalysis ride={detail.ride} /> : null}
       <Suspense fallback={<Skeleton className="h-48 w-full rounded-lg" />}>
         <ActivityAnalysisCard activityId={detail.id} hasStreams={detail.hasStreams} />
       </Suspense>
