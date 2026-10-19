@@ -28,5 +28,8 @@ jobs:
           cache: true
 
       - run: vp check
+      - run: vp run db:check
+        env:
+          STRAVA_MOCK: "1"
       - run: vp test
       - run: vp build

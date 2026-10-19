@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
 import { formatSportType, type CalendarSettings } from "@/services/calendar-settings.types.ts";
+import { maxHrAnchorHint, maxHrAnchorInfo } from "@/services/heart-insights.ts";
 import {
   ALL_SPORTS,
   HR_ZONES,
@@ -11,9 +13,13 @@ import {
   lthrHint,
   lthrInfo,
   overallFromSports,
+  sportForPeriod,
   type HeartRateData,
   type HeartRateSport,
 } from "@/services/heart-rate.ts";
+import { FITNESS_PERIODS, periodStartMs } from "@/services/training-load.ts";
+import { EfficiencyTrendCard } from "@/components/heart-rate-efficiency.tsx";
+import { PeriodToggle } from "@/components/period-toggle.tsx";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +30,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 const DATE_MED = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
 const MAX_HR_INFO =
-  "Highest plausible heart rate recorded for this selection. Spikes outside 40–230 bpm are ignored. Grouped ride or run types share one max. A ride peak does not set run zones.";
+  "Highest heart rate across sports from the last 18 months, with sensor spikes left out. Each sport keeps its own max: a ride peak does not set run zones. Open a sport to see how its max compares with your age.";
 
 const TIME_INFO =
-  "Time spent in each zone from heart-rate streams. Each sample is classified with that activity's sport model, then All sums those times. Activities without heart-rate samples are left out of the bars.";
+  "Time spent in each zone from heart-rate streams, in the selected period. Each sample is classified with that activity's sport model, then All sums those times. Activities without heart-rate samples are left out of the bars.";
 
 function Kpi({
   label,
@@ -76,6 +82,8 @@ function membersHint(sport: HeartRateSport) {
 }
 
 function peakHint(sport: HeartRateSport) {
+  const anchorHint = sport.maxAnchor ? maxHrAnchorHint(sport.maxAnchor) : null;
+  if (anchorHint) return anchorHint;
   if (!sport.peakActivityName || !sport.peakActivityStart) return undefined;
   const date = DATE_MED.format(new Date(sport.peakActivityStart));
   return `${sport.peakActivityName} · ${date}`;
@@ -89,13 +97,19 @@ export function HeartRateZones({
   sportTypes: CalendarSettings["sportTypes"];
 }) {
   const [sportType, setSportType] = useState(ALL_SPORTS);
+  const period = useTrainingPeriod();
+  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const startMs = period ? periodStartMs(period, timeZone) : null;
+  const periodLabel = FITNESS_PERIODS.find((item) => item.id === period)?.label;
   const sports = useMemo(
     () =>
-      data.sports.filter((sport) => {
-        const types = sport.members.length ? sport.members : [sport.sportType];
-        return types.some((type) => sportTypes[type]?.visible !== false);
-      }),
-    [data.sports, sportTypes],
+      data.sports
+        .filter((sport) => {
+          const types = sport.members.length ? sport.members : [sport.sportType];
+          return types.some((type) => sportTypes[type]?.visible !== false);
+        })
+        .map((sport) => sportForPeriod(sport, startMs)),
+    [data.sports, sportTypes, startMs],
   );
   const overall = useMemo(() => overallFromSports(sports), [sports]);
   const selectedType = sports.some((sport) => sport.sportType === sportType)
@@ -141,6 +155,7 @@ export function HeartRateZones({
 
   return (
     <div className="flex flex-col gap-4">
+      <PeriodToggle period={period} />
       <ToggleGroup
         size="sm"
         variant="outline"
@@ -171,7 +186,7 @@ export function HeartRateZones({
           label="Max HR"
           value={selected.maxHeartrate ? `${selected.maxHeartrate} bpm` : "—"}
           hint={peakHint(selected)}
-          info={MAX_HR_INFO}
+          info={selected.maxAnchor ? maxHrAnchorInfo(selected.maxAnchor) : MAX_HR_INFO}
           color="var(--color-ds-red-700)"
         />
         <Kpi
@@ -184,7 +199,7 @@ export function HeartRateZones({
         <Kpi
           label="Activities"
           value={String(selected.activityCount)}
-          hint="with heart rate"
+          hint={period === "all" || !periodLabel ? "with heart rate" : `in ${periodLabel}`}
           info="Count of activities that recorded a heart rate for this selection."
           color="var(--color-ds-blue-700)"
         />
@@ -215,9 +230,13 @@ export function HeartRateZones({
           {totalSeconds <= 0 ? (
             <Empty className="min-h-40 border">
               <EmptyHeader>
-                <EmptyTitle>No time in zone yet</EmptyTitle>
+                <EmptyTitle>
+                  {selected.activityCount ? "No time in zone yet" : "No heart rate in this period"}
+                </EmptyTitle>
                 <EmptyDescription>
-                  Max HR can come from activity summaries. Time in zone needs heart-rate streams.
+                  {selected.activityCount
+                    ? "Max HR can come from activity summaries. Time in zone needs heart-rate streams."
+                    : "Pick a longer period to see time in zone."}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -275,6 +294,9 @@ export function HeartRateZones({
           )}
         </CardContent>
       </Card>
+      {selected.efficiencyKind && period ? (
+        <EfficiencyTrendCard sport={selected} period={period} />
+      ) : null}
     </div>
   );
 }

@@ -99,6 +99,13 @@
       "when": 1792431547597,
       "tag": "0013_ride_analysis",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792434243271,
+      "tag": "0014_heart_analysis",
+      "breakpoints": true
     }
   ]
 }

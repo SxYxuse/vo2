@@ -9,6 +9,30 @@ import {
   type ActivityChartPreview,
   type ActivityDetail,
 } from "./activity-detail.types.ts";
+import { ageFromBirthDate } from "./app-settings.types.ts";
+import {
+  buildHeartAnalysis,
+  denseHistogram,
+  efficiencyKindFor,
+  efficiencyNorm,
+  estimateMaxHrAnchor,
+  isHeartAnalysis,
+  toEfficiencyPoint,
+  usualHeartrate,
+  type ActivityHeart,
+  type EfficiencyPoint,
+  type HeartAnalysis,
+  type HeartPeak,
+} from "./heart-insights.ts";
+import {
+  familyLthr,
+  heartRateFamily,
+  histogramSeconds,
+  isPlausibleBpm,
+  zoneModelFor,
+  zonesFromHistogram,
+  type SportLthrAnchors,
+} from "./heart-rate.ts";
 import {
   buildRideAnalysis,
   isRideAnalysis,
@@ -23,6 +47,12 @@ function isChartPreview(value: unknown): value is ActivityChartPreview {
   return Array.isArray(preview.series) && Array.isArray(preview.chart) && preview.kpis != null;
 }
 
+type DerivedCache = {
+  preview: ActivityChartPreview | null;
+  ride: RideAnalysis | null;
+  heart: HeartAnalysis | null;
+};
+
 export async function getActivityDetailImpl(id: string): Promise<ActivityDetail | null> {
   const session = await getRequiredSession();
   const [row] = await db
@@ -36,12 +66,19 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
       distance: activities.distance,
       totalElevationGain: activities.totalElevationGain,
       streamsSyncedAt: activities.streamsSyncedAt,
+      averageHeartrate: activities.averageHeartrate,
       averageWatts: activities.averageWatts,
       weightedAverageWatts: activities.weightedAverageWatts,
       deviceWatts: activities.deviceWatts,
       chartPreview: activityStreams.chartPreview,
       rideAnalysis: activityStreams.rideAnalysis,
+      heartAnalysis: activityStreams.heartAnalysis,
       ftp: athleteMetrics.ftp,
+      cyclingLthr: athleteMetrics.cyclingLthr,
+      runLthr: athleteMetrics.runLthr,
+      swimLthr: athleteMetrics.swimLthr,
+      lthr: athleteMetrics.lthr,
+      birthDate: athleteMetrics.birthDate,
     })
     .from(activities)
     .leftJoin(activityStreams, eq(activityStreams.activityId, activities.id))
@@ -56,19 +93,31 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
 
   const hasStreamsRow = Boolean(row.streamsSyncedAt);
   const cycling = isCyclingSport(row.sportType);
-  const cached = {
+  const cached: DerivedCache = {
     preview: isChartPreview(row.chartPreview) ? row.chartPreview : null,
     ride: isRideAnalysis(row.rideAnalysis) ? row.rideAnalysis : null,
+    heart: isHeartAnalysis(row.heartAnalysis) ? row.heartAnalysis : null,
   };
-  const derived =
-    cached.preview && (cached.ride || !cycling || !hasStreamsRow)
-      ? cached
-      : await loadAndStoreDerived(id, hasStreamsRow, {
-          preview: cached.preview,
-          ride: cycling ? cached.ride : null,
-          wantRide: cycling,
-        });
+  const complete =
+    cached.preview && (!hasStreamsRow || ((cached.ride || !cycling) && cached.heart));
+  const derived = complete
+    ? cached
+    : await loadAndStoreDerived(id, hasStreamsRow, {
+        ...cached,
+        ride: cycling ? cached.ride : null,
+        wantRide: cycling,
+        context: {
+          family: heartRateFamily(row.sportType),
+          sportType: row.sportType,
+          distance: row.distance,
+          totalElevationGain: row.totalElevationGain,
+        },
+      });
   const preview = derived.preview ?? emptyPreview();
+  const heart =
+    derived.heart?.histogram.length || isPlausibleBpm(row.averageHeartrate)
+      ? await buildActivityHeart(session.user.id, row, derived.heart)
+      : null;
   logger.debug("activity_detail.loaded", {
     activityId: id,
     hasStreams: hasStreamsRow,
@@ -103,17 +152,129 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
             ftp: row.ftp ?? null,
           })
         : null,
+    heart,
   };
 }
 
-/** Builds whichever of the chart preview and ride analysis is not cached yet, from one stream read. */
+type DetailRow = {
+  id: string;
+  sportType: string;
+  startDate: Date;
+  movingTime: number;
+  distance: number | null;
+  totalElevationGain: number | null;
+  averageHeartrate: number | null;
+  averageWatts: number | null;
+  weightedAverageWatts: number | null;
+  deviceWatts: boolean;
+  cyclingLthr: number | null;
+  runLthr: number | null;
+  swimLthr: number | null;
+  lthr: number | null;
+  birthDate: string | null;
+};
+
+/** Anchors come from the athlete's whole history, the same way the heart rate page builds them. */
+async function buildActivityHeart(
+  userId: string,
+  row: DetailRow,
+  analysis: HeartAnalysis | null,
+): Promise<ActivityHeart> {
+  const family = heartRateFamily(row.sportType);
+  const kind = efficiencyKindFor(row.sportType);
+  const history = await db
+    .select({
+      id: activities.id,
+      sportType: activities.sportType,
+      startDate: activities.startDate,
+      movingTime: activities.movingTime,
+      distance: activities.distance,
+      totalElevationGain: activities.totalElevationGain,
+      maxHeartrate: activities.maxHeartrate,
+      averageHeartrate: activities.averageHeartrate,
+      averageWatts: activities.averageWatts,
+      weightedAverageWatts: activities.weightedAverageWatts,
+      deviceWatts: activities.deviceWatts,
+    })
+    .from(activities)
+    .where(eq(activities.userId, userId));
+
+  const peaks: HeartPeak[] = [];
+  for (const item of history) {
+    if (heartRateFamily(item.sportType) !== family || !isPlausibleBpm(item.maxHeartrate)) continue;
+    peaks.push({
+      bpm: item.maxHeartrate!,
+      start: item.startDate.toISOString(),
+      avgBpm: item.averageHeartrate,
+    });
+  }
+  const maxAnchor = estimateMaxHrAnchor(peaks, { family, age: ageFromBirthDate(row.birthDate) });
+  const stored: SportLthrAnchors = {};
+  const cyclingLthr = row.cyclingLthr ?? row.lthr;
+  if (cyclingLthr) stored.cycling = { bpm: cyclingLthr, source: "estimated-from-max" };
+  if (row.runLthr) stored.running = { bpm: row.runLthr, source: "estimated-from-max" };
+  if (row.swimLthr) stored.swimming = { bpm: row.swimLthr, source: "estimated-from-max" };
+  const { lthr } = familyLthr(family, maxAnchor.bpm, stored);
+
+  const histogram = analysis?.histogram.length ? denseHistogram(analysis.histogram) : null;
+  const zones = histogram
+    ? zonesFromHistogram(histogram, row.sportType, maxAnchor.bpm, lthr)
+    : null;
+
+  const start = row.startDate.toISOString();
+  const current = toEfficiencyPoint({ ...row, start }, lthr);
+  let efficiency: ActivityHeart["efficiency"] = null;
+  let usual: ActivityHeart["usual"] = null;
+  if (current && kind) {
+    const points: EfficiencyPoint[] = [];
+    for (const item of history) {
+      if (item.id === row.id || efficiencyKindFor(item.sportType) !== kind) continue;
+      const point = toEfficiencyPoint({ ...item, start: item.startDate.toISOString() }, lthr);
+      if (point) points.push(point);
+    }
+    const norm = efficiencyNorm(points, start);
+    efficiency = {
+      kind,
+      value: current.ef,
+      aerobic: current.aerobic,
+      norm,
+      deltaPct: norm ? Math.round(((current.ef - norm.value) / norm.value) * 1000) / 10 : null,
+    };
+    const expected = usualHeartrate(points, start, current.output);
+    if (expected) {
+      usual = {
+        expectedBpm: expected.bpm,
+        gapBpm: Math.round(current.avgHeartrate - expected.bpm),
+        count: expected.count,
+      };
+    }
+  }
+
+  return {
+    family,
+    zoneModel: zoneModelFor(row.sportType).label,
+    maxHeartrate: maxAnchor.bpm,
+    lthr,
+    zones,
+    zoneSeconds: histogram ? histogramSeconds(histogram) : 0,
+    decoupling: analysis?.decoupling ?? null,
+    efficiency,
+    usual,
+    avgTempC: analysis?.avgTempC ?? null,
+  };
+}
+
+/** Builds whichever derived summaries are not cached yet, from one stream read. */
 async function loadAndStoreDerived(
   activityId: string,
   hasStreamsRow: boolean,
-  cached: { preview: ActivityChartPreview | null; ride: RideAnalysis | null; wantRide: boolean },
-): Promise<{ preview: ActivityChartPreview | null; ride: RideAnalysis | null }> {
+  cached: DerivedCache & {
+    wantRide: boolean;
+    context: Parameters<typeof buildHeartAnalysis>[1];
+  },
+): Promise<DerivedCache> {
   if (!hasStreamsRow) {
-    return { preview: cached.preview, ride: null };
+    return { preview: cached.preview, ride: null, heart: null };
   }
 
   const [streams] = await db
@@ -127,13 +288,14 @@ async function loadAndStoreDerived(
       cadence: activityStreams.cadence,
       velocitySmooth: activityStreams.velocitySmooth,
       moving: activityStreams.moving,
+      temp: activityStreams.temp,
     })
     .from(activityStreams)
     .where(eq(activityStreams.activityId, activityId))
     .limit(1);
 
   if (!streams) {
-    return { preview: cached.preview, ride: null };
+    return { preview: cached.preview, ride: null, heart: null };
   }
 
   const preview =
@@ -147,21 +309,24 @@ async function loadAndStoreDerived(
       altitude: streams.altitude,
     });
   const ride = cached.ride ?? (cached.wantRide ? buildRideAnalysis(streams) : null);
+  const heart = cached.heart ?? buildHeartAnalysis(streams, cached.context);
 
   logger.debug("activity_detail.derived_built", {
     activityId,
     preview: !cached.preview,
     ride: Boolean(ride && !cached.ride),
+    heart: !cached.heart,
   });
   await db
     .update(activityStreams)
     .set({
       ...(cached.preview ? {} : { chartPreview: preview }),
       ...(ride && !cached.ride ? { rideAnalysis: ride } : {}),
+      ...(cached.heart ? {} : { heartAnalysis: heart }),
     })
     .where(eq(activityStreams.activityId, activityId));
 
-  return { preview, ride };
+  return { preview, ride, heart };
 }
 
 function emptyPreview(): ActivityChartPreview {

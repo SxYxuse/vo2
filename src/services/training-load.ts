@@ -2,7 +2,13 @@ import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay, subDays, subMonths, subYears } from "date-fns";
 import { createServerFn } from "@tanstack/react-start";
 
-import { estimateLthrFromMax, heartRateFamily, isPlausibleBpm } from "./heart-rate.ts";
+import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
+import {
+  estimateLthrFromMax,
+  heartRateFamily,
+  isPlausibleBpm,
+  type HeartRateFamily,
+} from "./heart-rate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
 export const CTL_DAYS = 42;
@@ -24,6 +30,8 @@ export const FITNESS_PERIODS: { id: FitnessPeriod; label: string; shortLabel: st
 
 export type LoadInputs = {
   sportType: string;
+  /** Peaks older than the max-HR window stop setting zones; missing counts as recent. */
+  startDate?: Date | string;
   movingTime: number;
   averageHeartrate: number | null;
   maxHeartrate: number | null;
@@ -160,27 +168,38 @@ function sportLthr(sportType: string, anchors: LoadAnchors) {
   return null;
 }
 
-function peakByFamily(activities: LoadInputs[]) {
-  const peaks: Record<"cycling" | "running" | "swimming" | "walking" | "other", number> = {
-    cycling: 0,
-    running: 0,
-    swimming: 0,
-    walking: 0,
-    other: 0,
+export type AnchorOptions = { age?: number | null; now?: Date };
+
+/** Recent max HR per family, with sensor spikes dropped (same rules as the heart rate page). */
+function peakByFamily(activities: LoadInputs[], options: AnchorOptions) {
+  const peaks: Record<HeartRateFamily, HeartPeak[]> = {
+    cycling: [],
+    running: [],
+    swimming: [],
+    walking: [],
+    other: [],
   };
+  const now = options.now ?? new Date();
   for (const activity of activities) {
     const maxHr = activity.maxHeartrate ?? 0;
     if (!isPlausibleBpm(maxHr)) continue;
-    const family = heartRateFamily(activity.sportType);
-    if (maxHr > peaks[family]) peaks[family] = maxHr;
+    const start = activity.startDate ? new Date(activity.startDate) : now;
+    peaks[heartRateFamily(activity.sportType)].push({
+      bpm: maxHr,
+      start: start.toISOString(),
+      avgBpm: activity.averageHeartrate,
+    });
   }
-  const asNull = (value: number) => (value > 0 ? value : null);
+  const observed = (family: HeartRateFamily) => {
+    const anchor = estimateMaxHrAnchor(peaks[family], { family, age: options.age, now });
+    return anchor.peak ? anchor.bpm : null;
+  };
   return {
-    cyclingMaxHr: asNull(peaks.cycling),
-    runMaxHr: asNull(peaks.running),
-    swimMaxHr: asNull(peaks.swimming),
-    walkingMaxHr: asNull(peaks.walking),
-    otherMaxHr: asNull(peaks.other),
+    cyclingMaxHr: observed("cycling"),
+    runMaxHr: observed("running"),
+    swimMaxHr: observed("swimming"),
+    walkingMaxHr: observed("walking"),
+    otherMaxHr: observed("other"),
   };
 }
 
@@ -214,8 +233,11 @@ function estimateFtp(activities: LoadInputs[]) {
   return ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null;
 }
 
-export function estimateLoadAnchors(activities: LoadInputs[]): LoadAnchors {
-  const peaks = peakByFamily(activities);
+export function estimateLoadAnchors(
+  activities: LoadInputs[],
+  options: AnchorOptions = {},
+): LoadAnchors {
+  const peaks = peakByFamily(activities, options);
   return {
     ftp: estimateFtp(activities),
     cyclingLthr: estimateLthrFromMax(peaks.cyclingMaxHr, "cycling"),
@@ -334,16 +356,22 @@ export function ctlChange(points: PmcPoint[], days = 7) {
   return latest.ctl - prior.ctl;
 }
 
-export function slicePmc(points: PmcPoint[], period: FitnessPeriod, timeZone: string) {
-  if (!points.length || period === "all") return points;
-  const end = zonedDayStart(new Date(), timeZone);
+/** First instant of a period in the athlete's timezone; null for all time. */
+export function periodStartMs(period: FitnessPeriod, timeZone: string, now = new Date()) {
+  if (period === "all") return null;
+  const end = zonedDayStart(now, timeZone);
   const start =
     period === "7d"
       ? subDays(end, 6)
       : period === "1y"
         ? subYears(end, 1)
         : subMonths(end, period === "1m" ? 1 : period === "3m" ? 3 : 6);
-  const startMs = start.getTime();
+  return start.getTime();
+}
+
+export function slicePmc(points: PmcPoint[], period: FitnessPeriod, timeZone: string) {
+  const startMs = periodStartMs(period, timeZone);
+  if (!points.length || startMs == null) return points;
   return points.filter((point) => point.t >= startMs);
 }
 

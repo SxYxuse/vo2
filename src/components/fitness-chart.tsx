@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { cn } from "cn";
 import {
   Area,
@@ -15,6 +15,8 @@ import {
 } from "recharts";
 
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { PeriodToggle } from "@/components/period-toggle.tsx";
+import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
 
 import {
   FITNESS_PERIODS,
@@ -182,10 +184,9 @@ function Kpi({
 export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const isDesktop = useDesktopMedia();
-  const periodTouched = useRef(false);
-  const [chosenPeriod, setChosenPeriod] = useState<FitnessPeriod | null>(null);
+  const sharedPeriod = useTrainingPeriod();
   const [visible, setVisible] = useState<string[]>(() => [...SERIES_KEYS]);
-  const period: FitnessPeriod = chosenPeriod ?? (isDesktop === true ? "3m" : "7d");
+  const period: FitnessPeriod = sharedPeriod ?? "7d";
 
   const pmc = useMemo(() => (loads.length ? buildPmc(loads, timeZone) : []), [loads, timeZone]);
   const series = useMemo(
@@ -226,27 +227,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
             Track fitness, fatigue, and form so you can keep building without overreaching.
           </CardDescription>
         </div>
-        <ToggleGroup
-          size="sm"
-          variant="outline"
-          spacing={0}
-          value={[period]}
-          onValueChange={(next) => {
-            const value = next[0];
-            if (FITNESS_PERIODS.some((item) => item.id === value)) {
-              periodTouched.current = true;
-              setChosenPeriod(value as FitnessPeriod);
-            }
-          }}
-          className="flex-wrap"
-        >
-          {FITNESS_PERIODS.map((item) => (
-            <ToggleGroupItem key={item.id} value={item.id}>
-              <span className="sm:hidden">{item.shortLabel}</span>
-              <span className="hidden sm:inline">{item.label}</span>
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <PeriodToggle period={sharedPeriod} />
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {!loads.length ? (

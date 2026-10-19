@@ -13,18 +13,18 @@ import {
   settingsSnapshotQueryOptions,
 } from "@/lib/queries.ts";
 import { mergeCalendarSettings } from "@/services/calendar-settings.ts";
-import { parseDiaryWeekSearch } from "@/services/diary-window.ts";
+import { parseDiaryMonthSearch } from "@/services/diary-window.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
 type ActivitySearch = {
-  /** The calendar's ending week when the activity was opened from it. */
-  week?: string;
+  /** The calendar month when the activity was opened from it. */
+  month?: string;
 };
 
 export const Route = createFileRoute("/_app/activities/$activityId")({
   validateSearch: (search: Record<string, unknown>): ActivitySearch => {
-    const week = parseDiaryWeekSearch(search.week);
-    return week ? { week } : {};
+    const month = parseDiaryMonthSearch(search.month);
+    return month ? { month } : {};
   },
   loader: ({ context, params }) => {
     prefetchActivityDetail(context.queryClient, params.activityId);
@@ -38,22 +38,22 @@ export const Route = createFileRoute("/_app/activities/$activityId")({
 
 function ActivityPage() {
   const { activityId } = Route.useParams();
-  const { week } = Route.useSearch();
+  const { month } = Route.useSearch();
   const { data: detail } = useSuspenseQuery(activityDetailQueryOptions(activityId));
   const settingsQuery = useQuery(settingsSnapshotQueryOptions);
 
-  if (!detail) return <ActivityDetailMissing week={week} />;
+  if (!detail) return <ActivityDetailMissing month={month} />;
 
   const color = mergeCalendarSettings(settingsQuery.data?.settings, [detail.sportType]).sportTypes[
     detail.sportType
   ]?.color;
 
-  return <ActivityDetailView detail={detail} color={color} week={week} />;
+  return <ActivityDetailView detail={detail} color={color} month={month} />;
 }
 
 function ActivityPending() {
-  const { week } = Route.useSearch();
-  return <ActivityDetailPending week={week} />;
+  const { month } = Route.useSearch();
+  return <ActivityDetailPending month={month} />;
 }
 
 function ActivityError({ error }: ErrorComponentProps) {
