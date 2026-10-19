@@ -1,6 +1,6 @@
 # Keep a local copy of activities and pause on Strava rate limits
 
-Activities and their streams are copied into VO2's database. The calendar, maps, fitness chart, and field-test scoring read that copy, not live Strava.
+Activities and their streams are copied into VO2's database. The calendar, maps, and fitness chart read that copy, not live Strava.
 
 Strava caps reads (typically 100 per 15 minutes and 1,000 per day). Fetching streams for a full history will hit that cap. VO2 pages activities, then fetches streams in small batches, and pauses until the next window or the next UTC day. The athlete resumes with Sync from Strava.
 

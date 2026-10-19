@@ -35,7 +35,6 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSeparator,
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
@@ -56,7 +55,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const SESSION_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -592,77 +590,6 @@ export function TrainingStyleFields<T extends TrainingFormInput>({
           </FieldSet>
         )}
       />
-      <FieldSeparator />
-      <FieldSet>
-        <FieldLegend>Field tests</FieldLegend>
-        <FieldDescription>
-          Published field tests for FTP, VO2max, and lactate-threshold HR. They live on Tests, not
-          in the weekly bucket. Turn off any you do not want suggested.
-        </FieldDescription>
-        <Controller
-          name={"suggestFtpTest" as FieldPath<T>}
-          control={control}
-          render={({ field }) => (
-            <Field orientation="horizontal">
-              <Switch
-                id={`${idPrefix}-ftp-test`}
-                checked={Boolean(field.value)}
-                onCheckedChange={field.onChange}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor={`${idPrefix}-ftp-test`} className="font-normal">
-                  FTP 20-min
-                </FieldLabel>
-                <FieldDescription>
-                  Allen & Coggan. About 1h 15. FTP = 95% of 20-min power.
-                </FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
-        />
-        <Controller
-          name={"suggestBeepTest" as FieldPath<T>}
-          control={control}
-          render={({ field }) => (
-            <Field orientation="horizontal">
-              <Switch
-                id={`${idPrefix}-beep-test`}
-                checked={Boolean(field.value)}
-                onCheckedChange={field.onChange}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor={`${idPrefix}-beep-test`} className="font-normal">
-                  Beep test
-                </FieldLabel>
-                <FieldDescription>
-                  Léger 20 m shuttle. Stage speed estimates VO2max; peak HR is run max HR.
-                </FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
-        />
-        <Controller
-          name={"suggestRunLthrTest" as FieldPath<T>}
-          control={control}
-          render={({ field }) => (
-            <Field orientation="horizontal">
-              <Switch
-                id={`${idPrefix}-run-lthr`}
-                checked={Boolean(field.value)}
-                onCheckedChange={field.onChange}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor={`${idPrefix}-run-lthr`} className="font-normal">
-                  Run LTHR
-                </FieldLabel>
-                <FieldDescription>
-                  Friel 30-min solo time trial. Last 20 min average HR is run threshold.
-                </FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
-        />
-      </FieldSet>
     </FieldGroup>
   );
 }

@@ -23,21 +23,6 @@ export type ActivityKpis = {
   avgSpeed: number | null;
 };
 
-export type ActivityFieldTestSummary = {
-  assessmentId: string;
-  title: string;
-  result: {
-    ftpWatts: number | null;
-    cyclingLthr: number | null;
-    runLthr: number | null;
-    vo2max: number | null;
-    lastStage: number | null;
-    lastStageSpeedKmh: number | null;
-    peakHr: number | null;
-    meanPower20Min: number | null;
-  };
-};
-
 export type ActivityDetail = {
   id: string;
   title: string;
@@ -51,7 +36,6 @@ export type ActivityDetail = {
   kpis: ActivityKpis;
   series: StreamSeriesKey[];
   chart: ActivityChartPoint[];
-  fieldTest: ActivityFieldTestSummary | null;
 };
 
 export type ActivityChartPreview = {

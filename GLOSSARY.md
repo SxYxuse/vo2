@@ -106,7 +106,7 @@ _Avoid_: ATL used alone
 Fitness minus fatigue at the start of the day, before today's training. Positive means fresh; negative means carrying fatigue.
 _Avoid_: TSB used alone, freshness, TSB score
 
-## Anchors and tests
+## Anchors
 
 **FTP**:
 Estimated ~60-minute maximal cycling power, used as the cycling power anchor.
@@ -122,11 +122,7 @@ _Avoid_: RHR as a second term, using 60 for everyone when an estimate exists
 
 **Max heart rate**:
 The highest heart rate used as a zone anchor when a sport has no LTHR model.
-_Avoid_: HRmax as a second term, peak HR (that is a field-test observation)
-
-**Field test**:
-A prescribed all-out protocol that measures an anchor (FTP, running VO2max, or LTHR). It is never mixed into the week bucket.
-_Avoid_: Assessment, fitness test, race
+_Avoid_: HRmax as a second term, peak HR as a second term
 
 **Heart-rate zone**:
 One of five effort bands from recovery through VO2 max. Cycling, running, and swimming cut zones from that sport's LTHR; walking and other sports cut from max heart rate.

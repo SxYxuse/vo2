@@ -139,33 +139,6 @@ export const calendarSettings = pgTable("calendar_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const fieldTests = pgTable(
-  "field_tests",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    assessmentId: text("assessment_id").notNull(),
-    status: text("status").$type<"suggested" | "completed">().notNull().default("suggested"),
-    activityId: text("activity_id").references(() => activities.id, { onDelete: "set null" }),
-    result: jsonb("result"),
-    suggestedAt: timestamp("suggested_at", { withTimezone: true }).notNull().defaultNow(),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index("field_tests_user_assessment_idx").on(table.userId, table.assessmentId),
-    uniqueIndex("field_tests_open_suggestion_idx")
-      .on(table.userId, table.assessmentId)
-      .where(sql`${table.status} = 'suggested'`),
-    uniqueIndex("field_tests_activity_idx")
-      .on(table.activityId)
-      .where(sql`${table.activityId} is not null`),
-  ],
-);
-
 export const syncRuns = pgTable("sync_runs", {
   userId: text("user_id")
     .primaryKey()

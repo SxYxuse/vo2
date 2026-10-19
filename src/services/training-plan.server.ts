@@ -1,11 +1,10 @@
 import { cache } from "react";
-import { and, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, athleteMetrics, fieldTests, plannedSessions } from "@/db/schema.ts";
+import { activities, athleteMetrics, plannedSessions } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getRequiredSession } from "@/lib/session.server.ts";
-import { parseAssessmentResult } from "./assessments-score.ts";
 import { familyCollectors } from "./calendar-settings.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { toFitnessLoad } from "./training-load.ts";
@@ -13,7 +12,6 @@ import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import {
   assignActivitiesToSessions,
   dayKey,
-  isAssessmentSession,
   latestPmc,
   formForRemainingWeek,
   isTrainingPlanComplete,
@@ -23,7 +21,7 @@ import {
   weekStartKey,
   type MatchableActivity,
   type PlannedSession,
-  type TestAnchors,
+  type PlanningAnchors,
   type TrainingPlan,
 } from "./training-plan.types.ts";
 
@@ -144,14 +142,6 @@ async function weekActivitiesForUser(
   return week;
 }
 
-async function flaggedActivityIds(userId: string) {
-  const rows = await db
-    .select({ activityId: fieldTests.activityId })
-    .from(fieldTests)
-    .where(and(eq(fieldTests.userId, userId), isNotNull(fieldTests.activityId)));
-  return new Set(rows.flatMap((row) => (row.activityId ? [row.activityId] : [])));
-}
-
 async function fitnessLoadsForUser(userId: string) {
   const rows = await db
     .select({
@@ -216,9 +206,8 @@ async function rebuildWeek(
   const weekStart = weekStartKey(now, timeZone);
   await refreshTrainingLoadsIfNeeded(userId);
   const weekEnd = addDate(weekStart, 6);
-  const [loads, flagged, weekActivities, existing, settings, anchors] = await Promise.all([
+  const [loads, weekActivities, existing, settings, anchors] = await Promise.all([
     fitnessLoadsForUser(userId),
-    flaggedActivityIds(userId),
     weekActivitiesForUser(userId, weekStart, weekEnd, timeZone),
     db
       .select({
@@ -237,35 +226,30 @@ async function rebuildWeek(
       .where(and(eq(plannedSessions.userId, userId), eq(plannedSessions.weekStart, weekStart))),
     getCalendarSettingsForUser(userId),
     mode === "suggest"
-      ? latestTestAnchors(userId)
+      ? latestPlanningAnchors(userId)
       : Promise.resolve({
           ftpWatts: null,
           cyclingLthr: null,
           cyclingMaxHr: null,
           runLthr: null,
           runMaxHr: null,
-        } satisfies TestAnchors),
+        } satisfies PlanningAnchors),
   ]);
   const pmc = latestPmc(loads, timeZone);
-  const completed = weekActivities
-    .filter((activity) => !flagged.has(activity.id))
-    .map((activity) => ({
-      date: activity.date,
-      family: activity.family,
-      minutes: activity.minutes,
-      load: activity.load,
-    }));
+  const completed = weekActivities.map((activity) => ({
+    date: activity.date,
+    family: activity.family,
+    minutes: activity.minutes,
+    load: activity.load,
+  }));
 
   const existingPlanned = existing.map((row) => toPlanned(row));
-  const matches = assignActivitiesToSessions(
-    weekActivities.filter((activity) => !flagged.has(activity.id)),
-    existingPlanned,
-  );
+  const matches = assignActivitiesToSessions(weekActivities, existingPlanned);
   const matchBySession = new Map(matches.map((match) => [match.sessionId, match]));
   const preserved = existingPlanned
     .filter((session) => {
       if (session.status === "done" || matchBySession.has(session.id)) return true;
-      return mode === "adapt" && !isAssessmentSession(session);
+      return mode === "adapt";
     })
     .map((session) => {
       const match = matchBySession.get(session.id);
@@ -342,38 +326,23 @@ async function rebuildWeek(
   );
 }
 
-async function latestTestAnchors(userId: string): Promise<TestAnchors> {
-  const rows = await db
+async function latestPlanningAnchors(userId: string): Promise<PlanningAnchors> {
+  const [row] = await db
     .select({
-      assessmentId: fieldTests.assessmentId,
-      result: fieldTests.result,
+      ftp: athleteMetrics.ftp,
+      cyclingLthr: athleteMetrics.cyclingLthr,
+      runLthr: athleteMetrics.runLthr,
     })
-    .from(fieldTests)
-    .where(and(eq(fieldTests.userId, userId), eq(fieldTests.status, "completed")))
-    .orderBy(desc(fieldTests.completedAt));
-
-  const anchors: TestAnchors = {
-    ftpWatts: null,
-    cyclingLthr: null,
+    .from(athleteMetrics)
+    .where(eq(athleteMetrics.userId, userId))
+    .limit(1);
+  return {
+    ftpWatts: row?.ftp ?? null,
+    cyclingLthr: row?.cyclingLthr ?? null,
     cyclingMaxHr: null,
-    runLthr: null,
+    runLthr: row?.runLthr ?? null,
     runMaxHr: null,
   };
-  for (const row of rows) {
-    const result = parseAssessmentResult(row.result);
-    if (row.assessmentId === "ftp-20") {
-      if (anchors.ftpWatts == null) anchors.ftpWatts = result.ftpWatts;
-      if (anchors.cyclingLthr == null) anchors.cyclingLthr = result.cyclingLthr;
-      if (anchors.cyclingMaxHr == null) anchors.cyclingMaxHr = result.peakHr;
-    }
-    if (row.assessmentId === "run-lthr" && anchors.runLthr == null) {
-      anchors.runLthr = result.runLthr;
-    }
-    if (row.assessmentId === "beep-test" && anchors.runMaxHr == null) {
-      anchors.runMaxHr = result.peakHr;
-    }
-  }
-  return anchors;
 }
 
 function addDate(key: string, days: number) {

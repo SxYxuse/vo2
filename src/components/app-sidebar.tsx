@@ -6,7 +6,6 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   CalendarDaysIcon,
   ClipboardListIcon,
-  FlaskConicalIcon,
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
@@ -71,7 +70,6 @@ const NAV_ITEMS = [
   { title: "Map", to: "/map", icon: MapIcon },
   { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
   { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
-  { title: "Tests", to: "/tests", icon: FlaskConicalIcon },
 ] as const;
 
 function SidebarNavMenu({

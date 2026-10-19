@@ -6,7 +6,6 @@ import type { ActivityDetail } from "./activity-detail.types.ts";
 export type {
   ActivityChartPoint,
   ActivityDetail,
-  ActivityFieldTestSummary,
   StreamSeriesKey,
 } from "./activity-detail.types.ts";
 export {

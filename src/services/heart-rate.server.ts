@@ -1,7 +1,7 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, activityStreams, athleteMetrics, fieldTests } from "@/db/schema.ts";
+import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
@@ -17,8 +17,6 @@ import {
   type HeartRateSport,
   type SportLthrAnchors,
 } from "./heart-rate.ts";
-import { pickLoadAnchorsFromTests } from "./training-load.ts";
-
 const STREAM_BATCH = 40;
 
 const EMPTY_OVERALL: HeartRateSport = {
@@ -43,7 +41,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     return { signedIn: false, overall: EMPTY_OVERALL, sports: [], sportTypes: {} };
   }
 
-  const [rows, storedSettings, metricsRows, testRows] = await Promise.all([
+  const [rows, storedSettings, metricsRows] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -66,14 +64,6 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, session.user.id))
       .limit(1),
-    db
-      .select({
-        assessmentId: fieldTests.assessmentId,
-        result: fieldTests.result,
-      })
-      .from(fieldTests)
-      .where(and(eq(fieldTests.userId, session.user.id), eq(fieldTests.status, "completed")))
-      .orderBy(desc(fieldTests.completedAt)),
   ]);
 
   const bySport = new Map<string, ReturnType<typeof createSportBucket>>();
@@ -121,28 +111,27 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     storedSettings,
     rows.map((row) => row.sportType),
   );
-  const tests = pickLoadAnchorsFromTests(testRows);
   const metrics = metricsRows[0];
   const lthrAnchors: SportLthrAnchors = {};
-  const cyclingLthr = tests.cyclingLthr ?? metrics?.cyclingLthr ?? metrics?.lthr ?? null;
-  const runLthr = tests.runLthr ?? metrics?.runLthr ?? null;
-  const swimLthr = tests.swimLthr ?? metrics?.swimLthr ?? null;
+  const cyclingLthr = metrics?.cyclingLthr ?? metrics?.lthr ?? null;
+  const runLthr = metrics?.runLthr ?? null;
+  const swimLthr = metrics?.swimLthr ?? null;
   if (cyclingLthr) {
     lthrAnchors.cycling = {
       bpm: cyclingLthr,
-      source: tests.cyclingLthr ? "field-test" : "estimated-from-max",
+      source: "estimated-from-max",
     };
   }
   if (runLthr) {
     lthrAnchors.running = {
       bpm: runLthr,
-      source: tests.runLthr ? "field-test" : "estimated-from-max",
+      source: "estimated-from-max",
     };
   }
   if (swimLthr) {
     lthrAnchors.swimming = {
       bpm: swimLthr,
-      source: tests.swimLthr ? "field-test" : "estimated-from-max",
+      source: "estimated-from-max",
     };
   }
 

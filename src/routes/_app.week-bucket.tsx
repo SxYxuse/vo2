@@ -33,7 +33,7 @@ function WeekBucketHeading() {
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         Planned runs and rides still to do this training week. Pick one when you have a time window;
-        completed activities match themselves to open sessions. Field tests live on Tests.
+        completed activities match themselves to open sessions.
       </p>
     </div>
   );
