@@ -23,11 +23,7 @@ import {
 } from "@/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
 import { weekStartKey } from "@/services/training-plan.ts";
-import {
-  diaryWindow,
-  resolveDiaryCursorWeek,
-  stepDiaryWeek,
-} from "@/services/diary-window.ts";
+import { diaryWindow, resolveDiaryCursorWeek, stepDiaryWeek } from "@/services/diary-window.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,
