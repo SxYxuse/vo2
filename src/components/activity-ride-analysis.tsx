@@ -44,7 +44,7 @@ function RideStat({ label, value, hint, info }: RideStatProps) {
     <div className="flex min-w-0 flex-col gap-0.5 rounded-md px-3 py-2">
       <span className="flex items-center gap-1 text-muted-foreground">
         {label}
-        <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
+        <InfoTooltip label={`${label}`}>{info}</InfoTooltip>
       </span>
       <span className="font-mono text-base tabular-nums">{value}</span>
       {hint ? <span className="truncate text-muted-foreground">{hint}</span> : null}
