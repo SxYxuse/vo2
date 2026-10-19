@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { diaryWindow, stepDiaryWeek } from "./diary-window.ts";
+import {
+  diaryWindow,
+  parseDiaryWeekSearch,
+  resolveDiaryCursorWeek,
+  stepDiaryWeek,
+} from "./diary-window.ts";
 
 describe("diaryWindow", () => {
   it("shows the cursor training week and the three before it for four weeks", () => {
@@ -38,5 +43,29 @@ describe("stepDiaryWeek", () => {
 
   it("never walks past the current training week", () => {
     expect(stepDiaryWeek("2026-10-12", 1, "2026-10-12")).toBe("2026-10-12");
+  });
+});
+
+describe("parseDiaryWeekSearch", () => {
+  it("accepts a Monday day key", () => {
+    expect(parseDiaryWeekSearch("2026-08-17")).toBe("2026-08-17");
+  });
+
+  it("rejects non-Mondays, impossible dates, and non-strings", () => {
+    expect(parseDiaryWeekSearch("2026-08-18")).toBeUndefined();
+    expect(parseDiaryWeekSearch("2026-02-30")).toBeUndefined();
+    expect(parseDiaryWeekSearch("2026-13-40")).toBeUndefined();
+    expect(parseDiaryWeekSearch(20260817)).toBeUndefined();
+  });
+});
+
+describe("resolveDiaryCursorWeek", () => {
+  it("keeps a past week from the URL", () => {
+    expect(resolveDiaryCursorWeek("2026-08-17", "2026-10-12")).toBe("2026-08-17");
+  });
+
+  it("falls back to the current training week when missing or in the future", () => {
+    expect(resolveDiaryCursorWeek(undefined, "2026-10-12")).toBe("2026-10-12");
+    expect(resolveDiaryCursorWeek("2026-10-19", "2026-10-12")).toBe("2026-10-12");
   });
 });

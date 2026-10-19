@@ -12,19 +12,27 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { parseDiaryWeekSearch } from "@/services/diary-window.ts";
 
 type HomeSearch = {
   activity?: string;
+  week?: string;
 };
 
 export const Route = createFileRoute("/_app/")({
   validateSearch: (search: Record<string, unknown>): HomeSearch => {
     const activity = search.activity;
-    if (typeof activity === "string" && activity.length > 0) return { activity };
-    if (typeof activity === "number" && Number.isFinite(activity)) {
-      return { activity: String(activity) };
-    }
-    return {};
+    const normalizedActivity =
+      typeof activity === "string" && activity.length > 0
+        ? activity
+        : typeof activity === "number" && Number.isFinite(activity)
+          ? String(activity)
+          : undefined;
+    const week = parseDiaryWeekSearch(search.week);
+    return {
+      ...(normalizedActivity ? { activity: normalizedActivity } : {}),
+      ...(week ? { week } : {}),
+    };
   },
   beforeLoad: ({ search }) => {
     if (search.activity) {
@@ -42,6 +50,7 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CalendarPage() {
+  const { week } = Route.useSearch();
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { signedIn, activities, settings } = data;
 
@@ -70,7 +79,7 @@ function CalendarPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <ActivityCalendar activities={activities} initialSettings={settings} />
+        <ActivityCalendar activities={activities} initialSettings={settings} initialWeek={week} />
       )}
     </div>
   );
