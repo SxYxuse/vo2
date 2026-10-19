@@ -11,7 +11,7 @@ _Avoid_: User, account, client
 ## Completed work
 
 **Activity**:
-A completed session imported from Strava, with a sport type, start time, and duration.
+A completed session copied from Strava, with a sport type, start time, and duration.
 _Avoid_: Workout, exercise, ride (too specific)
 
 **Stream**:
@@ -37,6 +37,14 @@ _Avoid_: Pace, velocity, kph
 **Sport family**:
 The planning axis for remaining-week work: running or cycling only.
 _Avoid_: Sport group, sport type
+
+**Sync**:
+Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out and resumes when the athlete syncs again.
+_Avoid_: Import, fetch, refresh
+
+**Local copy**:
+VO2's stored activities and streams. It may be incomplete or paused while older history or streams are still missing.
+_Avoid_: Cache, mirror
 
 ## Planning
 

@@ -2,9 +2,9 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { CheckIcon, ChevronLeftIcon, ClipboardListIcon } from "lucide-react";
+import { CalendarDaysIcon, CheckIcon, ChevronLeftIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 
 import {
@@ -14,6 +14,7 @@ import {
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
+  syncStatusQueryOptions,
 } from "@/lib/queries.ts";
 import {
   TRAINING_PACE_FIELDS,
@@ -24,11 +25,14 @@ import {
   type TrainingFormInput,
   type TrainingFormValues,
 } from "@/lib/settings-form.ts";
+import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { saveAppSettings } from "@/services/app-settings.ts";
+import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { DEFAULT_SPORT_GROUP_SHARES, mergeSportGroupShares } from "@/services/sport-groups.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
+import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { TrainingPaceFields, TrainingWeekFields } from "@/components/settings-fields.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { Button } from "@/components/ui/button";
@@ -43,6 +47,11 @@ import { Spinner } from "@/components/ui/spinner";
 
 const STEPS = [
   {
+    id: "sync",
+    title: "Copy from Strava",
+    description: "Copy your activities first so your plan starts from real training.",
+  },
+  {
     id: "pace",
     title: "Fitness goal",
     description: "How hard you want to build — this drives weekly load.",
@@ -55,7 +64,7 @@ const STEPS = [
   {
     id: "ready",
     title: "You're set",
-    description: "Open the week bucket to fill this week.",
+    description: "Open the calendar to see your week.",
   },
 ] as const;
 
@@ -98,6 +107,15 @@ export function OnboardingForm({ userName }: { userName: string }) {
   });
 
   const step = STEPS[stepIndex];
+  const { data: syncStatus = null, isPending: syncStatusPending } =
+    useQuery(syncStatusQueryOptions);
+  const sync = useStravaSync({ showToast: false });
+  const syncStep = onboardingSyncStep({
+    status: syncStatus?.status ?? "never",
+    syncing: sync.isPending,
+    syncFailed: sync.error != null || Boolean(sync.lastResult?.lastError),
+    syncPaused: Boolean(sync.lastResult?.pausedUntil),
+  });
 
   const save = useMutation({
     mutationFn: saveAppSettings,
@@ -138,10 +156,17 @@ export function OnboardingForm({ userName }: { userName: string }) {
   }
 
   async function continueStep() {
+    if (step.id === "sync") {
+      if (!syncStep.canContinue) return;
+      // Defaults read the history this sync just copied; keep anything already edited.
+      form.reset(defaults, { keepDirtyValues: true });
+      setStepIndex((current) => current + 1);
+      return;
+    }
     if (step.id === "pace") {
       const ok = await form.trigger([...TRAINING_PACE_FIELDS]);
       if (!ok) return;
-      setStepIndex(1);
+      setStepIndex((current) => current + 1);
       return;
     }
     if (step.id !== "week") return;
@@ -163,6 +188,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const isReady = step.id === "ready";
+  const copyUnfinished = syncStatus?.status !== "complete";
 
   return (
     <form
@@ -200,15 +226,15 @@ export function OnboardingForm({ userName }: { userName: string }) {
           ))}
         </div>
         <h1 className="text-xl font-semibold tracking-tight">
-          {step.id === "pace" ? `Welcome, ${firstName}` : step.title}
+          {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
         </h1>
         <p className="text-muted-foreground text-sm">
-          {step.id === "pace" && !hasActivityHistory
-            ? "How hard you want this block to push — fitness and form come after activities are copied."
-            : step.id === "week" && !hasActivityHistory
-              ? "How many runs, rides, and hours you want each week."
-              : step.id === "ready" && !hasActivityHistory
-                ? "Copy activities from Strava, then fill this week."
+          {step.id === "sync"
+            ? "Start by copying your activities from Strava."
+            : step.id === "pace" && !hasActivityHistory
+              ? "How hard you want this block to push — fitness and form come after activities are copied."
+              : step.id === "week" && !hasActivityHistory
+                ? "How many runs, rides, and hours you want each week."
                 : step.description}
         </p>
       </div>
@@ -217,7 +243,20 @@ export function OnboardingForm({ userName }: { userName: string }) {
           key={step.id}
           className="flex flex-col gap-4 animate-in fade-in-0 slide-in-from-right-2 duration-200"
         >
-          {step.id === "pace" ? (
+          {step.id === "sync" ? (
+            syncStatusPending ? (
+              <div className="flex justify-center py-16">
+                <Spinner />
+              </div>
+            ) : (
+              <OnboardingSyncStepPanel
+                step={syncStep}
+                status={syncStatus}
+                error={sync.error?.message ?? null}
+                onSync={() => sync.mutate()}
+              />
+            )
+          ) : step.id === "pace" ? (
             <TrainingPaceFields
               idPrefix="onboard"
               control={form.control}
@@ -240,9 +279,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 </EmptyMedia>
                 <EmptyTitle>Ready to train</EmptyTitle>
                 <EmptyDescription>
-                  {hasActivityHistory
-                    ? "Your goal is saved. Open the week bucket to fill this week, or change anything later from Settings."
-                    : "Your goal is saved. Copy activities from Strava, then open the week bucket. You can change anything later from Settings."}
+                  {copyUnfinished
+                    ? "Your goal is saved. Your local copy of Strava is not finished yet — resume it later with Sync from Strava or from Settings. You can change anything later from Settings."
+                    : "Your goal is saved. Open the calendar to see your week, or change anything later from Settings."}
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -258,11 +297,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
             type="button"
             className="w-full sm:w-auto"
             onClick={() => {
-              void navigate({ to: "/week-bucket" });
+              void navigate({ to: "/" });
             }}
           >
-            <ClipboardListIcon data-icon="inline-start" />
-            Open week bucket
+            <CalendarDaysIcon data-icon="inline-start" />
+            Open calendar
           </Button>
         ) : (
           <>
@@ -277,7 +316,10 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 Back
               </Button>
             ) : null}
-            <Button type="submit" disabled={save.isPending}>
+            <Button
+              type="submit"
+              disabled={save.isPending || (step.id === "sync" && !syncStep.canContinue)}
+            >
               {save.isPending ? <Spinner data-icon="inline-start" /> : null}
               {step.id === "week" ? "Finish" : "Continue"}
             </Button>
