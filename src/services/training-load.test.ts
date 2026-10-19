@@ -8,6 +8,7 @@ import {
   estimateLoadAnchors,
   formAfterLoad,
   formLabel,
+  pmcWithCurrentForm,
   mergeLoadAnchors,
   pickLoadAnchorsFromTests,
   type LoadAnchors,
@@ -126,6 +127,20 @@ describe("PMC form", () => {
     expect(today!.ctl).toBeCloseTo(150 / 42, 5);
     expect(today!.atl).toBeCloseTo(150 / 7, 5);
     expect(formAfterLoad(today!)).toBeCloseTo(150 / 42 - 150 / 7, 5);
+  });
+
+  test("graph form is after today's known load, not morning TSB", () => {
+    const start = new Date();
+    const points = buildPmc(
+      [{ start: start.toISOString(), load: 150, estimatedLoad: 0, movingTime: 3600 }],
+      "UTC",
+    );
+    const watched = pmcWithCurrentForm(points).at(-1);
+    expect(watched).toBeDefined();
+    expect(watched!.tsb).toBeCloseTo(150 / 42 - 150 / 7, 5);
+    expect(watched!.tsb).toBeLessThan(0);
+    expect(watched!.ctl).toBeCloseTo(150 / 42, 5);
+    expect(watched!.atl).toBeCloseTo(150 / 7, 5);
   });
 
   test("7-day ramp uses the full series, not a 6-day window", () => {
