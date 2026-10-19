@@ -30,6 +30,7 @@ import {
   getTrainingPlanForUser,
   listPlannedSessions,
 } from "./training-plan.server.ts";
+import { athleteExists } from "./athlete-deletion.server.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 
 const ACTIVITY_PAGE_SIZE = 200;
@@ -253,6 +254,10 @@ export async function syncStravaImpl(): Promise<SyncResult> {
       logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
     } else if (isAbortError(error)) {
       logger.warn("sync.request_aborted", errorFields(error));
+    } else if (!(await athleteExists(session.user.id))) {
+      // Athlete deletion ran mid-sync; there is nothing left to write to.
+      logger.info("sync.stopped_athlete_deleted");
+      throw new Error("Athlete was deleted");
     } else {
       lastError = error instanceof Error ? error.message : "Sync failed";
       logger.error("sync.failed", errorFields(error));

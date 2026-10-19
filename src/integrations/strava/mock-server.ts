@@ -33,6 +33,7 @@ export function handleMockStravaRequest(request: Request): Response {
 
   if (path === "/oauth/authorize") return authorize(query);
   if (path === "/oauth/token" && request.method === "POST") return tokenResponse();
+  if (path === "/oauth/deauthorize" && request.method === "POST") return deauthorize(request);
   if (path === "/api/v3/athlete") return json(ATHLETE);
   if (path === "/api/v3/athlete/activities") {
     return json(
@@ -73,6 +74,12 @@ function tokenResponse() {
     expires_at: Math.floor(Date.now() / 1000) + expiresIn,
     athlete: ATHLETE,
   });
+}
+
+function deauthorize(request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
+  if (!token) return json({ message: "Authorization Error" }, 401);
+  return json({ access_token: token });
 }
 
 function json(body: unknown, status = 200) {

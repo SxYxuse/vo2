@@ -55,6 +55,7 @@ import {
   TrainingDoubleDaysField,
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
+import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
@@ -259,7 +260,11 @@ export function SettingsForm({
                 <Spinner />
               </div>
             ) : section === "profile" ? (
-              <ProfileFields idPrefix="settings" userName={userName} control={form.control} />
+              <>
+                <ProfileFields idPrefix="settings" userName={userName} control={form.control} />
+                <FieldSeparator />
+                <SettingsDeleteAthlete />
+              </>
             ) : section === "training" ? (
               <FieldGroup>
                 <TrainingPaceFields

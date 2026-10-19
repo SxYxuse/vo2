@@ -107,4 +107,10 @@ describe("StravaApi against mock Strava", () => {
   it("returns no streams for an unknown activity", async () => {
     expect(await new StravaApi("mock-token").getActivityStreams(42)).toEqual({});
   });
+
+  it("deauthorize revokes the token it holds", async () => {
+    expect(await new StravaApi("mock-token").deauthorize()).toEqual({
+      access_token: "mock-token",
+    });
+  });
 });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -21,7 +20,7 @@ import { useTheme } from "next-themes";
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { authClient } from "@/lib/auth-client.ts";
-import { appShellQueryOptions } from "@/lib/queries.ts";
+import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -232,8 +231,7 @@ export function AppSidebar() {
 }
 
 function SidebarUserMenu() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
+  const signOut = useSignOut();
   const { isMobile } = useSidebar();
   const { theme, setTheme } = useTheme();
   const { data: session, isPending } = authClient.useSession();
@@ -329,22 +327,7 @@ function SidebarUserMenu() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={() => {
-                        void authClient.signOut().then(async () => {
-                          queryClient.setQueryData(appShellQueryOptions.queryKey, {
-                            signedIn: false,
-                            training: null,
-                          });
-                          queryClient.removeQueries({
-                            predicate: (query) => query.queryKey[0] !== "app-shell",
-                          });
-                          await router.invalidate();
-                          await router.navigate({ to: "/", replace: true });
-                        });
-                      }}
-                    >
+                    <DropdownMenuItem variant="destructive" onClick={() => void signOut()}>
                       <LogOutIcon />
                       Log out
                     </DropdownMenuItem>
