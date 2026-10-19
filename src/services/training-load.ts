@@ -361,6 +361,11 @@ export function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
   return point.ctl - point.atl;
 }
 
+/** Form aligned with fitness and fatigue on the same point (after that day's known load). */
+export function pmcWithCurrentForm(points: PmcPoint[]): PmcPoint[] {
+  return points.map((point) => ({ ...point, tsb: formAfterLoad(point) }));
+}
+
 export function ctlChange(points: PmcPoint[], days = 7) {
   if (points.length < 2) return 0;
   const latest = points[points.length - 1];

@@ -23,6 +23,7 @@ import {
   buildPmc,
   ctlChange,
   formLabel,
+  pmcWithCurrentForm,
   roundLoad,
   slicePmc,
   type FitnessLoad,
@@ -61,7 +62,7 @@ const SERIES_SHORT_LABEL = {
 const SERIES_INFO = {
   ctl: "42-day training load. This is fitness: it climbs with consistent work and fades slowly if you rest. A steady rise over months is the goal.",
   atl: "7-day training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
-  tsb: "Fitness minus fatigue at the start of the day, before today's training. Positive means you are fresh (good for a hard session or event). Negative means you are carrying fatigue (better for easy work or rest).",
+  tsb: "Fitness minus fatigue after that day's known training (today: as of now). Positive means you are fresh. Negative means you are carrying fatigue.",
 } as const;
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
@@ -204,7 +205,8 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
 
   const pmc = useMemo(() => (loads.length ? buildPmc(loads, timeZone) : []), [loads, timeZone]);
   const series = useMemo(
-    () => (pmc.length && isDesktop !== null ? slicePmc(pmc, period, timeZone) : []),
+    () =>
+      pmc.length && isDesktop !== null ? pmcWithCurrentForm(slicePmc(pmc, period, timeZone)) : [],
     [pmc, period, timeZone, isDesktop],
   );
   const latest = series.at(-1);
