@@ -17,10 +17,3 @@ export const getActivityAnalysis = createServerFn({ method: "GET" })
     const { getActivityAnalysisImpl } = await import("./activity-analysis.server.ts");
     return getActivityAnalysisImpl(data.activityId);
   });
-
-export const saveActivityAnalysis = createServerFn({ method: "POST" })
-  .validator(z.object({ activityId: z.string().min(1), body: z.string().min(1) }))
-  .handler(async ({ data }): Promise<StoredActivityAnalysis | null> => {
-    const { saveActivityAnalysisImpl } = await import("./activity-analysis.server.ts");
-    return saveActivityAnalysisImpl(data);
-  });

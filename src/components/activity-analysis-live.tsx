@@ -14,7 +14,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { saveActivityAnalysis } from "@/services/activity-analysis.ts";
 import { activityAnalysisQueryOptions } from "@/lib/queries.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -53,8 +52,8 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
   },
 };
 
-const ANALYZE_PROMPT =
-  "Analyze this activity. Call every stream tool you need. Correlate heart rate with elevation and grade, detect when the athlete is gaining elevation, and explain effort on climbs versus the flat.";
+// The server ignores this text and sends its own prompt; useChat needs a message to start a run.
+const ANALYZE_PROMPT = "Analyze this activity.";
 
 type ToolCallPart = {
   id?: string;
@@ -149,12 +148,10 @@ export function ActivityAnalysisLive({
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     connection,
     threadId: `activity-${activityId}`,
-    onFinish: (message) => {
-      const body = assistantText(message.parts);
-      if (body.length < 24) return;
-      void saveActivityAnalysis({ data: { activityId, body } }).then((saved) => {
-        if (!saved) return;
-        queryClient.setQueryData(activityAnalysisQueryOptions(activityId).queryKey, saved);
+    // The server saves the note before it sends the final RUN_FINISHED.
+    onFinish: () => {
+      void queryClient.invalidateQueries({
+        queryKey: activityAnalysisQueryOptions(activityId).queryKey,
       });
     },
   });
