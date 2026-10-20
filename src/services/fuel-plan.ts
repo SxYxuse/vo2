@@ -190,7 +190,8 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
   const issues: string[] = [];
   const notes: string[] = [];
   for (const id of [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds]) {
-    if (id != null && !byId.has(id)) issues.push(`Unknown product ${id}.`);
+    // The input holds the athlete's own products, so a missing id is one they don't have.
+    if (id != null && !byId.has(id)) issues.push(`${id} isn't one of your products.`);
   }
 
   const window = windowFor(input.elapsedSec);
@@ -746,12 +747,25 @@ export function defaultProposals(input: FuelPlanInput): ProposalSpec[] {
       caffeineId: caffeine?.id ?? null,
     });
   }
-  return proposals;
+  // With few products the templates can collapse into the same mix; keep each mix once.
+  const seen = new Set<string>();
+  return proposals.filter((proposal) => {
+    const mix = [proposal.drinkId, proposal.barId, proposal.caffeineId, ...proposal.gelIds].join();
+    if (seen.has(mix)) return false;
+    seen.add(mix);
+    return true;
+  });
 }
 
-/** Products that can take another product's place: same role, stated carbs. */
-export function swapOptions(products: FuelProduct[], productId: string): FuelProduct[] {
-  const current = products.find((product) => product.id === productId);
+/**
+ * Products that can take another product's place: same role, stated carbs. Pass `current` when
+ * the product being replaced is no longer among `products`.
+ */
+export function swapOptions(
+  products: FuelProduct[],
+  productId: string,
+  current = products.find((product) => product.id === productId),
+): FuelProduct[] {
   if (!current) return [];
   const roles = rolesFor(current);
   return products.filter(
@@ -768,8 +782,10 @@ export function swapProduct(
   spec: ProposalSpec,
   productId: string,
   replacementId: string,
+  current?: FuelProduct,
 ): FuelPlan {
-  if (!swapOptions(input.products, productId).some((product) => product.id === replacementId)) {
+  const options = swapOptions(input.products, productId, current);
+  if (!options.some((product) => product.id === replacementId)) {
     throw new Error(`${replacementId} can't replace ${productId}.`);
   }
   const swap = (id: string | null) => (id === productId ? replacementId : id);

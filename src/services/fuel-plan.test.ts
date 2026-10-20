@@ -162,10 +162,10 @@ describe("solveFuelPlan", () => {
     }
   });
 
-  it("flags unknown products", () => {
+  it("flags products the athlete doesn't have", () => {
     const plan = solveFuelPlan(input(), spec({ gelIds: ["made-up-gel"] }));
 
-    expect(plan.issues).toContain("Unknown product made-up-gel.");
+    expect(plan.issues).toContain("made-up-gel isn't one of your products.");
   });
 
   it("flags an hour packed above the cap", () => {
@@ -201,6 +201,18 @@ describe("swapProduct", () => {
     );
   });
 
+  it("replaces a product the athlete no longer has with one they do", () => {
+    const owned = products.filter((product) => product.id !== "gel-40-mango");
+    const base = input({ products: owned });
+    const mango = products.find((product) => product.id === "gel-40-mango");
+    const plan = swapProduct(base, spec(), "gel-40-mango", "gel-40-lemon", mango);
+
+    expect(plan.issues).toEqual([]);
+    expect(swapOptions(owned, "gel-40-mango", mango).some((p) => p.id === "gel-40-mango")).toBe(
+      false,
+    );
+  });
+
   it("only offers products in the same role", () => {
     expect(swapOptions(products, "power-carb").every((product) => product.kind === "drink")).toBe(
       true,
@@ -222,6 +234,14 @@ describe("defaultProposals", () => {
     for (const proposal of proposals) {
       expect(solveFuelPlan(base, proposal).issues).toEqual([]);
     }
+  });
+
+  it("offers each mix once when the athlete has few products", () => {
+    const few = products.filter((product) => product.id === "gel-40-mango");
+    const proposals = defaultProposals(input({ products: few }));
+
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]?.gelIds).toEqual(["gel-40-mango"]);
   });
 
   it("leaves bars out on foot", () => {

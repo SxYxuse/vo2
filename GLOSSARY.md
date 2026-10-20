@@ -197,3 +197,7 @@ _Avoid_: Feed, dose
 **Fuel product**:
 A gel, chew, drink mix, or bar from the stored MNSTRY catalog. Its carbs, glucose:fructose ratio, and caffeine come only from what the store states; a value the store doesn't state stays missing.
 _Avoid_: Supplement, nutrition item, SKU
+
+**Your products**:
+The fuel products the athlete has ticked as theirs. Fuel plans and swaps use only these.
+_Avoid_: Pantry, inventory, stock

@@ -2,6 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { ChevronRightIcon, RouteIcon } from "lucide-react";
 
+import { FuelProductsPicker } from "@/components/fuel-products-picker.tsx";
 import { RouteUploadForm } from "@/components/route-upload-form.tsx";
 import { SignInPanel } from "@/components/sync-panel.tsx";
 import { loaderQuery, routePlansQueryOptions } from "@/lib/queries.ts";
@@ -68,7 +69,14 @@ function FuelPage() {
     <>
       <FuelHeader />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
-        <RouteUploadForm defaults={data.defaults} defaultSportType={data.defaultSportType} />
+        <div className="flex flex-col gap-4">
+          <FuelProductsPicker productIds={data.fuelProductIds} />
+          <RouteUploadForm
+            defaults={data.defaults}
+            defaultSportType={data.defaultSportType}
+            hasProducts={(data.fuelProductIds ?? []).length > 0}
+          />
+        </div>
         <section className="flex flex-col gap-2" aria-label="Your routes">
           <h2 className="text-sm font-medium">Your routes</h2>
           {data.plans.length === 0 ? (

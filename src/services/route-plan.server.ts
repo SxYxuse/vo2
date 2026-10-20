@@ -1,11 +1,16 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, routePlans } from "@/db/schema.ts";
+import { activities, athleteMetrics, routePlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getProfileSettingsForUser } from "./app-settings.server.ts";
-import { loadFuelCatalog, planningProducts } from "./fuel-catalog.ts";
+import {
+  loadFuelCatalog,
+  ownedProducts,
+  planningProducts,
+  type FuelProduct,
+} from "./fuel-catalog.ts";
 import { chooseSimilarActivities, proposeFuelPlans, reviewPlacement } from "./fuel-ai.server.ts";
 import {
   defaultProposals,
@@ -41,6 +46,47 @@ async function requireWeight(userId: string) {
   return weightKg;
 }
 
+async function fuelProductIdsFor(userId: string) {
+  const [row] = await db
+    .select({ ids: athleteMetrics.fuelProductIds })
+    .from(athleteMetrics)
+    .where(eq(athleteMetrics.userId, userId))
+    .limit(1);
+  return row?.ids ?? null;
+}
+
+/** The athlete's products; plans are only ever made from these. */
+async function requireProducts(userId: string) {
+  const products = ownedProducts(await fuelProductIdsFor(userId));
+  if (products.length === 0) throw new Error("Choose the MNSTRY products you have first.");
+  return products;
+}
+
+export async function saveFuelProductsImpl(ids: string[]) {
+  const session = await getRequiredSession();
+  // Only ids the planner can use are kept, so the stored list never carries unknown products.
+  const fuelProductIds = ownedProducts(ids).map((product) => product.id);
+  await db
+    .insert(athleteMetrics)
+    .values({ userId: session.user.id, fuelProductIds, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: athleteMetrics.userId,
+      set: { fuelProductIds, updatedAt: new Date() },
+    });
+  logger.info("fuel_products.saved", { count: fuelProductIds.length });
+}
+
+/** Proposals made before the athlete dropped one of their products start over from the defaults. */
+function proposalsFor(stored: ProposalSpec[], input: FuelPlanInput) {
+  const owned = new Set(input.products.map((product) => product.id));
+  const usesMissing = stored.some((spec) =>
+    [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds].some(
+      (id) => id != null && !owned.has(id),
+    ),
+  );
+  return usesMissing ? defaultProposals(input) : stored;
+}
+
 async function ownedPlan(id: string, userId: string) {
   const [row] = await db
     .select()
@@ -60,6 +106,7 @@ function planInput(
   prediction: RoutePrediction,
   settings: { carbTarget: number; bottleCount: number; bottleMl: number },
   bodyWeightKg: number,
+  products: FuelProduct[],
 ): FuelPlanInput {
   return {
     sportGroup: prediction.sportGroup,
@@ -69,7 +116,7 @@ function planInput(
     carbTarget: settings.carbTarget,
     bottles: { count: settings.bottleCount, ml: settings.bottleMl },
     bodyWeightKg,
-    products: planningProducts(),
+    products,
   };
 }
 
@@ -102,10 +149,18 @@ async function predict(userId: string, profile: RouteProfile, sportType: string)
 
 export async function listRoutePlansImpl(): Promise<RoutePlanList> {
   const session = await getOptionalSession();
-  if (!session) return { signedIn: false, plans: [], defaults: {}, defaultSportType: "Ride" };
+  if (!session) {
+    return {
+      signedIn: false,
+      fuelProductIds: null,
+      plans: [],
+      defaults: {},
+      defaultSportType: "Ride",
+    };
+  }
   const userId = session.user.id;
   const since = new Date(Date.now() - 90 * 86_400_000);
-  const [rows, sportRows] = await Promise.all([
+  const [rows, sportRows, fuelProductIds] = await Promise.all([
     db
       .select({
         id: routePlans.id,
@@ -128,6 +183,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
       .from(activities)
       .where(and(eq(activities.userId, userId), gte(activities.startDate, since)))
       .groupBy(activities.sportType),
+    fuelProductIdsFor(userId),
   ]);
 
   const defaults: RouteDefaults = {};
@@ -152,6 +208,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
 
   return {
     signedIn: true,
+    fuelProductIds,
     plans: rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -172,7 +229,8 @@ export async function getRoutePlanImpl(id: string): Promise<RoutePlanView | null
   const row = await ownedPlan(id, session.user.id).catch(() => null);
   if (!row) return null;
   const weightKg = await requireWeight(session.user.id);
-  const input = planInput(row.prediction, row, weightKg);
+  const products = ownedProducts(await fuelProductIdsFor(session.user.id));
+  const input = planInput(row.prediction, row, weightKg, products);
   const { steps, ...prediction } = row.prediction;
   return {
     id: row.id,
@@ -186,6 +244,7 @@ export async function getRoutePlanImpl(id: string): Promise<RoutePlanView | null
     proposals: row.proposals.map((spec) => solveFuelPlan(input, spec)),
     chosen: row.chosen?.plan ?? null,
     catalogChanged: row.catalogFetchedAt !== loadFuelCatalog().fetchedAt,
+    fuelProductIds: products.map((product) => product.id),
   };
 }
 
@@ -200,6 +259,7 @@ export async function createRoutePlanImpl(data: {
   const session = await getRequiredSession();
   const userId = session.user.id;
   const weightKg = await requireWeight(userId);
+  const products = await requireProducts(userId);
 
   let profile: RouteProfile;
   try {
@@ -209,7 +269,7 @@ export async function createRoutePlanImpl(data: {
     throw error;
   }
   const prediction = await predict(userId, profile, data.sportType);
-  const input = planInput(prediction, data, weightKg);
+  const input = planInput(prediction, data, weightKg, products);
   const proposals = await proposeFuelPlans(input, prediction, defaultProposals(input));
 
   const id = crypto.randomUUID();
@@ -247,11 +307,17 @@ export async function updateRoutePlanImpl(data: {
 }) {
   const session = await getRequiredSession();
   const row = await ownedPlan(data.id, session.user.id);
-  const input = planInput(row.prediction, data, await requireWeight(session.user.id));
+  const input = planInput(
+    row.prediction,
+    data,
+    await requireWeight(session.user.id),
+    await requireProducts(session.user.id),
+  );
   await db
     .update(routePlans)
     .set({
       carbTarget: data.carbTarget,
+      proposals: proposalsFor(row.proposals, input),
       bottleCount: data.bottleCount,
       bottleMl: data.bottleMl,
       chosen: resolveChosen(row.chosen, input),
@@ -266,7 +332,12 @@ export async function chooseFuelPlanImpl(id: string, proposalId: string) {
   const row = await ownedPlan(id, session.user.id);
   const spec = row.proposals.find((proposal) => proposal.id === proposalId);
   if (!spec) throw new Error("Proposal not found.");
-  const input = planInput(row.prediction, row, await requireWeight(session.user.id));
+  const input = planInput(
+    row.prediction,
+    row,
+    await requireWeight(session.user.id),
+    await requireProducts(session.user.id),
+  );
   const plan = await reviewPlacement(input, row.prediction, solveFuelPlan(input, spec));
   await db
     .update(routePlans)
@@ -278,8 +349,14 @@ export async function swapFuelProductImpl(id: string, productId: string, replace
   const session = await getRequiredSession();
   const row = await ownedPlan(id, session.user.id);
   if (!row.chosen) throw new Error("Choose a plan first.");
-  const input = planInput(row.prediction, row, await requireWeight(session.user.id));
-  const plan = swapProduct(input, row.chosen.spec, productId, replacementId);
+  const input = planInput(
+    row.prediction,
+    row,
+    await requireWeight(session.user.id),
+    await requireProducts(session.user.id),
+  );
+  const current = planningProducts().find((product) => product.id === productId);
+  const plan = swapProduct(input, row.chosen.spec, productId, replacementId, current);
   await db
     .update(routePlans)
     .set({ chosen: { spec: plan.spec, plan } satisfies Chosen, updatedAt: new Date() })
@@ -294,11 +371,17 @@ export async function repredictRoutePlanImpl(id: string) {
     profileFrom(row.prediction, row.name),
     row.sportType,
   );
-  const input = planInput(prediction, row, await requireWeight(session.user.id));
+  const input = planInput(
+    prediction,
+    row,
+    await requireWeight(session.user.id),
+    await requireProducts(session.user.id),
+  );
   await db
     .update(routePlans)
     .set({
       prediction,
+      proposals: proposalsFor(row.proposals, input),
       chosen: resolveChosen(row.chosen, input),
       catalogFetchedAt: loadFuelCatalog().fetchedAt,
       updatedAt: new Date(),

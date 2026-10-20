@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildFuelProduct, type ShopifyProduct } from "./fuel-catalog-parse.ts";
-import { isPlannable, loadFuelCatalog, planningProducts } from "./fuel-catalog.ts";
+import { isPlannable, loadFuelCatalog, ownedProducts, planningProducts } from "./fuel-catalog.ts";
 
 // Trimmed from the real mnstry.com pages.
 function nutritionTable(serving: string, carbs: string) {
@@ -176,5 +176,12 @@ describe("stored catalog", () => {
       expect(product.carbsG).not.toBeNull();
       if (product.kind === "drink") expect(product.serving?.mixMl).not.toBeNull();
     }
+  });
+
+  it("keeps only plannable products the athlete has", () => {
+    const owned = ownedProducts(["gel-40-mango", "race-carb-x", "no-such-product", "omega-3"]);
+
+    expect(owned.map((product) => product.id)).toEqual(["gel-40-mango"]);
+    expect(ownedProducts(null)).toEqual([]);
   });
 });

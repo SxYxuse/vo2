@@ -134,6 +134,13 @@
       "when": 1792520096845,
       "tag": "0018_route_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792520941417,
+      "tag": "0019_fuel_products",
+      "breakpoints": true
     }
   ]
 }

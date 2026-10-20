@@ -69,3 +69,12 @@ export function isPlannable(product: FuelProduct) {
 export function planningProducts(catalog: FuelCatalog = loadFuelCatalog()) {
   return catalog.products.filter(isPlannable);
 }
+
+/** The plannable products the athlete has, in catalog order; unknown or retired ids drop out. */
+export function ownedProducts(
+  ids: readonly string[] | null,
+  catalog: FuelCatalog = loadFuelCatalog(),
+) {
+  const owned = new Set(ids ?? []);
+  return planningProducts(catalog).filter((product) => owned.has(product.id));
+}

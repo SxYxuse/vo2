@@ -37,6 +37,10 @@ export const updateRoutePlanSchema = bottlesSchema.extend({
 
 const idSchema = z.object({ id: z.string() });
 
+export const fuelProductsSchema = z.object({
+  productIds: z.array(z.string()).max(200),
+});
+
 export type RoutePlanSummary = {
   id: string;
   name: string;
@@ -55,6 +59,8 @@ export type RouteDefaults = Partial<
 
 export type RoutePlanList = {
   signedIn: boolean;
+  /** MNSTRY products the athlete has; null until they choose. */
+  fuelProductIds: string[] | null;
   plans: RoutePlanSummary[];
   defaults: RouteDefaults;
   defaultSportType: (typeof ROUTE_SPORT_TYPES)[number];
@@ -76,6 +82,8 @@ export type RoutePlanView = {
   chosen: FuelPlan | null;
   /** The plans were made from an older catalog snapshot than the app ships now. */
   catalogChanged: boolean;
+  /** Products the athlete has: swaps offer only these. */
+  fuelProductIds: string[];
 };
 
 const MAX_PROFILE_POINTS = 400;
@@ -96,6 +104,13 @@ export function profilePoints(steps: RoutePrediction["steps"]): ProfilePoint[] {
   );
   return points;
 }
+
+export const saveFuelProducts = createServerFn({ method: "POST" })
+  .validator(fuelProductsSchema)
+  .handler(async ({ data }): Promise<void> => {
+    const { saveFuelProductsImpl } = await import("./route-plan.server.ts");
+    await saveFuelProductsImpl(data.productIds);
+  });
 
 export const listRoutePlans = createServerFn({ method: "GET" }).handler(
   async (): Promise<RoutePlanList> => {

@@ -99,6 +99,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   restHr: real("rest_hr"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
+  /** MNSTRY product ids the athlete has; fuel plans use only these. Null until chosen. */
+  fuelProductIds: jsonb("fuel_product_ids").$type<string[]>(),
   training: jsonb("training"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -387,7 +387,15 @@ function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan })
       data: { id: plan.id, productId: swapping ?? "", replacementId },
     }),
   );
-  const options: FuelProduct[] = swapping ? swapOptions(PRODUCTS, swapping) : [];
+  // Swaps offer only the athlete's products, even when replacing one they no longer have.
+  const owned = PRODUCTS.filter((product) => plan.fuelProductIds.includes(product.id));
+  const options: FuelProduct[] = swapping
+    ? swapOptions(
+        owned,
+        swapping,
+        PRODUCTS.find((product) => product.id === swapping),
+      )
+    : [];
 
   return (
     <section
@@ -484,6 +492,11 @@ function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan })
               </li>
             ))}
           </ul>
+          {options.length === 0 ? (
+            <p className="text-muted-foreground px-4 pb-4 text-sm">
+              None of your products can take its place. Add more on the Fuel page.
+            </p>
+          ) : null}
           {swap.error ? (
             <p className="text-destructive px-4 pb-4 text-sm">{swap.error.message}</p>
           ) : null}
