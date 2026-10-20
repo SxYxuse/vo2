@@ -17,7 +17,7 @@ import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
-import { useThemeCycle } from "@/hooks/use-theme-cycle.ts";
+import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -214,7 +214,7 @@ export function AppSidebar() {
 }
 
 function SidebarThemeButton() {
-  const { mounted, current, next, cycle } = useThemeCycle();
+  const { mounted, current, next, toggle } = useThemeToggle();
   const label = mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme";
 
   return (
@@ -223,7 +223,7 @@ function SidebarThemeButton() {
       aria-label={label}
       className="w-auto"
       disabled={!mounted}
-      onClick={cycle}
+      onClick={toggle}
     >
       {mounted ? <current.icon /> : <span aria-hidden className="size-4" />}
     </SidebarMenuButton>

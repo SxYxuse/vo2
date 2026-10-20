@@ -4,7 +4,7 @@ import { SignInPanel } from "@/components/sync-panel.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { Button } from "@/components/ui/button";
-import { useThemeCycle } from "@/hooks/use-theme-cycle.ts";
+import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 
 export function SignedOutPage() {
   return (
@@ -13,7 +13,7 @@ export function SignedOutPage() {
         <div className="flex items-center text-lg font-semibold">
           <Vo2Wordmark />
         </div>
-        <ThemeCycleButton />
+        <ThemeToggleButton />
       </header>
       <main className="flex flex-1 flex-col px-4 pt-16 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-24">
         <div className="mx-auto flex w-full max-w-md flex-col gap-6">
@@ -33,8 +33,8 @@ export function SignedOutPage() {
   );
 }
 
-function ThemeCycleButton() {
-  const { mounted, current, next, cycle } = useThemeCycle();
+function ThemeToggleButton() {
+  const { mounted, current, next, toggle } = useThemeToggle();
   const Icon = current.icon;
 
   return (
@@ -44,7 +44,7 @@ function ThemeCycleButton() {
       size="icon"
       aria-label={mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme"}
       disabled={!mounted}
-      onClick={cycle}
+      onClick={toggle}
     >
       {mounted ? <Icon /> : <span aria-hidden className="size-3.5" />}
     </Button>
