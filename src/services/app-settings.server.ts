@@ -5,7 +5,7 @@ import { db } from "@/db/index.ts";
 import { activities, athleteMetrics, calendarSettings } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
-import type { AppSettingsSave, ProfileSettings } from "./app-settings.types.ts";
+import type { AppSettingsSave, ProfileSave, ProfileSettings } from "./app-settings.types.ts";
 import { DEFAULT_PROFILE_SETTINGS } from "./app-settings.types.ts";
 import {
   DEFAULT_CALENDAR_SETTINGS,
@@ -154,4 +154,20 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
   const training = value.training ?? (await getTrainingPlanForUser(session.user.id));
   logger.info("settings.saved", { hasTraining: Boolean(training) });
   return { profile: value.profile, settings: parsed, training };
+}
+
+export async function saveBirthDateImpl(value: ProfileSave): Promise<void> {
+  const session = await getRequiredSession();
+  const previousProfile = await getProfileSettingsForUser(session.user.id);
+  await db
+    .insert(athleteMetrics)
+    .values({ userId: session.user.id, birthDate: value.birthDate, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: athleteMetrics.userId,
+      set: { birthDate: value.birthDate, updatedAt: new Date() },
+    });
+  if (previousProfile.birthDate !== value.birthDate) {
+    await refreshTrainingLoadsForUser(session.user.id);
+  }
+  logger.info("birth_date.saved");
 }

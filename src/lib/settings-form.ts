@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { type ProfileSettings, profileSettingsSchema } from "@/services/app-settings.types.ts";
+import {
+  type ProfileSave,
+  type ProfileSettings,
+  profileSaveSchema,
+} from "@/services/app-settings.types.ts";
 import { shownSportTypesSchema } from "@/services/calendar-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
@@ -87,8 +91,8 @@ export function profileFormDefaults(profile: ProfileSettings | null): ProfileFor
   return { birthDate: profile?.birthDate ?? null };
 }
 
-export function profileFromForm(values: ProfileFormValues): ProfileSettings {
-  return profileSettingsSchema.parse({ birthDate: values.birthDate });
+export function profileFromForm(values: ProfileFormValues): ProfileSave {
+  return profileSaveSchema.parse({ birthDate: values.birthDate });
 }
 
 export function trainingFormDefaults(

@@ -4,23 +4,27 @@ import { z } from "zod";
 import { shownSportTypesSchema } from "./calendar-settings.types.ts";
 import { trainingPlanSchema } from "./training-plan.types.ts";
 
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .nullable();
+const birthDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** Stored profile: athletes who onboarded before the birthday was required may have none. */
 export const profileSettingsSchema = z.object({
-  birthDate: isoDate,
+  birthDate: birthDateSchema.nullable(),
+});
+
+/** Every save carries a birthday, so it can't be cleared once set. */
+export const profileSaveSchema = z.object({
+  birthDate: birthDateSchema,
 });
 
 export const appSettingsSaveSchema = z.object({
-  profile: profileSettingsSchema,
+  profile: profileSaveSchema,
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
   training: trainingPlanSchema.optional(),
 });
 
 export type ProfileSettings = z.infer<typeof profileSettingsSchema>;
+export type ProfileSave = z.infer<typeof profileSaveSchema>;
 export type AppSettingsSave = z.infer<typeof appSettingsSaveSchema>;
 
 export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {

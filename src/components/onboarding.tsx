@@ -22,14 +22,16 @@ import {
   TRAINING_WEEK_FIELDS,
   onboardingFormDefaults,
   onboardingFormSchema,
+  profileFormSchema,
   profileFromForm,
   trainingFromForm,
   type OnboardingFormInput,
   type OnboardingFormValues,
+  type ProfileFormValues,
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
-import { saveAppSettings } from "@/services/app-settings.ts";
+import { saveAppSettings, saveBirthDate } from "@/services/app-settings.ts";
 import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
@@ -170,8 +172,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
             }
           : current,
       );
+      // Keeps the onboarding route on "You're set" instead of the birthday prompt.
       queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
-        current ? { ...current, training: saved.training } : current,
+        current ? { ...current, training: saved.training, hasBirthDate: true } : current,
       );
       void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
@@ -394,6 +397,56 @@ export function OnboardingForm({ userName }: { userName: string }) {
             </Button>
           </>
         )}
+      </div>
+    </form>
+  );
+}
+
+/** One-step setup for athletes who finished onboarding before the birthday was required. */
+export function BirthDatePrompt() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: { birthDate: null },
+  });
+  const save = useMutation({
+    mutationFn: saveBirthDate,
+    onSuccess: async () => {
+      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
+        current ? { ...current, hasBirthDate: true } : current,
+      );
+      // Age reshapes max HR, zones, and training load on every page.
+      void queryClient.invalidateQueries();
+      await navigate({ to: "/" });
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="flex flex-col overflow-hidden rounded-xl border bg-card"
+      onSubmit={form.handleSubmit((values) => save.mutate({ data: profileFromForm(values) }))}
+    >
+      <div className="flex flex-col gap-2 border-b px-4 pt-4 pb-3 text-center">
+        <h1 className="text-xl font-semibold tracking-tight">About you</h1>
+        <p className="text-muted-foreground text-sm">
+          VO2 now checks heart-rate peaks against your age. Add your birthday to continue.
+        </p>
+      </div>
+      <div className="flex flex-col gap-4 p-4 pb-6">
+        <BirthDateField idPrefix="birthday-prompt" control={form.control} />
+      </div>
+      <div className="flex flex-row flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+        {save.error ? (
+          <p className="text-destructive me-auto w-full text-xs sm:w-auto">
+            {save.error.message || "Could not save your birthday"}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+          Continue
+        </Button>
       </div>
     </form>
   );
