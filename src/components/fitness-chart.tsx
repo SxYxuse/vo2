@@ -1,7 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, type ReactNode } from "react";
-import { cn } from "cn";
+import { useId, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -16,6 +15,7 @@ import {
 
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
+import { StatCard } from "@/components/stat-card.tsx";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
 
 import {
@@ -138,49 +138,6 @@ function Sparkline({
   );
 }
 
-function Kpi({
-  label,
-  value,
-  hint,
-  info,
-  color,
-  hintClassName,
-  valueClassName,
-  sparkline,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  info: string;
-  color?: string;
-  hintClassName?: string;
-  valueClassName?: string;
-  sparkline?: ReactNode;
-}) {
-  return (
-    <Card size="sm" className="gap-1 py-3">
-      <CardHeader className="px-3">
-        <CardDescription className="flex items-center gap-1">
-          {color ? (
-            <span
-              aria-hidden
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-          ) : null}
-          <span className="min-w-0">{label}</span>
-          <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
-        </CardDescription>
-        <CardTitle className={cn("font-mono text-base tabular-nums sm:text-lg", valueClassName)}>
-          {value}
-        </CardTitle>
-        {hint ? <CardDescription className={hintClassName}>{hint}</CardDescription> : null}
-        {sparkline}
-      </CardHeader>
-    </Card>
-  );
-}
-
 export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const isDesktop = useDesktopMedia();
@@ -244,7 +201,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-              <Kpi
+              <StatCard
                 label="Fitness (CTL)"
                 value={roundLoad(latest.ctl).toFixed(1)}
                 info={SERIES_INFO.ctl}
@@ -253,7 +210,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                   isDesktop === true ? undefined : <Sparkline data={series} dataKey="ctl" />
                 }
               />
-              <Kpi
+              <StatCard
                 label="Fatigue (ATL)"
                 value={roundLoad(latest.atl).toFixed(1)}
                 info={SERIES_INFO.atl}
@@ -262,7 +219,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                   isDesktop === true ? undefined : <Sparkline data={series} dataKey="atl" />
                 }
               />
-              <Kpi
+              <StatCard
                 label="Form (TSB)"
                 value={roundLoad(latest.tsb).toFixed(1)}
                 hint={formLabel(latest.tsb)}
@@ -273,13 +230,13 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                   isDesktop === true ? undefined : <Sparkline data={series} dataKey="tsb" />
                 }
               />
-              <Kpi
+              <StatCard
                 label="Ramp (7d)"
                 value={`${ramp >= 0 ? "+" : ""}${roundLoad(ramp).toFixed(1)}`}
                 info={RAMP_INFO}
                 valueClassName={rampTone(ramp)}
               />
-              <Kpi
+              <StatCard
                 label="Avg week"
                 value={formatTrainingHmm(avgWeekSeconds)}
                 hint={period === "all" ? "all time" : `over ${periodLabel}`}

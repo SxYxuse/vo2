@@ -20,6 +20,7 @@ import {
 import { FITNESS_PERIODS, periodStartMs } from "@/services/training-load.ts";
 import { EfficiencyTrendCard } from "@/components/heart-rate-efficiency.tsx";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
+import { StatCard } from "@/components/stat-card.tsx";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,40 +35,6 @@ const MAX_HR_INFO =
 
 const TIME_INFO =
   "Time spent in each zone from heart-rate streams, in the selected period. Each sample is classified with that activity's sport model, then All sums those times. Activities without heart-rate samples are left out of the bars.";
-
-function Kpi({
-  label,
-  value,
-  hint,
-  info,
-  color,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  info: string;
-  color?: string;
-}) {
-  return (
-    <Card size="sm" className="gap-1 py-3">
-      <CardHeader className="px-3">
-        <CardDescription className="flex items-center gap-1">
-          {color ? (
-            <span
-              aria-hidden
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-          ) : null}
-          <span className="min-w-0">{label}</span>
-          <InfoTooltip label={`About ${label}`}>{info}</InfoTooltip>
-        </CardDescription>
-        <CardTitle className="font-mono text-base tabular-nums sm:text-lg">{value}</CardTitle>
-        {hint ? <CardDescription className="line-clamp-2">{hint}</CardDescription> : null}
-      </CardHeader>
-    </Card>
-  );
-}
 
 function sportLabel(sport: HeartRateSport | string) {
   const sportType = typeof sport === "string" ? sport : sport.sportType;
@@ -182,28 +149,32 @@ export function HeartRateZones({
         ))}
       </ToggleGroup>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Kpi
+        <StatCard
+          hintClassName="line-clamp-2"
           label="Max HR"
           value={selected.maxHeartrate ? `${selected.maxHeartrate} bpm` : "—"}
           hint={peakHint(selected)}
           info={selected.maxAnchor ? maxHrAnchorInfo(selected.maxAnchor) : MAX_HR_INFO}
           color="var(--color-ds-red-700)"
         />
-        <Kpi
+        <StatCard
+          hintClassName="line-clamp-2"
           label="Est. LTHR"
           value={selected.lthr ? `${selected.lthr} bpm` : "—"}
           hint={lthrHint(selected)}
           info={lthrInfo(selected)}
           color="var(--color-ds-amber-700)"
         />
-        <Kpi
+        <StatCard
+          hintClassName="line-clamp-2"
           label="Activities"
           value={String(selected.activityCount)}
           hint={period === "all" || !periodLabel ? "with heart rate" : `in ${periodLabel}`}
           info="Count of activities that recorded a heart rate for this selection."
           color="var(--color-ds-blue-700)"
         />
-        <Kpi
+        <StatCard
+          hintClassName="line-clamp-2"
           label="Time with HR"
           value={formatHmm(selected.sampleSeconds)}
           hint="from streams"

@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { deleteCurrentAthlete } from "@/services/athlete-deletion.ts";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +56,10 @@ export function SettingsDeleteAthlete() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deletion.isError ? (
-            <p className="text-destructive text-xs">Could not delete your data. Try again.</p>
+            <Alert variant="destructive">
+              <AlertTitle>Could not delete</AlertTitle>
+              <AlertDescription>Could not delete your data. Try again.</AlertDescription>
+            </Alert>
           ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deletion.isPending}>Cancel</AlertDialogCancel>

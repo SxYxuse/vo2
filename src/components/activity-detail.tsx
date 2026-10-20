@@ -20,12 +20,12 @@ import { formatSportType } from "@/services/calendar-settings.ts";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
 import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
+import { StatCard } from "@/components/stat-card.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
 import { weekStartKey } from "@/services/training-plan.types.ts";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -47,51 +47,31 @@ const ActivityStreamCharts = lazy(() =>
   })),
 );
 
-function KpiCard({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <Card size="sm" className="gap-1 py-3">
-      <CardHeader className="px-3">
-        <CardDescription className="flex items-center gap-1.5">
-          {color ? (
-            <span
-              aria-hidden
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-          ) : null}
-          {label}
-        </CardDescription>
-        <CardTitle className="font-mono text-base tabular-nums sm:text-lg">{value}</CardTitle>
-      </CardHeader>
-    </Card>
-  );
-}
-
 function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        <KpiCard
+        <StatCard
           label="Distance"
           value={formatDistanceKm(detail.distance)}
           color="var(--color-ds-teal-700)"
         />
-        <KpiCard
+        <StatCard
           label="Moving time"
           value={formatDuration(detail.movingTime)}
           color="var(--color-ds-purple-700)"
         />
-        <KpiCard
+        <StatCard
           label="Elevation"
           value={formatElevation(detail.totalElevationGain)}
           color={SERIES_META.altitude.color}
         />
-        <KpiCard
+        <StatCard
           label="Avg HR"
           value={formatBpm(detail.kpis.avgHeartrate)}
           color={SERIES_META.heartrate.color}
         />
-        <KpiCard
+        <StatCard
           label={isCyclingSport(detail.sportType) ? "Avg / NP" : "Avg power"}
           value={
             isCyclingSport(detail.sportType)
@@ -100,7 +80,7 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           }
           color={SERIES_META.watts.color}
         />
-        <KpiCard
+        <StatCard
           label={locomotionFor(detail.sportType).kpiLabel}
           value={formatLocomotion(detail.kpis.avgSpeed, detail.sportType)}
           color={SERIES_META.speed.color}

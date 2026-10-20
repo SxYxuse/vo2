@@ -146,7 +146,7 @@ export function SportTypesFields<T extends SportsFormInput>({
         const powerId = `${inputId}-power`;
         const offersPower = sportOffersPower(sportType);
         return (
-          <FieldGroup key={sportType} className="rounded-lg border p-3">
+          <FieldSet key={sportType} className="gap-3 rounded-lg border p-3">
             <Field orientation="horizontal">
               <Controller
                 name={`sportTypes.${sportType}.visible` as FieldPath<T>}
@@ -242,7 +242,7 @@ export function SportTypesFields<T extends SportsFormInput>({
                 ) : null}
               </FieldGroup>
             </FieldSet>
-          </FieldGroup>
+          </FieldSet>
         );
       })}
     </FieldGroup>
