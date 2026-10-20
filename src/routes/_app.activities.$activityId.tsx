@@ -13,19 +13,12 @@ import {
   settingsSnapshotQueryOptions,
 } from "@/lib/queries.ts";
 import { mergeCalendarSettings } from "@/services/calendar-settings.ts";
-import { parseDiaryMonthSearch } from "@/services/diary-window.ts";
+import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
-type ActivitySearch = {
-  /** The calendar month when the activity was opened from it. */
-  month?: string;
-};
-
 export const Route = createFileRoute("/_app/activities/$activityId")({
-  validateSearch: (search: Record<string, unknown>): ActivitySearch => {
-    const month = parseDiaryMonthSearch(search.month);
-    return month ? { month } : {};
-  },
+  // The calendar period the activity was opened from, so the Calendar link returns to it.
+  validateSearch: (search: Record<string, unknown>): DiarySearch => parseDiarySearch(search),
   loader: ({ context, params }) => {
     prefetchActivityDetail(context.queryClient, params.activityId);
     return context.queryClient.query(loaderQuery(activityDetailQueryOptions(params.activityId)));
@@ -38,22 +31,22 @@ export const Route = createFileRoute("/_app/activities/$activityId")({
 
 function ActivityPage() {
   const { activityId } = Route.useParams();
-  const { month } = Route.useSearch();
+  const diary = Route.useSearch();
   const { data: detail } = useSuspenseQuery(activityDetailQueryOptions(activityId));
   const settingsQuery = useQuery(settingsSnapshotQueryOptions);
 
-  if (!detail) return <ActivityDetailMissing month={month} />;
+  if (!detail) return <ActivityDetailMissing diary={diary} />;
 
   const color = mergeCalendarSettings(settingsQuery.data?.settings, [detail.sportType]).sportTypes[
     detail.sportType
   ]?.color;
 
-  return <ActivityDetailView detail={detail} color={color} month={month} />;
+  return <ActivityDetailView detail={detail} color={color} diary={diary} />;
 }
 
 function ActivityPending() {
-  const { month } = Route.useSearch();
-  return <ActivityDetailPending month={month} />;
+  const diary = Route.useSearch();
+  return <ActivityDetailPending diary={diary} />;
 }
 
 function ActivityError({ error }: ErrorComponentProps) {

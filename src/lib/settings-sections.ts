@@ -1,9 +1,10 @@
-import { ActivityIcon, RefreshCwIcon, TargetIcon, UserIcon } from "lucide-react";
+import { ActivityIcon, CalendarDaysIcon, RefreshCwIcon, TargetIcon, UserIcon } from "lucide-react";
 
 export const SETTINGS_SECTIONS = [
   { id: "profile", label: "Profile", icon: UserIcon },
   { id: "training", label: "Training", icon: TargetIcon },
   { id: "sports", label: "Sports", icon: ActivityIcon },
+  { id: "calendar", label: "Calendar", icon: CalendarDaysIcon },
   { id: "sync", label: "Sync", icon: RefreshCwIcon },
 ] as const;
 

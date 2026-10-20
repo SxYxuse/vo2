@@ -22,7 +22,12 @@ import {
   trainingConsistency,
   type HoursIntent,
 } from "@/services/training-plan.ts";
-import type { ProfileFormValues, TrainingFormInput } from "@/lib/settings-form.ts";
+import { CALENDAR_PERIODS } from "@/services/calendar-settings.ts";
+import type {
+  ProfileFormValues,
+  SettingsFormInput,
+  TrainingFormInput,
+} from "@/lib/settings-form.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -591,5 +596,53 @@ export function TrainingStyleFields<T extends TrainingFormInput>({
         )}
       />
     </FieldGroup>
+  );
+}
+
+export function CalendarPeriodField({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<SettingsFormInput>;
+}) {
+  return (
+    <Controller
+      name="calendarPeriod"
+      control={control}
+      render={({ field }) => (
+        <FieldSet>
+          <FieldLegend>Calendar period</FieldLegend>
+          <FieldDescription>
+            What the activity calendar shows on a wide screen. Previous and next move by that same
+            period. Phones always show one training week.
+          </FieldDescription>
+          <RadioGroup
+            name={field.name}
+            value={field.value}
+            onValueChange={(next) => {
+              if (!next) return;
+              field.onChange(next);
+            }}
+            className="gap-2"
+          >
+            {CALENDAR_PERIODS.map((period) => {
+              const id = `${idPrefix}-calendar-period-${period.id}`;
+              return (
+                <FieldLabel key={period.id} htmlFor={id} className="w-full">
+                  <Field orientation="horizontal" className="items-start rounded-lg border p-3">
+                    <RadioGroupItem value={period.id} id={id} />
+                    <FieldContent>
+                      <FieldTitle>{period.label}</FieldTitle>
+                      <FieldDescription>{period.hint}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              );
+            })}
+          </RadioGroup>
+        </FieldSet>
+      )}
+    />
   );
 }

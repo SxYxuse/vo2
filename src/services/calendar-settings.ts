@@ -1,6 +1,7 @@
-export type { CalendarSettings } from "./calendar-settings.types.ts";
+export type { CalendarPeriod, CalendarSettings } from "./calendar-settings.types.ts";
 export {
   ACTIVITY_COLOR_OPTIONS,
+  CALENDAR_PERIODS,
   DEFAULT_CALENDAR_SETTINGS,
   familyCollectors,
   formatSportType,

@@ -50,9 +50,26 @@ const sportTypeSettingSchema = z.object({
   power: z.boolean().default(false),
 });
 
+export const CALENDAR_PERIODS = [
+  {
+    id: "month",
+    label: "Current month",
+    hint: "One calendar month. Days of the neighbouring months stay blank.",
+  },
+  {
+    id: "weeks",
+    label: "Last 4 weeks",
+    hint: "The current training week and the three before it.",
+  },
+] as const;
+
+export const calendarPeriodSchema = z.enum(["month", "weeks"]);
+export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
+
 export const calendarSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
+  calendarPeriod: calendarPeriodSchema.default("month"),
 });
 
 export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
@@ -142,6 +159,7 @@ export function familyCollectors(
 export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
+  calendarPeriod: "month",
 };
 
 export function formatSportType(sportType: string) {
