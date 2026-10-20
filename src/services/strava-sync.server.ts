@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, syncRuns } from "@/db/schema.ts";
@@ -13,6 +13,7 @@ import { StravaDailyLimitError, StravaShortLimitError } from "@/integrations/str
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getStravaAccessToken } from "@/lib/strava-token.server.ts";
+import { CLEARED_DERIVED_CACHES, staleDerivedCacheIds } from "./activity-derived-cache.ts";
 import { buildChartPreview } from "./activity-detail.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
@@ -463,6 +464,20 @@ async function insertActivityRows(
     return row ? [row] : [];
   });
   if (rows.length === 0) return 0;
+  const stored = await db
+    .select({
+      id: activities.id,
+      sportType: activities.sportType,
+      distance: activities.distance,
+      totalElevationGain: activities.totalElevationGain,
+    })
+    .from(activities)
+    .where(
+      inArray(
+        activities.id,
+        rows.map((row) => row.id),
+      ),
+    );
   await db
     .insert(activities)
     .values(rows)
@@ -490,6 +505,14 @@ async function insertActivityRows(
         updatedAt: sql`excluded.updated_at`,
       },
     });
+  // after the upsert, so a detail view in between can only rebuild from the fresh fields
+  const stale = staleDerivedCacheIds(stored, rows);
+  if (stale.length > 0) {
+    await db
+      .update(activityStreams)
+      .set(CLEARED_DERIVED_CACHES)
+      .where(inArray(activityStreams.activityId, stale));
+  }
   return rows.length;
 }
 
@@ -638,7 +661,7 @@ async function storeStreams(activityId: string, streams: StreamSet) {
         gradeSmooth: streams.grade_smooth?.data ?? null,
         chartPreview,
         // rebuilt from the fresh streams on the next detail view
-        rideAnalysis: null,
+        ...CLEARED_DERIVED_CACHES,
         raw: streams,
         syncedAt: now,
       },
