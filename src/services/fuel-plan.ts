@@ -177,7 +177,8 @@ function climbAt(climbs: MajorClimb[], atSec: number) {
   return climbs.some((climb) => atSec >= climb.startSec && atSec <= climb.endSec);
 }
 
-function formatClock(sec: number) {
+/** Suggested times read "around 1:45": rounded to 5 minutes from the start, not a clock time. */
+export function formatAroundTime(sec: number) {
   const minutes = Math.round(sec / 60 / 5) * 5;
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
@@ -471,7 +472,7 @@ function scheduleIntakes(
       "gel",
       target,
       [Math.min(target, latest - 10 * 60), latest],
-      `ready for the climb at km ${climb.startKm}, around ${formatClock(climb.startSec)}`,
+      `ready for the climb at km ${climb.startKm}, around ${formatAroundTime(climb.startSec)}`,
     );
   }
 
@@ -486,7 +487,7 @@ function scheduleIntakes(
         "caffeine",
         at,
         [at - 10 * 60, at + 10 * 60],
-        `caffeine peaks for the climb at km ${climb.startKm}, around ${formatClock(climb.startSec)}`,
+        `caffeine peaks for the climb at km ${climb.startKm}, around ${formatAroundTime(climb.startSec)}`,
       );
     } else if (plan.gelProducts[0]) {
       // No room before the climb: a plain gel keeps the carbs.
@@ -621,7 +622,7 @@ export function checkPlan(input: FuelPlanInput, plan: FuelPlan): string[] {
         .reduce((sum, intake) => sum + intake.carbsG, 0);
       if (carbs > MAX_CARBS_PER_HOUR + ROUNDING_G) {
         issues.push(
-          `More than ${MAX_CARBS_PER_HOUR} g of carbs in the hour from ${formatClock(start)}.`,
+          `More than ${MAX_CARBS_PER_HOUR} g of carbs in the hour from ${formatAroundTime(start)}.`,
         );
         break;
       }
@@ -630,7 +631,7 @@ export function checkPlan(input: FuelPlanInput, plan: FuelPlan): string[] {
         carbs > rate * ROLLING_RANGE[1] + slack + ROUNDING_G
       ) {
         issues.push(
-          `The hour from ${formatClock(start)} gets ${round(carbs)} g, off your ${plan.carbTarget} g/h.`,
+          `The hour from ${formatAroundTime(start)} gets ${round(carbs)} g, off your ${plan.carbTarget} g/h.`,
         );
         break;
       }

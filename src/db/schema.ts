@@ -125,3 +125,30 @@ export const syncRuns = pgTable("sync_runs", {
   lastError: text("last_error"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** A GPX route the athlete plans to do, with its prediction and fuel plans (ADR 0017). */
+export const routePlans = pgTable(
+  "route_plans",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sportType: text("sport_type").notNull(),
+    carbTarget: real("carb_target").notNull(),
+    bottleCount: integer("bottle_count").notNull(),
+    bottleMl: integer("bottle_ml").notNull(),
+    /** RoutePrediction, steps included: they are the resampled route, not the raw GPX. */
+    prediction: jsonb("prediction").notNull(),
+    /** ProposalSpec[]: products and shares; servings are solved on read. */
+    proposals: jsonb("proposals").notNull(),
+    /** The chosen proposal after swaps, with its timeline: { spec, plan }. */
+    chosen: jsonb("chosen"),
+    /** Which catalog snapshot the plans were made from. */
+    catalogFetchedAt: text("catalog_fetched_at").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("route_plans_user_created_idx").on(table.userId, table.createdAt)],
+);

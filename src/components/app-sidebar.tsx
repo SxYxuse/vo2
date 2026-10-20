@@ -9,6 +9,7 @@ import {
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
+  RouteIcon,
   Settings2Icon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -47,6 +48,7 @@ import {
 const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
   { title: "Week target", to: "/week", icon: TargetIcon },
+  { title: "Fuel", to: "/fuel", icon: RouteIcon },
 ] as const;
 
 const NAV_ITEMS = [
