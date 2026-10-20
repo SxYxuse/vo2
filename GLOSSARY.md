@@ -171,3 +171,9 @@ _Avoid_: Expected HR, baseline HR, resting heart rate
 **Heart-rate zone**:
 One of five effort bands from recovery through VO2 max. Cycling, running, and swimming cut zones from that sport's LTHR; walking and other sports cut from max heart rate.
 _Avoid_: Polar zone, Coggan zone, power zone
+
+## Fuelling
+
+**Fuel product**:
+A gel, chew, drink mix, or bar from the stored MNSTRY catalog. Its carbs, glucose:fructose ratio, and caffeine come only from what the store states; a value the store doesn't state stays missing.
+_Avoid_: Supplement, nutrition item, SKU
