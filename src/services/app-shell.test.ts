@@ -6,7 +6,7 @@ const training = {
   buildPace: "steady",
   targetMode: "auto",
   hoursIntent: "keep",
-  weekMix: { sessions: 5, keyShare: 20 },
+  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20 },
   targetWeeklyHours: 6,
   preferredRestWeekday: 0,
   timeZone: "Europe/Paris",

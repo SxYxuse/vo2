@@ -1,13 +1,15 @@
 "use client";
 
-import { Controller, useWatch, type Control } from "react-hook-form";
+import { Controller, useController, useWatch, type Control } from "react-hook-form";
 
 import {
   BUILD_PACES,
   KEY_SHARE_PRESETS,
-  easySessionCount,
+  MAX_SESSIONS_PER_WEEK,
+  easySessionRange,
   keySessionCount,
   type BuildPace,
+  type SessionHistory,
   type WeekMix,
 } from "@/services/training-plan.ts";
 import { keySessionTypes } from "@/services/week-target.ts";
@@ -21,12 +23,6 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -36,25 +32,37 @@ function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
+/** "4–6 sessions", or "5 sessions" when the range is a single value. */
+function rangeLabel(min: number, max: number, word: string) {
+  if (min === max) return plural(min, word);
+  return `${min}–${max} ${word}s`;
+}
+
 export function WeekMixFields<T extends TrainingFormInput>({
   idPrefix,
   control: anyControl,
-  recentSessionsPerWeek,
+  history,
   onOpenSports,
 }: {
   idPrefix: string;
   control: Control<T>;
-  /** Average sessions a week over the last 8 weeks, when there is history. */
-  recentSessionsPerWeek: number | null;
+  /** Sessions a week over the last 3 months, when there is history. */
+  history: SessionHistory | null;
   onOpenSports?: () => void;
 }) {
   const control = anyControl as unknown as Control<Form>;
   const mix = useWatch({ control, name: "weekMix" }) as WeekMix | undefined;
   const buildPace = useWatch({ control, name: "buildPace" }) as BuildPace | "";
-  const sessions = Number.isFinite(mix?.sessions) ? (mix?.sessions ?? 0) : 0;
+  const minField = useController({ control, name: "weekMix.minSessions" });
+  const maxField = useController({ control, name: "weekMix.maxSessions" });
+  const minSessions = mix?.minSessions ?? 1;
+  const maxSessions = mix?.maxSessions ?? minSessions;
   const keyShare = mix?.keyShare ?? 0;
-  const keys = keySessionCount({ sessions, keyShare });
-  const easy = easySessionCount({ sessions, keyShare });
+  const keys = keySessionCount({ minSessions, maxSessions, keyShare });
+  const easy = easySessionRange({ minSessions, maxSessions, keyShare });
+  const rangeError = minField.fieldState.error ?? maxField.fieldState.error;
+  const matchesHistory =
+    history != null && history.low === minSessions && history.high === maxSessions;
   const [main, ...rotating] = buildPace ? keySessionTypes(buildPace) : [];
   const paceLabel = BUILD_PACES.find((pace) => pace.id === buildPace)?.label;
 
@@ -67,44 +75,52 @@ export function WeekMixFields<T extends TrainingFormInput>({
         easy sessions.
       </FieldDescription>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr]">
-        <Controller
-          name="weekMix.sessions"
-          control={control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`${idPrefix}-sessions`}>Sessions per week</FieldLabel>
-              <InputGroup>
-                <InputGroupInput
-                  id={`${idPrefix}-sessions`}
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={14}
-                  step={1}
-                  name={field.name}
-                  value={Number.isFinite(field.value) ? field.value : ""}
-                  aria-invalid={fieldState.invalid}
-                  onBlur={field.onBlur}
-                  onChange={(event) => {
-                    const value = event.target.valueAsNumber;
-                    field.onChange(Number.isFinite(value) ? value : Number.NaN);
+        <Field data-invalid={Boolean(rangeError)}>
+          <FieldLabel htmlFor={`${idPrefix}-sessions`}>
+            Sessions per week ·{" "}
+            {minSessions === maxSessions ? minSessions : `${minSessions}–${maxSessions}`}
+          </FieldLabel>
+          <Slider
+            id={`${idPrefix}-sessions`}
+            aria-label="Sessions per week, fewest and most"
+            min={1}
+            max={MAX_SESSIONS_PER_WEEK}
+            step={1}
+            minStepsBetweenValues={0}
+            value={[minSessions, maxSessions]}
+            onValueChange={(next) => {
+              if (!Array.isArray(next)) return;
+              const [low, high] = next;
+              if (low !== minSessions) minField.field.onChange(low);
+              if (high !== maxSessions) maxField.field.onChange(high);
+            }}
+          />
+          {rangeError ? (
+            <FieldError errors={[rangeError]} />
+          ) : history ? (
+            <FieldDescription>
+              Last 3 months: about {Math.round(history.average)} a week, usually{" "}
+              {history.low === history.high ? history.low : `${history.low}–${history.high}`}.{" "}
+              {matchesHistory ? null : (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0"
+                  onClick={() => {
+                    minField.field.onChange(history.low);
+                    maxField.field.onChange(history.high);
                   }}
-                  ref={field.ref}
-                />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupText>a week</InputGroupText>
-                </InputGroupAddon>
-              </InputGroup>
-              {fieldState.invalid ? (
-                <FieldError errors={[fieldState.error]} />
-              ) : recentSessionsPerWeek != null ? (
-                <FieldDescription>
-                  You did about {Math.round(recentSessionsPerWeek)} a week lately.
-                </FieldDescription>
-              ) : null}
-            </Field>
+                >
+                  Use{" "}
+                  {history.low === history.high ? history.low : `${history.low}–${history.high}`}
+                </Button>
+              )}
+            </FieldDescription>
+          ) : (
+            <FieldDescription>A range lets busy and quiet weeks both count.</FieldDescription>
           )}
-        />
+        </Field>
         <Controller
           name="weekMix.keyShare"
           control={control}
@@ -147,9 +163,7 @@ export function WeekMixFields<T extends TrainingFormInput>({
         />
       </div>
       <p className="text-sm font-medium">
-        {sessions > 0
-          ? `${plural(sessions, "session")} → ${plural(keys, "key session")} · ${plural(easy, "easy session")}`
-          : "Pick how many sessions you do a week."}
+        {`${rangeLabel(minSessions, maxSessions, "session")} → ${plural(keys, "key session")} · ${rangeLabel(easy.min, easy.max, "easy session")}`}
       </p>
       {keys > 0 && main && paceLabel ? (
         <FieldDescription>
@@ -159,15 +173,20 @@ export function WeekMixFields<T extends TrainingFormInput>({
             : ""}
           . Reps and length follow your fitness, and key sessions pause when form is very low.
         </FieldDescription>
-      ) : keys === 0 && sessions > 0 ? (
+      ) : keys === 0 && keyShare === 0 ? (
         <FieldDescription>All easy: no intervals or time in zone this week.</FieldDescription>
       ) : null}
-      {keyShare > 0 && sessions > 0 && keys === 0 ? (
+      {keyShare > 0 && keys === 0 ? (
         <FieldDescription>
-          {keyShare}% of {plural(sessions, "session")} rounds to no key session. Add sessions or
-          raise the split.
+          {keyShare}% of {plural(minSessions, "session")} rounds to no key session. Raise the fewest
+          sessions or the split.
         </FieldDescription>
-      ) : null}
+      ) : (
+        <FieldDescription>
+          Key sessions come from the low end of the range, so they happen even in a quiet week. The
+          number of easy sessions settles within the range as the week goes.
+        </FieldDescription>
+      )}
       {onOpenSports ? (
         <Button
           type="button"

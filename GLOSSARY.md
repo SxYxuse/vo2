@@ -69,7 +69,7 @@ Whether fixed weekly hours should cut, keep, or add volume relative to recent we
 _Avoid_: Volume target (the numeric hours live on the training plan)
 
 **Week mix**:
-How many sessions the athlete does a week, and what share of them are key sessions (for example 5 sessions at 20 / 80: one key, four easy). The athlete sets the mix; VO2 builds the sessions.
+A range of sessions the athlete does a week, and what share of them are key sessions (for example 4–6 sessions at 25 / 75: one key, three to five easy). Key sessions come from the low end of the range; the number of easy sessions settles within it as the week goes. The athlete sets the mix, seeded from their last 3 months; VO2 builds the sessions.
 _Avoid_: Workout style, polarized split, session caps
 
 **Key session**:

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   addDayKey,
+  easySessionRange,
+  keySessionCount,
+  recentSessionHistory,
   keySessionName,
   parseTrainingPlan,
   type TrainingPlan,
@@ -31,7 +34,7 @@ const PLAN: TrainingPlan = {
   hoursIntent: "keep",
   // 60% of 5 sessions: 3 key sessions. At fitness 50 in the week of Oct 19 that is
   // 3 × 10 min Z4 (1h 05), 2 × 20 min Z3 (1h 10), and a 2h long Z2: 4h 15, then 2 easy sessions.
-  weekMix: { sessions: 5, keyShare: 60 },
+  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 60 },
   targetWeeklyHours: 8,
   preferredRestWeekday: 0,
   timeZone: "UTC",
@@ -181,7 +184,9 @@ describe("summarizeWeek", () => {
     expect(summary.easy).toEqual({
       target: 480 - 255,
       left: 420 - 255,
-      sessions: 2,
+      min: 2,
+      max: 2,
+      planned: 2,
       // The 60 min ride already filled one easy session.
       done: 1,
       perSession: 165,
@@ -328,7 +333,7 @@ describe("parseTrainingPlan", () => {
       buildPace: "slow",
       targetMode: "auto",
       hoursIntent: "keep",
-      weekMix: { sessions: 5, keyShare: 0 },
+      weekMix: { minSessions: 4, maxSessions: 6, keyShare: 0 },
       targetWeeklyHours: 6,
       preferredRestWeekday: 1,
       timeZone: "Europe/Brussels",
@@ -346,7 +351,7 @@ describe("legacy workout style", () => {
       preferredRestWeekday: 0,
       timeZone: "UTC",
     });
-    expect(plan?.weekMix).toEqual({ sessions: 5, keyShare: 40 });
+    expect(plan?.weekMix).toEqual({ minSessions: 4, maxSessions: 6, keyShare: 40 });
   });
 });
 
@@ -392,7 +397,10 @@ describe("generateKeySessions", () => {
       generateKeySessions({
         ...base,
         targetMinutes: 1200,
-        plan: { buildPace: "steady", weekMix: { sessions, keyShare } },
+        plan: {
+          buildPace: "steady",
+          weekMix: { minSessions: sessions, maxSessions: sessions, keyShare },
+        },
       }).length;
     expect(count(5, 20)).toBe(1);
     expect(count(6, 50)).toBe(3);
@@ -402,7 +410,10 @@ describe("generateKeySessions", () => {
   });
 
   it("always leads with the build pace's main session and rotates the rest weekly", () => {
-    const plan = { buildPace: "fast" as const, weekMix: { sessions: 4, keyShare: 50 } };
+    const plan = {
+      buildPace: "fast" as const,
+      weekMix: { minSessions: 4, maxSessions: 4, keyShare: 50 },
+    };
     const names = (weekStart: string) =>
       generateKeySessions({ ...base, plan, weekStart }).map((session) =>
         session.id.split("-").at(-1),
@@ -412,7 +423,10 @@ describe("generateKeySessions", () => {
   });
 
   it("sizes sessions by fitness", () => {
-    const plan = { buildPace: "steady" as const, weekMix: { sessions: 5, keyShare: 20 } };
+    const plan = {
+      buildPace: "steady" as const,
+      weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20 },
+    };
     const [low] = generateKeySessions({ ...base, plan, ctl: 20 });
     const [high] = generateKeySessions({ ...base, plan, ctl: 80 });
     expect(keySessionName(low)).toBe("3 × 8 min Z4");
@@ -423,7 +437,7 @@ describe("generateKeySessions", () => {
     const sessions = generateKeySessions({
       ...base,
       targetMinutes: 180,
-      plan: { buildPace: "steady", weekMix: { sessions: 3, keyShare: 100 } },
+      plan: { buildPace: "steady", weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100 } },
     });
     expect(sessions.map((session) => session.kind)).not.toContain("long");
     expect(sessions.length).toBe(1);
@@ -476,7 +490,9 @@ describe("today's choice", () => {
   });
 
   it("builds an extra key session when the mix has none left", () => {
-    const data = week({ plan: { ...PLAN, weekMix: { sessions: 5, keyShare: 0 } } });
+    const data = week({
+      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0 } },
+    });
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 90,
       sport: "any",
@@ -497,7 +513,9 @@ describe("today's choice", () => {
   });
 
   it("splits a run + ride day into a run then an easy ride", () => {
-    const data = week({ plan: { ...PLAN, weekMix: { sessions: 5, keyShare: 0 } } });
+    const data = week({
+      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0 } },
+    });
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 120,
       sport: "both",
@@ -547,5 +565,43 @@ describe("re-planning from what was logged", () => {
     const summary = summarizeWeek(week({ activities: [unplanned] }));
     // 40 min at Z3 or above covers the tempo block's 40 planned minutes.
     expect(summary.keySessions[1].done?.id).toBe("group-ride");
+  });
+});
+
+describe("session range", () => {
+  it("takes key sessions from the low end and gives the rest of the range to easy", () => {
+    const mix = { minSessions: 4, maxSessions: 7, keyShare: 25 };
+    expect(keySessionCount(mix)).toBe(1);
+    expect(easySessionRange(mix)).toEqual({ min: 3, max: 6 });
+  });
+
+  it("plans more easy sessions early in the week and settles lower as days run out", () => {
+    const plan = { ...PLAN, weekMix: { minSessions: 4, maxSessions: 7, keyShare: 25 } };
+    const monday = summarizeWeek(week({ plan, today: WEEK_START }));
+    // 6 training days (Sunday rest), one taken by the key session: 5 easy, within 3–6.
+    expect(monday.easy).toMatchObject({ min: 3, max: 6, planned: 5, done: 0 });
+    const saturday = summarizeWeek(week({ plan, today: "2026-10-24" }));
+    expect(saturday.easy.planned).toBe(3);
+  });
+
+  it("reads the usual range from the last 3 months of activities", () => {
+    const now = new Date("2026-10-20T12:00:00Z");
+    const loads = Array.from({ length: 13 }, (_, week) =>
+      Array.from({ length: week === 0 ? 2 : week % 3 === 0 ? 7 : 5 }, (_, index) => ({
+        start: new Date(now.getTime() - (week * 7 + index * 0.5 + 0.25) * 86_400_000).toISOString(),
+        load: 50,
+        estimatedLoad: 0,
+        movingTime: 3600,
+      })),
+    ).flat();
+    const history = recentSessionHistory(loads, now);
+    expect(history?.low).toBe(5);
+    expect(history?.high).toBe(7);
+    expect(history?.average).toBeCloseTo((2 + 4 * 7 + 8 * 5) / 13);
+  });
+
+  it("turns a saved single count into a range of one", () => {
+    const plan = parseTrainingPlan({ ...PLAN, weekMix: { sessions: 6, keyShare: 30 } });
+    expect(plan?.weekMix).toEqual({ minSessions: 6, maxSessions: 6, keyShare: 30 });
   });
 });

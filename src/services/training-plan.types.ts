@@ -90,26 +90,44 @@ export const KEY_SHARE_PRESETS = [
   { share: 50, label: "50 / 50" },
 ] as const;
 
-/** How many sessions a week, and what share of them are key sessions. */
-export const weekMixSchema = z.object({
-  sessions: z
-    .number()
-    .int()
-    .min(1, { error: "At least 1 session a week." })
-    .max(14, { error: "14 sessions a week at most." }),
-  keyShare: z.number().int().min(0).max(100),
-});
+export const MAX_SESSIONS_PER_WEEK = 14;
+
+/** A range of sessions a week, and what share of them are key sessions. */
+export const weekMixSchema = z
+  .object({
+    minSessions: z
+      .number()
+      .int()
+      .min(1, { error: "At least 1 session a week." })
+      .max(MAX_SESSIONS_PER_WEEK),
+    maxSessions: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_SESSIONS_PER_WEEK, { error: `${MAX_SESSIONS_PER_WEEK} sessions a week at most.` }),
+    keyShare: z.number().int().min(0).max(100),
+  })
+  .refine((mix) => mix.maxSessions >= mix.minSessions, {
+    error: "The busiest week can't have fewer sessions than the quietest.",
+    path: ["maxSessions"],
+  });
 
 export type WeekMix = z.infer<typeof weekMixSchema>;
 
-export const DEFAULT_WEEK_MIX: WeekMix = { sessions: 5, keyShare: 20 };
+export const DEFAULT_WEEK_MIX: WeekMix = { minSessions: 4, maxSessions: 6, keyShare: 20 };
 
+/** Key sessions come from the low end of the range: they are the sessions that always happen. */
 export function keySessionCount(mix: WeekMix) {
-  return Math.min(MAX_KEY_SESSIONS, Math.round((mix.sessions * mix.keyShare) / 100));
+  return Math.min(MAX_KEY_SESSIONS, Math.round((mix.minSessions * mix.keyShare) / 100));
 }
 
-export function easySessionCount(mix: WeekMix) {
-  return Math.max(0, mix.sessions - keySessionCount(mix));
+/** Easy sessions fill the rest of the range. */
+export function easySessionRange(mix: WeekMix) {
+  const keys = keySessionCount(mix);
+  return {
+    min: Math.max(0, mix.minSessions - keys),
+    max: Math.max(0, mix.maxSessions - keys),
+  };
 }
 export const WARM_UP_MINUTES = 15;
 export const COOL_DOWN_MINUTES = 10;
@@ -179,16 +197,31 @@ export function keySessionName(session: KeySession) {
   return `${session.reps} × ${session.workMinutes} min ${zone}`;
 }
 
+/** A single "sessions" count saved before ranges becomes a range of one. */
+function normalizeWeekMix(raw: Record<string, unknown>) {
+  const mix = raw.weekMix;
+  if (!mix || typeof mix !== "object") return legacyWeekMix(raw);
+  const stored = mix as Record<string, unknown>;
+  if (typeof stored.sessions === "number" && stored.minSessions == null) {
+    return {
+      minSessions: stored.sessions,
+      maxSessions: stored.sessions,
+      keyShare: stored.keyShare,
+    };
+  }
+  return mix;
+}
+
 /** Plans saved before the week mix: "Intervals and zones" keeps some key sessions. */
 function legacyWeekMix(raw: Record<string, unknown>): WeekMix {
   if (Array.isArray(raw.keySessions)) {
-    return { sessions: 5, keyShare: Math.min(100, raw.keySessions.length * 20) };
+    return { ...DEFAULT_WEEK_MIX, keyShare: Math.min(100, raw.keySessions.length * 20) };
   }
   if (raw.workoutStyle !== "structured" || raw.buildPace === "hold") {
     return { ...DEFAULT_WEEK_MIX, keyShare: 0 };
   }
   const fast = raw.buildPace === "fast" || raw.buildPace === "overreach";
-  return { sessions: 5, keyShare: fast ? 40 : 20 };
+  return { ...DEFAULT_WEEK_MIX, keyShare: fast ? 40 : 20 };
 }
 
 export type FamilyCollectors = {
@@ -251,7 +284,7 @@ function withPlanDefaults(value: unknown) {
   return {
     ...raw,
     targetMode: raw.targetMode === "manual" ? "manual" : "auto",
-    weekMix: raw.weekMix && typeof raw.weekMix === "object" ? raw.weekMix : legacyWeekMix(raw),
+    weekMix: normalizeWeekMix(raw),
   };
 }
 
@@ -283,11 +316,29 @@ export function recentAverageWeeklyHours(loads: FitnessLoad[], timeZone: string)
   return averageWeeklyMovingSeconds(loads, series, timeZone) / 3600;
 }
 
-/** Activities a week over the last 8 weeks; null when there is too little history. */
-export function recentSessionsPerWeek(loads: FitnessLoad[], now = new Date()) {
-  const from = now.getTime() - 56 * 86_400_000;
-  const count = loads.filter((load) => new Date(load.start).getTime() >= from).length;
-  return count >= 3 ? count / 8 : null;
+export type SessionHistory = { average: number; low: number; high: number };
+
+/** Activities a week over the last 3 months: the average and the usual low and high. */
+export function recentSessionHistory(
+  loads: FitnessLoad[],
+  now = new Date(),
+): SessionHistory | null {
+  const weeks = 13;
+  const counts = Array.from({ length: weeks }, () => 0);
+  for (const load of loads) {
+    const age = Math.floor((now.getTime() - new Date(load.start).getTime()) / (7 * 86_400_000));
+    if (age >= 0 && age < weeks) counts[age] += 1;
+  }
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  if (total < 3) return null;
+  const sorted = [...counts].sort((left, right) => left - right);
+  // Skip the odd holiday or block week: the 20th and 80th percentile weeks.
+  const at = (share: number) => sorted[Math.round((sorted.length - 1) * share)];
+  return {
+    average: total / weeks,
+    low: Math.max(1, at(0.2)),
+    high: Math.max(1, at(0.8)),
+  };
 }
 
 export function formatHours(hours: number) {

@@ -10,7 +10,7 @@ import {
   WARM_UP_MINUTES,
   addDayKey,
   formatHours,
-  easySessionCount,
+  easySessionRange,
   keySessionCount,
   keySessionFromPreset,
   keySessionMinutes,
@@ -114,8 +114,10 @@ export type WeekSummary = {
   easy: {
     target: number;
     left: number;
-    /** Easy sessions planned this week, and how many activities already filled one. */
-    sessions: number;
+    /** The easy-session range from the week mix, how many are planned now, and how many are done. */
+    min: number;
+    max: number;
+    planned: number;
     done: number;
     /** Suggested length of each easy session still to do. */
     perSession: number;
@@ -488,19 +490,26 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
     return { ...status, skipped: true };
   });
   const usedByKey = new Set(keySessions.map((status) => status.done?.id).filter(Boolean));
-  const easySessions = easySessionCount(plan.weekMix);
-  const easyDone = Math.min(
-    easySessions,
-    activities.filter(
-      (activity) => !usedByKey.has(activity.id) && activity.minutes >= EASY_SESSION_MIN_MINUTES,
-    ).length,
-  );
+  const easyRange = easySessionRange(plan.weekMix);
+  const easyDone = activities.filter(
+    (activity) => !usedByKey.has(activity.id) && activity.minutes >= EASY_SESSION_MIN_MINUTES,
+  ).length;
   const paused = form < PAUSE_FORM;
   const keyLeftMinutes = paused
     ? 0
     : keySessions
         .filter((status) => !status.done && !status.skipped)
         .reduce((sum, status) => sum + status.minutes, 0);
+  // Within the range: aim high while there are days to spare, settle lower as they run out.
+  const openKeys = paused
+    ? 0
+    : keySessions.filter((status) => !status.done && !status.skipped).length;
+  const easyDaysLeft = Math.max(0, trainingDaysLeft - openKeys);
+  const easyPlanned = clamp(
+    easyDone + easyDaysLeft,
+    easyRange.min,
+    Math.max(easyRange.max, easyDone),
+  );
   const keyTotal = keySessions
     .filter((status) => !status.skipped)
     .reduce((sum, status) => sum + status.minutes, 0);
@@ -528,10 +537,12 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
     easy: {
       target: Math.max(0, target.minutes - keyTotal),
       left: Math.max(0, remainingMinutes - keyLeftMinutes),
-      sessions: easySessions,
+      min: easyRange.min,
+      max: easyRange.max,
+      planned: easyPlanned,
       done: easyDone,
       perSession: round5(
-        Math.max(0, remainingMinutes - keyLeftMinutes) / Math.max(1, easySessions - easyDone),
+        Math.max(0, remainingMinutes - keyLeftMinutes) / Math.max(1, easyPlanned - easyDone),
       ),
     },
     loadPerHour,
@@ -756,7 +767,10 @@ export function fitKeySession(session: KeySession, available: number): KeySessio
 /** A key session beyond the week mix, for a day the athlete wants to go hard anyway. */
 function extraKeySession(data: WeekTargetData & { plan: TrainingPlan }) {
   const [first] = generateKeySessions({
-    plan: { buildPace: data.plan.buildPace, weekMix: { sessions: 1, keyShare: 100 } },
+    plan: {
+      buildPace: data.plan.buildPace,
+      weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100 },
+    },
     weekStart: data.weekStart,
     ctl: data.weekStartFitness.ctl,
     targetMinutes: Number.MAX_SAFE_INTEGER,
@@ -890,10 +904,10 @@ export function recommendToday(
   }
 
   if (kind === "easy" && feel === "auto") {
-    const { sessions, done, perSession } = summary.easy;
-    if (sessions > 0 && done < sessions) {
+    const { planned, done, perSession } = summary.easy;
+    if (planned > 0 && done < planned) {
       reasons.push(
-        `Easy session ${done + 1} of ${sessions} · about ${formatHours(perSession / 60)} each.`,
+        `Easy session ${done + 1} of ${planned} · about ${formatHours(perSession / 60)} each.`,
       );
     }
     const left = summary.bySport[family].left;

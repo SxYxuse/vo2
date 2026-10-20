@@ -34,7 +34,7 @@ import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   hasRecentWeeklyHours,
   recentAverageWeeklyHours,
-  recentSessionsPerWeek,
+  recentSessionHistory,
 } from "@/services/training-plan.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -246,9 +246,7 @@ export function SettingsForm({
                 <WeekMixFields
                   idPrefix="settings"
                   control={form.control}
-                  recentSessionsPerWeek={
-                    data.fitnessLoads ? recentSessionsPerWeek(data.fitnessLoads) : null
-                  }
+                  history={data.fitnessLoads ? recentSessionHistory(data.fitnessLoads) : null}
                   onOpenSports={() => setSection("sports")}
                 />
               </FieldGroup>

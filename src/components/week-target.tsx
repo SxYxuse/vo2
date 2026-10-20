@@ -344,12 +344,18 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
               Easy sessions · Z1–2
             </span>
             <span className="font-mono text-xs tabular-nums">
-              {easy.done} of {easy.sessions} done
+              {easy.done} of {easy.planned} done
+              {easy.min !== easy.max ? (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {easy.min}–{easy.max} this week
+                </span>
+              ) : null}
             </span>
           </div>
           <p className="text-muted-foreground text-xs">
             {easy.left > 0
-              ? `${minutesLabel(easy.left)} of easy time left${easy.sessions > easy.done ? `, about ${minutesLabel(easy.perSession)} a session` : ""}.`
+              ? `${minutesLabel(easy.left)} of easy time left${easy.planned > easy.done ? `, about ${minutesLabel(easy.perSession)} a session` : ""}.`
               : "Easy time is done for the week."}
           </p>
         </div>
