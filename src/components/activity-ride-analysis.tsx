@@ -1,8 +1,7 @@
-import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
+import { StatCard, type StatCardProps } from "@/components/stat-card.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import {
   Table,
   TableBody,
@@ -29,8 +28,6 @@ function formatNumber(value: number | null, digits = 0) {
   return value == null ? "—" : value.toFixed(digits);
 }
 
-type RideStatProps = { label: string; value: string; hint?: string; info: string };
-
 const STAT_INFO = {
   intensity:
     "Intensity factor: normalized power divided by your FTP. 0.75 is endurance, 0.85–0.95 tempo to sweet spot, 1.0 is a one-hour all-out effort.",
@@ -41,23 +38,8 @@ const STAT_INFO = {
     "Share of moving time with zero cadence: descents, drafting, and freewheeling. High coasting lowers average power but not the cost of the hard parts.",
 } as const;
 
-function RideStat({ label, value, hint, info }: RideStatProps) {
-  return (
-    <Item variant="muted" size="sm" className="flex-col items-stretch">
-      <ItemContent>
-        <ItemDescription className="flex items-center gap-1">
-          {label}
-          <InfoTooltip label={label}>{info}</InfoTooltip>
-        </ItemDescription>
-        <ItemTitle className="font-mono tabular-nums">{value}</ItemTitle>
-        {hint ? <ItemDescription>{hint}</ItemDescription> : null}
-      </ItemContent>
-    </Item>
-  );
-}
-
 function rideStats(ride: RideSummary) {
-  const stats: RideStatProps[] = [];
+  const stats: StatCardProps[] = [];
   if (ride.intensityFactor != null) {
     stats.push({
       label: "Intensity",
@@ -111,7 +93,7 @@ export function ActivityRideAnalysis({ ride }: { ride: RideSummary }) {
       {stats.length ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {stats.map((stat) => (
-            <RideStat key={stat.label} {...stat} />
+            <StatCard key={stat.label} {...stat} />
           ))}
         </div>
       ) : null}

@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "cn";
 import { HeartPulseIcon } from "lucide-react";
 
 import { fitnessQueryOptions } from "@/lib/queries.ts";
@@ -17,18 +16,17 @@ import {
 import { HR_ZONES, formatZoneBpm } from "@/services/heart-rate.ts";
 import { buildPmc } from "@/services/training-load.ts";
 import { dayKey } from "@/services/training-plan.types.ts";
-import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Item,
   ItemActions,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
+import { StatCard, type StatCardProps } from "@/components/stat-card.tsx";
 
 const STAT_INFO = {
   efficiency:
@@ -44,29 +42,6 @@ const SKIPPED_HINT = {
   hilly: "Too hilly for run speed",
 } as const;
 
-type StatProps = {
-  label: string;
-  value: string;
-  hint?: string;
-  info: string;
-  className?: string;
-};
-
-function Stat({ label, value, hint, info, className }: StatProps) {
-  return (
-    <Item variant="muted" size="sm" className="flex-col items-stretch">
-      <ItemContent>
-        <ItemDescription className="flex items-center gap-1">
-          {label}
-          <InfoTooltip label={label}>{info}</InfoTooltip>
-        </ItemDescription>
-        <ItemTitle className={cn("font-mono tabular-nums", className)}>{value}</ItemTitle>
-        {hint ? <ItemDescription>{hint}</ItemDescription> : null}
-      </ItemContent>
-    </Item>
-  );
-}
-
 function formatOutput(value: number, output: "power" | "speed") {
   return output === "power" ? `${Math.round(value)} W` : `${(value * 3.6).toFixed(1)} km/h`;
 }
@@ -75,7 +50,7 @@ function signed(value: number, digits = 0, unit = "") {
   return `${value > 0 ? "+" : ""}${value.toFixed(digits)}${unit}`;
 }
 
-function decouplingStat(heart: ActivityHeart): StatProps | null {
+function decouplingStat(heart: ActivityHeart): StatCardProps | null {
   const result = heart.decoupling;
   if (!result) return null;
   if (result.status === "skipped") {
@@ -92,7 +67,7 @@ function decouplingStat(heart: ActivityHeart): StatProps | null {
     value: signed(result.pct, 1, " %"),
     hint: `${decouplingLabel(result.pct)} · ${Math.round(result.firstHalf.avgHeartrate)}→${Math.round(result.secondHalf.avgHeartrate)} bpm at ${formatOutput(result.firstHalf.avgOutput, result.output)}→${formatOutput(result.secondHalf.avgOutput, result.output)}`,
     info: decouplingInfo(result),
-    className:
+    valueClassName:
       result.pct > 10
         ? "text-warning"
         : result.pct < 5 && result.pct >= -5
@@ -101,7 +76,7 @@ function decouplingStat(heart: ActivityHeart): StatProps | null {
   };
 }
 
-function efficiencyStat(heart: ActivityHeart): StatProps | null {
+function efficiencyStat(heart: ActivityHeart): StatCardProps | null {
   const ef = heart.efficiency;
   if (!ef) return null;
   const hint =
@@ -116,7 +91,7 @@ function efficiencyStat(heart: ActivityHeart): StatProps | null {
   };
 }
 
-function usualStat(heart: ActivityHeart): StatProps | null {
+function usualStat(heart: ActivityHeart): StatCardProps | null {
   const usual = heart.usual;
   if (!usual) return null;
   return {
@@ -124,7 +99,7 @@ function usualStat(heart: ActivityHeart): StatProps | null {
     value: `${signed(usual.gapBpm)} bpm`,
     hint: `Usual ${usual.expectedBpm} bpm for this output`,
     info: STAT_INFO.usual,
-    className: Math.abs(usual.gapBpm) >= 5 ? "text-warning" : undefined,
+    valueClassName: Math.abs(usual.gapBpm) >= 5 ? "text-warning" : undefined,
   };
 }
 
@@ -150,7 +125,7 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
     pct: total > 0 ? (zone.seconds / total) * 100 : 0,
   }));
   const stats = [decouplingStat(heart), efficiencyStat(heart), usualStat(heart)].filter(
-    (stat): stat is StatProps => stat != null,
+    (stat): stat is StatCardProps => stat != null,
   );
   const context = heart.usual
     ? explainHeartGap({ gapBpm: heart.usual.gapBpm, tsb, tempC: heart.avgTempC })
@@ -236,7 +211,7 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
       {stats.length ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {stats.map((stat) => (
-            <Stat key={stat.label} {...stat} />
+            <StatCard key={stat.label} {...stat} />
           ))}
         </div>
       ) : null}
