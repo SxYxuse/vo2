@@ -943,6 +943,16 @@ function splitByWeight(total: number, sports: PartSport[]) {
   return sports.map((sport) => round5((total * PART_WEIGHT[sport]) / Math.max(weight, 0.1)));
 }
 
+/** Copied activities dated today, in the order they were done. */
+export function todayActivities(data: Pick<WeekTargetData, "today" | "activities">) {
+  return data.activities.filter((activity) => activity.date === data.today);
+}
+
+/** Today is done once any copied activity is dated today. Another session is extra. */
+export function isTodayComplete(data: Pick<WeekTargetData, "today" | "activities">) {
+  return todayActivities(data).length > 0;
+}
+
 /** One session for today, shaped by what the athlete chose and by what the week still needs. */
 export function recommendToday(
   data: WeekTargetData & { plan: TrainingPlan },
