@@ -173,10 +173,65 @@ function hasGps(kind: MockKind) {
   return kind !== "virtualRide" && kind !== "swim";
 }
 
+/** Long rides and the trail run climb one real hill, so route predictions see climbing speed. */
+function climbFor(spec: MockSpec) {
+  if (spec.name === "Long ride") return 420;
+  if (spec.kind === "trailRun") return 260;
+  return 0;
+}
+
+/**
+ * Altitude, grade, speed and distance per sample. Flat activities keep the old gentle wave;
+ * hilly ones climb from 30 % to 55 % of the time, descend until 75 %, and slow on the way up.
+ */
+function terrainFor(spec: MockSpec, samples: number) {
+  const base = speedMps(spec.kind);
+  const gpsOn = hasGps(spec.kind);
+  const climbM = gpsOn ? climbFor(spec) : 0;
+  const onFoot = spec.kind === "run" || spec.kind === "trailRun" || spec.kind === "walk";
+  const altitude: number[] = [];
+  const grade: number[] = [];
+  const speed: number[] = [];
+  const distance: number[] = [];
+  let travelled = 0;
+  let previousAltitude = 40;
+  for (let i = 0; i < samples; i += 1) {
+    const progress = i / Math.max(1, samples - 1);
+    const wave = Math.sin(progress * Math.PI * 4);
+    if (!gpsOn) {
+      altitude.push(0);
+      grade.push(0);
+      speed.push(base);
+    } else if (climbM === 0) {
+      altitude.push(40 + wave * 18);
+      grade.push(wave * 3);
+      speed.push(base);
+    } else {
+      const up = Math.min(1, Math.max(0, (progress - 0.3) / 0.25));
+      const down = Math.min(1, Math.max(0, (progress - 0.55) / 0.2));
+      const height = 40 + climbM * (up - down);
+      const slope =
+        progress >= 0.3 && progress < 0.55 ? 1 : progress >= 0.55 && progress < 0.75 ? -1 : 0;
+      const pace = slope > 0 ? (onFoot ? 0.7 : 0.42) : slope < 0 ? (onFoot ? 1.15 : 1.45) : 1;
+      const step = base * pace * STREAM_STEP_SEC;
+      altitude.push(height);
+      grade.push(i === 0 || step <= 0 ? 0 : ((height - previousAltitude) / step) * 100);
+      speed.push(base * pace);
+      previousAltitude = height;
+    }
+    distance.push(Math.round(travelled));
+    travelled += (speed[i] ?? base) * STREAM_STEP_SEC;
+  }
+  return { altitude, grade, speed, distance, climbM };
+}
+
 function toSummary(spec: MockSpec): SummaryActivity {
   const movingTime = spec.minutes * 60;
   const sportType = KIND_SPORT[spec.kind];
-  const speed = speedMps(spec.kind);
+  const samples = Math.max(2, Math.round(movingTime / STREAM_STEP_SEC) + 1);
+  const terrain = terrainFor(spec, samples);
+  const distance = terrain.distance.at(-1) ?? 0;
+  const speed = movingTime > 0 ? distance / movingTime : 0;
   const points = hasGps(spec.kind) ? loopPoints(24) : [];
   const power = hasPower(spec.kind);
   const avgWatts = power ? (spec.kind === "ftpRide" ? 198 : 190) : undefined;
@@ -186,10 +241,10 @@ function toSummary(spec: MockSpec): SummaryActivity {
     id: spec.id,
     athlete: { id: ATHLETE.id },
     name: spec.name,
-    distance: spec.kind === "swim" ? spec.minutes * 50 : movingTime * speed,
+    distance: spec.kind === "swim" ? spec.minutes * 50 : distance,
     moving_time: movingTime,
     elapsed_time: movingTime + 60,
-    total_elevation_gain: hasGps(spec.kind) ? 120 : 0,
+    total_elevation_gain: hasGps(spec.kind) ? 120 + terrain.climbM : 0,
     type: sportType,
     sport_type: sportType,
     start_date: iso,
@@ -216,11 +271,10 @@ function streamsFor(spec: MockSpec): StreamSet {
   const samples = Math.max(2, Math.round((spec.minutes * 60) / STREAM_STEP_SEC) + 1);
   const gpsOn = hasGps(spec.kind);
   const power = hasPower(spec.kind);
-  const speed = speedMps(spec.kind);
+  const terrain = terrainFor(spec, samples);
   const gps = gpsOn ? loopPoints(samples) : [];
   const indexes = Array.from({ length: samples }, (_, i) => i);
   const progress = (i: number) => i / (samples - 1);
-  const wave = (i: number) => Math.sin(progress(i) * Math.PI * 4);
   const meta = {
     original_size: samples,
     resolution: "high" as const,
@@ -230,16 +284,16 @@ function streamsFor(spec: MockSpec): StreamSet {
 
   return {
     time: stream(indexes.map((i) => i * STREAM_STEP_SEC)),
-    distance: stream(indexes.map((i) => Math.round(i * STREAM_STEP_SEC * speed))),
+    distance: stream(terrain.distance),
     latlng: gpsOn ? stream(gps) : undefined,
-    altitude: stream(indexes.map((i) => (gpsOn ? 40 + wave(i) * 18 : 0))),
-    velocity_smooth: stream(indexes.map(() => speed)),
+    altitude: stream(terrain.altitude),
+    velocity_smooth: stream(terrain.speed),
     heartrate: stream(indexes.map((i) => heartAt(spec.kind, progress(i)))),
     cadence: stream(indexes.map(() => (power ? 88 : spec.kind === "swim" ? 0 : 164))),
     watts: power ? stream(indexes.map((i) => wattsAt(spec.kind, progress(i)))) : undefined,
     temp: stream(indexes.map(() => 16)),
     moving: stream(indexes.map(() => true)),
-    grade_smooth: stream(indexes.map((i) => (gpsOn ? wave(i) * 3 : 0))),
+    grade_smooth: stream(terrain.grade),
   } as StreamSet;
 }
 
