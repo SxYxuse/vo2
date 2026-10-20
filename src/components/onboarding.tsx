@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -62,7 +62,7 @@ const STEPS = [
   {
     id: "about",
     title: "About you",
-    description: "Your age predicts your max heart rate until your activities show a real one.",
+    description: "Your birthday, to check heart-rate peaks against your age.",
   },
   {
     id: "sports",
@@ -135,6 +135,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const step = STEPS[stepIndex];
   const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
+  const birthDate = useWatch({ control: form.control, name: "birthDate" });
+  // Steps validate with trigger, not submit, so react-hook-form never revalidates on change.
+  useEffect(() => {
+    if (birthDate) form.clearErrors("birthDate");
+  }, [birthDate, form]);
   const hasSportTypes = Object.keys(sportTypes).length > 0;
   const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
