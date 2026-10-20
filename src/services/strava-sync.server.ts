@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import { db } from "@/db/index.ts";
+import { db, pool } from "@/db/index.ts";
 import { activities, activityStreams, syncRuns } from "@/db/schema.ts";
 import {
   DEFAULT_STREAM_KEYS,
@@ -26,6 +26,7 @@ import {
   remainingSyncBudgetMs,
   SYNC_POSTPROCESS_MIN_MS,
   stopsAfterNewestPage,
+  storedPauseResult,
 } from "./strava-sync.types.ts";
 import {
   adaptPlannedWeek,
@@ -215,11 +216,83 @@ async function activityCopyCounts(userId: string) {
 
 export async function syncStravaImpl(): Promise<SyncResult> {
   const session = await getRequiredSession();
+  const userId = session.user.id;
+  const result = await withAthleteSyncLock(userId, async () => {
+    // Read the pause inside the lock: a sync that just finished on another device may have set it.
+    const [run, { streamsPending }] = await Promise.all([
+      db
+        .select({
+          status: syncRuns.status,
+          pausedUntil: syncRuns.pausedUntil,
+          lastError: syncRuns.lastError,
+          shortLimitRemaining: syncRuns.shortLimitRemaining,
+          dailyLimitRemaining: syncRuns.dailyLimitRemaining,
+        })
+        .from(syncRuns)
+        .where(eq(syncRuns.userId, userId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+      activityCopyCounts(userId),
+    ]);
+    const paused = storedPauseResult(run, streamsPending);
+    if (paused) {
+      logger.info("sync.skip_paused", { pausedUntil: paused.pausedUntil });
+      return paused;
+    }
+    return runSync(userId);
+  });
+  if (result) return result;
+  logger.info("sync.already_running");
+  return {
+    activitiesUpserted: 0,
+    streamsFetched: 0,
+    streamsPending: 0,
+    historyComplete: false,
+    done: false,
+    pausedUntil: null,
+    lastError: null,
+    alreadyRunning: true,
+    rateLimit: { shortRemaining: 0, dailyRemaining: 0, nextWindowAt: new Date().toISOString() },
+  };
+}
+
+/**
+ * One sync per athlete across devices, tabs, and server instances. A session-level advisory lock
+ * lives on one pooled connection, so Postgres frees it if the server dies mid-sync. Returns null
+ * when another request holds it. This needs a direct (or session-pooled) Postgres connection.
+ */
+async function withAthleteSyncLock<T>(userId: string, run: () => Promise<T>): Promise<T | null> {
+  const key = `strava-sync:${userId}`;
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    const { rows } = await client.query<{ locked: boolean }>(
+      "select pg_try_advisory_lock(hashtext($1)) as locked",
+      [key],
+    );
+    if (!rows[0]?.locked) return null;
+    try {
+      return await run();
+    } finally {
+      try {
+        await client.query("select pg_advisory_unlock(hashtext($1))", [key]);
+      } catch (error) {
+        // Dropping the connection releases the lock too.
+        broken = error instanceof Error ? error : new Error("Advisory unlock failed");
+        logger.warn("sync.unlock_failed", errorFields(error));
+      }
+    }
+  } finally {
+    client.release(broken);
+  }
+}
+
+async function runSync(userId: string): Promise<SyncResult> {
   logger.info("sync.start");
   const startedAt = Date.now();
   const [, accessToken] = await Promise.all([
-    stampStoredStreams(session.user.id),
-    getStravaAccessToken(session.user.id),
+    stampStoredStreams(userId),
+    getStravaAccessToken(userId),
   ]);
   const api = new StravaApi(accessToken);
   let activitiesUpserted = 0;
@@ -232,16 +305,16 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   try {
     let newerCaughtUp = false;
     let olderCaughtUp = false;
-    const firstCopy = (await oldestActivityEpoch(session.user.id)) == null;
+    const firstCopy = (await oldestActivityEpoch(userId)) == null;
     let newestOnly = false;
     if (!isOverSyncBudget(startedAt)) {
-      const newer = await upsertNewerActivities(api, session.user.id, String(session.user.id));
+      const newer = await upsertNewerActivities(api, userId, String(userId));
       activitiesUpserted += newer.upserted;
       newerCaughtUp = newer.caughtUp;
       newestOnly = stopsAfterNewestPage({ firstCopy, newestUpserted: newer.upserted });
     }
     if (!newestOnly && !isOverSyncBudget(startedAt)) {
-      const older = await upsertOlderActivities(api, session.user.id, String(session.user.id));
+      const older = await upsertOlderActivities(api, userId, String(userId));
       activitiesUpserted += older.upserted;
       olderCaughtUp = older.caughtUp;
     }
@@ -249,7 +322,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     // History first: older pages are 200 activities per read and settle fitness; streams cost a
     // read each and only feed maps and charts.
     if (historyComplete && !isOverSyncBudget(startedAt)) {
-      streamsFetched = await syncPendingStreams(api, session.user.id, startedAt);
+      streamsFetched = await syncPendingStreams(api, userId, startedAt);
     }
   } catch (error) {
     if (error instanceof StravaDailyLimitError) {
@@ -262,7 +335,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
       logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
     } else if (isAbortError(error)) {
       logger.warn("sync.request_aborted", errorFields(error));
-    } else if (!(await athleteExists(session.user.id))) {
+    } else if (!(await athleteExists(userId))) {
       athleteDeleted = true;
     } else {
       lastError = error instanceof Error ? error.message : "Sync failed";
@@ -271,7 +344,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   }
 
   // Athlete deletion ran mid-sync: stop quietly, there is nothing left to write to.
-  if (athleteDeleted || !(await athleteExists(session.user.id))) {
+  if (athleteDeleted || !(await athleteExists(userId))) {
     logger.info("sync.stopped_athlete_deleted");
     const snapshot = api.rateLimit.snapshot();
     return {
@@ -282,6 +355,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
       done: false,
       pausedUntil: null,
       lastError: null,
+      alreadyRunning: false,
       rateLimit: {
         shortRemaining: snapshot.shortRemaining,
         dailyRemaining: snapshot.dailyRemaining,
@@ -291,10 +365,10 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   }
 
   if (remainingSyncBudgetMs(startedAt) > SYNC_POSTPROCESS_MIN_MS) {
-    await refreshTrainingLoadsIfNeeded(session.user.id);
+    await refreshTrainingLoadsIfNeeded(userId);
     if (activitiesUpserted > 0) {
       try {
-        await adaptPlannedWeek(session.user.id);
+        await adaptPlannedWeek(userId);
       } catch (error) {
         logger.warn("sync.adapt_week_failed", errorFields(error));
       }
@@ -303,7 +377,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     logger.debug("sync.skip_postprocess_budget");
   }
 
-  const { streamsPending } = await activityCopyCounts(session.user.id);
+  const { streamsPending } = await activityCopyCounts(userId);
   const snapshot = api.rateLimit.snapshot();
   if (!pausedUntil && snapshot.shortRemaining <= 5 && (!historyComplete || streamsPending > 0)) {
     pausedUntil = new Date(snapshot.nextWindowAt);
@@ -319,7 +393,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   await db
     .insert(syncRuns)
     .values({
-      userId: session.user.id,
+      userId: userId,
       status,
       activitiesUpserted,
       streamsFetched,
@@ -370,6 +444,7 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     done,
     pausedUntil: pausedUntil?.toISOString() ?? null,
     lastError,
+    alreadyRunning: false,
     rateLimit: {
       shortRemaining: snapshot.shortRemaining,
       dailyRemaining: snapshot.dailyRemaining,

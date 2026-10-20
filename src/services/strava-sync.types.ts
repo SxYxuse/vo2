@@ -100,12 +100,48 @@ export type SyncResult = {
   done: boolean;
   pausedUntil: string | null;
   lastError: string | null;
+  /** Another request (a second device or tab) holds this athlete's sync; nothing was copied. */
+  alreadyRunning: boolean;
   rateLimit: {
     shortRemaining: number;
     dailyRemaining: number;
     nextWindowAt: string;
   };
 };
+
+/**
+ * While a stored pause is still in force, sync answers from it instead of asking Strava: a read
+ * spent only to hear the limit again comes out of the quota the pause is waiting on (ADR 0002).
+ */
+export function storedPauseResult(
+  run: {
+    status: string;
+    pausedUntil: Date | null;
+    lastError: string | null;
+    shortLimitRemaining: number | null;
+    dailyLimitRemaining: number | null;
+  } | null,
+  streamsPending: number,
+  now = Date.now(),
+): SyncResult | null {
+  if (!run?.pausedUntil || run.pausedUntil.getTime() <= now) return null;
+  const pausedUntil = run.pausedUntil.toISOString();
+  return {
+    activitiesUpserted: 0,
+    streamsFetched: 0,
+    streamsPending,
+    historyComplete: historyCompleteFromRun(run.status, streamsPending),
+    done: false,
+    pausedUntil,
+    lastError: run.lastError,
+    alreadyRunning: false,
+    rateLimit: {
+      shortRemaining: run.shortLimitRemaining ?? 0,
+      dailyRemaining: run.dailyLimitRemaining ?? 0,
+      nextWindowAt: pausedUntil,
+    },
+  };
+}
 
 /**
  * Return before Bun.serve's 10s idleTimeout (and typical preview proxies) close
