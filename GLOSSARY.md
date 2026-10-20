@@ -31,7 +31,7 @@ A display grouping of related sport types: cycling, running, swimming, or walkin
 _Avoid_: Sport family (that term is reserved for planning)
 
 **Hidden sport type**:
-A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views.
+A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form (ADR 0015).
 _Avoid_: Disabled sport, filtered sport, sport selection
 
 **Pace**:
