@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  autoResumePlan,
   deriveSyncKind,
   historyCompleteFromRun,
   isAbortError,
   isOverSyncBudget,
   isTransientSyncError,
   remainingSyncBudgetMs,
+  stopsAfterNewestPage,
   SYNC_REQUEST_BUDGET_MS,
 } from "./strava-sync.types.ts";
 
@@ -103,5 +105,47 @@ describe("transient sync errors", () => {
   it("does not retry a real Strava failure", () => {
     expect(isTransientSyncError(new Error("Strava request failed (500) /activities"))).toBe(false);
     expect(isAbortError(new Error("Strava request failed (500) /activities"))).toBe(false);
+  });
+});
+
+describe("stopsAfterNewestPage", () => {
+  it("returns early on the first copy once the newest page holds activities", () => {
+    expect(stopsAfterNewestPage({ firstCopy: true, newestUpserted: 200 })).toBe(true);
+  });
+
+  it("keeps going when the athlete has no activities on Strava", () => {
+    expect(stopsAfterNewestPage({ firstCopy: true, newestUpserted: 0 })).toBe(false);
+  });
+
+  it("keeps going once a local copy already exists", () => {
+    expect(stopsAfterNewestPage({ firstCopy: false, newestUpserted: 3 })).toBe(false);
+  });
+});
+
+describe("autoResumePlan", () => {
+  const now = Date.parse("2026-10-20T10:00:00Z");
+
+  it("resumes an incomplete local copy", () => {
+    expect(autoResumePlan({ status: "incomplete", pausedUntil: null }, now)).toEqual({
+      kind: "sync",
+    });
+  });
+
+  it("waits for an active pause to end", () => {
+    expect(autoResumePlan({ status: "paused", pausedUntil: "2026-10-20T10:15:00Z" }, now)).toEqual({
+      kind: "wait",
+      until: Date.parse("2026-10-20T10:15:00Z"),
+    });
+  });
+
+  it("never starts the first copy or retries a failed one on its own", () => {
+    expect(autoResumePlan({ status: "never", pausedUntil: null }, now)).toEqual({ kind: "idle" });
+    expect(autoResumePlan({ status: "failed", pausedUntil: null }, now)).toEqual({ kind: "idle" });
+  });
+
+  it("leaves a complete local copy alone", () => {
+    expect(autoResumePlan({ status: "complete", pausedUntil: null }, now)).toEqual({
+      kind: "idle",
+    });
   });
 });

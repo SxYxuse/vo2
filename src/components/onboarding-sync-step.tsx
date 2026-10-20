@@ -43,25 +43,25 @@ const PHASE_STYLE: Record<
 };
 
 function statusLine(step: OnboardingSyncStep, status: SyncStatus | null, error: string | null) {
-  const pending = status?.streamsPending ?? 0;
   const count = status?.activityCount ?? 0;
   switch (step.phase) {
     case "syncing":
-      if (count === 0) return "Copying your recent activities…";
-      if (!status?.historyComplete) return "Walking back through your history…";
-      return pending > 0 ? `Copying streams · ${pending} still to copy` : "Finishing up…";
+      if (count === 0) return "Copying your latest activities…";
+      return "Found your latest training. Older history and streams keep copying in the background, so you can continue.";
     case "complete":
       return "All caught up. Every activity and stream is copied.";
     case "paused":
       return status?.pausedUntil && step.action === null
-        ? `Strava's rate limit paused the copy until ${pauseLabel(status.pausedUntil)}. You can continue now and sync the rest later.`
-        : "Strava's rate limit paused the copy. You can continue now and sync the rest later.";
+        ? `Strava's rate limit paused the copy until ${pauseLabel(status.pausedUntil)}. You can continue now; the rest copies on its own after that.`
+        : "Strava's rate limit paused the copy. You can continue now; the rest copies on its own after that.";
     case "failed":
       return (
         error ?? status?.lastError ?? "The copy was interrupted. Retry, or continue and sync later."
       );
     case "incomplete":
-      return "Part of your history is already copied. Sync to pick up the rest.";
+      return count > 0
+        ? "Found your latest training. The rest of your history copies in the background while VO2 is open."
+        : "Part of your history is already copied. Sync to pick up the rest.";
     case "never":
       return "Copy your Strava activities so fitness, form, and your weekly hours start from real training.";
   }
@@ -85,9 +85,8 @@ export function OnboardingSyncStepPanel({
   onSync: () => void;
 }) {
   const activities = status?.activityCount ?? 0;
-  const copied = status?.streamsCopied ?? 0;
-  const fraction =
-    step.phase === "complete" ? 1 : activities === 0 ? 0 : Math.min(1, copied / activities);
+  // The ring tracks the gate, not streams: it fills once the newest page is in (ADR 0012).
+  const fraction = step.phase === "complete" || activities > 0 ? 1 : 0;
   const syncing = step.phase === "syncing";
   const badge =
     step.phase === "syncing"
@@ -153,11 +152,6 @@ export function OnboardingSyncStepPanel({
       <div className="flex flex-col items-center gap-2" aria-live="polite">
         <Badge variant={badge.variant}>{badge.label}</Badge>
         <p className="text-muted-foreground max-w-sm text-sm">{statusLine(step, status, error)}</p>
-        {activities > 0 ? (
-          <p className="text-muted-foreground text-xs tabular-nums">
-            {copied} of {activities} with streams
-          </p>
-        ) : null}
       </div>
       {step.action ? (
         <Button type="button" variant="outline" onClick={onSync}>

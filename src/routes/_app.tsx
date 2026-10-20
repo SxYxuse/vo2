@@ -12,6 +12,7 @@ import {
 import { AppSidebar } from "@/components/app-sidebar.tsx";
 import { SignedOutPage } from "@/components/signed-out-page.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
+import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import { isTrainingPlanComplete } from "@/services/training-plan.ts";
@@ -42,6 +43,11 @@ function SignedInPrefetch() {
   return null;
 }
 
+function SyncAutoResume() {
+  useSyncAutoResume();
+  return null;
+}
+
 function AppLayout() {
   const { data } = useSuspenseQuery(appShellQueryOptions);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -58,6 +64,7 @@ function AppLayout() {
   return (
     <SidebarProvider>
       <SignedInPrefetch />
+      <SyncAutoResume />
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 pt-[max(0px,env(safe-area-inset-top))] md:pt-0">
