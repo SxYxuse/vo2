@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { type ProfileSettings, profileSettingsSchema } from "@/services/app-settings.types.ts";
-import { calendarSettingsSchema } from "@/services/calendar-settings.types.ts";
+import { shownSportTypesSchema } from "@/services/calendar-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   suggestedTargetHours,
@@ -62,11 +62,17 @@ function withTrainingConsistency<Schema extends z.ZodType>(schema: Schema) {
 
 export const trainingFormSchema = withTrainingConsistency(trainingFormFields);
 
+const sportsFormFields = {
+  sportTypes: shownSportTypesSchema,
+  sportGroupShares: z.record(z.string(), z.boolean()),
+};
+
 export const settingsFormSchema = withTrainingConsistency(
-  profileFormSchema.extend(trainingFormFields.shape).extend({
-    sportTypes: calendarSettingsSchema.shape.sportTypes,
-    sportGroupShares: z.record(z.string(), z.boolean()),
-  }),
+  profileFormSchema.extend(trainingFormFields.shape).extend(sportsFormFields),
+);
+
+export const onboardingFormSchema = withTrainingConsistency(
+  trainingFormFields.extend(sportsFormFields),
 );
 
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -74,9 +80,15 @@ export type TrainingFormValues = z.output<typeof trainingFormSchema>;
 export type TrainingFormInput = z.input<typeof trainingFormSchema>;
 export type SettingsFormValues = z.output<typeof settingsFormSchema>;
 export type SettingsFormInput = z.input<typeof settingsFormSchema>;
+export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
+export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
+export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 
 export const TRAINING_PACE_FIELDS = ["buildPace"] as const satisfies ReadonlyArray<
   keyof TrainingFormInput
+>;
+export const SPORTS_FIELDS = ["sportTypes", "sportGroupShares"] as const satisfies ReadonlyArray<
+  keyof OnboardingFormInput
 >;
 export const TRAINING_WEEK_FIELDS = [
   "maxRunSessions",
@@ -147,6 +159,23 @@ export function settingsFormDefaults(input: {
 }): SettingsFormInput {
   return {
     ...profileFormDefaults(input.profile),
+    ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
+    sportTypes: input.sportTypes,
+    sportGroupShares: {
+      ...DEFAULT_SPORT_GROUP_SHARES,
+      ...input.sportGroupShares,
+    },
+  };
+}
+
+export function onboardingFormDefaults(input: {
+  training: TrainingPlan | null;
+  sportTypes: OnboardingFormValues["sportTypes"];
+  sportGroupShares: OnboardingFormValues["sportGroupShares"] | undefined;
+  avgHours: number;
+  timeZone: string;
+}): OnboardingFormInput {
+  return {
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
     sportTypes: input.sportTypes,
     sportGroupShares: {

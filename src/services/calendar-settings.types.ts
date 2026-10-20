@@ -55,6 +55,17 @@ export const calendarSettingsSchema = z.object({
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
 });
 
+export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
+
+/** Sport type settings for a save: once any type is copied, at least one must stay shown. */
+export const shownSportTypesSchema = calendarSettingsSchema.shape.sportTypes.refine(
+  (sportTypes) => {
+    const settings = Object.values(sportTypes);
+    return settings.length === 0 || settings.some((setting) => setting.visible);
+  },
+  { error: SHOW_ONE_SPORT_MESSAGE },
+);
+
 type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type CalendarSettings = z.infer<typeof calendarSettingsSchema>;
 
