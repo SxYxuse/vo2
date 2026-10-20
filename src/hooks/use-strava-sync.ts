@@ -7,6 +7,7 @@ import {
   activityMapQueryOptions,
   appShellQueryOptions,
   fitnessQueryOptions,
+  weekTargetQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
@@ -147,6 +148,7 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
             queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey }),
             queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey }),
             queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
+            queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
             router.invalidate(),
           ]);
           if (result.alreadyRunning || result.done || result.pausedUntil || result.lastError) {

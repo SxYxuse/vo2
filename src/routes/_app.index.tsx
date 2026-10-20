@@ -60,7 +60,7 @@ function CalendarPage() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Planned sessions live in the Week bucket.
+          Completed Strava activities. Time left this week lives in the Week target.
         </p>
       </div>
       {signedIn && activities.length === 0 ? (
@@ -95,7 +95,7 @@ function CalendarPending() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Planned sessions live in the Week bucket.
+          Completed Strava activities. Time left this week lives in the Week target.
         </p>
       </div>
       <Skeleton className="h-[40rem] w-full rounded-xl" />

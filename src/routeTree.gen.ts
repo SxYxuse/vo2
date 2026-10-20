@@ -16,11 +16,13 @@ import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
+import { Route as AppWeekRouteImport } from './routes/_app.week'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
+import { Route as AppWeekSessionRouteImport } from './routes/_app.week_.session'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
 
@@ -58,6 +60,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWeekRoute = AppWeekRouteImport.update({
+  id: '/week',
+  path: '/week',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppWeekBucketRoute = AppWeekBucketRouteImport.update({
   id: '/week-bucket',
   path: '/week-bucket',
@@ -83,6 +90,11 @@ const AppSettingsSectionRoute = AppSettingsSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => AppSettingsRoute,
 } as any)
+const AppWeekSessionRoute = AppWeekSessionRouteImport.update({
+  id: '/week_/session',
+  path: '/week/session',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -101,10 +113,12 @@ export interface FileRoutesByFullPath {
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
   '/settings': typeof AppSettingsRouteWithChildren
+  '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
+  '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/settings/': typeof AppSettingsIndexRoute
@@ -114,11 +128,13 @@ export interface FileRoutesByTo {
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
+  '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/settings': typeof AppSettingsIndexRoute
@@ -131,11 +147,13 @@ export interface FileRoutesById {
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
+  '/_app/week': typeof AppWeekRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
+  '/_app/week_/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
@@ -149,10 +167,12 @@ export interface FileRouteTypes {
     | '/heart-rate'
     | '/map'
     | '/settings'
+    | '/week'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/activities/$activityId'
     | '/settings/$section'
+    | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/settings/'
@@ -162,11 +182,13 @@ export interface FileRouteTypes {
     | '/fitness'
     | '/heart-rate'
     | '/map'
+    | '/week'
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/'
     | '/activities/$activityId'
     | '/settings/$section'
+    | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/settings'
@@ -178,11 +200,13 @@ export interface FileRouteTypes {
     | '/_app/heart-rate'
     | '/_app/map'
     | '/_app/settings'
+    | '/_app/week'
     | '/_app/week-bucket'
     | '/api/activity-analysis'
     | '/_app/'
     | '/_app/activities/$activityId'
     | '/_app/settings/$section'
+    | '/_app/week_/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/_app/settings/'
@@ -247,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/week': {
+      id: '/_app/week'
+      path: '/week'
+      fullPath: '/week'
+      preLoaderRoute: typeof AppWeekRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/week-bucket': {
       id: '/_app/week-bucket'
       path: '/week-bucket'
@@ -281,6 +312,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/$section'
       preLoaderRoute: typeof AppSettingsSectionRouteImport
       parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/week_/session': {
+      id: '/_app/week_/session'
+      path: '/week/session'
+      fullPath: '/week/session'
+      preLoaderRoute: typeof AppWeekSessionRouteImport
+      parentRoute: typeof AppRoute
     }
     '/api/auth/$': {
       id: '/api/auth/$'
@@ -318,9 +356,11 @@ interface AppRouteChildren {
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
+  AppWeekRoute: typeof AppWeekRoute
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
   AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
+  AppWeekSessionRoute: typeof AppWeekSessionRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -328,9 +368,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
+  AppWeekRoute: AppWeekRoute,
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
   AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,
+  AppWeekSessionRoute: AppWeekSessionRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

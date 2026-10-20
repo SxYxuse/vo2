@@ -12,7 +12,6 @@ import {
   type LoadAnchors,
   type LoadInputs,
 } from "./training-load.ts";
-import { formForRemainingWeek, planRemainingWeek } from "./training-plan.types.ts";
 
 const ANCHORS: LoadAnchors = {
   ftp: 250,
@@ -164,58 +163,6 @@ describe("anchors", () => {
     ]);
     expect(estimated.cyclingLthr).toBe(Math.round(180 * 0.83));
     expect(estimated.runLthr).toBe(Math.round(200 * 0.88));
-  });
-});
-
-describe("remaining week", () => {
-  const plan = {
-    buildPace: "fast" as const,
-    maxRunSessions: 3,
-    maxRideSessions: 3,
-    maxDoubleDays: 0,
-    hoursIntent: "keep" as const,
-    workoutStyle: "structured" as const,
-    targetWeeklyHours: 8,
-    preferredRestWeekday: 0,
-    timeZone: "UTC",
-  };
-
-  test("structured fast build still schedules quality when form is productively negative", () => {
-    const vo2 = planRemainingWeek({
-      plan,
-      today: "2026-10-16",
-      ctl: 50,
-      tsb: -8,
-      completed: [],
-    });
-    const threshold = planRemainingWeek({
-      plan,
-      today: "2026-10-16",
-      ctl: 50,
-      tsb: -18,
-      completed: [],
-    });
-    expect(vo2.some((session) => session.title.includes("VO2"))).toBe(true);
-    expect(threshold.some((session) => session.title.includes("Threshold"))).toBe(true);
-  });
-
-  test("very fatigued form drops quality", () => {
-    const sessions = planRemainingWeek({
-      plan,
-      today: "2026-10-16",
-      ctl: 50,
-      tsb: -35,
-      completed: [],
-    });
-    expect(sessions.every((session) => !/VO2|Threshold|Tempo|Sweet-spot/.test(session.title))).toBe(
-      true,
-    );
-  });
-
-  test("remaining-week form uses end of day after today's completed load", () => {
-    const pmc = { ctl: 52, atl: 64, tsb: 1 };
-    expect(formForRemainingWeek(pmc, "2026-10-16", [{ date: "2026-10-16", load: 150 }])).toBe(-12);
-    expect(formForRemainingWeek(pmc, "2026-10-16", [])).toBe(1);
   });
 });
 

@@ -12,7 +12,7 @@ import {
 const PREFETCH_BATCH = 4;
 const PREFETCH_VISIBLE_CAP = 40;
 
-const APP_ROUTES = ["/", "/map", "/fitness", "/heart-rate"] as const;
+const APP_ROUTES = ["/", "/week", "/map", "/fitness", "/heart-rate"] as const;
 
 export function scheduleIdle(work: () => void) {
   if (typeof window === "undefined") return () => undefined;
