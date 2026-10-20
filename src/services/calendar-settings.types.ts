@@ -55,6 +55,20 @@ export const calendarSettingsSchema = z.object({
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
 });
 
+export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
+
+/** True when sport types have been copied and the athlete hid all of them. */
+export function hidesEverySportType(sportTypes: Record<string, { visible: boolean }>) {
+  const settings = Object.values(sportTypes);
+  return settings.length > 0 && settings.every((setting) => !setting.visible);
+}
+
+/** Sport type settings for a save: once any type is copied, at least one must stay shown. */
+export const shownSportTypesSchema = calendarSettingsSchema.shape.sportTypes.refine(
+  (sportTypes) => !hidesEverySportType(sportTypes),
+  { error: SHOW_ONE_SPORT_MESSAGE },
+);
+
 type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type CalendarSettings = z.infer<typeof calendarSettingsSchema>;
 
