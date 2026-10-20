@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { type ProfileSettings, profileSettingsSchema } from "@/services/app-settings.types.ts";
-import { shownSportTypesSchema } from "@/services/calendar-settings.types.ts";
+import {
+  calendarPeriodSchema,
+  shownSportTypesSchema,
+  type CalendarPeriod,
+} from "@/services/calendar-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   suggestedTargetHours,
@@ -68,7 +72,10 @@ const sportsFormFields = {
 };
 
 export const settingsFormSchema = withTrainingConsistency(
-  profileFormSchema.extend(trainingFormFields.shape).extend(sportsFormFields),
+  profileFormSchema
+    .extend(trainingFormFields.shape)
+    .extend(sportsFormFields)
+    .extend({ calendarPeriod: calendarPeriodSchema }),
 );
 
 export const onboardingFormSchema = withTrainingConsistency(
@@ -164,6 +171,7 @@ export function settingsFormDefaults(input: {
   training: TrainingPlan | null;
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
+  calendarPeriod?: CalendarPeriod;
   avgHours: number;
   timeZone: string;
 }): SettingsFormInput {
@@ -171,6 +179,7 @@ export function settingsFormDefaults(input: {
     ...profileFormDefaults(input.profile),
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
+    calendarPeriod: input.calendarPeriod ?? "month",
   };
 }
 

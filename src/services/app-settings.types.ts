@@ -1,7 +1,7 @@
 import { differenceInYears, isValid } from "date-fns";
 import { z } from "zod";
 
-import { shownSportTypesSchema } from "./calendar-settings.types.ts";
+import { calendarPeriodSchema, shownSportTypesSchema } from "./calendar-settings.types.ts";
 import { trainingPlanSchema } from "./training-plan.types.ts";
 
 const isoDate = z
@@ -19,6 +19,7 @@ export const appSettingsSaveSchema = z.object({
   profile: profileSettingsSchema,
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
+  calendarPeriod: calendarPeriodSchema.optional(),
   training: trainingPlanSchema.optional(),
 });
 
