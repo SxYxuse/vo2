@@ -11,8 +11,6 @@ const isoDate = z
 
 export const profileSettingsSchema = z.object({
   birthDate: isoDate,
-  weightKg: z.number().min(20).max(250).nullable(),
-  heightCm: z.number().int().min(80).max(250).nullable(),
 });
 
 export const appSettingsSaveSchema = z.object({
@@ -27,8 +25,6 @@ export type AppSettingsSave = z.infer<typeof appSettingsSaveSchema>;
 
 export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   birthDate: null,
-  weightKg: null,
-  heightCm: null,
 };
 
 export function parseBirthDate(value: string) {

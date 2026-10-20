@@ -31,18 +31,12 @@ export const getProfileSettingsForUser = cache(async (userId: string): Promise<P
   const [row] = await db
     .select({
       birthDate: athleteMetrics.birthDate,
-      weightKg: athleteMetrics.weightKg,
-      heightCm: athleteMetrics.heightCm,
     })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
   if (!row) return DEFAULT_PROFILE_SETTINGS;
-  return {
-    birthDate: row.birthDate ?? null,
-    weightKg: row.weightKg ?? null,
-    heightCm: row.heightCm ?? null,
-  };
+  return { birthDate: row.birthDate ?? null };
 });
 
 export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
@@ -125,8 +119,6 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
       .values({
         userId: session.user.id,
         birthDate: value.profile.birthDate,
-        weightKg: value.profile.weightKg,
-        heightCm: value.profile.heightCm,
         training: value.training,
         updatedAt: new Date(),
       })
@@ -134,8 +126,6 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
         target: athleteMetrics.userId,
         set: {
           birthDate: value.profile.birthDate,
-          weightKg: value.profile.weightKg,
-          heightCm: value.profile.heightCm,
           ...(value.training ? { training: value.training } : {}),
           updatedAt: new Date(),
         },

@@ -19,6 +19,8 @@ const plan = {
   timeZone: "Europe/Paris",
 } as const;
 
+const profile = { birthDate: "1990-05-14" };
+
 function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
 }
@@ -31,7 +33,7 @@ describe("settingsFormSchema", () => {
   it("flags the sports section when every sport type is hidden", () => {
     const result = settingsFormSchema.safeParse(
       settingsFormDefaults({
-        profile: null,
+        profile,
         training: plan,
         sportTypes: { Run: sport(false), Walk: sport(false) },
         sportGroupShares: undefined,
@@ -47,7 +49,7 @@ describe("settingsFormSchema", () => {
   it("accepts settings saved before any sport type has been copied", () => {
     const result = settingsFormSchema.safeParse(
       settingsFormDefaults({
-        profile: null,
+        profile,
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
@@ -58,12 +60,28 @@ describe("settingsFormSchema", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("flags the profile section when the birthday is missing", () => {
+    const result = settingsFormSchema.safeParse(
+      settingsFormDefaults({
+        profile: { birthDate: null },
+        training: plan,
+        sportTypes: {},
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+    );
+
+    expect(issuePaths(result)).toEqual(["birthDate"]);
+  });
 });
 
 describe("onboardingFormSchema", () => {
   it("flags the sports step when every sport type is hidden", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
+        profile,
         training: plan,
         sportTypes: { Run: sport(false), Walk: sport(false) },
         sportGroupShares: undefined,
@@ -79,6 +97,7 @@ describe("onboardingFormSchema", () => {
   it("accepts an athlete who keeps one sport shown", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
+        profile,
         training: plan,
         sportTypes: { Run: sport(true), Walk: sport(false) },
         sportGroupShares: undefined,
@@ -93,6 +112,7 @@ describe("onboardingFormSchema", () => {
   it("accepts an athlete with no copied activities yet", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
+        profile,
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
@@ -102,5 +122,20 @@ describe("onboardingFormSchema", () => {
     );
 
     expect(result.success).toBe(true);
+  });
+
+  it("flags the about step when the birthday is missing", () => {
+    const result = onboardingFormSchema.safeParse(
+      onboardingFormDefaults({
+        profile: null,
+        training: plan,
+        sportTypes: {},
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+    );
+
+    expect(issuePaths(result)).toEqual(["birthDate"]);
   });
 });

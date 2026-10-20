@@ -16,11 +16,13 @@ import {
   syncStatusQueryOptions,
 } from "@/lib/queries.ts";
 import {
+  PROFILE_FIELDS,
   SPORTS_FIELDS,
   TRAINING_PACE_FIELDS,
   TRAINING_WEEK_FIELDS,
   onboardingFormDefaults,
   onboardingFormSchema,
+  profileFromForm,
   trainingFromForm,
   type OnboardingFormInput,
   type OnboardingFormValues,
@@ -35,7 +37,11 @@ import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
-import { TrainingPaceFields, TrainingWeekFields } from "@/components/settings-fields.tsx";
+import {
+  BirthDateField,
+  TrainingPaceFields,
+  TrainingWeekFields,
+} from "@/components/settings-fields.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +58,11 @@ const STEPS = [
     id: "sync",
     title: "Copy from Strava",
     description: "Copy your activities first so your plan starts from real training.",
+  },
+  {
+    id: "about",
+    title: "About you",
+    description: "Your age predicts your max heart rate until your activities show a real one.",
   },
   {
     id: "sports",
@@ -106,13 +117,14 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
+        profile: data.profile,
         training: data.training,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         avgHours,
         timeZone,
       }),
-    [data.training, data.settings, avgHours, timeZone],
+    [data.profile, data.training, data.settings, avgHours, timeZone],
   );
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormValues>({
     resolver: zodResolver(onboardingFormSchema),
@@ -182,6 +194,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
       setStepIndex((current) => current + 1);
       return;
     }
+    if (step.id === "about") {
+      const ok = await form.trigger([...PROFILE_FIELDS]);
+      if (!ok) return;
+      setStepIndex((current) => current + 1);
+      return;
+    }
     if (step.id === "sports") {
       const ok = await form.trigger([...SPORTS_FIELDS]);
       if (!ok) return;
@@ -196,6 +214,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     }
     if (step.id !== "week") return;
     const ok = await form.trigger([
+      ...PROFILE_FIELDS,
       ...SPORTS_FIELDS,
       ...TRAINING_PACE_FIELDS,
       ...TRAINING_WEEK_FIELDS,
@@ -204,7 +223,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     await form.handleSubmit((values) => {
       save.mutate({
         data: {
-          profile: data.profile,
+          profile: profileFromForm(values),
           sportTypes: values.sportTypes,
           sportGroupShares: values.sportGroupShares,
           training: trainingFromForm(values),
@@ -283,6 +302,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 onSync={() => sync.mutate()}
               />
             )
+          ) : step.id === "about" ? (
+            <BirthDateField idPrefix="onboard" control={form.control} />
           ) : step.id === "sports" ? (
             <>
               <SportTypesFields idPrefix="onboard" control={form.control} />

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { appSettingsSaveSchema } from "./app-settings.types.ts";
 
-const profile = { birthDate: null, weightKg: null, heightCm: null };
+const profile = { birthDate: null };
 
 function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
