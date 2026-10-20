@@ -275,12 +275,33 @@ export const trainingPlanSchema = z.object({
   targetMode: z.enum(["auto", "manual"]).default("auto"),
   hoursIntent: z.enum(["lower", "keep", "higher"]),
   weekMix: weekMixSchema.default(DEFAULT_WEEK_MIX),
+  /** The athlete's own sport for a key session, by session id (ids start with their week). */
+  keySessionSports: z.record(z.string(), z.enum(["cycling", "running"])).default({}),
   targetWeeklyHours: z.number().min(0.5).max(30),
   preferredRestWeekday: z.number().int().min(0).max(6),
   timeZone: z.string().min(1),
 });
 
 export type TrainingPlan = z.infer<typeof trainingPlanSchema>;
+
+export const keySessionSportSchema = z.object({
+  id: z.string().regex(/^\d{4}-\d{2}-\d{2}-/),
+  /** Null goes back to VO2's suggestion. */
+  sport: z.enum(["cycling", "running"]).nullable(),
+});
+
+/** Sets or clears one pick; picks from other weeks are dropped, their sessions are gone. */
+export function withKeySessionSport(
+  picks: TrainingPlan["keySessionSports"],
+  { id, sport }: z.infer<typeof keySessionSportSchema>,
+): TrainingPlan["keySessionSports"] {
+  const week = id.slice(0, 10);
+  const next = Object.fromEntries(
+    Object.entries(picks).filter(([key]) => key.startsWith(week) && key !== id),
+  );
+  if (sport) next[id] = sport;
+  return next;
+}
 
 /** Load per hour of mostly aerobic work, used until the athlete has history. */
 export const DEFAULT_LOAD_PER_HOUR = 42;

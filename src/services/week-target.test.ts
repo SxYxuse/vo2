@@ -7,9 +7,11 @@ import {
   recentSessionHistory,
   keySessionName,
   parseTrainingPlan,
+  withKeySessionSport,
   type TrainingPlan,
 } from "./training-plan.types.ts";
 import {
+  assignKeySports,
   customSplit,
   estimatedHardMinutes,
   generateKeySessions,
@@ -37,6 +39,7 @@ const PLAN: TrainingPlan = {
   // 60% of 5 sessions: 3 key sessions. At fitness 50 in the week of Oct 19 that is
   // 3 × 10 min Z4 (1h 05), 2 × 20 min Z3 (1h 10), and a 2h long Z2: 4h 15, then 2 easy sessions.
   weekMix: { minSessions: 5, maxSessions: 5, keyShare: 60, doubleDays: 0 },
+  keySessionSports: {},
   targetWeeklyHours: 8,
   preferredRestWeekday: 0,
   timeZone: "UTC",
@@ -235,11 +238,46 @@ describe("recommendToday", () => {
   it("picks the next key session that fits the window", () => {
     const data = week({ activities: [activity({ date: "2026-10-19", minutes: 60 })] });
     const pick = recommendToday(data, summarizeWeek(data), auto(60));
-    // A ride is already done and the split is even, so running has the bigger gap.
-    expect(pick).toMatchObject({ kind: "key", family: "running", minutes: 65 });
-    // Friel Z4 is 95–99% of the 170 bpm running LTHR.
-    expect(pick.description).toMatch(/3 × 10 min in Z4 \(161–168 bpm\), 5 min easy between/);
+    // With no history the main session goes on the bike.
+    expect(pick).toMatchObject({ kind: "key", family: "cycling", minutes: 65 });
+    expect(pick.description).toMatch(/3 × 10 min in Z4 \(151–168 bpm\), 5 min easy between/);
     expect(pick.reasons).toContain("Key session 1 of 3 this week.");
+  });
+
+  it("plans a key session on the sport the athlete picked", () => {
+    const id = `${WEEK_START}-1-threshold`;
+    const data = week({ plan: { ...PLAN, keySessionSports: { [id]: "running" } } });
+    const summary = summarizeWeek(data);
+    expect(summary.keySessions[0]).toMatchObject({
+      session: { id, sport: "running" },
+      suggestedSport: "cycling",
+      sportPinned: true,
+    });
+    const pick = recommendToday(data, summary, auto(60));
+    expect(pick).toMatchObject({ kind: "key", family: "running" });
+    // Friel Z4 is 95–99% of the 170 bpm running LTHR.
+    expect(pick.description).toMatch(/3 × 10 min in Z4 \(161–168 bpm\)/);
+  });
+
+  it("prefers the key session planned on today's sport, then takes the other one", () => {
+    const run = { ...auto(60), sports: ["running"] } satisfies TodayChoice;
+    const data = week();
+    expect(recommendToday(data, summarizeWeek(data), run)).toMatchObject({
+      family: "running",
+      title: "2 × 20 min Z3",
+    });
+
+    const tempoDone = activity({
+      date: "2026-10-20",
+      family: "running",
+      sportType: "Run",
+      zoneMinutes: [5, 10, 40, 0, 0],
+    });
+    const afterTempo = week({ activities: [tempoDone] });
+    expect(recommendToday(afterTempo, summarizeWeek(afterTempo), run)).toMatchObject({
+      family: "running",
+      title: "3 × 10 min Z4",
+    });
   });
 
   it("saves a key session for a longer window", () => {
@@ -338,10 +376,75 @@ describe("parseTrainingPlan", () => {
       targetMode: "auto",
       hoursIntent: "keep",
       weekMix: { minSessions: 4, maxSessions: 6, keyShare: 0, doubleDays: 0 },
+      keySessionSports: {},
       targetWeeklyHours: 6,
       preferredRestWeekday: 1,
       timeZone: "Europe/Brussels",
     });
+  });
+});
+
+describe("assignKeySports", () => {
+  const sessions = generateKeySessions({
+    plan: {
+      buildPace: "overreach",
+      weekMix: { minSessions: 4, maxSessions: 4, keyShare: 100, doubleDays: 0 },
+    },
+    weekStart: WEEK_START,
+    ctl: 50,
+    targetMinutes: 1200,
+  });
+  const sports = (shares: { cycling: number; running: number }, pinned = {}) =>
+    assignKeySports(sessions, { ...shares, other: 0 }, pinned).map((session) => [
+      session.kind,
+      session.sport,
+    ]);
+
+  it("puts the main session on the sport done most and spreads the rest by balance", () => {
+    expect(sports({ cycling: 0.3, running: 0.7 })).toEqual([
+      ["intervals", "running"],
+      ["zone", "cycling"],
+      ["intervals", "running"],
+      ["long", "cycling"],
+    ]);
+  });
+
+  it("keeps a runner's whole week on foot", () => {
+    expect(sports({ cycling: 0.05, running: 0.95 }).map(([, sport]) => sport)).toEqual([
+      "running",
+      "running",
+      "running",
+      "running",
+    ]);
+  });
+
+  it("lets the athlete's pick win and remembers the suggestion", () => {
+    const [first] = assignKeySports(
+      sessions,
+      { cycling: 1, running: 0, other: 0 },
+      { [sessions[0].id]: "running" },
+    );
+    expect(first).toMatchObject({ sport: "running", suggestedSport: "cycling", sportPinned: true });
+  });
+});
+
+describe("withKeySessionSport", () => {
+  const thisWeek = `${WEEK_START}-1-threshold`;
+  const lastWeek = "2026-10-12-1-threshold";
+
+  it("sets a pick and drops picks from other weeks", () => {
+    expect(
+      withKeySessionSport(
+        { [lastWeek]: "running", [`${WEEK_START}-2-tempo`]: "cycling" },
+        { id: thisWeek, sport: "running" },
+      ),
+    ).toEqual({ [`${WEEK_START}-2-tempo`]: "cycling", [thisWeek]: "running" });
+  });
+
+  it("goes back to the suggestion when cleared", () => {
+    expect(withKeySessionSport({ [thisWeek]: "running" }, { id: thisWeek, sport: null })).toEqual(
+      {},
+    );
   });
 });
 

@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import type { TrainingPlan } from "./training-plan.types.ts";
-import { trainingPlanSchema } from "./training-plan.types.ts";
+import {
+  keySessionSportSchema,
+  trainingPlanSchema,
+  withKeySessionSport,
+} from "./training-plan.types.ts";
 
 export type {
   BuildPace,
@@ -53,4 +57,18 @@ export const saveTrainingPlan = createServerFn({ method: "POST" })
     const session = await getRequiredSession();
     await saveTrainingPlanForUser(session.user.id, data);
     return data;
+  });
+
+export const saveKeySessionSport = createServerFn({ method: "POST" })
+  .validator(keySessionSportSchema)
+  .handler(async ({ data }): Promise<TrainingPlan> => {
+    const { getRequiredSession } = await import("@/lib/session.server.ts");
+    const { getTrainingPlanForUser, saveTrainingPlanForUser } =
+      await import("./training-plan.server.ts");
+    const session = await getRequiredSession();
+    const plan = await getTrainingPlanForUser(session.user.id);
+    if (!plan) throw new Error("Finish your training plan first.");
+    const next = { ...plan, keySessionSports: withKeySessionSport(plan.keySessionSports, data) };
+    await saveTrainingPlanForUser(session.user.id, next);
+    return next;
   });

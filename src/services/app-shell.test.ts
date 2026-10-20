@@ -7,6 +7,7 @@ const training = {
   targetMode: "auto",
   hoursIntent: "keep",
   weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20, doubleDays: 0 },
+  keySessionSports: {},
   targetWeeklyHours: 6,
   preferredRestWeekday: 0,
   timeZone: "Europe/Paris",

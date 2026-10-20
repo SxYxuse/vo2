@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import {
@@ -14,8 +15,15 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 
-import { BUILD_PACES, addDayKey, formatHours, keySessionName } from "@/services/training-plan.ts";
-import type { TrainingPlan } from "@/services/training-plan.types.ts";
+import { settingsSnapshotQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
+import {
+  BUILD_PACES,
+  addDayKey,
+  formatHours,
+  keySessionName,
+  saveKeySessionSport,
+} from "@/services/training-plan.ts";
+import { withKeySessionSport, type TrainingPlan } from "@/services/training-plan.types.ts";
 import {
   AVAILABLE_WINDOWS,
   HISTORY_WEEKS,
@@ -33,6 +41,7 @@ import {
   type PaceStatus,
   type DayPart,
   type DaySport,
+  type KeySessionStatus,
   type TodayChoice,
   type WeekSummary,
   type WeekTargetData,
@@ -53,6 +62,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Slider } from "@/components/ui/slider";
+import { toast } from "@/components/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type PlannedWeek = WeekTargetData & { plan: TrainingPlan };
@@ -235,11 +245,78 @@ function SplitBar({
   );
 }
 
-const SPORT_LABEL = { any: "Ride or run", cycling: "Ride", running: "Run" } as const;
+const KEY_SPORTS = [
+  { id: "cycling", label: "Ride" },
+  { id: "running", label: "Run" },
+] as const;
+
+type KeySport = (typeof KEY_SPORTS)[number]["id"];
+
+/** Ride or run for one key session. Picking VO2's suggestion clears the athlete's own pick. */
+function KeySportPicker({ status }: { status: KeySessionStatus }) {
+  const queryClient = useQueryClient();
+  const id = status.session.id;
+  const save = useMutation({
+    mutationFn: (sport: KeySport | null) => saveKeySessionSport({ data: { id, sport } }),
+    onMutate: (sport) => {
+      queryClient.setQueryData(weekTargetQueryOptions.queryKey, (current) =>
+        current?.plan
+          ? {
+              ...current,
+              plan: {
+                ...current.plan,
+                keySessionSports: withKeySessionSport(current.plan.keySessionSports, { id, sport }),
+              },
+            }
+          : current,
+      );
+    },
+    onError: () => {
+      toast.add({
+        type: "error",
+        title: "Could not save the sport",
+        description: "Check your connection and pick it again.",
+      });
+      void queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
+    },
+  });
+  const sport = status.session.sport === "running" ? "running" : "cycling";
+
+  return (
+    <ToggleGroup
+      size="sm"
+      variant="outline"
+      spacing={0}
+      aria-label={`Sport for ${keySessionName(status.session)}`}
+      value={[sport]}
+      onValueChange={(next) => {
+        const picked = KEY_SPORTS.find((option) => option.id === next[0])?.id;
+        if (!picked || picked === sport) return;
+        save.mutate(picked === status.suggestedSport ? null : picked);
+      }}
+    >
+      {KEY_SPORTS.map((option) => (
+        <ToggleGroupItem key={option.id} value={option.id}>
+          {option.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+function keySportHint(status: KeySessionStatus) {
+  const suggested = status.suggestedSport === "running" ? "run" : "ride";
+  return status.sportPinned ? `Your pick · VO2 suggests a ${suggested}` : "VO2’s pick";
+}
 
 function WeekMixCard({ summary }: { summary: WeekSummary }) {
   const { keySessions, easy, paused } = summary;
   const doneCount = keySessions.filter((status) => status.done).length;
+  const keyCount = keySessions.filter((status) => !status.skipped).length;
+  const easyCount = easy.min === easy.max ? `${easy.max}` : `${easy.min}–${easy.max}`;
 
   return (
     <Card>
@@ -253,8 +330,9 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
           ) : null}
         </CardTitle>
         <CardDescription>
-          Built from your week mix. Key sessions tick off when an activity spends enough time in
-          their zone; the rest of the target is easy.
+          {keyCount
+            ? `This week: ${keyCount} key ${keyCount === 1 ? "session" : "sessions"} and ${easyCount} easy ones. A key session counts once any ride or run spends enough time in its zone. Pick the sport you plan it on.`
+            : `This week: ${easyCount} easy sessions.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -308,7 +386,7 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                       ) : status.skipped ? (
                         "Dropped: not enough days left. Its time moved to easy."
                       ) : (
-                        SPORT_LABEL[status.session.sport]
+                        keySportHint(status)
                       )}
                     </ItemDescription>
                   </ItemContent>
@@ -317,6 +395,11 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                       {minutesLabel(status.minutes)}
                     </span>
                   </ItemActions>
+                  {!done && !status.skipped ? (
+                    <div className="basis-full">
+                      <KeySportPicker status={status} />
+                    </div>
+                  ) : null}
                 </Item>
               );
             })}

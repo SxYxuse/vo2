@@ -383,12 +383,7 @@ export function SessionDetail({
             ) : null}
             {pick.keySession ? (
               <p className="text-muted-foreground border-t pt-3 text-xs">
-                Ticked off when one{" "}
-                {pick.keySession.sport === "any"
-                  ? "ride or run"
-                  : pick.keySession.sport === "cycling"
-                    ? "ride"
-                    : "run"}{" "}
+                Ticked off when one ride or run{" "}
                 {pick.keySession.kind === "long"
                   ? `lasts at least ${minutesLabel(needed)}.`
                   : `spends at least ${minutesLabel(needed)} at ${zoneLabel(pick.keySession.zone)} or above.`}
