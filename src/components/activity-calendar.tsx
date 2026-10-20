@@ -9,7 +9,7 @@ import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
 
-import { prefetchActivityDetail, prefetchActivityDetails, scheduleIdle } from "@/lib/prefetch.ts";
+import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import {
   formatSportType,
@@ -398,15 +398,6 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
       }),
       replace: true,
     });
-
-  useEffect(() => {
-    return scheduleIdle(() => {
-      prefetchActivityDetails(
-        queryClient,
-        activities.map((activity) => activity.id),
-      );
-    });
-  }, [activities, queryClient]);
 
   // The month view still lays bars across its padded weeks, even with outside days hidden.
   const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
