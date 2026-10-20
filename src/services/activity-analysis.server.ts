@@ -2,10 +2,8 @@ import { and, eq } from "drizzle-orm";
 import {
   chat,
   chatParamsFromRequest,
-  EventType,
   maxIterations,
   toServerSentEventsResponse,
-  type StreamChunk,
 } from "@tanstack/ai";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
@@ -16,6 +14,7 @@ import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
+import { analysisMessages, persistAnalysisOnce } from "./activity-analysis-run.ts";
 import {
   correlateStreamsDef,
   detectElevationSegmentsDef,
@@ -38,7 +37,6 @@ import {
 } from "./activity-analysis.types.ts";
 
 const ANALYSIS_MODEL = "openai/gpt-6-luna";
-const MIN_SAVED_CHARS = 24;
 
 export type AnalysisRuntime = {
   activityId: string;
@@ -184,30 +182,20 @@ export async function getActivityAnalysisImpl(
   };
 }
 
-export async function saveActivityAnalysisImpl(input: {
+async function saveActivityAnalysis(input: {
   activityId: string;
+  userId: string;
   body: string;
-  userId?: string;
-  mocked?: boolean;
-  model?: string | null;
-}): Promise<StoredActivityAnalysis | null> {
+  mocked: boolean;
+  model: string;
+}) {
   const body = input.body.trim();
-  if (body.length < MIN_SAVED_CHARS) return null;
-  const userId = input.userId ?? (await getRequiredSession()).user.id;
-  const [owned] = await db
-    .select({ id: activities.id })
-    .from(activities)
-    .where(and(eq(activities.id, input.activityId), eq(activities.userId, userId)))
-    .limit(1);
-  if (!owned) return null;
-
-  const mocked = input.mocked ?? isAnalysisMocked();
-  const model = input.model ?? (mocked ? "mock" : ANALYSIS_MODEL);
+  const { activityId, userId, mocked, model } = input;
   const now = new Date();
-  const [row] = await db
+  await db
     .insert(activityAnalyses)
     .values({
-      activityId: input.activityId,
+      activityId,
       userId,
       body,
       mocked,
@@ -218,54 +206,17 @@ export async function saveActivityAnalysisImpl(input: {
     .onConflictDoUpdate({
       target: activityAnalyses.activityId,
       set: { body, mocked, model, userId, updatedAt: now },
-    })
-    .returning({
-      activityId: activityAnalyses.activityId,
-      body: activityAnalyses.body,
-      mocked: activityAnalyses.mocked,
-      model: activityAnalyses.model,
-      updatedAt: activityAnalyses.updatedAt,
     });
-  if (!row) return null;
-  logger.info("analysis.saved", {
-    activityId: row.activityId,
-    mocked: row.mocked,
-    model: row.model,
-    chars: row.body.length,
-  });
-  return {
-    activityId: row.activityId,
-    body: row.body,
-    mocked: row.mocked,
-    model: row.model,
-    updatedAt: row.updatedAt.toISOString(),
-  };
+  logger.info("analysis.saved", { activityId, mocked, model, chars: body.length });
 }
 
-function chunkTextDelta(chunk: StreamChunk) {
-  if (chunk.type !== EventType.TEXT_MESSAGE_CONTENT) return "";
-  if (!("delta" in chunk) || typeof chunk.delta !== "string") return "";
-  return chunk.delta;
-}
-
-async function* persistCompletedAnalysis(
-  stream: AsyncIterable<StreamChunk>,
-  input: { activityId: string; userId: string; mocked: boolean; model: string },
-) {
-  let body = "";
-  try {
-    for await (const chunk of stream) {
-      yield chunk;
-      body += chunkTextDelta(chunk);
-      if (chunk.type === EventType.TEXT_MESSAGE_END && body.trim().length >= MIN_SAVED_CHARS) {
-        await saveActivityAnalysisImpl({ ...input, body });
-      }
-    }
-  } finally {
-    if (body.trim().length >= MIN_SAVED_CHARS) {
-      await saveActivityAnalysisImpl({ ...input, body });
-    }
-  }
+async function ownsActivity(activityId: string, userId: string) {
+  const [row] = await db
+    .select({ id: activities.id })
+    .from(activities)
+    .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function handleActivityAnalysis(request: Request) {
@@ -281,6 +232,12 @@ export async function handleActivityAnalysis(request: Request) {
     return new Response("Missing activityId", { status: 400 });
   }
 
+  if (!(await ownsActivity(activityId, session.user.id))) {
+    logger.warn("analysis.activity_not_found", { activityId });
+    return new Response("Activity not found", { status: 404 });
+  }
+
+  // Only the run ids come from the request; the messages are built here.
   const params = await chatParamsFromRequest(request);
   const apiKey = env.OPENROUTER_API_KEY;
   const mocked = !apiKey;
@@ -295,7 +252,7 @@ export async function handleActivityAnalysis(request: Request) {
 
   const stream = chat({
     adapter,
-    messages: params.messages,
+    messages: analysisMessages(),
     threadId: params.threadId,
     runId: params.runId,
     tools: createActivityAnalysisTools(),
@@ -308,11 +265,14 @@ export async function handleActivityAnalysis(request: Request) {
   });
 
   return toServerSentEventsResponse(
-    persistCompletedAnalysis(stream, {
-      activityId,
-      userId: session.user.id,
-      mocked,
-      model: mocked ? "mock" : ANALYSIS_MODEL,
-    }),
+    persistAnalysisOnce(stream, (body) =>
+      saveActivityAnalysis({
+        activityId,
+        userId: session.user.id,
+        body,
+        mocked,
+        model: mocked ? "mock" : ANALYSIS_MODEL,
+      }),
+    ),
   );
 }
