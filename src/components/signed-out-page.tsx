@@ -1,19 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react";
-import { useTheme } from "next-themes";
-
 import { SignInPanel } from "@/components/sync-panel.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { Button } from "@/components/ui/button";
-
-const THEME_CYCLE = [
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "system", label: "System", icon: MonitorIcon },
-] as const;
+import { useThemeCycle } from "@/hooks/use-theme-cycle.ts";
 
 export function SignedOutPage() {
   return (
@@ -43,18 +34,7 @@ export function SignedOutPage() {
 }
 
 function ThemeCycleButton() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const current = THEME_CYCLE.find((option) => option.value === theme) ?? THEME_CYCLE[2];
-  const next =
-    THEME_CYCLE[
-      (THEME_CYCLE.findIndex((option) => option.value === current.value) + 1) % THEME_CYCLE.length
-    ];
+  const { mounted, current, next, cycle } = useThemeCycle();
   const Icon = current.icon;
 
   return (
@@ -64,7 +44,7 @@ function ThemeCycleButton() {
       size="icon"
       aria-label={mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme"}
       disabled={!mounted}
-      onClick={() => setTheme(next.value)}
+      onClick={cycle}
     >
       {mounted ? <Icon /> : <span aria-hidden className="size-3.5" />}
     </Button>
