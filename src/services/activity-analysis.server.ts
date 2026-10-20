@@ -36,7 +36,7 @@ import {
   type StoredActivityAnalysis,
 } from "./activity-analysis.types.ts";
 
-const ANALYSIS_MODEL = "openai/gpt-6-luna";
+export const ANALYSIS_MODEL = "openai/gpt-6-luna";
 
 export type AnalysisRuntime = {
   activityId: string;
