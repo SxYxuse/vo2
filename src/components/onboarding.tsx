@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -16,18 +16,22 @@ import {
   syncStatusQueryOptions,
 } from "@/lib/queries.ts";
 import {
+  PROFILE_FIELDS,
   SPORTS_FIELDS,
   TRAINING_PACE_FIELDS,
   TRAINING_WEEK_FIELDS,
   onboardingFormDefaults,
   onboardingFormSchema,
+  profileFormSchema,
+  profileFromForm,
   trainingFromForm,
   type OnboardingFormInput,
   type OnboardingFormValues,
+  type ProfileFormValues,
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
-import { saveAppSettings } from "@/services/app-settings.ts";
+import { saveAppSettings, saveBirthDate } from "@/services/app-settings.ts";
 import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
@@ -35,7 +39,11 @@ import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
-import { TrainingPaceFields, TrainingWeekFields } from "@/components/settings-fields.tsx";
+import {
+  BirthDateField,
+  TrainingPaceFields,
+  TrainingWeekFields,
+} from "@/components/settings-fields.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +60,11 @@ const STEPS = [
     id: "sync",
     title: "Copy from Strava",
     description: "Copy your activities first so your plan starts from real training.",
+  },
+  {
+    id: "about",
+    title: "About you",
+    description: "Your birthday, to check heart-rate peaks against your age.",
   },
   {
     id: "sports",
@@ -106,13 +119,14 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
+        profile: data.profile,
         training: data.training,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         avgHours,
         timeZone,
       }),
-    [data.training, data.settings, avgHours, timeZone],
+    [data.profile, data.training, data.settings, avgHours, timeZone],
   );
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormValues>({
     resolver: zodResolver(onboardingFormSchema),
@@ -123,6 +137,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const step = STEPS[stepIndex];
   const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
+  const birthDate = useWatch({ control: form.control, name: "birthDate" });
+  // Steps validate with trigger, not submit, so react-hook-form never revalidates on change.
+  useEffect(() => {
+    if (birthDate) form.clearErrors("birthDate");
+  }, [birthDate, form]);
   const hasSportTypes = Object.keys(sportTypes).length > 0;
   const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
@@ -153,8 +172,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
             }
           : current,
       );
+      // Keeps the onboarding route on "You're set" instead of the birthday prompt.
       queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
-        current ? { ...current, training: saved.training } : current,
+        current ? { ...current, training: saved.training, hasBirthDate: true } : current,
       );
       void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
@@ -182,6 +202,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
       setStepIndex((current) => current + 1);
       return;
     }
+    if (step.id === "about") {
+      const ok = await form.trigger([...PROFILE_FIELDS]);
+      if (!ok) return;
+      setStepIndex((current) => current + 1);
+      return;
+    }
     if (step.id === "sports") {
       const ok = await form.trigger([...SPORTS_FIELDS]);
       if (!ok) return;
@@ -196,6 +222,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     }
     if (step.id !== "week") return;
     const ok = await form.trigger([
+      ...PROFILE_FIELDS,
       ...SPORTS_FIELDS,
       ...TRAINING_PACE_FIELDS,
       ...TRAINING_WEEK_FIELDS,
@@ -204,7 +231,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     await form.handleSubmit((values) => {
       save.mutate({
         data: {
-          profile: data.profile,
+          profile: profileFromForm(values),
           sportTypes: values.sportTypes,
           sportGroupShares: values.sportGroupShares,
           training: trainingFromForm(values),
@@ -283,6 +310,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 onSync={() => sync.mutate()}
               />
             )
+          ) : step.id === "about" ? (
+            <BirthDateField idPrefix="onboard" control={form.control} />
           ) : step.id === "sports" ? (
             <>
               <SportTypesFields idPrefix="onboard" control={form.control} />
@@ -368,6 +397,56 @@ export function OnboardingForm({ userName }: { userName: string }) {
             </Button>
           </>
         )}
+      </div>
+    </form>
+  );
+}
+
+/** One-step setup for athletes who finished onboarding before the birthday was required. */
+export function BirthDatePrompt() {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: { birthDate: null },
+  });
+  const save = useMutation({
+    mutationFn: saveBirthDate,
+    onSuccess: async () => {
+      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
+        current ? { ...current, hasBirthDate: true } : current,
+      );
+      // Age reshapes max HR, zones, and training load on every page.
+      void queryClient.invalidateQueries();
+      await navigate({ to: "/" });
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      className="flex flex-col overflow-hidden rounded-xl border bg-card"
+      onSubmit={form.handleSubmit((values) => save.mutate({ data: profileFromForm(values) }))}
+    >
+      <div className="flex flex-col gap-2 border-b px-4 pt-4 pb-3 text-center">
+        <h1 className="text-xl font-semibold tracking-tight">About you</h1>
+        <p className="text-muted-foreground text-sm">
+          VO2 now checks heart-rate peaks against your age. Add your birthday to continue.
+        </p>
+      </div>
+      <div className="flex flex-col gap-4 p-4 pb-6">
+        <BirthDateField idPrefix="birthday-prompt" control={form.control} />
+      </div>
+      <div className="flex flex-row flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+        {save.error ? (
+          <p className="text-destructive me-auto w-full text-xs sm:w-auto">
+            {save.error.message || "Could not save your birthday"}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+          Continue
+        </Button>
       </div>
     </form>
   );

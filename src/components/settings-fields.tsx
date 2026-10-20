@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarIcon, RulerIcon, WeightIcon } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import {
   Controller,
   useWatch,
@@ -43,12 +43,6 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-  InputGroupText,
-} from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -74,10 +68,6 @@ export function ProfileFields<T extends ProfileFormValues>({
   userName: string;
   control: Control<T>;
 }) {
-  const birthDate = useWatch({ control, name: "birthDate" as FieldPath<T> }) as string | null;
-  const age = ageFromBirthDate(birthDate);
-  const birth = birthDate ? parseBirthDate(birthDate) : null;
-
   return (
     <FieldGroup>
       <Field>
@@ -85,131 +75,69 @@ export function ProfileFields<T extends ProfileFormValues>({
         <Input id={`${idPrefix}-name`} value={userName} disabled />
         <FieldDescription>From your Strava account.</FieldDescription>
       </Field>
-      <Controller
-        name={"birthDate" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor={`${idPrefix}-birth`}>Birthday</FieldLabel>
-            <div className="flex flex-wrap items-center gap-2">
-              <Popover>
-                <PopoverTrigger
-                  render={
-                    <Button
-                      id={`${idPrefix}-birth`}
-                      type="button"
-                      variant="outline"
-                      className="min-w-48 justify-start font-normal"
-                      aria-invalid={fieldState.invalid}
-                    />
-                  }
-                >
-                  <CalendarIcon data-icon="inline-start" />
-                  {birth ? format(birth, "MMM d, yyyy") : "Pick a date"}
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-2">
-                  <Calendar
-                    mode="single"
-                    captionLayout="dropdown"
-                    selected={birth ?? undefined}
-                    defaultMonth={birth ?? new Date(1990, 0)}
-                    startMonth={new Date(1926, 0)}
-                    endMonth={new Date()}
-                    disabled={{ after: new Date() }}
-                    onSelect={(next) => field.onChange(next ? formatBirthDate(next) : null)}
-                  />
-                </PopoverContent>
-              </Popover>
-              {age != null ? (
-                <Badge variant="secondary">{age} years old</Badge>
-              ) : (
-                <Badge variant="outline">Age unknown</Badge>
-              )}
-              {birthDate ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => field.onChange(null)}
-                >
-                  Clear
-                </Button>
-              ) : null}
-            </div>
-            <FieldDescription>
-              Used later for age-graded analysis. Age updates from this date.
-            </FieldDescription>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </Field>
-        )}
-      />
-      <Controller
-        name={"weightKg" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor={`${idPrefix}-weight`}>Weight</FieldLabel>
-            <InputGroup>
-              <InputGroupInput
-                id={`${idPrefix}-weight`}
-                type="number"
-                inputMode="decimal"
-                min={20}
-                max={250}
-                step="0.1"
-                placeholder="72"
-                name={field.name}
-                value={field.value as string}
-                aria-invalid={fieldState.invalid}
-                onBlur={field.onBlur}
-                onChange={field.onChange}
-                ref={field.ref}
-              />
-              <InputGroupAddon align="inline-end">
-                <InputGroupText>
-                  <WeightIcon />
-                  kg
-                </InputGroupText>
-              </InputGroupAddon>
-            </InputGroup>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </Field>
-        )}
-      />
-      <Controller
-        name={"heightCm" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor={`${idPrefix}-height`}>Height</FieldLabel>
-            <InputGroup>
-              <InputGroupInput
-                id={`${idPrefix}-height`}
-                type="number"
-                inputMode="numeric"
-                min={80}
-                max={250}
-                step="1"
-                placeholder="178"
-                name={field.name}
-                value={field.value as string}
-                aria-invalid={fieldState.invalid}
-                onBlur={field.onBlur}
-                onChange={field.onChange}
-                ref={field.ref}
-              />
-              <InputGroupAddon align="inline-end">
-                <InputGroupText>
-                  <RulerIcon />
-                  cm
-                </InputGroupText>
-              </InputGroupAddon>
-            </InputGroup>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </Field>
-        )}
-      />
+      <BirthDateField idPrefix={idPrefix} control={control} />
     </FieldGroup>
+  );
+}
+
+export function BirthDateField<T extends ProfileFormValues>({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<T>;
+}) {
+  const birthDate = useWatch({ control, name: "birthDate" as FieldPath<T> }) as string | null;
+  const age = ageFromBirthDate(birthDate);
+  const birth = birthDate ? parseBirthDate(birthDate) : null;
+
+  return (
+    <Controller
+      name={"birthDate" as FieldPath<T>}
+      control={control}
+      render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor={`${idPrefix}-birth`}>Birthday</FieldLabel>
+          <div className="flex flex-wrap items-center gap-2">
+            <Popover>
+              <PopoverTrigger
+                render={
+                  <Button
+                    id={`${idPrefix}-birth`}
+                    type="button"
+                    variant="outline"
+                    className="min-w-48 justify-start font-normal"
+                    aria-invalid={fieldState.invalid}
+                  />
+                }
+              >
+                <CalendarIcon data-icon="inline-start" />
+                {birth ? format(birth, "MMM d, yyyy") : "Pick a date"}
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto p-2">
+                <Calendar
+                  mode="single"
+                  captionLayout="dropdown"
+                  selected={birth ?? undefined}
+                  defaultMonth={birth ?? new Date(1990, 0)}
+                  startMonth={new Date(1926, 0)}
+                  endMonth={new Date()}
+                  disabled={{ after: new Date() }}
+                  onSelect={(next) => {
+                    if (next) field.onChange(formatBirthDate(next));
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            {age != null ? <Badge variant="secondary">{age} years old</Badge> : null}
+          </div>
+          <FieldDescription>
+            Your age predicts your max heart rate, which sets heart-rate zones and training load.
+          </FieldDescription>
+          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+        </Field>
+      )}
+    />
   );
 }
 

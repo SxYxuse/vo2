@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { type ProfileSettings, profileSettingsSchema } from "@/services/app-settings.types.ts";
+import {
+  type ProfileSave,
+  type ProfileSettings,
+  profileSaveSchema,
+} from "@/services/app-settings.types.ts";
 import {
   calendarPeriodSchema,
   shownSportTypesSchema,
@@ -16,31 +20,13 @@ import {
 
 const BUILD_PACES = ["hold", "slow", "steady", "fast", "overreach"] as const;
 
+// Age checks the max-HR anchor against spikes, so every athlete gives a birthday.
 export const profileFormSchema = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
-  weightKg: z
-    .string()
-    .trim()
-    .refine(
-      (value) =>
-        value === "" ||
-        (Number.isFinite(Number(value)) && Number(value) >= 20 && Number(value) <= 250),
-      { error: "Enter a weight between 20 and 250 kg." },
-    ),
-  heightCm: z
-    .string()
-    .trim()
-    .refine(
-      (value) => {
-        if (value === "") return true;
-        const parsed = Number(value);
-        return Number.isInteger(parsed) && parsed >= 80 && parsed <= 250;
-      },
-      { error: "Enter a whole height between 80 and 250 cm." },
-    ),
+    .nullable()
+    .refine((value) => value != null, { error: "Pick your birthday." }),
 });
 
 const trainingFormFields = trainingPlanSchema.extend({
@@ -79,10 +65,10 @@ export const settingsFormSchema = withTrainingConsistency(
 );
 
 export const onboardingFormSchema = withTrainingConsistency(
-  trainingFormFields.extend(sportsFormFields),
+  profileFormSchema.extend(trainingFormFields.shape).extend(sportsFormFields),
 );
 
-export type ProfileFormValues = z.infer<typeof profileFormSchema>;
+export type ProfileFormValues = z.input<typeof profileFormSchema>;
 export type TrainingFormValues = z.output<typeof trainingFormSchema>;
 export type TrainingFormInput = z.input<typeof trainingFormSchema>;
 export type SettingsFormValues = z.output<typeof settingsFormSchema>;
@@ -91,6 +77,9 @@ export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 
+export const PROFILE_FIELDS = ["birthDate"] as const satisfies ReadonlyArray<
+  keyof OnboardingFormInput
+>;
 export const TRAINING_PACE_FIELDS = ["buildPace"] as const satisfies ReadonlyArray<
   keyof TrainingFormInput
 >;
@@ -106,19 +95,11 @@ export const TRAINING_WEEK_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof TrainingFormInput>;
 
 export function profileFormDefaults(profile: ProfileSettings | null): ProfileFormValues {
-  return {
-    birthDate: profile?.birthDate ?? null,
-    weightKg: profile?.weightKg != null ? String(profile.weightKg) : "",
-    heightCm: profile?.heightCm != null ? String(profile.heightCm) : "",
-  };
+  return { birthDate: profile?.birthDate ?? null };
 }
 
-export function profileFromForm(values: ProfileFormValues): ProfileSettings {
-  return profileSettingsSchema.parse({
-    birthDate: values.birthDate,
-    weightKg: values.weightKg.trim() === "" ? null : Number(values.weightKg),
-    heightCm: values.heightCm.trim() === "" ? null : Number(values.heightCm),
-  });
+export function profileFromForm(values: ProfileFormValues): ProfileSave {
+  return profileSaveSchema.parse({ birthDate: values.birthDate });
 }
 
 export function trainingFormDefaults(
@@ -184,6 +165,7 @@ export function settingsFormDefaults(input: {
 }
 
 export function onboardingFormDefaults(input: {
+  profile: ProfileSettings | null;
   training: TrainingPlan | null;
   sportTypes: OnboardingFormValues["sportTypes"];
   sportGroupShares: OnboardingFormValues["sportGroupShares"] | undefined;
@@ -191,6 +173,7 @@ export function onboardingFormDefaults(input: {
   timeZone: string;
 }): OnboardingFormInput {
   return {
+    ...profileFormDefaults(input.profile),
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
   };

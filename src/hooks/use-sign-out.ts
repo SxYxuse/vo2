@@ -19,6 +19,7 @@ export function useSignOut() {
       queryClient.setQueryData(appShellQueryOptions.queryKey, {
         signedIn: false,
         training: null,
+        hasBirthDate: false,
       });
       queryClient.removeQueries({
         predicate: (query) => query.queryKey[0] !== "app-shell",

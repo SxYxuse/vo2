@@ -15,7 +15,7 @@ import { SyncPanel } from "@/components/sync-panel.tsx";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
-import { isTrainingPlanComplete } from "@/services/training-plan.ts";
+import { isSetUp } from "@/services/app-shell.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_app")({
       }
       return;
     }
-    if (!isTrainingPlanComplete(shell.training)) {
+    if (!isSetUp(shell)) {
       throw redirect({ to: "/onboarding" });
     }
   },
@@ -57,7 +57,7 @@ function AppLayout() {
     }
     return <SignedOutPage />;
   }
-  if (!isTrainingPlanComplete(data.training)) {
+  if (!isSetUp(data)) {
     return <Navigate to="/onboarding" replace />;
   }
 
