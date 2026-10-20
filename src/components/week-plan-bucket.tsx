@@ -23,6 +23,7 @@ import {
   type PlannedSession,
   type TrainingPlan,
 } from "@/services/training-plan.ts";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -128,7 +129,12 @@ export function WeekPlanBucket({
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {error ? <p className="text-destructive text-xs">{error}</p> : null}
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not fill the week</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
         <Progress
           value={filled}
           className={

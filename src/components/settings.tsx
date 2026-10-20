@@ -31,6 +31,7 @@ import {
 import { saveAppSettings } from "@/services/app-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
   ProfileFields,
@@ -202,10 +204,15 @@ export function SettingsForm({
               </Button>
             )}
           </div>
-          {saveError ? <p className="text-destructive text-xs">{saveError}</p> : null}
+          {saveError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Could not save</AlertTitle>
+              <AlertDescription>{saveError}</AlertDescription>
+            </Alert>
+          ) : null}
         </div>
-        <div className="flex flex-col rounded-xl border bg-card">
-          <div className="flex flex-col gap-4 p-4">
+        <Card>
+          <CardContent className="flex flex-col gap-4">
             {!data ? (
               <div className="flex justify-center py-12">
                 <Spinner />
@@ -244,8 +251,8 @@ export function SettingsForm({
             ) : (
               <SportTypesFields idPrefix="settings" control={form.control} />
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </form>
       <AlertDialog
         open={blocker.status === "blocked"}

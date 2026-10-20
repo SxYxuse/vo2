@@ -19,7 +19,16 @@ import { buildPmc } from "@/services/training-load.ts";
 import { dayKey } from "@/services/training-plan.types.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
 
 const STAT_INFO = {
   efficiency:
@@ -45,14 +54,16 @@ type StatProps = {
 
 function Stat({ label, value, hint, info, className }: StatProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-md px-3 py-2">
-      <span className="flex items-center gap-1 text-muted-foreground">
-        {label}
-        <InfoTooltip label={label}>{info}</InfoTooltip>
-      </span>
-      <span className={cn("font-mono text-base tabular-nums", className)}>{value}</span>
-      {hint ? <span className="line-clamp-2 text-muted-foreground">{hint}</span> : null}
-    </div>
+    <Item variant="muted" size="sm" className="flex-col items-stretch">
+      <ItemContent>
+        <ItemDescription className="flex items-center gap-1">
+          {label}
+          <InfoTooltip label={label}>{info}</InfoTooltip>
+        </ItemDescription>
+        <ItemTitle className={cn("font-mono tabular-nums", className)}>{value}</ItemTitle>
+        {hint ? <ItemDescription>{hint}</ItemDescription> : null}
+      </ItemContent>
+    </Item>
   );
 }
 
@@ -152,82 +163,83 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
   if (!zones?.length && !stats.length) return null;
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <ActivityDetailSection
+      title={
+        <>
           <HeartPulseIcon aria-hidden className="size-4" />
           Heart rate
-        </CardTitle>
-        <CardDescription>
-          {heart.zoneModel}
-          {anchors.length ? ` · ${anchors.join(" · ")} bpm` : ""}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {context ? (
-          <Alert
-            variant={
-              context.tone === "warning"
-                ? "warning"
-                : context.tone === "positive"
-                  ? "success"
-                  : "info"
-            }
-          >
-            <AlertTitle>{context.title}</AlertTitle>
-            <AlertDescription>{context.detail}</AlertDescription>
-          </Alert>
-        ) : null}
+        </>
+      }
+      description={`${heart.zoneModel}${anchors.length ? ` · ${anchors.join(" · ")} bpm` : ""}`}
+    >
+      {context ? (
+        <Alert
+          variant={
+            context.tone === "warning"
+              ? "warning"
+              : context.tone === "positive"
+                ? "success"
+                : "info"
+          }
+        >
+          <AlertTitle>{context.title}</AlertTitle>
+          <AlertDescription>{context.detail}</AlertDescription>
+        </Alert>
+      ) : null}
 
-        {zones?.length && total > 0 ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex h-2 w-full overflow-hidden rounded-md bg-muted">
-              {zoneShare.map((zone) =>
-                zone.pct > 0 ? (
-                  <div
-                    key={zone.id}
-                    className="h-full min-w-0"
-                    style={{ width: `${zone.pct}%`, backgroundColor: zone.def.color }}
-                    title={`${zone.def.label} ${Math.round(zone.pct)}%`}
-                  />
-                ) : null,
-              )}
-            </div>
-            <ul className="flex flex-col gap-1.5">
-              {zoneShare.map((zone) => (
-                <li key={zone.id} className="flex items-center gap-2">
+      {zones?.length && total > 0 ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex h-2 w-full overflow-hidden rounded-md bg-muted">
+            {zoneShare.map((zone) =>
+              zone.pct > 0 ? (
+                <div
+                  key={zone.id}
+                  className="h-full min-w-0"
+                  style={{ width: `${zone.pct}%`, backgroundColor: zone.def.color }}
+                  title={`${zone.def.label} ${Math.round(zone.pct)}%`}
+                />
+              ) : null,
+            )}
+          </div>
+          <ItemGroup className="gap-1.5">
+            {zoneShare.map((zone) => (
+              <Item key={zone.id} size="xs" className="px-0">
+                <ItemMedia>
                   <span
                     aria-hidden
                     className="size-2 shrink-0 rounded-full"
                     style={{ backgroundColor: zone.def.color }}
                   />
-                  <span className="min-w-0 flex-1 truncate">
+                </ItemMedia>
+                <ItemContent>
+                  <ItemTitle>
                     {zone.def.label.replace("Zone ", "Z")} · {zone.def.name}
-                    <span className="text-muted-foreground">
-                      {" "}
+                    <span className="font-normal text-muted-foreground">
                       {formatZoneBpm(zone, zone.id === "z5")}
                     </span>
-                  </span>
-                  <span className="w-14 shrink-0 text-right font-mono tabular-nums text-muted-foreground">
+                  </ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <span className="w-14 text-right font-mono tabular-nums text-muted-foreground">
                     {formatDuration(zone.seconds)}
                   </span>
-                  <span className="w-9 shrink-0 text-right font-mono tabular-nums">
+                  <span className="w-9 text-right font-mono tabular-nums">
                     {Math.round(zone.pct)}%
                   </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {stats.length ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {stats.map((stat) => (
-              <Stat key={stat.label} {...stat} />
+                </ItemActions>
+              </Item>
             ))}
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+          </ItemGroup>
+        </div>
+      ) : null}
+
+      {stats.length ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {stats.map((stat) => (
+            <Stat key={stat.label} {...stat} />
+          ))}
+        </div>
+      ) : null}
+    </ActivityDetailSection>
   );
 }

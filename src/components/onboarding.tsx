@@ -45,7 +45,9 @@ import {
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -53,6 +55,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 
 const STEPS = [
@@ -247,157 +250,162 @@ export function OnboardingForm({ userName }: { userName: string }) {
   return (
     <form
       noValidate
-      className="flex flex-col overflow-hidden rounded-xl border bg-card"
+      className="flex flex-col"
       onSubmit={(event) => {
         event.preventDefault();
         void continueStep();
       }}
     >
-      <div className="flex flex-col gap-2 border-b px-4 pt-4 pb-3 text-center">
-        <div
-          className="flex items-center justify-center gap-1.5"
-          role="tablist"
-          aria-label="Setup steps"
-        >
-          {STEPS.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-label={item.title}
-              aria-current={index === stepIndex ? "step" : undefined}
-              disabled={isReady || index > stepIndex}
-              className={cn(
-                "size-2.5 rounded-full transition-colors",
-                index === stepIndex
-                  ? "bg-primary"
-                  : index < stepIndex
-                    ? "bg-primary/50"
-                    : "bg-muted",
-              )}
-              onClick={() => goToStep(index)}
-            />
-          ))}
-        </div>
-        <h1 className="text-xl font-semibold tracking-tight">
-          {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          {step.id === "sync"
-            ? "Start by copying your activities from Strava."
-            : step.id === "pace" && !hasActivityHistory
-              ? "How hard you want this block to push — fitness and form come after activities are copied."
-              : step.id === "week" && !hasActivityHistory
-                ? "How many runs, rides, and hours you want each week."
-                : step.description}
-        </p>
-      </div>
-      <div className="flex flex-col gap-4 p-4 pb-6">
-        <div
-          key={step.id}
-          className="flex flex-col gap-4 animate-in fade-in-0 slide-in-from-right-2 duration-200"
-        >
-          {step.id === "sync" ? (
-            syncStatusPending ? (
-              <div className="flex justify-center py-16">
-                <Spinner />
-              </div>
-            ) : (
-              <OnboardingSyncStepPanel
-                step={syncStep}
-                status={syncStatus}
-                error={sync.error?.message ?? null}
-                onSync={() => sync.mutate()}
-              />
-            )
-          ) : step.id === "about" ? (
-            <BirthDateField idPrefix="onboard" control={form.control} />
-          ) : step.id === "sports" ? (
-            <>
-              <SportTypesFields idPrefix="onboard" control={form.control} />
-              {hidesEverySport ? (
-                <p className="text-destructive text-sm">{SHOW_ONE_SPORT_MESSAGE}</p>
-              ) : hasSportTypes ? (
-                <p className="text-muted-foreground text-sm">
-                  More sports appear here as your history finishes copying. Change them anytime in
-                  Settings.
-                </p>
-              ) : null}
-            </>
-          ) : step.id === "pace" ? (
-            <TrainingPaceFields
-              idPrefix="onboard"
-              control={form.control}
-              hasActivityHistory={hasActivityHistory}
-            />
-          ) : step.id === "week" ? (
-            <TrainingWeekFields
-              idPrefix="onboard"
-              control={form.control}
-              setValue={form.setValue}
-              avgHours={avgHours}
-            />
-          ) : (
-            <Empty className="min-h-48 border-0">
-              <EmptyHeader>
-                <EmptyMedia variant="default">
-                  <IconStack>
-                    <CheckIcon className="size-5" />
-                  </IconStack>
-                </EmptyMedia>
-                <EmptyTitle>Ready to train</EmptyTitle>
-                <EmptyDescription>
-                  {copyUnfinished
-                    ? "Your goal is saved. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
-                    : "Your goal is saved. Open the calendar to see your week, or change anything later from Settings."}
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-        </div>
-      </div>
-      <div className="flex flex-row flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
-        {saveError ? (
-          <p className="text-destructive me-auto w-full text-xs sm:w-auto">{saveError}</p>
-        ) : null}
-        {isReady ? (
-          <Button
-            type="button"
-            className="w-full sm:w-auto"
-            onClick={() => {
-              void navigate({ to: "/" });
-            }}
+      <Card>
+        <CardHeader className="justify-items-center border-b text-center">
+          <div
+            className="flex items-center justify-center gap-1.5"
+            role="tablist"
+            aria-label="Setup steps"
           >
-            <CalendarDaysIcon data-icon="inline-start" />
-            Open calendar
-          </Button>
-        ) : (
-          <>
-            {stepIndex > 0 ? (
-              <Button
+            {STEPS.map((item, index) => (
+              <button
+                key={item.id}
                 type="button"
-                variant="outline"
-                className="me-auto"
-                onClick={() => setStepIndex((current) => current - 1)}
-              >
-                <ChevronLeftIcon data-icon="inline-start" />
-                Back
-              </Button>
-            ) : null}
+                role="tab"
+                aria-label={item.title}
+                aria-current={index === stepIndex ? "step" : undefined}
+                disabled={isReady || index > stepIndex}
+                className={cn(
+                  "size-2.5 rounded-full transition-colors",
+                  index === stepIndex
+                    ? "bg-primary"
+                    : index < stepIndex
+                      ? "bg-primary/50"
+                      : "bg-muted",
+                )}
+                onClick={() => goToStep(index)}
+              />
+            ))}
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {step.id === "sync"
+              ? "Start by copying your activities from Strava."
+              : step.id === "pace" && !hasActivityHistory
+                ? "How hard you want this block to push — fitness and form come after activities are copied."
+                : step.id === "week" && !hasActivityHistory
+                  ? "How many runs, rides, and hours you want each week."
+                  : step.description}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div
+            key={step.id}
+            className="flex flex-col gap-4 animate-in fade-in-0 slide-in-from-right-2 duration-200"
+          >
+            {step.id === "sync" ? (
+              syncStatusPending ? (
+                <div className="flex justify-center py-16">
+                  <Spinner />
+                </div>
+              ) : (
+                <OnboardingSyncStepPanel
+                  step={syncStep}
+                  status={syncStatus}
+                  error={sync.error?.message ?? null}
+                  onSync={() => sync.mutate()}
+                />
+              )
+            ) : step.id === "about" ? (
+              <BirthDateField idPrefix="onboard" control={form.control} />
+            ) : step.id === "sports" ? (
+              <>
+                <SportTypesFields idPrefix="onboard" control={form.control} />
+                {hidesEverySport ? (
+                  <FieldError>{SHOW_ONE_SPORT_MESSAGE}</FieldError>
+                ) : hasSportTypes ? (
+                  <FieldDescription>
+                    More sports appear here as your history finishes copying. Change them anytime in
+                    Settings.
+                  </FieldDescription>
+                ) : null}
+              </>
+            ) : step.id === "pace" ? (
+              <TrainingPaceFields
+                idPrefix="onboard"
+                control={form.control}
+                hasActivityHistory={hasActivityHistory}
+              />
+            ) : step.id === "week" ? (
+              <TrainingWeekFields
+                idPrefix="onboard"
+                control={form.control}
+                setValue={form.setValue}
+                avgHours={avgHours}
+              />
+            ) : (
+              <Empty className="min-h-48 border-0">
+                <EmptyHeader>
+                  <EmptyMedia variant="default">
+                    <IconStack>
+                      <CheckIcon className="size-5" />
+                    </IconStack>
+                  </EmptyMedia>
+                  <EmptyTitle>Ready to train</EmptyTitle>
+                  <EmptyDescription>
+                    {copyUnfinished
+                      ? "Your goal is saved. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
+                      : "Your goal is saved. Open the calendar to see your week, or change anything later from Settings."}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="flex-wrap justify-end gap-2 border-t">
+          {saveError ? (
+            <Alert variant="destructive" className="me-auto w-full sm:w-auto">
+              <AlertTitle>Could not save</AlertTitle>
+              <AlertDescription>{saveError}</AlertDescription>
+            </Alert>
+          ) : null}
+          {isReady ? (
             <Button
-              type="submit"
-              disabled={
-                save.isPending ||
-                (step.id === "sync" && !syncStep.canContinue) ||
-                (step.id === "sports" && hidesEverySport)
-              }
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                void navigate({ to: "/" });
+              }}
             >
-              {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-              {step.id === "week" ? "Finish" : "Continue"}
+              <CalendarDaysIcon data-icon="inline-start" />
+              Open calendar
             </Button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              {stepIndex > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="me-auto"
+                  onClick={() => setStepIndex((current) => current - 1)}
+                >
+                  <ChevronLeftIcon data-icon="inline-start" />
+                  Back
+                </Button>
+              ) : null}
+              <Button
+                type="submit"
+                disabled={
+                  save.isPending ||
+                  (step.id === "sync" && !syncStep.canContinue) ||
+                  (step.id === "sports" && hidesEverySport)
+                }
+              >
+                {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+                {step.id === "week" ? "Finish" : "Continue"}
+              </Button>
+            </>
+          )}
+        </CardFooter>
+      </Card>
     </form>
   );
 }
