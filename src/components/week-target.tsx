@@ -24,11 +24,14 @@ import {
   DAY_SPORTS,
   MAX_DAY_PARTS,
   TODAY_FEELS,
+  SPLIT_MIN_MINUTES,
+  customSplit,
   isDefaultChoice,
   recommendToday,
   sessionSteps,
   summarizeWeek,
   type PaceStatus,
+  type DayPart,
   type DaySport,
   type TodayChoice,
   type WeekSummary,
@@ -49,6 +52,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type PlannedWeek = WeekTargetData & { plan: TrainingPlan };
@@ -524,6 +528,76 @@ function DaySportsField({
   );
 }
 
+/** How today's time is shared between sports: VO2's split, or the athlete's own. */
+function SplitField({
+  available,
+  sports,
+  parts,
+  custom,
+  onChange,
+}: {
+  available: number;
+  sports: DaySport[];
+  parts: DayPart[];
+  custom: boolean;
+  onChange: (split: number[] | null) => void;
+}) {
+  // A part VO2 dropped as too short still gets a share once the athlete moves the handles.
+  const minutes =
+    parts.length === sports.length
+      ? parts.map((part) => part.minutes)
+      : sports.map(() => Math.round(available / sports.length / 5) * 5);
+  const labels = sports.map((sport, index) =>
+    parts.length === sports.length
+      ? SPORT_STYLE[parts[index].sport].label
+      : (DAY_SPORTS.find((item) => item.id === sport)?.label ?? sport),
+  );
+  const boundaries = minutes
+    .slice(0, -1)
+    .map((_, index) => minutes.slice(0, index + 1).reduce((sum, value) => sum + value, 0));
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-muted-foreground text-xs">Split · {custom ? "yours" : "VO2’s"}</span>
+        {custom ? (
+          <Button variant="link" size="sm" className="h-auto p-0" onClick={() => onChange(null)}>
+            Auto split
+          </Button>
+        ) : null}
+      </div>
+      <Slider
+        aria-label="Time per sport"
+        min={0}
+        max={available}
+        step={5}
+        minStepsBetweenValues={SPLIT_MIN_MINUTES / 5}
+        value={boundaries}
+        onValueChange={(next) => {
+          const marks = (Array.isArray(next) ? next : [next]).map((mark) =>
+            clamp5(mark, SPLIT_MIN_MINUTES, available - SPLIT_MIN_MINUTES),
+          );
+          const edges = [0, ...marks, available];
+          onChange(edges.slice(1).map((edge, index) => edge - edges[index]));
+        }}
+      />
+      <div className="flex flex-wrap justify-between gap-x-3 text-xs">
+        {labels.map((label, index) => (
+          // Positional: the order is the meaning.
+          // oxlint-disable-next-line react/no-array-index-key
+          <span key={index} className="font-mono tabular-nums">
+            {label} {minutesLabel(minutes[index])}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function clamp5(value: number, low: number, high: number) {
+  return Math.min(high, Math.max(low, Math.round(value / 5) * 5));
+}
+
 function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary }) {
   const [choice, setChoice] = useTodayChoice(data.today, {
     available: defaultWindow(summary),
@@ -562,9 +636,21 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
           label="Time"
           value={choice.available}
           options={WINDOW_OPTIONS}
-          onChange={(available) => setChoice({ available })}
+          onChange={(available) => setChoice({ available, split: null })}
         />
-        <DaySportsField sports={choice.sports} onChange={(sports) => setChoice({ sports })} />
+        <DaySportsField
+          sports={choice.sports}
+          onChange={(sports) => setChoice({ sports, split: null })}
+        />
+        {choice.sports.length > 1 && pick.kind !== "rest" ? (
+          <SplitField
+            available={choice.available}
+            sports={choice.sports}
+            parts={pick.parts}
+            custom={customSplit(choice) != null}
+            onChange={(split) => setChoice({ split })}
+          />
+        ) : null}
         <div className="flex flex-wrap gap-x-4 gap-y-3">
           <ChoiceToggle
             label="Feel"
@@ -636,6 +722,7 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
                       available: choice.available,
                       feel: choice.feel,
                       sports: choice.sports.join(","),
+                      ...(customSplit(choice) ? { split: choice.split?.join(",") } : {}),
                     }}
                   />
                 }

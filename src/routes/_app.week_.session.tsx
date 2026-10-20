@@ -28,6 +28,8 @@ type SessionSearch = {
   available?: number;
   /** Today's sports in order, comma-separated: "swimming,cycling". */
   sports?: string;
+  /** Minutes per sport, comma-separated, when the athlete set the split. */
+  split?: string;
   feel?: TodayFeel;
   /** A key session id from the week mix. */
   key?: string;
@@ -44,6 +46,9 @@ export const Route = createFileRoute("/_app/week_/session")({
     return {
       ...(AVAILABLE_WINDOWS.some((window) => window.minutes === available) ? { available } : {}),
       ...(sports ? { sports } : {}),
+      ...(typeof search.split === "string" && /^\d+(,\d+)*$/.test(search.split)
+        ? { split: search.split }
+        : {}),
       ...(feel ? { feel } : {}),
     };
   },
@@ -56,7 +61,7 @@ export const Route = createFileRoute("/_app/week_/session")({
 
 function SessionPage() {
   const { data } = useSuspenseQuery(weekTargetQueryOptions);
-  const { available, sports, feel, key } = Route.useSearch();
+  const { available, sports, split, feel, key } = Route.useSearch();
   const plan = data.plan;
   const view = useMemo(() => {
     if (!plan) return null;
@@ -67,10 +72,11 @@ function SessionPage() {
       : recommendToday(planned, summary, {
           available: available ?? 60,
           sports: parseDaySports(sports),
+          split: split ? split.split(",").map(Number) : null,
           feel: feel ?? "auto",
         });
     return pick ? { pick, summary, planned } : null;
-  }, [data, plan, available, sports, feel, key]);
+  }, [data, plan, available, sports, split, feel, key]);
 
   if (!view) {
     return (

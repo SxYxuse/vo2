@@ -762,7 +762,26 @@ export type TodayFeel = (typeof TODAY_FEELS)[number]["id"];
 export const MAX_DAY_PARTS = 3;
 
 /** What the athlete says about today: time, sports in order, and feel. VO2 adapts, it never refuses. */
-export type TodayChoice = { available: number; sports: DaySport[]; feel: TodayFeel };
+export type TodayChoice = {
+  available: number;
+  sports: DaySport[];
+  feel: TodayFeel;
+  /** Minutes per sport, in order, when the athlete set the split themselves. */
+  split?: number[] | null;
+};
+
+/** Smallest part a hand-set split can give a sport. */
+export const SPLIT_MIN_MINUTES = 10;
+
+/** The athlete's own split, when it still matches today's sports and time. */
+export function customSplit(choice: TodayChoice): number[] | null {
+  const { split, sports, available } = choice;
+  if (!split || split.length !== sports.length || sports.length < 2) return null;
+  if (split.some((minutes) => !Number.isFinite(minutes) || minutes < SPLIT_MIN_MINUTES))
+    return null;
+  const total = split.reduce((sum, minutes) => sum + minutes, 0);
+  return Math.abs(total - available) <= 5 ? split : null;
+}
 
 export function isDefaultChoice(choice: TodayChoice) {
   return choice.feel === "auto" && choice.sports.length === 1 && choice.sports[0] === "any";
@@ -898,8 +917,11 @@ export function recommendToday(
     : [];
   const active = summary.paused ? [] : open.filter((status) => !status.skipped);
   const ready = active.filter((status) => !(hardYesterday && isHard(status.session)));
-  // The other parts need their own time, so the key session gets what is left.
-  const keyWindow = available - (sports.length - 1) * PART_MIN_MINUTES;
+  // The other parts need their own time, so the key session gets what is left,
+  // or exactly its share when the athlete set the split.
+  const custom = customSplit({ ...choice, sports });
+  const keyWindow =
+    custom && keyIndex >= 0 ? custom[keyIndex] : available - (sports.length - 1) * PART_MIN_MINUTES;
   const fits = ready.find((status) => status.minutes <= keyWindow + 10) ?? null;
 
   if (todayMinutes > 0) {
@@ -987,6 +1009,7 @@ export function recommendToday(
   // Minutes per part.
   let minutesByPart: number[];
   if (kind === "rest") minutesByPart = resolved.map(() => 0);
+  else if (custom) minutesByPart = custom.map((minutes) => round5(minutes));
   else if (kind === "key" && keySession) {
     const keyMinutes = keySessionMinutes(keySession);
     const others = resolved.filter((_, index) => index !== mainIndex);
@@ -996,11 +1019,14 @@ export function recommendToday(
   } else {
     const easySize =
       summary.easy.perSession > 0 ? summary.easy.perSession : summary.remainingMinutes;
-    // Each part fills one easy session; recovery days stay short whatever the parts.
+    // One sport: the easy session's share of the week. Several: the whole time the athlete
+    // picked, split by sport. Recovery days stay short whatever the parts.
     const dayMinutes =
       kind === "recovery"
         ? Math.min(available, 45)
-        : Math.min(available, Math.max(30, easySize * resolved.length));
+        : resolved.length > 1
+          ? available
+          : Math.min(available, Math.max(30, easySize));
     minutesByPart = splitByWeight(dayMinutes, resolved);
     if (resolved.length === 1 && resolved[0] === "running") {
       minutesByPart[0] = Math.min(minutesByPart[0], 90);
@@ -1008,7 +1034,7 @@ export function recommendToday(
   }
   const parts: DayPart[] = resolved
     .map((sport, index) => ({ sport, minutes: minutesByPart[index], main: index === mainIndex }))
-    .filter((part) => part.main || part.minutes >= PART_MIN_MINUTES);
+    .filter((part) => part.main || part.minutes >= (custom ? SPLIT_MIN_MINUTES : PART_MIN_MINUTES));
 
   // Double days: a second session on one date, up to what the week mix allows.
   const { allowed, left } = summary.doubles;
@@ -1081,14 +1107,15 @@ export function buildRecommendation(
   // Scale a generic session by how costly an hour usually is for this athlete.
   const perHour = summary.loadPerHour / stress(60, EASY_INTENSITY);
   const totalMinutes = kind === "rest" ? 0 : parts.reduce((sum, part) => sum + part.minutes, 0);
+  const partStress = (part: DayPart) => {
+    if (!part.main) return stress(part.minutes, EASY_INTENSITY);
+    if (kind !== "key" || !keySession) return stress(part.minutes, mainIntensity);
+    // Time beyond the key session in its part (a hand-set split) is steady Z2.
+    const keyMinutes = Math.min(part.minutes, keySessionMinutes(keySession));
+    return stress(keyMinutes, mainIntensity) + stress(part.minutes - keyMinutes, EASY_INTENSITY);
+  };
   const load = Math.round(
-    parts.reduce(
-      (sum, part) =>
-        kind === "rest"
-          ? sum
-          : sum + stress(part.minutes, part.main ? mainIntensity : EASY_INTENSITY),
-      0,
-    ) * perHour,
+    (kind === "rest" ? 0 : parts.reduce((sum, part) => sum + partStress(part), 0)) * perHour,
   );
   const ctl = data.fitness.ctl + load / CTL_DAYS;
   const atl = data.fitness.atl + load / ATL_DAYS;
@@ -1105,7 +1132,10 @@ export function buildRecommendation(
         : `Very easy ${noun}. ${partHint(part.sport, data)}`;
     }
     if (keySession && isRideOrRun(part.sport)) {
-      return keySessionDescription(keySession, part.sport, data);
+      const extra = round5(part.minutes - keySessionMinutes(keySession));
+      const steady =
+        extra >= 5 ? ` Add ${formatHours(extra / 60)} steady Z2 before the cool-down.` : "";
+      return `${keySessionDescription(keySession, part.sport, data)}${steady}`;
     }
     return isRideOrRun(part.sport)
       ? `Zone 2 the whole way. ${partHint(part.sport, data)}`
@@ -1224,6 +1254,9 @@ export function sessionSteps(
         step(label, session.workMinutes, session.zone, true);
         if (rep < session.reps && session.restMinutes > 0) step("Easy", session.restMinutes, "z1");
       }
+      // A hand-set split can give the key part more time than the session: ride it steady.
+      const extra = round5(part.minutes - keySessionMinutes(session));
+      if (extra >= 5) step("Steady", extra, "z2");
       step("Cool-down", COOL_DOWN_MINUTES, "z1");
     }
   }

@@ -10,6 +10,7 @@ import {
   type TrainingPlan,
 } from "./training-plan.types.ts";
 import {
+  customSplit,
   estimatedHardMinutes,
   generateKeySessions,
   keySessionRecommendation,
@@ -686,5 +687,71 @@ describe("session range", () => {
       weekMix: { sessions: 6, keyShare: 30, doubleDays: 0 },
     });
     expect(plan?.weekMix).toEqual({ minSessions: 6, maxSessions: 6, keyShare: 30, doubleDays: 0 });
+  });
+});
+
+describe("splitting today's time", () => {
+  const easyWeek = {
+    ...PLAN,
+    weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0, doubleDays: 2 },
+  };
+
+  it("uses all the time picked when there are several sports", () => {
+    const data = week({ plan: easyWeek });
+    const pick = recommendToday(data, summarizeWeek(data), {
+      available: 180,
+      sports: ["swimming", "cycling", "running"],
+      feel: "auto",
+    });
+    // Weights 0.8 : 1.5 : 1 over 3h.
+    expect(pick.parts.map((part) => [part.sport, part.minutes])).toEqual([
+      ["swimming", 45],
+      ["cycling", 80],
+      ["running", 55],
+    ]);
+  });
+
+  it("follows the athlete's own split, padding a key session with steady time", () => {
+    const data = week();
+    const pick = recommendToday(data, summarizeWeek(data), {
+      available: 120,
+      sports: ["swimming", "cycling"],
+      feel: "hard",
+      split: [30, 90],
+    });
+    expect(pick.parts.map((part) => part.minutes)).toEqual([30, 90]);
+    const steps = sessionSteps(pick, data);
+    // 3 × 10 min Z4 takes 1h 05; the other 25 min of the ride are steady before the cool-down.
+    expect(steps.slice(-2).map((step) => [step.label, step.minutes])).toEqual([
+      ["Ride · Steady", 25],
+      ["Ride · Cool-down", 10],
+    ]);
+    expect(steps.reduce((sum, step) => sum + step.minutes, 0)).toBe(120);
+    expect(pick.description).toMatch(/Add 25 min steady Z2 before the cool-down\./);
+  });
+
+  it("shortens the key session when its share of the split is small", () => {
+    const data = week();
+    const pick = recommendToday(data, summarizeWeek(data), {
+      available: 120,
+      sports: ["running", "swimming"],
+      feel: "hard",
+      split: [45, 75],
+    });
+    expect(pick.keySession?.reps).toBe(1);
+    expect(pick.warnings.join(" ")).toMatch(/Shortened/);
+  });
+
+  it("falls back to VO2's split when the time or sports changed", () => {
+    const choice = {
+      available: 90,
+      sports: ["running", "cycling"] as const,
+      feel: "auto" as const,
+    };
+    expect(customSplit({ ...choice, sports: [...choice.sports], split: [30, 90] })).toBeNull();
+    expect(customSplit({ ...choice, sports: ["running"], split: [30, 60] })).toBeNull();
+    expect(customSplit({ ...choice, sports: [...choice.sports], split: [30, 60] })).toEqual([
+      30, 60,
+    ]);
   });
 });
