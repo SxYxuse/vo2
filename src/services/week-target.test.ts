@@ -19,6 +19,7 @@ import {
   minutesByZone,
   sessionSteps,
   projectWeek,
+  isTodayComplete,
   recommendToday,
   summarizeWeek,
   usualWeekCurve,
@@ -231,6 +232,14 @@ describe("summarizeWeek", () => {
     const summary = summarizeWeek(week({ fitness: { ctl: 50, atl: 85 } }));
     expect(summary).toMatchObject({ paused: true, keyLeftMinutes: 0 });
     expect(summary.easy.left).toBe(480);
+  });
+});
+
+describe("isTodayComplete", () => {
+  it("is complete once an activity is copied today", () => {
+    expect(isTodayComplete(week())).toBe(false);
+    expect(isTodayComplete(week({ activities: [activity({ date: "2026-10-20" })] }))).toBe(false);
+    expect(isTodayComplete(week({ activities: [activity({ date: WEDNESDAY })] }))).toBe(true);
   });
 });
 

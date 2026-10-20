@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import {
+  ChevronDownIcon,
   CircleCheckIcon,
   CircleIcon,
   MoonIcon,
@@ -35,14 +36,17 @@ import {
   SPLIT_MIN_MINUTES,
   customSplit,
   isDefaultChoice,
+  isTodayComplete,
   recommendToday,
   sessionSteps,
   summarizeWeek,
+  todayActivities,
   type PaceStatus,
   type DayPart,
   type DaySport,
   type KeySessionStatus,
   type TodayChoice,
+  type WeekActivity,
   type WeekSummary,
   type WeekTargetData,
 } from "@/services/week-target.ts";
@@ -52,6 +56,7 @@ import { SessionStrip } from "@/components/session-detail.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Item,
   ItemActions,
@@ -681,6 +686,34 @@ function clamp5(value: number, low: number, high: number) {
   return Math.min(high, Math.max(low, Math.round(value / 5) * 5));
 }
 
+function TodayDoneList({ activities }: { activities: WeekActivity[] }) {
+  return (
+    <ItemGroup className="gap-2">
+      {activities.map((activity) => {
+        const style = FAMILY_STYLE[activity.family];
+        return (
+          <Item
+            key={activity.id}
+            variant="muted"
+            size="sm"
+            render={<Link to="/activities/$activityId" params={{ activityId: activity.id }} />}
+          >
+            <ItemMedia variant="icon">
+              <CircleCheckIcon className="text-success" />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{activity.title}</ItemTitle>
+              <ItemDescription>
+                {style.label} · {minutesLabel(activity.minutes)}
+              </ItemDescription>
+            </ItemContent>
+          </Item>
+        );
+      })}
+    </ItemGroup>
+  );
+}
+
 function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary }) {
   const [choice, setChoice] = useTodayChoice(data.today, {
     available: defaultWindow(summary),
@@ -693,142 +726,164 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
     [data, summary, choice],
   );
   const steps = useMemo(() => sessionSteps(pick, data), [pick, data]);
-  const doneToday = data.activities.filter((activity) => activity.date === data.today);
+  const doneToday = todayActivities(data);
+  const complete = isTodayComplete(data);
   const overridden = !isDefaultChoice(choice) && vo2Pick.title !== pick.title;
   const style = FAMILY_STYLE[pick.family];
   const Icon = pick.kind === "rest" ? MoonIcon : style.icon;
 
+  const planner = (
+    <>
+      <ChoiceToggle
+        label="Time"
+        value={choice.available}
+        options={WINDOW_OPTIONS}
+        onChange={(available) => setChoice({ available, split: null })}
+      />
+      <DaySportsField
+        sports={choice.sports}
+        onChange={(sports) => setChoice({ sports, split: null })}
+      />
+      {choice.sports.length > 1 && pick.kind !== "rest" ? (
+        <SplitField
+          available={choice.available}
+          sports={choice.sports}
+          parts={pick.parts}
+          custom={customSplit(choice) != null}
+          onChange={(split) => setChoice({ split })}
+        />
+      ) : null}
+      <div className="flex flex-wrap gap-x-4 gap-y-3">
+        <ChoiceToggle
+          label="Feel"
+          value={choice.feel}
+          options={TODAY_FEELS}
+          onChange={(feel) => setChoice({ feel })}
+        />
+      </div>
+      <div className="flex flex-col gap-3 rounded-lg border p-3">
+        <div className="flex items-start gap-3">
+          <Icon className={cn("mt-0.5 size-5 shrink-0", pick.kind !== "rest" && style.text)} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-semibold">{pick.title}</span>
+              {pick.minutes > 0 ? (
+                <span className="font-mono text-sm tabular-nums">
+                  {minutesLabel(pick.parts.reduce((sum, part) => sum + part.minutes, 0))}
+                </span>
+              ) : null}
+            </div>
+            <p className="text-sm">{pick.description}</p>
+            {pick.reasons.length ? (
+              <ul className="text-muted-foreground flex list-disc flex-col gap-0.5 ps-4 text-xs">
+                {pick.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+        {pick.warnings.length ? (
+          <Alert variant="warning">
+            <TriangleAlertIcon />
+            <AlertTitle>Your call</AlertTitle>
+            <AlertDescription>
+              <ul className="flex list-disc flex-col gap-0.5 ps-4">
+                {pick.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {pick.minutes > 0 ? <SessionStrip steps={steps} /> : null}
+        {pick.minutes > 0 ? (
+          <div className="grid grid-cols-3 gap-3 border-t pt-3">
+            <Stat label="Left after" value={minutesLabel(pick.after.remainingMinutes)} />
+            <Stat
+              label="Form tomorrow"
+              value={signed(pick.after.formTomorrow)}
+              hint={pick.after.formTomorrowLabel}
+            />
+            <Stat
+              label="Fitness"
+              value={`+${pick.after.fitnessChange.toFixed(1)}`}
+              hint={`Load ~${pick.load}`}
+            />
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {pick.minutes > 0 ? (
+            <Button
+              variant="outline"
+              size="sm"
+              render={
+                <Link
+                  to="/week/session"
+                  search={{
+                    available: choice.available,
+                    feel: choice.feel,
+                    sports: choice.sports.join(","),
+                    ...(customSplit(choice) ? { split: choice.split?.join(",") } : {}),
+                  }}
+                />
+              }
+              nativeButton={false}
+            >
+              View session
+            </Button>
+          ) : null}
+          {overridden ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setChoice({ sports: ["any"], feel: "auto" })}
+            >
+              VO2 would pick {vo2Pick.title} · use it
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        Whatever you end up doing counts once it syncs: the week re-plans from your activities,
+        suggested or not.
+      </p>
+    </>
+  );
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Today</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          Today
+          {complete ? <Badge variant="success">Done</Badge> : null}
+        </CardTitle>
         <CardDescription>
-          Tell VO2 what you feel like. It shapes the session around it and shows what it costs.
+          {complete
+            ? "Today is done. Another session today is extra."
+            : "Tell VO2 what you feel like. It shapes the session around it and shows what it costs."}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {doneToday.length ? (
-          <p className="text-sm">
-            <span className="text-muted-foreground">Already today: </span>
-            {doneToday
-              .map((activity) => `${activity.title} · ${minutesLabel(activity.minutes)}`)
-              .join(", ")}
-          </p>
-        ) : null}
-        <ChoiceToggle
-          label="Time"
-          value={choice.available}
-          options={WINDOW_OPTIONS}
-          onChange={(available) => setChoice({ available, split: null })}
-        />
-        <DaySportsField
-          sports={choice.sports}
-          onChange={(sports) => setChoice({ sports, split: null })}
-        />
-        {choice.sports.length > 1 && pick.kind !== "rest" ? (
-          <SplitField
-            available={choice.available}
-            sports={choice.sports}
-            parts={pick.parts}
-            custom={customSplit(choice) != null}
-            onChange={(split) => setChoice({ split })}
-          />
-        ) : null}
-        <div className="flex flex-wrap gap-x-4 gap-y-3">
-          <ChoiceToggle
-            label="Feel"
-            value={choice.feel}
-            options={TODAY_FEELS}
-            onChange={(feel) => setChoice({ feel })}
-          />
-        </div>
-        <div className="flex flex-col gap-3 rounded-lg border p-3">
-          <div className="flex items-start gap-3">
-            <Icon className={cn("mt-0.5 size-5 shrink-0", pick.kind !== "rest" && style.text)} />
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-semibold">{pick.title}</span>
-                {pick.minutes > 0 ? (
-                  <span className="font-mono text-sm tabular-nums">
-                    {minutesLabel(pick.parts.reduce((sum, part) => sum + part.minutes, 0))}
-                  </span>
-                ) : null}
-              </div>
-              <p className="text-sm">{pick.description}</p>
-              {pick.reasons.length ? (
-                <ul className="text-muted-foreground flex list-disc flex-col gap-0.5 ps-4 text-xs">
-                  {pick.reasons.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          </div>
-          {pick.warnings.length ? (
-            <Alert variant="warning">
-              <TriangleAlertIcon />
-              <AlertTitle>Your call</AlertTitle>
-              <AlertDescription>
-                <ul className="flex list-disc flex-col gap-0.5 ps-4">
-                  {pick.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {pick.minutes > 0 ? <SessionStrip steps={steps} /> : null}
-          {pick.minutes > 0 ? (
-            <div className="grid grid-cols-3 gap-3 border-t pt-3">
-              <Stat label="Left after" value={minutesLabel(pick.after.remainingMinutes)} />
-              <Stat
-                label="Form tomorrow"
-                value={signed(pick.after.formTomorrow)}
-                hint={pick.after.formTomorrowLabel}
-              />
-              <Stat
-                label="Fitness"
-                value={`+${pick.after.fitnessChange.toFixed(1)}`}
-                hint={`Load ~${pick.load}`}
-              />
-            </div>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-2">
-            {pick.minutes > 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                render={
-                  <Link
-                    to="/week/session"
-                    search={{
-                      available: choice.available,
-                      feel: choice.feel,
-                      sports: choice.sports.join(","),
-                      ...(customSplit(choice) ? { split: choice.split?.join(",") } : {}),
-                    }}
-                  />
-                }
-                nativeButton={false}
+        {complete ? (
+          <>
+            <TodayDoneList activities={doneToday} />
+            <Collapsible className="group/today-more flex flex-col gap-4">
+              <CollapsibleTrigger
+                render={<Button variant="outline" size="sm" className="self-start" />}
               >
-                View session
-              </Button>
-            ) : null}
-            {overridden ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setChoice({ sports: ["any"], feel: "auto" })}
-              >
-                VO2 would pick {vo2Pick.title} · use it
-              </Button>
-            ) : null}
-          </div>
-        </div>
-        <p className="text-muted-foreground text-xs">
-          Whatever you end up doing counts once it syncs: the week re-plans from your activities,
-          suggested or not.
-        </p>
+                Another session
+                <ChevronDownIcon
+                  data-icon="inline-end"
+                  className="transition-transform group-data-panel-open/today-more:rotate-180"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-4">{planner}</CollapsibleContent>
+            </Collapsible>
+          </>
+        ) : (
+          planner
+        )}
       </CardContent>
     </Card>
   );
