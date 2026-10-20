@@ -1,5 +1,7 @@
 # The calendar shows one civil month
 
+Superseded by [0014](0014-calendar-period-is-a-setting.md).
+
 The calendar shows one civil month of completed activities, on desktop and phones alike. Desktop draws a Monday-first month grid with the days of other months left blank and their activities left out. A phone shows the month's days as a list. The calendar pages one month at a time and never past the current one.
 
 The month lives in a `?month=YYYY-MM` search param. The current month has no param, so a bare `/` keeps following today. Opening an activity passes the month along, and the Calendar link returns to it. If the athlete reaches an activity without one, such as from a shared link, the Calendar link returns to that activity's month.

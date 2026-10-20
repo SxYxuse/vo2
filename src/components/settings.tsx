@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  CalendarPeriodField,
   ProfileFields,
   TrainingPaceFields,
   TrainingStyleFields,
@@ -121,6 +122,7 @@ export function SettingsForm({
         training: data.training,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
+        calendarPeriod: data.settings.calendarPeriod,
         avgHours: recentAverageWeeklyHours(data.fitnessLoads, timeZone),
         timeZone,
       }),
@@ -167,6 +169,7 @@ export function SettingsForm({
         profile: profileFromForm(values),
         sportTypes: values.sportTypes,
         sportGroupShares: values.sportGroupShares,
+        calendarPeriod: values.calendarPeriod,
         training: trainingFromForm(values),
       },
     });
@@ -189,7 +192,11 @@ export function SettingsForm({
               {sectionLabel}
             </h1>
             {section === "sync" ? null : (
-              <Button type="submit" className="shrink-0" disabled={!data || save.isPending}>
+              <Button
+                type="submit"
+                className="shrink-0"
+                disabled={!data || !isDirty || save.isPending}
+              >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
                 Save
               </Button>
@@ -230,6 +237,8 @@ export function SettingsForm({
                   onOpenSports={() => setSection("sports")}
                 />
               </FieldGroup>
+            ) : section === "calendar" ? (
+              <CalendarPeriodField idPrefix="settings" control={form.control} />
             ) : section === "sync" ? (
               <SettingsSyncSection enabled />
             ) : (

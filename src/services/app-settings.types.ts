@@ -1,7 +1,7 @@
 import { differenceInYears, isValid } from "date-fns";
 import { z } from "zod";
 
-import { shownSportTypesSchema } from "./calendar-settings.types.ts";
+import { calendarPeriodSchema, shownSportTypesSchema } from "./calendar-settings.types.ts";
 import { trainingPlanSchema } from "./training-plan.types.ts";
 
 const birthDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -20,6 +20,7 @@ export const appSettingsSaveSchema = z.object({
   profile: profileSaveSchema,
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
+  calendarPeriod: calendarPeriodSchema.optional(),
   training: trainingPlanSchema.optional(),
 });
 

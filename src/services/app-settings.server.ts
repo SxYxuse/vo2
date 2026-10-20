@@ -106,6 +106,7 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
         ...value.sportTypes,
       },
       sportGroupShares: value.sportGroupShares,
+      calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
     },
     [...sportTypeRows.map((row) => row.sportType), ...Object.keys(value.sportTypes)],
   );

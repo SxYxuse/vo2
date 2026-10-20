@@ -21,7 +21,8 @@ import { SERIES_META } from "@/components/activity-detail-series.ts";
 import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
-import { monthKey } from "@/services/diary-window.ts";
+import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
+import { weekStartKey } from "@/services/training-plan.types.ts";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,15 +133,28 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   );
 }
 
-/** Returns to the calendar month the activity was opened from, or the activity's own month. */
-function CalendarBackLink({ month, start }: { month?: string; start?: string }) {
+/**
+ * Returns to the calendar period the activity was opened from, or the activity's own month and
+ * week so either calendar view lands on it.
+ */
+function CalendarBackLink({ diary, start }: { diary?: DiarySearch; start?: string }) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const currentMonth = monthKey(new Date(), timeZone);
-  const target = month ?? (start ? monthKey(new Date(start), timeZone) : currentMonth);
+  let search: DiarySearch = {};
+  if (diary?.month || diary?.week) {
+    search = diary;
+  } else if (start) {
+    const now = new Date();
+    const month = monthKey(new Date(start), timeZone);
+    const week = weekStartKey(new Date(start), timeZone);
+    search = {
+      ...(month < monthKey(now, timeZone) ? { month } : {}),
+      ...(week < weekStartKey(now, timeZone) ? { week } : {}),
+    };
+  }
   return (
     <Link
       to="/"
-      search={target < currentMonth ? { month: target } : {}}
+      search={search}
       className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "self-start")}
     >
       <ChevronLeftIcon />
@@ -149,11 +163,11 @@ function CalendarBackLink({ month, start }: { month?: string; start?: string }) 
   );
 }
 
-export function ActivityDetailPending({ month }: { month?: string }) {
+export function ActivityDetailPending({ diary }: { diary?: DiarySearch }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink month={month} />
+        <CalendarBackLink diary={diary} />
         <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-4 w-80 max-w-full" />
       </div>
@@ -171,11 +185,11 @@ export function ActivityDetailPending({ month }: { month?: string }) {
 export function ActivityDetailView({
   detail,
   color,
-  month,
+  diary,
 }: {
   detail: ActivityDetail;
   color?: string;
-  month?: string;
+  diary?: DiarySearch;
 }) {
   useEffect(() => {
     void import("@/components/activity-analysis.tsx");
@@ -189,7 +203,7 @@ export function ActivityDetailView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink month={month} start={detail.start} />
+        <CalendarBackLink diary={diary} start={detail.start} />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">
             {detail.title}
@@ -218,10 +232,10 @@ export function ActivityDetailView({
   );
 }
 
-export function ActivityDetailMissing({ month }: { month?: string }) {
+export function ActivityDetailMissing({ diary }: { diary?: DiarySearch }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <CalendarBackLink month={month} />
+      <CalendarBackLink diary={diary} />
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">

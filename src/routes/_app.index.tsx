@@ -12,11 +12,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { parseDiaryMonthSearch } from "@/services/diary-window.ts";
+import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
 
-type HomeSearch = {
+type HomeSearch = DiarySearch & {
   activity?: string;
-  month?: string;
 };
 
 export const Route = createFileRoute("/_app/")({
@@ -28,10 +27,9 @@ export const Route = createFileRoute("/_app/")({
         : typeof activity === "number" && Number.isFinite(activity)
           ? String(activity)
           : undefined;
-    const month = parseDiaryMonthSearch(search.month);
     return {
       ...(normalizedActivity ? { activity: normalizedActivity } : {}),
-      ...(month ? { month } : {}),
+      ...parseDiarySearch(search),
     };
   },
   beforeLoad: ({ search }) => {
@@ -50,7 +48,7 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CalendarPage() {
-  const { month } = Route.useSearch();
+  const { month, week } = Route.useSearch();
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { signedIn, activities, settings } = data;
 
@@ -62,7 +60,7 @@ function CalendarPage() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities by month. Planned sessions live in the Week bucket.
+          Completed Strava activities. Planned sessions live in the Week bucket.
         </p>
       </div>
       {signedIn && activities.length === 0 ? (
@@ -78,7 +76,11 @@ function CalendarPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <ActivityCalendar activities={activities} initialSettings={settings} initialMonth={month} />
+        <ActivityCalendar
+          activities={activities}
+          initialSettings={settings}
+          diary={{ month, week }}
+        />
       )}
     </div>
   );
@@ -93,7 +95,7 @@ function CalendarPending() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities by month. Planned sessions live in the Week bucket.
+          Completed Strava activities. Planned sessions live in the Week bucket.
         </p>
       </div>
       <Skeleton className="h-[40rem] w-full rounded-xl" />

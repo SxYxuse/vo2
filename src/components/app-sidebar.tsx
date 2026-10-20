@@ -246,7 +246,7 @@ function SidebarUserMenu() {
               render={
                 <SidebarMenuButton
                   aria-label={user?.name ?? "Account"}
-                  className="w-auto p-1 data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
+                  className="w-auto rounded-full p-1 data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
                 />
               }
             >

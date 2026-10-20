@@ -24,6 +24,7 @@ describe("mergeCalendarSettings", () => {
           },
         },
         sportGroupShares: {},
+        calendarPeriod: "month",
       },
       ["Run", "Ride"],
     );
