@@ -12,6 +12,10 @@ _Avoid_: User, account, client
 Permanently removing an athlete and their whole local copy, training plan, planned sessions, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
 _Avoid_: Account deletion, deactivation, closing an account
 
+**Body weight**:
+The athlete's weight in kilograms, asked during onboarding with the birthday. It caps caffeine in fuel plans.
+_Avoid_: Mass, BMI
+
 ## Completed work
 
 **Activity**:

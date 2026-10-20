@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  MAX_WEIGHT_KG,
+  MIN_WEIGHT_KG,
   type ProfileSave,
   type ProfileSettings,
   profileSaveSchema,
@@ -21,13 +23,29 @@ import {
 
 const BUILD_PACES = ["hold", "slow", "steady", "fast", "overreach"] as const;
 
-// Age checks the max-HR anchor against spikes, so every athlete gives a birthday.
+// Age checks the max-HR anchor against spikes, and weight caps caffeine in fuel plans,
+// so every athlete gives both.
 export const profileFormSchema = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .refine((value) => value != null, { error: "Pick your birthday." }),
+  weightKg: z
+    .string()
+    .trim()
+    .superRefine((value, ctx) => {
+      if (value === "") {
+        ctx.addIssue({ code: "custom", message: "Enter your weight." });
+        return;
+      }
+      const parsed = Number(value.replace(",", "."));
+      if (Number.isFinite(parsed) && parsed >= MIN_WEIGHT_KG && parsed <= MAX_WEIGHT_KG) return;
+      ctx.addIssue({
+        code: "custom",
+        message: `Enter a weight between ${MIN_WEIGHT_KG} and ${MAX_WEIGHT_KG} kg.`,
+      });
+    }),
 });
 
 const trainingFormFields = trainingPlanSchema.extend({
@@ -63,7 +81,7 @@ export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 
-export const PROFILE_FIELDS = ["birthDate"] as const satisfies ReadonlyArray<
+export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
 >;
 export const TRAINING_PACE_FIELDS = ["buildPace"] as const satisfies ReadonlyArray<
@@ -80,11 +98,16 @@ export const TRAINING_WEEK_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof TrainingFormInput>;
 
 export function profileFormDefaults(profile: ProfileSettings | null): ProfileFormValues {
-  return { birthDate: profile?.birthDate ?? null };
+  return {
+    birthDate: profile?.birthDate ?? null,
+    weightKg: profile?.weightKg != null ? String(profile.weightKg) : "",
+  };
 }
 
 export function profileFromForm(values: ProfileFormValues): ProfileSave {
-  return profileSaveSchema.parse({ birthDate: values.birthDate });
+  // Phones in comma-decimal locales type "72,5".
+  const weightKg = Math.round(Number(values.weightKg.replace(",", ".")) * 10) / 10;
+  return profileSaveSchema.parse({ birthDate: values.birthDate, weightKg });
 }
 
 export function trainingFormDefaults(

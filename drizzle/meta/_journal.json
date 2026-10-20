@@ -120,6 +120,13 @@
       "when": 1792489400022,
       "tag": "0016_drop_planned_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792518475897,
+      "tag": "0017_add_weight",
+      "breakpoints": true
     }
   ]
 }

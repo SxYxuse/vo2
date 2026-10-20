@@ -98,6 +98,7 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   swimLthr: real("swim_lthr"),
   restHr: real("rest_hr"),
   birthDate: date("birth_date", { mode: "string" }),
+  weightKg: real("weight_kg"),
   training: jsonb("training"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

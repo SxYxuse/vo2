@@ -6,7 +6,7 @@ import {
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 
-import { BirthDatePrompt, OnboardingForm, OnboardingShell } from "@/components/onboarding.tsx";
+import { ProfilePrompt, OnboardingForm, OnboardingShell } from "@/components/onboarding.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions, loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { isSetUp } from "@/services/app-shell.ts";
@@ -42,8 +42,8 @@ function OnboardingPage() {
 
   return (
     <OnboardingShell>
-      {isTrainingPlanComplete(shell.training) && !shell.hasBirthDate ? (
-        <BirthDatePrompt />
+      {isTrainingPlanComplete(shell.training) && !shell.hasProfile ? (
+        <ProfilePrompt />
       ) : (
         <OnboardingForm userName={session?.user.name ?? ""} />
       )}

@@ -31,12 +31,13 @@ export const getProfileSettingsForUser = cache(async (userId: string): Promise<P
   const [row] = await db
     .select({
       birthDate: athleteMetrics.birthDate,
+      weightKg: athleteMetrics.weightKg,
     })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
   if (!row) return DEFAULT_PROFILE_SETTINGS;
-  return { birthDate: row.birthDate ?? null };
+  return { birthDate: row.birthDate ?? null, weightKg: row.weightKg ?? null };
 });
 
 export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
@@ -120,6 +121,7 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
       .values({
         userId: session.user.id,
         birthDate: value.profile.birthDate,
+        weightKg: value.profile.weightKg,
         training: value.training,
         updatedAt: new Date(),
       })
@@ -127,6 +129,7 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
         target: athleteMetrics.userId,
         set: {
           birthDate: value.profile.birthDate,
+          weightKg: value.profile.weightKg,
           ...(value.training ? { training: value.training } : {}),
           updatedAt: new Date(),
         },
@@ -157,18 +160,16 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
   return { profile: value.profile, settings: parsed, training };
 }
 
-export async function saveBirthDateImpl(value: ProfileSave): Promise<void> {
+export async function saveProfileImpl(value: ProfileSave): Promise<void> {
   const session = await getRequiredSession();
   const previousProfile = await getProfileSettingsForUser(session.user.id);
+  const fields = { birthDate: value.birthDate, weightKg: value.weightKg, updatedAt: new Date() };
   await db
     .insert(athleteMetrics)
-    .values({ userId: session.user.id, birthDate: value.birthDate, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: athleteMetrics.userId,
-      set: { birthDate: value.birthDate, updatedAt: new Date() },
-    });
+    .values({ userId: session.user.id, ...fields })
+    .onConflictDoUpdate({ target: athleteMetrics.userId, set: fields });
   if (previousProfile.birthDate !== value.birthDate) {
     await refreshTrainingLoadsForUser(session.user.id);
   }
-  logger.info("birth_date.saved");
+  logger.info("profile.saved");
 }
