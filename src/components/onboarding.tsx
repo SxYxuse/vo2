@@ -26,6 +26,7 @@ import {
   type OnboardingFormValues,
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
+import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { saveAppSettings } from "@/services/app-settings.ts";
 import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
@@ -126,12 +127,14 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
     useQuery(syncStatusQueryOptions);
-  const sync = useStravaSync({ showToast: false });
+  const sync = useStravaSync({ quiet: true });
+  useSyncAutoResume();
   const syncStep = onboardingSyncStep({
     status: syncStatus?.status ?? "never",
     syncing: sync.isPending,
     syncFailed: sync.error != null || Boolean(sync.lastResult?.lastError),
     syncPaused: Boolean(sync.lastResult?.pausedUntil),
+    activityCount: syncStatus?.activityCount ?? 0,
   });
 
   const save = useMutation({
@@ -316,7 +319,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 <EmptyTitle>Ready to train</EmptyTitle>
                 <EmptyDescription>
                   {copyUnfinished
-                    ? "Your goal is saved. Your local copy of Strava is not finished yet — resume it later with Sync from Strava or from Settings. You can change anything later from Settings."
+                    ? "Your goal is saved. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
                     : "Your goal is saved. Open the calendar to see your week, or change anything later from Settings."}
                 </EmptyDescription>
               </EmptyHeader>

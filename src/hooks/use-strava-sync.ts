@@ -30,12 +30,26 @@ function syncCopiedDescription(activitiesUpserted: number, streamsFetched: numbe
   return `Copied ${countLabel(activitiesUpserted, "activity", "activities")} and ${countLabel(streamsFetched, "stream", "streams")}.`;
 }
 
-type SyncToast = Pick<typeof toast, "add" | "update">;
+type SyncToastOptions = Parameters<typeof toast.add>[0];
 
-const silentToast: SyncToast = {
-  add: () => "",
-  update: () => {},
+type SyncToast = {
+  add: (options: SyncToastOptions) => string;
+  update: (toastId: string, options: SyncToastOptions) => void;
 };
+
+/**
+ * Skips the progress toast. The finish toast still shows if the athlete has left onboarding
+ * by the time the copy ends, since that copy keeps running behind the app (ADR 0012).
+ */
+function quietToast(onOnboarding: () => boolean): SyncToast {
+  return {
+    add: () => "",
+    update: (_toastId, options) => {
+      if (options.type === "loading" || onOnboarding()) return;
+      toast.add(options);
+    },
+  };
+}
 
 function finishSyncToast(
   notify: SyncToast,
@@ -74,9 +88,11 @@ export function useStravaSyncPending() {
   return useIsMutating({ mutationKey: stravaSyncMutationKey }) > 0;
 }
 
-export function useStravaSync({ showToast = true }: { showToast?: boolean } = {}) {
-  const notify: SyncToast = showToast ? toast : silentToast;
+export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
   const router = useRouter();
+  const notify: SyncToast = quiet
+    ? quietToast(() => router.state.location.pathname.startsWith("/onboarding"))
+    : toast;
   const queryClient = useQueryClient();
   const isPending = useStravaSyncPending();
 

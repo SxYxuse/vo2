@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { onboardingSyncStep } from "./onboarding-sync.ts";
 
-const idle = { syncing: false, syncFailed: false, syncPaused: false } as const;
+const idle = { syncing: false, syncFailed: false, syncPaused: false, activityCount: 0 } as const;
 
 describe("onboardingSyncStep", () => {
   it("asks the athlete to start the first sync and keeps Continue locked", () => {
@@ -13,7 +13,7 @@ describe("onboardingSyncStep", () => {
     });
   });
 
-  it("keeps Continue locked while a sync is running", () => {
+  it("keeps Continue locked while the newest page is still being copied", () => {
     expect(onboardingSyncStep({ ...idle, status: "incomplete", syncing: true })).toEqual({
       canContinue: false,
       action: null,
@@ -61,7 +61,25 @@ describe("onboardingSyncStep", () => {
     });
   });
 
-  it("asks an athlete with a partial copy to sync before moving on", () => {
+  it("unlocks Continue as soon as the newest page is in, while the copy keeps running", () => {
+    expect(
+      onboardingSyncStep({ ...idle, status: "incomplete", syncing: true, activityCount: 200 }),
+    ).toEqual({
+      canContinue: true,
+      action: null,
+      phase: "syncing",
+    });
+  });
+
+  it("lets an athlete with a partial copy move on without waiting for older history", () => {
+    expect(onboardingSyncStep({ ...idle, status: "incomplete", activityCount: 42 })).toEqual({
+      canContinue: true,
+      action: "sync",
+      phase: "incomplete",
+    });
+  });
+
+  it("asks an athlete with nothing copied yet to sync before moving on", () => {
     expect(onboardingSyncStep({ ...idle, status: "incomplete" })).toEqual({
       canContinue: false,
       action: "sync",

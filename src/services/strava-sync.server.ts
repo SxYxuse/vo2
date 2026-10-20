@@ -24,6 +24,7 @@ import {
   isOverSyncBudget,
   remainingSyncBudgetMs,
   SYNC_POSTPROCESS_MIN_MS,
+  stopsAfterNewestPage,
 } from "./strava-sync.types.ts";
 import {
   adaptPlannedWeek,
@@ -230,18 +231,23 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   try {
     let newerCaughtUp = false;
     let olderCaughtUp = false;
+    const firstCopy = (await oldestActivityEpoch(session.user.id)) == null;
+    let newestOnly = false;
     if (!isOverSyncBudget(startedAt)) {
       const newer = await upsertNewerActivities(api, session.user.id, String(session.user.id));
       activitiesUpserted += newer.upserted;
       newerCaughtUp = newer.caughtUp;
+      newestOnly = stopsAfterNewestPage({ firstCopy, newestUpserted: newer.upserted });
     }
-    if (!isOverSyncBudget(startedAt)) {
+    if (!newestOnly && !isOverSyncBudget(startedAt)) {
       const older = await upsertOlderActivities(api, session.user.id, String(session.user.id));
       activitiesUpserted += older.upserted;
       olderCaughtUp = older.caughtUp;
     }
     historyComplete = newerCaughtUp && olderCaughtUp;
-    if (!isOverSyncBudget(startedAt)) {
+    // History first: older pages are 200 activities per read and settle fitness; streams cost a
+    // read each and only feed maps and charts.
+    if (historyComplete && !isOverSyncBudget(startedAt)) {
       streamsFetched = await syncPendingStreams(api, session.user.id, startedAt);
     }
   } catch (error) {

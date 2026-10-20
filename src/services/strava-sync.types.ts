@@ -58,6 +58,32 @@ export function historyCompleteFromRun(status: string | null, streamsPending: nu
   return false;
 }
 
+/**
+ * The first copy returns as soon as the newest page is stored, so onboarding can move on;
+ * older history and streams follow on the next calls (ADR 0012).
+ */
+export function stopsAfterNewestPage(input: { firstCopy: boolean; newestUpserted: number }) {
+  return input.firstCopy && input.newestUpserted > 0;
+}
+
+export type AutoResumePlan = { kind: "sync" } | { kind: "wait"; until: number } | { kind: "idle" };
+
+/**
+ * While the app is open, an incomplete local copy resumes on its own and an active pause is
+ * waited out. The first copy and failed copies still wait for the athlete (ADR 0012).
+ */
+export function autoResumePlan(
+  status: Pick<SyncStatus, "status" | "pausedUntil">,
+  now = Date.now(),
+): AutoResumePlan {
+  if (status.status === "incomplete") return { kind: "sync" };
+  if (status.status === "paused" && status.pausedUntil) {
+    const until = new Date(status.pausedUntil).getTime();
+    if (until > now) return { kind: "wait", until };
+  }
+  return { kind: "idle" };
+}
+
 export type HomeData = {
   signedIn: boolean;
   activities: CalendarActivity[];

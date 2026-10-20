@@ -47,7 +47,7 @@ The planning axis for remaining-week work: running or cycling only.
 _Avoid_: Sport group, sport type
 
 **Sync**:
-Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out and resumes when the athlete syncs again.
+Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out. While the app is open, it resumes on its own after the pause to finish an incomplete local copy; the athlete can also sync again by hand.
 _Avoid_: Import, fetch, refresh
 
 **Local copy**:
