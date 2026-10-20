@@ -149,6 +149,16 @@ export function trainingFromForm(values: TrainingFormValues): TrainingPlan {
   return trainingPlanSchema.parse(values);
 }
 
+function sportsFormDefaults(
+  sportTypes: SportsFormInput["sportTypes"],
+  sportGroupShares: SportsFormInput["sportGroupShares"] | undefined,
+): SportsFormInput {
+  return {
+    sportTypes,
+    sportGroupShares: { ...DEFAULT_SPORT_GROUP_SHARES, ...sportGroupShares },
+  };
+}
+
 export function settingsFormDefaults(input: {
   profile: ProfileSettings | null;
   training: TrainingPlan | null;
@@ -160,11 +170,7 @@ export function settingsFormDefaults(input: {
   return {
     ...profileFormDefaults(input.profile),
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
-    sportTypes: input.sportTypes,
-    sportGroupShares: {
-      ...DEFAULT_SPORT_GROUP_SHARES,
-      ...input.sportGroupShares,
-    },
+    ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
   };
 }
 
@@ -177,10 +183,6 @@ export function onboardingFormDefaults(input: {
 }): OnboardingFormInput {
   return {
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
-    sportTypes: input.sportTypes,
-    sportGroupShares: {
-      ...DEFAULT_SPORT_GROUP_SHARES,
-      ...input.sportGroupShares,
-    },
+    ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
   };
 }

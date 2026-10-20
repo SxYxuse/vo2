@@ -5,6 +5,7 @@ export {
   familyCollectors,
   formatSportType,
   heartRateCollectorLabel,
+  hidesEverySportType,
   mergeCalendarSettings,
   SHOW_ONE_SPORT_MESSAGE,
   sortSportTypeKeys,

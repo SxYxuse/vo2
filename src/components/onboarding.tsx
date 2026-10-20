@@ -27,7 +27,7 @@ import {
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { saveAppSettings } from "@/services/app-settings.ts";
-import { SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
+import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { cn } from "cn";
@@ -122,9 +122,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const step = STEPS[stepIndex];
   const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
-  const sportSettings = Object.values(sportTypes);
-  const hidesEverySport =
-    sportSettings.length > 0 && sportSettings.every((setting) => !setting.visible);
+  const hasSportTypes = Object.keys(sportTypes).length > 0;
+  const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
     useQuery(syncStatusQueryOptions);
   const sync = useStravaSync({ showToast: false });
@@ -286,7 +285,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
               <SportTypesFields idPrefix="onboard" control={form.control} />
               {hidesEverySport ? (
                 <p className="text-destructive text-sm">{SHOW_ONE_SPORT_MESSAGE}</p>
-              ) : sportSettings.length > 0 ? (
+              ) : hasSportTypes ? (
                 <p className="text-muted-foreground text-sm">
                   More sports appear here as your history finishes copying. Change them anytime in
                   Settings.

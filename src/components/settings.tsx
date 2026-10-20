@@ -16,6 +16,7 @@ import {
 import {
   profileFromForm,
   settingsFormDefaults,
+  SPORTS_FIELDS,
   settingsFormSchema,
   trainingFromForm,
   type SettingsFormInput,
@@ -55,11 +56,10 @@ import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
 const PROFILE_ERROR_KEYS = ["birthDate", "weightKg", "heightCm"] as const;
-const SPORTS_ERROR_KEYS = ["sportTypes", "sportGroupShares"] as const;
 
 function sectionForErrors(errors: FieldErrors<SettingsFormInput>): SettingsSection {
   if (PROFILE_ERROR_KEYS.some((key) => errors[key])) return "profile";
-  if (SPORTS_ERROR_KEYS.some((key) => errors[key])) return "sports";
+  if (SPORTS_FIELDS.some((key) => errors[key])) return "sports";
   return "training";
 }
 

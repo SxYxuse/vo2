@@ -43,6 +43,21 @@ describe("settingsFormSchema", () => {
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toEqual(["sportTypes"]);
   });
+
+  it("accepts settings saved before any sport type has been copied", () => {
+    const result = settingsFormSchema.safeParse(
+      settingsFormDefaults({
+        profile: null,
+        training: plan,
+        sportTypes: {},
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("onboardingFormSchema", () => {
