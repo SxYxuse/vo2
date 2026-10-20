@@ -121,7 +121,11 @@ export type WeekSummary = {
     done: number;
     /** Suggested length of each easy session still to do. */
     perSession: number;
+    /** Days left that can take one more session without doubling up. */
+    singleDaySlots: number;
   };
+  /** Days with two or more sessions: allowed by the week mix, used, and left. */
+  doubles: { allowed: number; used: number; left: number };
   loadPerHour: number;
   form: number;
 };
@@ -139,10 +143,12 @@ export type SessionKind = "rest" | "recovery" | "easy" | "key";
 export type Recommendation = {
   kind: SessionKind;
   keySession: KeySession | null;
-  family: "running" | "cycling";
+  /** Sport of the main part. */
+  family: PartSport;
+  /** Minutes of the main part. */
   minutes: number;
-  /** An easy second part on the other sport, for a "run + ride" day. */
-  second: { family: "running" | "cycling"; minutes: number } | null;
+  /** Today in order: the main part and any easy parts before or after it. */
+  parts: DayPart[];
   title: string;
   description: string;
   reasons: string[];
@@ -504,7 +510,17 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
   const openKeys = paused
     ? 0
     : keySessions.filter((status) => !status.done && !status.skipped).length;
-  const easyDaysLeft = Math.max(0, trainingDaysLeft - openKeys);
+  // Any two sessions of 20 minutes or more on one date make a double day, whatever the sports.
+  const sessionsByDate = new Map<string, number>();
+  for (const activity of activities) {
+    if (activity.minutes < EASY_SESSION_MIN_MINUTES) continue;
+    sessionsByDate.set(activity.date, (sessionsByDate.get(activity.date) ?? 0) + 1);
+  }
+  const doublesUsed = [...sessionsByDate.values()].filter((count) => count >= 2).length;
+  const doublesAllowed = plan.weekMix.doubleDays;
+  const doublesLeft = Math.max(0, doublesAllowed - doublesUsed);
+  const singleDaySlots = Math.max(0, trainingDaysLeft - openKeys);
+  const easyDaysLeft = singleDaySlots + Math.min(doublesLeft, trainingDaysLeft);
   const easyPlanned = clamp(
     easyDone + easyDaysLeft,
     easyRange.min,
@@ -541,10 +557,12 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
       max: easyRange.max,
       planned: easyPlanned,
       done: easyDone,
+      singleDaySlots,
       perSession: round5(
         Math.max(0, remainingMinutes - keyLeftMinutes) / Math.max(1, easyPlanned - easyDone),
       ),
     },
+    doubles: { allowed: doublesAllowed, used: doublesUsed, left: doublesLeft },
     loadPerHour,
     form,
   };
@@ -672,11 +690,13 @@ const COOL_DOWN_LABEL = "10 min easy";
 
 function sessionTitle(
   kind: SessionKind,
-  family: "running" | "cycling",
+  sport: PartSport,
   minutes: number,
   keySession: KeySession | null,
 ) {
-  const noun = family === "cycling" ? "ride" : "run";
+  const noun = PART_NOUN[sport];
+  if (sport === "strength")
+    return kind === "recovery" ? "Light strength session" : "Strength session";
   if (kind === "key" && keySession) return keySessionName(keySession);
   if (kind === "rest") return "Rest day";
   if (kind === "recovery") return `Recovery ${noun}`;
@@ -718,11 +738,14 @@ export function pickFamily(
 }
 
 /** One session for the time the athlete has today, and what it does to the week. */
-export const TODAY_SPORTS = [
+/** Sports a part of today can be. "Either" lets VO2 pick between a ride and a run. */
+export const DAY_SPORTS = [
   { id: "any", label: "Either" },
-  { id: "running", label: "Run" },
   { id: "cycling", label: "Ride" },
-  { id: "both", label: "Run + ride" },
+  { id: "running", label: "Run" },
+  { id: "swimming", label: "Swim" },
+  { id: "walking", label: "Walk" },
+  { id: "strength", label: "Strength" },
 ] as const;
 
 export const TODAY_FEELS = [
@@ -731,22 +754,86 @@ export const TODAY_FEELS = [
   { id: "hard", label: "Hard" },
 ] as const;
 
-export type TodaySport = (typeof TODAY_SPORTS)[number]["id"];
+export type DaySport = (typeof DAY_SPORTS)[number]["id"];
+export type PartSport = Exclude<DaySport, "any">;
 export type TodayFeel = (typeof TODAY_FEELS)[number]["id"];
 
-/** What the athlete says about today. VO2 adapts to it and warns, it never refuses. */
-export type TodayChoice = { available: number; sport: TodaySport; feel: TodayFeel };
+/** A day has at most this many parts (for example swim, ride, then run). */
+export const MAX_DAY_PARTS = 3;
+
+/** What the athlete says about today: time, sports in order, and feel. VO2 adapts, it never refuses. */
+export type TodayChoice = { available: number; sports: DaySport[]; feel: TodayFeel };
 
 export function isDefaultChoice(choice: TodayChoice) {
-  return choice.sport === "any" && choice.feel === "auto";
+  return choice.feel === "auto" && choice.sports.length === 1 && choice.sports[0] === "any";
 }
 
-/** The second sport of a "run + ride" day takes at least this long, or it is left out. */
-const SECOND_PART_MIN_MINUTES = 20;
+export function parseDaySports(value: unknown): DaySport[] {
+  const raw = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : [];
+  const sports = raw
+    .map((item) => DAY_SPORTS.find((sport) => sport.id === item)?.id)
+    .filter((sport): sport is DaySport => Boolean(sport))
+    .slice(0, MAX_DAY_PARTS);
+  return sports.length ? sports : ["any"];
+}
 
-function sportAccepts(sport: TodaySport, session: KeySession) {
-  if (sport === "any" || sport === "both" || session.sport === "any") return true;
-  return session.sport === sport;
+/** One part of today, in order. The main part carries today's session kind. */
+export type DayPart = { sport: PartSport; minutes: number; main: boolean };
+
+/** Any part after the main one takes at least this long, or it is left out. */
+const PART_MIN_MINUTES = 20;
+
+/** Share of an easy day each sport takes when combined: a ride runs longest, strength shortest. */
+const PART_WEIGHT: Record<PartSport, number> = {
+  cycling: 1.5,
+  running: 1,
+  swimming: 0.8,
+  walking: 1,
+  strength: 0.6,
+};
+
+const PART_NOUN: Record<PartSport, string> = {
+  cycling: "ride",
+  running: "run",
+  swimming: "swim",
+  walking: "walk",
+  strength: "strength session",
+};
+
+export function partNoun(sport: PartSport) {
+  return PART_NOUN[sport];
+}
+
+function isRideOrRun(sport: PartSport): sport is "running" | "cycling" {
+  return sport === "running" || sport === "cycling";
+}
+
+/** Key sessions are rides or runs: that is where zones and watts mean something. */
+function hostsKey(sport: DaySport) {
+  return sport === "any" || sport === "cycling" || sport === "running";
+}
+
+function sportAccepts(sport: DaySport, session: KeySession) {
+  if (!hostsKey(sport)) return false;
+  return sport === "any" || session.sport === "any" || session.sport === sport;
+}
+
+/** How to hold an easy part in a sport without zones or watts in VO2. */
+function partHint(sport: PartSport, data: Pick<WeekTargetData, "collectors" | "anchors">) {
+  if (isRideOrRun(sport)) return easyCap(sport, data.collectors[sport], data.anchors);
+  if (sport === "swimming") return "Long, relaxed strokes; you could keep going.";
+  if (sport === "walking") return "Brisk, breathing through your nose.";
+  return "Controlled reps, full rest between sets; no intervals.";
+}
+
+function partCue(
+  sport: PartSport,
+  zone: StepZone,
+  data: Pick<WeekTargetData, "collectors" | "anchors">,
+) {
+  if (isRideOrRun(sport)) return zoneCue(zone, sport, data.collectors[sport], data.anchors);
+  if (sport === "strength") return "Controlled, no intervals";
+  return ZONE_RPE[zone];
 }
 
 /** Fewer reps (or a shorter long Z2) so a key session fits the window the athlete has. */
@@ -769,7 +856,7 @@ function extraKeySession(data: WeekTargetData & { plan: TrainingPlan }) {
   const [first] = generateKeySessions({
     plan: {
       buildPace: data.plan.buildPace,
-      weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100 },
+      weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100, doubleDays: 0 },
     },
     weekStart: data.weekStart,
     ctl: data.weekStartFitness.ctl,
@@ -778,27 +865,41 @@ function extraKeySession(data: WeekTargetData & { plan: TrainingPlan }) {
   return { ...first, id: "extra" };
 }
 
+/** Split minutes over parts by sport weight; parts under the minimum are dropped. */
+function splitByWeight(total: number, sports: PartSport[]) {
+  const weight = sports.reduce((sum, sport) => sum + PART_WEIGHT[sport], 0);
+  return sports.map((sport) => round5((total * PART_WEIGHT[sport]) / Math.max(weight, 0.1)));
+}
+
 /** One session for today, shaped by what the athlete chose and by what the week still needs. */
 export function recommendToday(
   data: WeekTargetData & { plan: TrainingPlan },
   summary: WeekSummary,
   choice: TodayChoice,
 ): Recommendation {
-  const { available, sport, feel } = choice;
+  const { available, feel } = choice;
+  const sports = choice.sports.length
+    ? choice.sports.slice(0, MAX_DAY_PARTS)
+    : (["any"] as DaySport[]);
   const form = summary.form;
   const reasons: string[] = [];
   const warnings: string[] = [];
   const hardYesterday = hardRecently(data.activities, data.today);
-  const todayMinutes = data.activities
-    .filter((activity) => activity.date === data.today)
-    .reduce((sum, activity) => sum + activity.minutes, 0);
-  const open = summary.keySessions.filter(
-    (status) => !status.done && sportAccepts(sport, status.session),
+  const todaySessions = data.activities.filter(
+    (activity) => activity.date === data.today && activity.minutes >= EASY_SESSION_MIN_MINUTES,
   );
+  const todayMinutes = todaySessions.reduce((sum, activity) => sum + activity.minutes, 0);
+
+  // The first ride or run part is the only one that can carry a key session.
+  const keyIndex = sports.findIndex(hostsKey);
+  const keySport = keyIndex >= 0 ? sports[keyIndex] : null;
+  const open = keySport
+    ? summary.keySessions.filter((status) => !status.done && sportAccepts(keySport, status.session))
+    : [];
   const active = summary.paused ? [] : open.filter((status) => !status.skipped);
   const ready = active.filter((status) => !(hardYesterday && isHard(status.session)));
-  // On a two-sport day the key session shares the window with the second part.
-  const keyWindow = sport === "both" ? available - SECOND_PART_MIN_MINUTES : available;
+  // The other parts need their own time, so the key session gets what is left.
+  const keyWindow = available - (sports.length - 1) * PART_MIN_MINUTES;
   const fits = ready.find((status) => status.minutes <= keyWindow + 10) ?? null;
 
   if (todayMinutes > 0) {
@@ -816,6 +917,9 @@ export function recommendToday(
         `Easy today, as you asked. ${keySessionName(active[0].session)} stays open for another day.`,
       );
     }
+  } else if (feel === "hard" && !keySport) {
+    kind = "easy";
+    warnings.push("Key sessions are rides or runs. Add one to today to go hard.");
   } else if (feel === "hard") {
     kind = "key";
     const hard = (status: KeySessionStatus) => isHard(status.session);
@@ -827,10 +931,11 @@ export function recommendToday(
     const base = chosen?.session ?? extraKeySession(data);
     keySession = fitKeySession(base, keyWindow);
     if (!chosen) warnings.push("All key sessions are done: this one is extra on top of the week.");
-    else if (chosen.skipped)
+    else if (chosen.skipped) {
       warnings.push(
         "This key session was dropped for lack of days; doing it today brings it back.",
       );
+    }
     if (keySession !== base) warnings.push(`Shortened to fit ${formatHours(available / 60)}.`);
     if (hardYesterday) {
       warnings.push("You went hard in the last day. Two hard days in a row cost more recovery.");
@@ -867,42 +972,60 @@ export function recommendToday(
     }
   }
 
-  // Which sport carries the main part.
-  const forced = sport === "running" || sport === "cycling" ? sport : null;
-  const family: "running" | "cycling" =
-    forced ??
-    (sport === "both"
-      ? keySession?.sport === "cycling"
-        ? "cycling"
-        : "running"
-      : pickFamily(summary, available, keySession?.sport));
-  // Today's session is on the sport the athlete picked, whatever the key session allowed.
-  if (forced && keySession) keySession = { ...keySession, sport: forced };
+  // Resolve "Either" parts: the main one by what the week needs, the others to the other sport.
+  const mainIndex = kind === "key" && keyIndex >= 0 ? keyIndex : 0;
+  const mainChoice = sports[mainIndex];
+  const mainSport: PartSport =
+    mainChoice === "any" ? pickFamily(summary, available, keySession?.sport) : mainChoice;
+  const resolved: PartSport[] = sports.map((sport, index) => {
+    if (index === mainIndex) return mainSport;
+    if (sport !== "any") return sport;
+    return mainSport === "cycling" ? "running" : "cycling";
+  });
+  if (keySession && isRideOrRun(mainSport)) keySession = { ...keySession, sport: mainSport };
 
-  let minutes: number;
-  // How long the whole day should be: the window for a key session, the easy share otherwise.
-  let dayMinutes = available;
-  if (kind === "rest") minutes = 0;
-  else if (kind === "recovery") minutes = Math.min(available, 45);
-  else if (kind === "key" && keySession) minutes = keySessionMinutes(keySession);
-  else {
+  // Minutes per part.
+  let minutesByPart: number[];
+  if (kind === "rest") minutesByPart = resolved.map(() => 0);
+  else if (kind === "key" && keySession) {
+    const keyMinutes = keySessionMinutes(keySession);
+    const others = resolved.filter((_, index) => index !== mainIndex);
+    const shares = splitByWeight(Math.max(0, available - keyMinutes), others);
+    let next = 0;
+    minutesByPart = resolved.map((_, index) => (index === mainIndex ? keyMinutes : shares[next++]));
+  } else {
     const easySize =
       summary.easy.perSession > 0 ? summary.easy.perSession : summary.remainingMinutes;
-    dayMinutes = Math.min(available, Math.max(30, easySize));
-    // On a run + ride day the run is the shorter opener.
-    minutes = sport === "both" ? Math.min(45, Math.max(20, dayMinutes * 0.35)) : dayMinutes;
-    if (family === "running" && sport !== "both") minutes = Math.min(minutes, 90);
+    // Each part fills one easy session; recovery days stay short whatever the parts.
+    const dayMinutes =
+      kind === "recovery"
+        ? Math.min(available, 45)
+        : Math.min(available, Math.max(30, easySize * resolved.length));
+    minutesByPart = splitByWeight(dayMinutes, resolved);
+    if (resolved.length === 1 && resolved[0] === "running") {
+      minutesByPart[0] = Math.min(minutesByPart[0], 90);
+    }
   }
-  minutes = round5(minutes);
+  const parts: DayPart[] = resolved
+    .map((sport, index) => ({ sport, minutes: minutesByPart[index], main: index === mainIndex }))
+    .filter((part) => part.main || part.minutes >= PART_MIN_MINUTES);
 
-  let second: { family: "running" | "cycling"; minutes: number } | null = null;
-  if (sport === "both" && kind !== "rest") {
-    const left = round5(dayMinutes - minutes);
-    if (left >= SECOND_PART_MIN_MINUTES) {
-      second = { family: family === "running" ? "cycling" : "running", minutes: left };
+  // Double days: a second session on one date, up to what the week mix allows.
+  const { allowed, left } = summary.doubles;
+  const isDouble = parts.length > 1 || (todaySessions.length > 0 && kind !== "rest");
+  if (isDouble) {
+    if (left > 0) reasons.push(`Double day · ${left} of ${allowed} left this week.`);
+    else {
+      warnings.push(
+        allowed > 0
+          ? `You already used your ${allowed} double ${allowed === 1 ? "day" : "days"} this week; this one is extra.`
+          : "Your week mix has no double days; this one is extra.",
+      );
     }
   }
 
+  const main = parts.find((part) => part.main);
+  const family = main?.sport ?? mainSport;
   if (kind === "easy" && feel === "auto") {
     const { planned, done, perSession } = summary.easy;
     if (planned > 0 && done < planned) {
@@ -910,41 +1033,46 @@ export function recommendToday(
         `Easy session ${done + 1} of ${planned} · about ${formatHours(perSession / 60)} each.`,
       );
     }
-    const left = summary.bySport[family].left;
-    if (left > 0) {
-      reasons.push(
-        `${formatHours(left / 60)} of ${family === "cycling" ? "riding" : "running"} left this week.`,
-      );
+    if (isRideOrRun(family)) {
+      const sportLeft = summary.bySport[family].left;
+      if (sportLeft > 0) {
+        reasons.push(
+          `${formatHours(sportLeft / 60)} of ${family === "cycling" ? "riding" : "running"} left this week.`,
+        );
+      }
     }
     if (summary.pace.status === "behind") {
       reasons.push("Behind your usual pace. Easy time closes the gap without digging a hole.");
     }
+    // More easy sessions than single days left: suggest stacking, but let the athlete pick the sport.
+    const easyNeeded = planned - done;
+    if (parts.length === 1 && left > 0 && easyNeeded > summary.easy.singleDaySlots) {
+      reasons.push(
+        `${easyNeeded} easy sessions left for ${summary.easy.singleDaySlots} ${summary.easy.singleDaySlots === 1 ? "day" : "days"}: add a second sport today.`,
+      );
+    }
   }
 
-  return buildRecommendation(
-    { kind, keySession, family, minutes, reasons, warnings, second },
-    data,
-    summary,
-  );
+  return buildRecommendation({ kind, keySession, parts, reasons, warnings }, data, summary);
 }
 
-/** Load, effect on the week, and wording for a chosen session. */
+/** Load, effect on the week, and wording for a chosen day. */
 export function buildRecommendation(
   pick: {
     kind: SessionKind;
     keySession: KeySession | null;
-    family: "running" | "cycling";
-    minutes: number;
+    parts: DayPart[];
     reasons: string[];
     warnings?: string[];
-    second?: { family: "running" | "cycling"; minutes: number } | null;
   },
   data: WeekTargetData,
   summary: WeekSummary,
 ): Recommendation {
-  const { kind, keySession, family, minutes, reasons } = pick;
-  const second = pick.second ?? null;
-  const intensity =
+  const { kind, keySession, parts, reasons } = pick;
+  const main = parts.find((part) => part.main) ?? parts[0];
+  const family: PartSport = main?.sport ?? "cycling";
+  const minutes = kind === "rest" ? 0 : (main?.minutes ?? 0);
+  const mainIntensity =
     kind === "key" && keySession
       ? keySessionIntensity(keySession)
       : kind === "recovery"
@@ -952,40 +1080,62 @@ export function buildRecommendation(
         : EASY_INTENSITY;
   // Scale a generic session by how costly an hour usually is for this athlete.
   const perHour = summary.loadPerHour / stress(60, EASY_INTENSITY);
+  const totalMinutes = kind === "rest" ? 0 : parts.reduce((sum, part) => sum + part.minutes, 0);
   const load = Math.round(
-    (stress(minutes, intensity) + (second ? stress(second.minutes, EASY_INTENSITY) : 0)) * perHour,
+    parts.reduce(
+      (sum, part) =>
+        kind === "rest"
+          ? sum
+          : sum + stress(part.minutes, part.main ? mainIntensity : EASY_INTENSITY),
+      0,
+    ) * perHour,
   );
   const ctl = data.fitness.ctl + load / CTL_DAYS;
   const atl = data.fitness.atl + load / ATL_DAYS;
   const formTomorrow = ctl - atl;
 
-  const collectors = data.collectors[family];
-  const main =
+  const describe = (part: DayPart) => {
+    const noun = PART_NOUN[part.sport];
+    if (!part.main)
+      return `${formatHours(part.minutes / 60)} easy ${noun}: ${partHint(part.sport, data)}`;
+    if (kind === "rest") return "Take the day off. The week’s target is already met.";
+    if (kind === "recovery") {
+      return isRideOrRun(part.sport)
+        ? `Zone 1 only, no surges. ${partHint(part.sport, data)}`
+        : `Very easy ${noun}. ${partHint(part.sport, data)}`;
+    }
+    if (keySession && isRideOrRun(part.sport)) {
+      return keySessionDescription(keySession, part.sport, data);
+    }
+    return isRideOrRun(part.sport)
+      ? `Zone 2 the whole way. ${partHint(part.sport, data)}`
+      : `Easy ${noun}. ${partHint(part.sport, data)}`;
+  };
+  const description =
     kind === "rest"
-      ? "Take the day off. The week’s target is already met."
-      : kind === "recovery"
-        ? `Zone 1 only, no surges. ${easyCap(family, collectors, data.anchors)}`
-        : keySession
-          ? keySessionDescription(keySession, family, data)
-          : `Zone 2 the whole way. ${easyCap(family, collectors, data.anchors)}`;
-  const then = second
-    ? ` Then ${formatHours(second.minutes / 60)} easy ${second.family === "cycling" ? "ride" : "run"}: ${easyCap(second.family, data.collectors[second.family], data.anchors)}`
-    : "";
-  const title = sessionTitle(kind, family, minutes, keySession);
+      ? describe({ sport: family, minutes: 0, main: true })
+      : parts
+          .map((part, index) => (index === 0 ? describe(part) : `Then ${describe(part)}`))
+          .join(" ");
+  const titles = parts.map((part, index) =>
+    part.main
+      ? sessionTitle(kind, part.sport, part.minutes, keySession)
+      : `${index === 0 ? "Easy" : "easy"} ${PART_NOUN[part.sport]}`,
+  );
 
   return {
     kind,
     keySession,
     family,
     minutes,
-    second,
-    title: second ? `${title} + easy ${second.family === "cycling" ? "ride" : "run"}` : title,
-    description: `${main}${then}`,
+    parts,
+    title: kind === "rest" ? "Rest day" : titles.join(" + "),
+    description,
     reasons,
     warnings: pick.warnings ?? [],
     load,
     after: {
-      remainingMinutes: Math.max(0, summary.remainingMinutes - minutes - (second?.minutes ?? 0)),
+      remainingMinutes: Math.max(0, summary.remainingMinutes - totalMinutes),
       formTomorrow,
       formTomorrowLabel: formLabel(formTomorrow),
       fitnessChange: load / CTL_DAYS,
@@ -1010,7 +1160,12 @@ export function keySessionRecommendation(
         ? ["Paused this week: form is very low."]
         : [];
   return buildRecommendation(
-    { kind: "key", keySession: status.session, family, minutes: status.minutes, reasons },
+    {
+      kind: "key",
+      keySession: status.session,
+      parts: [{ sport: family, minutes: status.minutes, main: true }],
+      reasons,
+    },
     data,
     summary,
   );
@@ -1021,60 +1176,62 @@ export type SessionStep = {
   minutes: number;
   zone: StepZone;
   cue: string;
-  family: "running" | "cycling";
+  sport: PartSport;
   /** Set on the hard part of a key session. */
   work: boolean;
 };
 
-/** Minute-by-minute shape of a session, for the profile chart and the steps table. */
+/** Minute-by-minute shape of today, part by part, for the profile chart and the steps table. */
 export function sessionSteps(
-  pick: Pick<Recommendation, "kind" | "keySession" | "family" | "minutes" | "second">,
+  pick: Pick<Recommendation, "kind" | "keySession" | "parts">,
   data: Pick<WeekTargetData, "collectors" | "anchors">,
 ): SessionStep[] {
-  const step = (
-    label: string,
-    minutes: number,
-    zone: StepZone,
-    work = false,
-    family = pick.family,
-  ): SessionStep => ({
-    label,
-    minutes,
-    zone,
-    cue: zoneCue(zone, family, data.collectors[family], data.anchors),
-    family,
-    work,
-  });
-  const session = pick.keySession;
   const steps: SessionStep[] = [];
-  if (pick.kind === "rest" || pick.minutes <= 0) return steps;
-  if (pick.kind === "recovery") steps.push(step("Recovery", pick.minutes, "z1"));
-  else if (pick.kind === "easy" || !session || session.kind === "long") {
-    if (pick.minutes < 40) steps.push(step("Steady", pick.minutes, "z2", Boolean(session)));
-    else {
-      steps.push(
-        step("Ease in", 10, "z1"),
-        step("Steady", pick.minutes - 20, "z2", Boolean(session)),
-        step("Ease out", 10, "z1"),
+  if (pick.kind === "rest") return steps;
+  const multi = pick.parts.length > 1;
+  for (const part of pick.parts) {
+    if (part.minutes <= 0) continue;
+    const step = (label: string, minutes: number, zone: StepZone, work = false) => {
+      steps.push({
+        label: multi ? `${capitalize(PART_NOUN[part.sport])} · ${label}` : label,
+        minutes,
+        zone,
+        cue: partCue(part.sport, zone, data),
+        sport: part.sport,
+        work,
+      });
+    };
+    const session = part.main ? pick.keySession : null;
+    if (!part.main) {
+      step(
+        part.sport === "strength" ? "Strength" : "Easy",
+        part.minutes,
+        part.sport === "strength" ? "z1" : "z2",
       );
-    }
-  } else {
-    steps.push(step("Warm-up", WARM_UP_MINUTES, "z1"));
-    for (let rep = 1; rep <= session.reps; rep += 1) {
-      const label = session.reps === 1 ? "Main block" : `Rep ${rep} of ${session.reps}`;
-      steps.push(step(label, session.workMinutes, session.zone, true));
-      if (rep < session.reps && session.restMinutes > 0) {
-        steps.push(step("Easy", session.restMinutes, "z1"));
+    } else if (pick.kind === "recovery") step("Recovery", part.minutes, "z1");
+    else if (part.sport === "strength") step("Strength", part.minutes, "z1");
+    else if (!session || pick.kind !== "key" || session.kind === "long") {
+      if (part.minutes < 40) step("Steady", part.minutes, "z2", Boolean(session));
+      else {
+        step("Ease in", 10, "z1");
+        step("Steady", part.minutes - 20, "z2", Boolean(session));
+        step("Ease out", 10, "z1");
       }
+    } else {
+      step("Warm-up", WARM_UP_MINUTES, "z1");
+      for (let rep = 1; rep <= session.reps; rep += 1) {
+        const label = session.reps === 1 ? "Main block" : `Rep ${rep} of ${session.reps}`;
+        step(label, session.workMinutes, session.zone, true);
+        if (rep < session.reps && session.restMinutes > 0) step("Easy", session.restMinutes, "z1");
+      }
+      step("Cool-down", COOL_DOWN_MINUTES, "z1");
     }
-    steps.push(step("Cool-down", COOL_DOWN_MINUTES, "z1"));
-  }
-  const second = pick.second;
-  if (second) {
-    const noun = second.family === "cycling" ? "ride" : "run";
-    steps.push(step(`Easy ${noun}`, second.minutes, "z2", false, second.family));
   }
   return steps;
+}
+
+function capitalize(text: string) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export function minutesByZone(steps: SessionStep[]) {

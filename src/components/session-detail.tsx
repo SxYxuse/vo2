@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, BikeIcon, FootprintsIcon, MoonIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowLeftIcon, MoonIcon, TriangleAlertIcon } from "lucide-react";
 import { cn } from "cn";
 
+import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { HR_ZONES } from "@/services/heart-rate.ts";
 import {
   formatHours,
@@ -282,8 +283,7 @@ export function SessionDetail({
   source: "today" | "week-mix";
 }) {
   const steps = useMemo(() => sessionSteps(pick, data), [pick, data]);
-  const SportIcon =
-    pick.kind === "rest" ? MoonIcon : pick.family === "cycling" ? BikeIcon : FootprintsIcon;
+  const SportIcon = pick.kind === "rest" ? MoonIcon : SPORT_STYLE[pick.family].icon;
   const status = pick.keySession
     ? summary.keySessions.find((item) => item.session.id === pick.keySession?.id)
     : null;
@@ -305,17 +305,11 @@ export function SessionDetail({
           Week target
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <SportIcon
-            aria-hidden
-            className={cn(
-              "size-5",
-              pick.family === "cycling" ? "text-ds-blue-700" : "text-ds-amber-700",
-            )}
-          />
+          <SportIcon aria-hidden className={cn("size-5", SPORT_STYLE[pick.family].text)} />
           {pick.title}
           {pick.minutes > 0 ? (
             <Badge variant="outline">
-              {minutesLabel(pick.minutes + (pick.second?.minutes ?? 0))}
+              {minutesLabel(pick.parts.reduce((sum, part) => sum + part.minutes, 0))}
             </Badge>
           ) : null}
           {pick.keySession ? <Badge variant="info">Key session</Badge> : null}

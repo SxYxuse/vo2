@@ -101,12 +101,16 @@ Minutes at heart-rate zone 3 or above. Estimated from load per hour when an acti
 _Avoid_: Intensity minutes, quality time
 
 **Today's choice**:
-What the athlete says about today: the time they have, the sport (either, run, ride, or run + ride), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it.
+What the athlete says about today: the time they have, the sports in order (up to three parts, such as swim then ride, or ride then strength), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it. A key session goes on the first ride or run part; the other parts are easy.
 _Avoid_: Override, preference
 
 **Today's pick**:
 The one session VO2 builds for today's choice: the next key session that fits, otherwise an easy session. When the choice goes against what VO2 would pick, the pick carries warnings with the cost (for example two hard days in a row) and VO2's own pick stays one tap away.
 _Avoid_: Planned session, workout of the day
+
+**Double day**:
+A date with two or more sessions of 20 minutes or more, any sports. The week mix sets how many a week the athlete is fine with; VO2 counts the ones done, plans extra easy sessions on the rest, and suggests adding a second sport when the week needs it.
+_Avoid_: Brick (a brick is one specific double: a run straight after a ride)
 
 **Dropped key session**:
 A key session left out of this week because there are more open key sessions than training days left. Its time moves to easy. Doing it anyway still ticks it off.

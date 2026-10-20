@@ -58,8 +58,11 @@ export function WeekMixFields<T extends TrainingFormInput>({
   const minSessions = mix?.minSessions ?? 1;
   const maxSessions = mix?.maxSessions ?? minSessions;
   const keyShare = mix?.keyShare ?? 0;
-  const keys = keySessionCount({ minSessions, maxSessions, keyShare });
-  const easy = easySessionRange({ minSessions, maxSessions, keyShare });
+  const doubleDays = mix?.doubleDays ?? 0;
+  const keys = keySessionCount({ minSessions, maxSessions, keyShare, doubleDays });
+  const easy = easySessionRange({ minSessions, maxSessions, keyShare, doubleDays });
+  // With one rest day there are six training days; more sessions than that need double days.
+  const doublesNeeded = Math.max(0, maxSessions - 6);
   const rangeError = minField.fieldState.error ?? maxField.fieldState.error;
   const matchesHistory =
     history != null && history.low === minSessions && history.high === maxSessions;
@@ -187,6 +190,40 @@ export function WeekMixFields<T extends TrainingFormInput>({
           number of easy sessions settles within the range as the week goes.
         </FieldDescription>
       )}
+      <Controller
+        name="weekMix.doubleDays"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel htmlFor={`${idPrefix}-double-days`}>Double days per week</FieldLabel>
+            <ToggleGroup
+              id={`${idPrefix}-double-days`}
+              size="sm"
+              variant="outline"
+              spacing={0}
+              aria-label="Double days per week"
+              value={[String(field.value ?? 0)]}
+              onValueChange={(next) => {
+                if (next[0] != null) field.onChange(Number(next[0]));
+              }}
+              className="flex-wrap"
+            >
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((count) => (
+                <ToggleGroupItem key={count} value={String(count)}>
+                  {count === 0 ? "None" : count}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <FieldDescription>
+              Days you are fine doing two sessions, any sports: a ride then a run, a swim then
+              strength. VO2 suggests a second sport when the week needs it; you pick which.
+              {doublesNeeded > (field.value ?? 0)
+                ? ` Up to ${maxSessions} sessions needs about ${doublesNeeded} double ${doublesNeeded === 1 ? "day" : "days"}.`
+                : ""}
+            </FieldDescription>
+          </Field>
+        )}
+      />
       {onOpenSports ? (
         <Button
           type="button"

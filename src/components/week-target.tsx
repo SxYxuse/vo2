@@ -4,14 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import {
-  ActivityIcon,
-  BikeIcon,
   CircleCheckIcon,
   CircleIcon,
-  FootprintsIcon,
   MoonIcon,
   PauseIcon,
+  PlusIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react";
 import { cn } from "cn";
 
@@ -22,13 +21,15 @@ import {
   HISTORY_WEEKS,
   defaultWindow,
   projectWeek,
+  DAY_SPORTS,
+  MAX_DAY_PARTS,
   TODAY_FEELS,
-  TODAY_SPORTS,
   isDefaultChoice,
   recommendToday,
   sessionSteps,
   summarizeWeek,
   type PaceStatus,
+  type DaySport,
   type TodayChoice,
   type WeekSummary,
   type WeekTargetData,
@@ -36,6 +37,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { SessionStrip } from "@/components/session-detail.tsx";
+import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -61,16 +63,7 @@ const STATUS_BADGE: Record<
   behind: { label: "Behind", variant: "warning" },
 };
 
-const FAMILY_STYLE = {
-  cycling: { label: "Ride", icon: BikeIcon, bar: "bg-ds-blue-700", text: "text-ds-blue-700" },
-  running: {
-    label: "Run",
-    icon: FootprintsIcon,
-    bar: "bg-ds-amber-700",
-    text: "text-ds-amber-700",
-  },
-  other: { label: "Other", icon: ActivityIcon, bar: "bg-muted-foreground", text: "" },
-} as const;
+const FAMILY_STYLE = SPORT_STYLE;
 
 function weekRangeLabel(weekStart: string) {
   const start = parseISO(`${weekStart}T12:00:00`);
@@ -358,6 +351,11 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
               ? `${minutesLabel(easy.left)} of easy time left${easy.planned > easy.done ? `, about ${minutesLabel(easy.perSession)} a session` : ""}.`
               : "Easy time is done for the week."}
           </p>
+          {summary.doubles.allowed > 0 || summary.doubles.used > 0 ? (
+            <p className="text-muted-foreground text-xs">
+              Double days: {summary.doubles.used} of {summary.doubles.allowed} used.
+            </p>
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -476,15 +474,65 @@ const WINDOW_OPTIONS = AVAILABLE_WINDOWS.map((window) => ({
   label: window.label as string,
 }));
 
+/** Today's sports in order: "Ride", or "Swim, then ride", up to three parts. */
+function DaySportsField({
+  sports,
+  onChange,
+}: {
+  sports: DaySport[];
+  onChange: (sports: DaySport[]) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {sports.map((sport, index) => (
+        <div
+          // Parts are positional: the order is the meaning.
+          // oxlint-disable-next-line react/no-array-index-key
+          key={index}
+          className="flex items-end gap-2"
+        >
+          <ChoiceToggle
+            label={index === 0 ? "Sport" : "Then"}
+            value={sport}
+            options={DAY_SPORTS}
+            onChange={(next) => onChange(sports.map((item, at) => (at === index ? next : item)))}
+          />
+          {index > 0 ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Remove part ${index + 1}`}
+              onClick={() => onChange(sports.filter((_, at) => at !== index))}
+            >
+              <XIcon />
+            </Button>
+          ) : null}
+        </div>
+      ))}
+      {sports.length < MAX_DAY_PARTS ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => onChange([...sports, sports.at(-1) === "cycling" ? "running" : "cycling"])}
+        >
+          <PlusIcon data-icon="inline-start" />
+          Add a sport after
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary }) {
   const [choice, setChoice] = useTodayChoice(data.today, {
     available: defaultWindow(summary),
-    sport: "any",
+    sports: ["any"],
     feel: "auto",
   });
   const pick = useMemo(() => recommendToday(data, summary, choice), [data, summary, choice]);
   const vo2Pick = useMemo(
-    () => recommendToday(data, summary, { ...choice, sport: "any", feel: "auto" }),
+    () => recommendToday(data, summary, { ...choice, sports: ["any"], feel: "auto" }),
     [data, summary, choice],
   );
   const steps = useMemo(() => sessionSteps(pick, data), [pick, data]);
@@ -516,13 +564,8 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
           options={WINDOW_OPTIONS}
           onChange={(available) => setChoice({ available })}
         />
+        <DaySportsField sports={choice.sports} onChange={(sports) => setChoice({ sports })} />
         <div className="flex flex-wrap gap-x-4 gap-y-3">
-          <ChoiceToggle
-            label="Sport"
-            value={choice.sport}
-            options={TODAY_SPORTS}
-            onChange={(sport) => setChoice({ sport })}
-          />
           <ChoiceToggle
             label="Feel"
             value={choice.feel}
@@ -538,7 +581,7 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
                 <span className="font-semibold">{pick.title}</span>
                 {pick.minutes > 0 ? (
                   <span className="font-mono text-sm tabular-nums">
-                    {minutesLabel(pick.minutes + (pick.second?.minutes ?? 0))}
+                    {minutesLabel(pick.parts.reduce((sum, part) => sum + part.minutes, 0))}
                   </span>
                 ) : null}
               </div>
@@ -586,7 +629,16 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
               <Button
                 variant="outline"
                 size="sm"
-                render={<Link to="/week/session" search={choice} />}
+                render={
+                  <Link
+                    to="/week/session"
+                    search={{
+                      available: choice.available,
+                      feel: choice.feel,
+                      sports: choice.sports.join(","),
+                    }}
+                  />
+                }
                 nativeButton={false}
               >
                 View session
@@ -596,7 +648,7 @@ function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setChoice({ sport: "any", feel: "auto" })}
+                onClick={() => setChoice({ sports: ["any"], feel: "auto" })}
               >
                 VO2 would pick {vo2Pick.title} · use it
               </Button>

@@ -106,6 +106,8 @@ export const weekMixSchema = z
       .min(1)
       .max(MAX_SESSIONS_PER_WEEK, { error: `${MAX_SESSIONS_PER_WEEK} sessions a week at most.` }),
     keyShare: z.number().int().min(0).max(100),
+    /** Days a week the athlete is fine doing two sessions, of any sports. */
+    doubleDays: z.number().int().min(0).max(7).default(0),
   })
   .refine((mix) => mix.maxSessions >= mix.minSessions, {
     error: "The busiest week can't have fewer sessions than the quietest.",
@@ -114,7 +116,12 @@ export const weekMixSchema = z
 
 export type WeekMix = z.infer<typeof weekMixSchema>;
 
-export const DEFAULT_WEEK_MIX: WeekMix = { minSessions: 4, maxSessions: 6, keyShare: 20 };
+export const DEFAULT_WEEK_MIX: WeekMix = {
+  minSessions: 4,
+  maxSessions: 6,
+  keyShare: 20,
+  doubleDays: 0,
+};
 
 /** Key sessions come from the low end of the range: they are the sessions that always happen. */
 export function keySessionCount(mix: WeekMix) {

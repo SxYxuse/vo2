@@ -7,12 +7,11 @@ import { loaderQuery, weekTargetQueryOptions } from "@/lib/queries.ts";
 import {
   AVAILABLE_WINDOWS,
   TODAY_FEELS,
-  TODAY_SPORTS,
+  parseDaySports,
   keySessionRecommendation,
   recommendToday,
   summarizeWeek,
   type TodayFeel,
-  type TodaySport,
 } from "@/services/week-target.ts";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +26,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 type SessionSearch = {
   /** Today's choice: shows today's pick for that window, sport, and feel. */
   available?: number;
-  sport?: TodaySport;
+  /** Today's sports in order, comma-separated: "swimming,cycling". */
+  sports?: string;
   feel?: TodayFeel;
   /** A key session id from the week mix. */
   key?: string;
@@ -38,11 +38,12 @@ export const Route = createFileRoute("/_app/week_/session")({
     const available = Number(search.available);
     const key = typeof search.key === "string" && search.key ? search.key : undefined;
     if (key) return { key };
-    const sport = TODAY_SPORTS.find((item) => item.id === search.sport)?.id;
+    const sports =
+      typeof search.sports === "string" ? parseDaySports(search.sports).join(",") : null;
     const feel = TODAY_FEELS.find((item) => item.id === search.feel)?.id;
     return {
       ...(AVAILABLE_WINDOWS.some((window) => window.minutes === available) ? { available } : {}),
-      ...(sport ? { sport } : {}),
+      ...(sports ? { sports } : {}),
       ...(feel ? { feel } : {}),
     };
   },
@@ -55,7 +56,7 @@ export const Route = createFileRoute("/_app/week_/session")({
 
 function SessionPage() {
   const { data } = useSuspenseQuery(weekTargetQueryOptions);
-  const { available, sport, feel, key } = Route.useSearch();
+  const { available, sports, feel, key } = Route.useSearch();
   const plan = data.plan;
   const view = useMemo(() => {
     if (!plan) return null;
@@ -65,11 +66,11 @@ function SessionPage() {
       ? keySessionRecommendation(planned, summary, key)
       : recommendToday(planned, summary, {
           available: available ?? 60,
-          sport: sport ?? "any",
+          sports: parseDaySports(sports),
           feel: feel ?? "auto",
         });
     return pick ? { pick, summary, planned } : null;
-  }, [data, plan, available, sport, feel, key]);
+  }, [data, plan, available, sports, feel, key]);
 
   if (!view) {
     return (

@@ -21,6 +21,7 @@ import {
   usualWeekCurve,
   weeklyTarget,
   type DayTotal,
+  type TodayChoice,
   type WeekActivity,
   type WeekTargetData,
 } from "./week-target.ts";
@@ -34,15 +35,15 @@ const PLAN: TrainingPlan = {
   hoursIntent: "keep",
   // 60% of 5 sessions: 3 key sessions. At fitness 50 in the week of Oct 19 that is
   // 3 × 10 min Z4 (1h 05), 2 × 20 min Z3 (1h 10), and a 2h long Z2: 4h 15, then 2 easy sessions.
-  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 60 },
+  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 60, doubleDays: 0 },
   targetWeeklyHours: 8,
   preferredRestWeekday: 0,
   timeZone: "UTC",
 };
 
 /** Today with no preference: VO2 picks. */
-function auto(available: number) {
-  return { available, sport: "any", feel: "auto" } as const;
+function auto(available: number): TodayChoice {
+  return { available, sports: ["any"], feel: "auto" };
 }
 
 const COLLECTORS = { heartRate: true, power: false, powerPartial: false };
@@ -190,6 +191,8 @@ describe("summarizeWeek", () => {
       // The 60 min ride already filled one easy session.
       done: 1,
       perSession: 165,
+      // 4 training days left, 3 of them for key sessions.
+      singleDaySlots: 1,
     });
   });
 
@@ -333,7 +336,7 @@ describe("parseTrainingPlan", () => {
       buildPace: "slow",
       targetMode: "auto",
       hoursIntent: "keep",
-      weekMix: { minSessions: 4, maxSessions: 6, keyShare: 0 },
+      weekMix: { minSessions: 4, maxSessions: 6, keyShare: 0, doubleDays: 0 },
       targetWeeklyHours: 6,
       preferredRestWeekday: 1,
       timeZone: "Europe/Brussels",
@@ -351,7 +354,7 @@ describe("legacy workout style", () => {
       preferredRestWeekday: 0,
       timeZone: "UTC",
     });
-    expect(plan?.weekMix).toEqual({ minSessions: 4, maxSessions: 6, keyShare: 40 });
+    expect(plan?.weekMix).toEqual({ minSessions: 4, maxSessions: 6, keyShare: 40, doubleDays: 0 });
   });
 });
 
@@ -399,7 +402,7 @@ describe("generateKeySessions", () => {
         targetMinutes: 1200,
         plan: {
           buildPace: "steady",
-          weekMix: { minSessions: sessions, maxSessions: sessions, keyShare },
+          weekMix: { minSessions: sessions, maxSessions: sessions, keyShare, doubleDays: 0 },
         },
       }).length;
     expect(count(5, 20)).toBe(1);
@@ -412,7 +415,7 @@ describe("generateKeySessions", () => {
   it("always leads with the build pace's main session and rotates the rest weekly", () => {
     const plan = {
       buildPace: "fast" as const,
-      weekMix: { minSessions: 4, maxSessions: 4, keyShare: 50 },
+      weekMix: { minSessions: 4, maxSessions: 4, keyShare: 50, doubleDays: 0 },
     };
     const names = (weekStart: string) =>
       generateKeySessions({ ...base, plan, weekStart }).map((session) =>
@@ -425,7 +428,7 @@ describe("generateKeySessions", () => {
   it("sizes sessions by fitness", () => {
     const plan = {
       buildPace: "steady" as const,
-      weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20 },
+      weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20, doubleDays: 0 },
     };
     const [low] = generateKeySessions({ ...base, plan, ctl: 20 });
     const [high] = generateKeySessions({ ...base, plan, ctl: 80 });
@@ -437,7 +440,10 @@ describe("generateKeySessions", () => {
     const sessions = generateKeySessions({
       ...base,
       targetMinutes: 180,
-      plan: { buildPace: "steady", weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100 } },
+      plan: {
+        buildPace: "steady",
+        weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100, doubleDays: 0 },
+      },
     });
     expect(sessions.map((session) => session.kind)).not.toContain("long");
     expect(sessions.length).toBe(1);
@@ -449,7 +455,7 @@ describe("today's choice", () => {
     const data = week();
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 90,
-      sport: "any",
+      sports: ["any"],
       feel: "easy",
     });
     expect(pick.kind).toBe("easy");
@@ -470,7 +476,7 @@ describe("today's choice", () => {
     });
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 90,
-      sport: "any",
+      sports: ["any"],
       feel: "hard",
     });
     expect(pick.kind).toBe("key");
@@ -482,7 +488,7 @@ describe("today's choice", () => {
     const data = week();
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 45,
-      sport: "any",
+      sports: ["any"],
       feel: "hard",
     });
     expect(pick.keySession?.reps).toBe(1);
@@ -491,11 +497,11 @@ describe("today's choice", () => {
 
   it("builds an extra key session when the mix has none left", () => {
     const data = week({
-      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0 } },
+      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0, doubleDays: 0 } },
     });
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 90,
-      sport: "any",
+      sports: ["any"],
       feel: "hard",
     });
     expect(pick.kind).toBe("key");
@@ -506,27 +512,98 @@ describe("today's choice", () => {
     const data = week();
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 180,
-      sport: "running",
+      sports: ["running"],
       feel: "auto",
     });
     expect(pick.family).toBe("running");
   });
 
-  it("splits a run + ride day into a run then an easy ride", () => {
+  it("splits a run + ride day by sport, the ride taking the larger share", () => {
     const data = week({
-      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0 } },
+      plan: { ...PLAN, weekMix: { minSessions: 5, maxSessions: 5, keyShare: 0, doubleDays: 1 } },
     });
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 120,
-      sport: "both",
+      sports: ["running", "cycling"],
       feel: "auto",
     });
-    // The easy session is about 1h 35 (8h over 5 sessions): a 35 min run, then the rest on the bike.
-    expect(pick).toMatchObject({ family: "running", minutes: 35 });
-    expect(pick.second).toEqual({ family: "cycling", minutes: 60 });
+    // Two easy sessions of about 1h 35 would be 3h 10; the 2h window caps it, 1 : 1.5.
+    expect(pick.parts).toEqual([
+      { sport: "running", minutes: 50, main: true },
+      { sport: "cycling", minutes: 70, main: false },
+    ]);
     expect(pick.title).toBe("Easy run + easy ride");
+    expect(pick.reasons).toContain("Double day · 1 of 1 left this week.");
     const steps = sessionSteps(pick, data);
-    expect(steps.at(-1)).toMatchObject({ label: "Easy ride", minutes: 60, family: "cycling" });
+    expect(steps.at(-1)).toMatchObject({ label: "Ride · Easy", minutes: 70, sport: "cycling" });
+  });
+
+  it("puts the key session on the ride when a swim comes first", () => {
+    const data = week();
+    const pick = recommendToday(data, summarizeWeek(data), {
+      available: 120,
+      sports: ["swimming", "cycling"],
+      feel: "hard",
+    });
+    expect(pick.parts.map((part) => [part.sport, part.main])).toEqual([
+      ["swimming", false],
+      ["cycling", true],
+    ]);
+    expect(pick.title).toBe("Easy swim + 3 × 10 min Z4");
+    expect(pick.description).toMatch(
+      /^.+easy swim: Long, relaxed strokes.+ Then 15 min easy\. 3 × 10 min in Z4/,
+    );
+  });
+
+  it("keeps a strength-only day easy, and says hard needs a ride or a run", () => {
+    const data = week();
+    const pick = recommendToday(data, summarizeWeek(data), {
+      available: 60,
+      sports: ["strength"],
+      feel: "hard",
+    });
+    expect(pick).toMatchObject({ kind: "easy", family: "strength", title: "Strength session" });
+    expect(pick.warnings).toContain("Key sessions are rides or runs. Add one to today to go hard.");
+  });
+});
+
+describe("double days", () => {
+  const plan = {
+    ...PLAN,
+    weekMix: { minSessions: 1, maxSessions: 9, keyShare: 0, doubleDays: 2 },
+  };
+
+  it("counts any two sessions on one date as a double day", () => {
+    const summary = summarizeWeek(
+      week({
+        plan,
+        activities: [
+          activity({ id: "swim", sportType: "Swim", family: "other", minutes: 40 }),
+          activity({ id: "ride", minutes: 60 }),
+        ],
+      }),
+    );
+    expect(summary.doubles).toEqual({ allowed: 2, used: 1, left: 1 });
+  });
+
+  it("plans extra easy sessions on double days and suggests a second sport", () => {
+    // Saturday, Sunday rest: one training day, two double days allowed.
+    const data = week({ plan, today: "2026-10-24" });
+    const summary = summarizeWeek(data);
+    expect(summary.easy).toMatchObject({ planned: 2, singleDaySlots: 1 });
+    const pick = recommendToday(data, summary, auto(90));
+    expect(pick.reasons).toContain("2 easy sessions left for 1 day: add a second sport today.");
+  });
+
+  it("warns, without refusing, when a second session goes past the allowed doubles", () => {
+    const noDoubles = { ...plan, weekMix: { ...plan.weekMix, doubleDays: 0 } };
+    const data = week({
+      plan: noDoubles,
+      activities: [activity({ date: WEDNESDAY, minutes: 45 })],
+    });
+    const pick = recommendToday(data, summarizeWeek(data), auto(60));
+    expect(pick.minutes).toBeGreaterThan(0);
+    expect(pick.warnings).toContain("Your week mix has no double days; this one is extra.");
   });
 });
 
@@ -570,13 +647,16 @@ describe("re-planning from what was logged", () => {
 
 describe("session range", () => {
   it("takes key sessions from the low end and gives the rest of the range to easy", () => {
-    const mix = { minSessions: 4, maxSessions: 7, keyShare: 25 };
+    const mix = { minSessions: 4, maxSessions: 7, keyShare: 25, doubleDays: 0 };
     expect(keySessionCount(mix)).toBe(1);
     expect(easySessionRange(mix)).toEqual({ min: 3, max: 6 });
   });
 
   it("plans more easy sessions early in the week and settles lower as days run out", () => {
-    const plan = { ...PLAN, weekMix: { minSessions: 4, maxSessions: 7, keyShare: 25 } };
+    const plan = {
+      ...PLAN,
+      weekMix: { minSessions: 4, maxSessions: 7, keyShare: 25, doubleDays: 0 },
+    };
     const monday = summarizeWeek(week({ plan, today: WEEK_START }));
     // 6 training days (Sunday rest), one taken by the key session: 5 easy, within 3–6.
     expect(monday.easy).toMatchObject({ min: 3, max: 6, planned: 5, done: 0 });
@@ -601,7 +681,10 @@ describe("session range", () => {
   });
 
   it("turns a saved single count into a range of one", () => {
-    const plan = parseTrainingPlan({ ...PLAN, weekMix: { sessions: 6, keyShare: 30 } });
-    expect(plan?.weekMix).toEqual({ minSessions: 6, maxSessions: 6, keyShare: 30 });
+    const plan = parseTrainingPlan({
+      ...PLAN,
+      weekMix: { sessions: 6, keyShare: 30, doubleDays: 0 },
+    });
+    expect(plan?.weekMix).toEqual({ minSessions: 6, maxSessions: 6, keyShare: 30, doubleDays: 0 });
   });
 });
