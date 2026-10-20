@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { CalendarDaysIcon, CheckIcon, ChevronLeftIcon } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import {
   activityMapQueryOptions,
@@ -16,23 +16,25 @@ import {
   syncStatusQueryOptions,
 } from "@/lib/queries.ts";
 import {
+  SPORTS_FIELDS,
   TRAINING_PACE_FIELDS,
   TRAINING_WEEK_FIELDS,
-  trainingFormDefaults,
-  trainingFormSchema,
+  onboardingFormDefaults,
+  onboardingFormSchema,
   trainingFromForm,
-  type TrainingFormInput,
-  type TrainingFormValues,
+  type OnboardingFormInput,
+  type OnboardingFormValues,
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { saveAppSettings } from "@/services/app-settings.ts";
+import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
-import { DEFAULT_SPORT_GROUP_SHARES, mergeSportGroupShares } from "@/services/sport-groups.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
+import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { TrainingPaceFields, TrainingWeekFields } from "@/components/settings-fields.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,12 @@ const STEPS = [
     id: "sync",
     title: "Copy from Strava",
     description: "Copy your activities first so your plan starts from real training.",
+  },
+  {
+    id: "sports",
+    title: "Your sports",
+    description:
+      "Choose what shows in your calendar, map, and heart rate, and the gear you train with.",
   },
   {
     id: "pace",
@@ -96,17 +104,27 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const defaults = useMemo(
-    () => trainingFormDefaults(data.training, avgHours, timeZone),
-    [data.training, avgHours, timeZone],
+    () =>
+      onboardingFormDefaults({
+        training: data.training,
+        sportTypes: data.settings.sportTypes,
+        sportGroupShares: data.settings.sportGroupShares,
+        avgHours,
+        timeZone,
+      }),
+    [data.training, data.settings, avgHours, timeZone],
   );
-  const form = useForm<TrainingFormInput, unknown, TrainingFormValues>({
-    resolver: zodResolver(trainingFormSchema),
+  const form = useForm<OnboardingFormInput, unknown, OnboardingFormValues>({
+    resolver: zodResolver(onboardingFormSchema),
     defaultValues: defaults,
     mode: "onSubmit",
     reValidateMode: "onChange",
   });
 
   const step = STEPS[stepIndex];
+  const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
+  const hasSportTypes = Object.keys(sportTypes).length > 0;
+  const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
     useQuery(syncStatusQueryOptions);
   const sync = useStravaSync({ quiet: true });
@@ -164,6 +182,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
       setStepIndex((current) => current + 1);
       return;
     }
+    if (step.id === "sports") {
+      const ok = await form.trigger([...SPORTS_FIELDS]);
+      if (!ok) return;
+      setStepIndex((current) => current + 1);
+      return;
+    }
     if (step.id === "pace") {
       const ok = await form.trigger([...TRAINING_PACE_FIELDS]);
       if (!ok) return;
@@ -171,16 +195,18 @@ export function OnboardingForm({ userName }: { userName: string }) {
       return;
     }
     if (step.id !== "week") return;
-    const ok = await form.trigger([...TRAINING_PACE_FIELDS, ...TRAINING_WEEK_FIELDS]);
+    const ok = await form.trigger([
+      ...SPORTS_FIELDS,
+      ...TRAINING_PACE_FIELDS,
+      ...TRAINING_WEEK_FIELDS,
+    ]);
     if (!ok) return;
     await form.handleSubmit((values) => {
       save.mutate({
         data: {
           profile: data.profile,
-          sportTypes: data.settings.sportTypes,
-          sportGroupShares: mergeSportGroupShares(
-            data.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES,
-          ),
+          sportTypes: values.sportTypes,
+          sportGroupShares: values.sportGroupShares,
           training: trainingFromForm(values),
         },
       });
@@ -257,6 +283,18 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 onSync={() => sync.mutate()}
               />
             )
+          ) : step.id === "sports" ? (
+            <>
+              <SportTypesFields idPrefix="onboard" control={form.control} />
+              {hidesEverySport ? (
+                <p className="text-destructive text-sm">{SHOW_ONE_SPORT_MESSAGE}</p>
+              ) : hasSportTypes ? (
+                <p className="text-muted-foreground text-sm">
+                  More sports appear here as your history finishes copying. Change them anytime in
+                  Settings.
+                </p>
+              ) : null}
+            </>
           ) : step.id === "pace" ? (
             <TrainingPaceFields
               idPrefix="onboard"
@@ -319,7 +357,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
             ) : null}
             <Button
               type="submit"
-              disabled={save.isPending || (step.id === "sync" && !syncStep.canContinue)}
+              disabled={
+                save.isPending ||
+                (step.id === "sync" && !syncStep.canContinue) ||
+                (step.id === "sports" && hidesEverySport)
+              }
             >
               {save.isPending ? <Spinner data-icon="inline-start" /> : null}
               {step.id === "week" ? "Finish" : "Continue"}

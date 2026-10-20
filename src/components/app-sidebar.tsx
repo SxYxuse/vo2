@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -9,29 +9,17 @@ import {
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
-  MonitorIcon,
-  MoonIcon,
   Settings2Icon,
-  SunIcon,
   TrendingUpIcon,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
+import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Field, FieldLabel } from "@/components/ui/field";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,12 +43,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-const THEME_OPTIONS = [
-  { value: "light", label: "Light", icon: SunIcon },
-  { value: "dark", label: "Dark", icon: MoonIcon },
-  { value: "system", label: "System", icon: MonitorIcon },
-] as const;
 
 const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
@@ -221,6 +203,7 @@ export function AppSidebar() {
             <Settings2Icon />
           </SidebarMenuButton>
         )}
+        <SidebarThemeButton />
         <div className="ml-auto group-data-[collapsible=icon]:ml-0">
           <SidebarUserMenu />
         </div>
@@ -230,37 +213,35 @@ export function AppSidebar() {
   );
 }
 
+function SidebarThemeButton() {
+  const { mounted, current, next, toggle } = useThemeToggle();
+  const label = mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme";
+
+  return (
+    <SidebarMenuButton
+      tooltip={label}
+      aria-label={label}
+      className="w-auto"
+      disabled={!mounted}
+      onClick={toggle}
+    >
+      {mounted ? <current.icon /> : <span aria-hidden className="size-4" />}
+    </SidebarMenuButton>
+  );
+}
+
 function SidebarUserMenu() {
   const signOut = useSignOut();
   const { isMobile } = useSidebar();
-  const { theme, setTheme } = useTheme();
   const { data: session, isPending } = authClient.useSession();
-  const [mounted, setMounted] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
   const user = session?.user;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const initials = user?.name?.charAt(0).toUpperCase() || "V";
-  const currentTheme = mounted ? (theme ?? "system") : "system";
-  const currentOption =
-    THEME_OPTIONS.find((option) => option.value === currentTheme) ?? THEME_OPTIONS[2];
 
   return (
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <DropdownMenu
-            modal={false}
-            open={menuOpen}
-            onOpenChange={(open) => {
-              if (!open && themeOpen) return;
-              setMenuOpen(open);
-            }}
-          >
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger
               render={
                 <SidebarMenuButton
@@ -288,40 +269,6 @@ function SidebarUserMenu() {
             >
               <DropdownMenuGroup>
                 <DropdownMenuLabel>{user?.name ?? "Account"}</DropdownMenuLabel>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <div className="px-2 py-1.5" onPointerDown={(event) => event.stopPropagation()}>
-                  <Field orientation="horizontal">
-                    <FieldLabel htmlFor="sidebar-theme">Theme</FieldLabel>
-                    <Select
-                      value={currentTheme}
-                      open={themeOpen}
-                      onOpenChange={setThemeOpen}
-                      onValueChange={(next) => {
-                        if (next == null) return;
-                        setTheme(String(next));
-                      }}
-                    >
-                      <SelectTrigger id="sidebar-theme" size="sm" className="ml-auto w-28">
-                        <SelectValue>
-                          <currentOption.icon />
-                          {currentOption.label}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false} align="end" side="top">
-                        <SelectGroup>
-                          {THEME_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              <option.icon />
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                </div>
               </DropdownMenuGroup>
               {user ? (
                 <>

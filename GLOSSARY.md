@@ -30,6 +30,10 @@ _Avoid_: Sport, discipline
 A display grouping of related sport types: cycling, running, swimming, or walking.
 _Avoid_: Sport family (that term is reserved for planning)
 
+**Hidden sport type**:
+A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views.
+_Avoid_: Disabled sport, filtered sport, sport selection
+
 **Pace**:
 Time to cover a fixed distance. Running and walking use minutes per kilometre; swimming uses minutes per 100 metres.
 _Avoid_: Speed, build pace
