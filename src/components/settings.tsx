@@ -192,7 +192,11 @@ export function SettingsForm({
               {sectionLabel}
             </h1>
             {section === "sync" ? null : (
-              <Button type="submit" className="shrink-0" disabled={!data || save.isPending}>
+              <Button
+                type="submit"
+                className="shrink-0"
+                disabled={!data || !isDirty || save.isPending}
+              >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
                 Save
               </Button>
