@@ -9,6 +9,7 @@ import {
   isTransientSyncError,
   remainingSyncBudgetMs,
   stopsAfterNewestPage,
+  storedPauseResult,
   SYNC_REQUEST_BUDGET_MS,
 } from "./strava-sync.types.ts";
 
@@ -147,5 +148,43 @@ describe("autoResumePlan", () => {
     expect(autoResumePlan({ status: "complete", pausedUntil: null }, now)).toEqual({
       kind: "idle",
     });
+  });
+});
+
+describe("storedPauseResult", () => {
+  const now = Date.parse("2026-10-20T10:00:00Z");
+  const run = {
+    status: "paused",
+    pausedUntil: new Date("2026-10-20T10:15:00Z"),
+    lastError: "Strava 15-minute read rate limit reached",
+    shortLimitRemaining: 3,
+    dailyLimitRemaining: 640,
+  };
+
+  it("answers from a pause still in force", () => {
+    expect(storedPauseResult(run, 12, now)).toEqual({
+      activitiesUpserted: 0,
+      streamsFetched: 0,
+      streamsPending: 12,
+      historyComplete: false,
+      done: false,
+      pausedUntil: "2026-10-20T10:15:00.000Z",
+      lastError: "Strava 15-minute read rate limit reached",
+      alreadyRunning: false,
+      rateLimit: {
+        shortRemaining: 3,
+        dailyRemaining: 640,
+        nextWindowAt: "2026-10-20T10:15:00.000Z",
+      },
+    });
+  });
+
+  it("lets the sync run once the pause has passed", () => {
+    expect(storedPauseResult(run, 12, Date.parse("2026-10-20T10:15:00Z"))).toBeNull();
+  });
+
+  it("lets the sync run without a stored pause or run", () => {
+    expect(storedPauseResult({ ...run, pausedUntil: null }, 12, now)).toBeNull();
+    expect(storedPauseResult(null, 0, now)).toBeNull();
   });
 });

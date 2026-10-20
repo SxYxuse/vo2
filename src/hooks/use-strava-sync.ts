@@ -45,7 +45,8 @@ function quietToast(onOnboarding: () => boolean): SyncToast {
   return {
     add: () => "",
     update: (_toastId, options) => {
-      if (options.type === "loading" || onOnboarding()) return;
+      // "info" is the copy already running elsewhere; a quiet resume has nothing to add to it.
+      if (options.type === "loading" || options.type === "info" || onOnboarding()) return;
       toast.add(options);
     },
   };
@@ -58,6 +59,15 @@ function finishSyncToast(
   activitiesUpserted: number,
   streamsFetched: number,
 ) {
+  if (result.alreadyRunning) {
+    notify.update(toastId, {
+      type: "info",
+      title: "Strava sync already running",
+      description: "Another device or tab is already copying from Strava.",
+      timeout: 8000,
+    });
+    return;
+  }
   if (result.done) {
     notify.update(toastId, {
       type: "success",
@@ -139,7 +149,7 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
             queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
             router.invalidate(),
           ]);
-          if (result.done || result.pausedUntil || result.lastError) {
+          if (result.alreadyRunning || result.done || result.pausedUntil || result.lastError) {
             finishSyncToast(notify, toastId, result, activitiesUpserted, streamsFetched);
             return result;
           }
