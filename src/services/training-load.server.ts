@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
+import { ageFromBirthDate } from "./app-settings.types.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import {
   activityTrainingLoad,
@@ -115,7 +116,14 @@ async function refreshTrainingLoads(userId: string) {
   if (!rows.length) return;
 
   const withStreams = await attachPowerStreams(rows);
-  const anchors = estimateLoadAnchors(withStreams);
+  const [profile] = await db
+    .select({ birthDate: athleteMetrics.birthDate })
+    .from(athleteMetrics)
+    .where(eq(athleteMetrics.userId, userId))
+    .limit(1);
+  const anchors = estimateLoadAnchors(withStreams, {
+    age: ageFromBirthDate(profile?.birthDate ?? null),
+  });
   const stored = persistableAnchors(anchors);
   await db
     .insert(athleteMetrics)

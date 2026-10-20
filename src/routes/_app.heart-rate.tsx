@@ -34,7 +34,7 @@ function HeartRatePage() {
           Heart rate
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Max heart rate, estimated zones, and time in zone — overall and per sport.
+          Max heart rate, zones, time in zone, and aerobic efficiency — overall and per sport.
         </p>
       </div>
       {data.signedIn ? (
@@ -68,7 +68,7 @@ function HeartRatePending() {
           Heart rate
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Max heart rate, estimated zones, and time in zone — overall and per sport.
+          Max heart rate, zones, time in zone, and aerobic efficiency — overall and per sport.
         </p>
       </div>
       <Skeleton className="h-80 w-full rounded-xl" />

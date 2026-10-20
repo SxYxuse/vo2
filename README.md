@@ -31,10 +31,10 @@ cp .env.example .env
 vp dlx @better-auth/cli secret
 ```
 
-3. Apply the schema, then start the app:
+3. Apply the migrations, then start the app:
 
 ```bash
-vp run db:push
+vp run db:migrate
 vp run dev
 ```
 
@@ -80,10 +80,12 @@ vp run generate:strava-sdk
 
 ## Scripts
 
-| Script                       | Purpose                      |
-| ---------------------------- | ---------------------------- |
-| `vp run dev`                 | Vite+ dev server             |
-| `vp run db:up`               | Start local Postgres         |
-| `vp run db:push`             | Push Drizzle schema          |
-| `vp run db:studio`           | Drizzle Studio               |
-| `vp run generate:strava-sdk` | Refresh Strava OpenAPI types |
+| Script                       | Purpose                                          |
+| ---------------------------- | ------------------------------------------------ |
+| `vp run dev`                 | Vite+ dev server                                 |
+| `vp run db:up`               | Start local Postgres                             |
+| `vp run db:generate`         | Generate a migration from `src/db/schema.ts`     |
+| `vp run db:migrate`          | Apply pending migrations                         |
+| `vp run db:check`            | Fail if the schema has changes with no migration |
+| `vp run db:studio`           | Drizzle Studio                                   |
+| `vp run generate:strava-sdk` | Refresh Strava OpenAPI types                     |

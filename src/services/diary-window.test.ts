@@ -1,71 +1,51 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
-  diaryWindow,
-  parseDiaryWeekSearch,
-  resolveDiaryCursorWeek,
-  stepDiaryWeek,
+  formatDiaryMonth,
+  monthKey,
+  parseDiaryMonthSearch,
+  resolveDiaryCursorMonth,
+  stepDiaryMonth,
 } from "./diary-window.ts";
 
-describe("diaryWindow", () => {
-  it("shows the cursor training week and the three before it for four weeks", () => {
-    expect(diaryWindow("2026-10-12", 4)).toEqual({
-      start: "2026-09-21",
-      end: "2026-10-18",
-      days: 28,
-    });
-  });
-
-  it("keeps four full weeks at the start of a month", () => {
-    expect(diaryWindow("2026-09-28", 4)).toMatchObject({
-      start: "2026-09-07",
-      end: "2026-10-04",
-    });
-  });
-
-  it("shows only the cursor training week for one week", () => {
-    expect(diaryWindow("2026-10-12", 1)).toEqual({
-      start: "2026-10-12",
-      end: "2026-10-18",
-      days: 7,
-    });
+describe("monthKey", () => {
+  it("uses the athlete's timezone, not UTC", () => {
+    const lateOnTheLast = new Date("2026-09-30T23:30:00Z");
+    expect(monthKey(lateOnTheLast, "UTC")).toBe("2026-09");
+    expect(monthKey(lateOnTheLast, "Europe/Brussels")).toBe("2026-10");
   });
 });
 
-describe("stepDiaryWeek", () => {
-  it("moves one training week back", () => {
-    expect(stepDiaryWeek("2026-10-12", -1, "2026-10-12")).toBe("2026-10-05");
+describe("stepDiaryMonth", () => {
+  it("moves one month across year boundaries", () => {
+    expect(stepDiaryMonth("2026-01", -1, "2026-10")).toBe("2025-12");
+    expect(stepDiaryMonth("2025-12", 1, "2026-10")).toBe("2026-01");
   });
 
-  it("moves forward toward the current training week", () => {
-    expect(stepDiaryWeek("2026-09-28", 1, "2026-10-12")).toBe("2026-10-05");
-  });
-
-  it("never walks past the current training week", () => {
-    expect(stepDiaryWeek("2026-10-12", 1, "2026-10-12")).toBe("2026-10-12");
+  it("never moves past the current month", () => {
+    expect(stepDiaryMonth("2026-10", 1, "2026-10")).toBe("2026-10");
   });
 });
 
-describe("parseDiaryWeekSearch", () => {
-  it("accepts a Monday day key", () => {
-    expect(parseDiaryWeekSearch("2026-08-17")).toBe("2026-08-17");
-  });
-
-  it("rejects non-Mondays, impossible dates, and non-strings", () => {
-    expect(parseDiaryWeekSearch("2026-08-18")).toBeUndefined();
-    expect(parseDiaryWeekSearch("2026-02-30")).toBeUndefined();
-    expect(parseDiaryWeekSearch("2026-13-40")).toBeUndefined();
-    expect(parseDiaryWeekSearch(20260817)).toBeUndefined();
+describe("parseDiaryMonthSearch", () => {
+  it("accepts YYYY-MM only", () => {
+    expect(parseDiaryMonthSearch("2026-09")).toBe("2026-09");
+    expect(parseDiaryMonthSearch("2026-13")).toBeUndefined();
+    expect(parseDiaryMonthSearch("2026-09-01")).toBeUndefined();
+    expect(parseDiaryMonthSearch(202609)).toBeUndefined();
   });
 });
 
-describe("resolveDiaryCursorWeek", () => {
-  it("keeps a past week from the URL", () => {
-    expect(resolveDiaryCursorWeek("2026-08-17", "2026-10-12")).toBe("2026-08-17");
+describe("resolveDiaryCursorMonth", () => {
+  it("falls back to the current month for a missing or future month", () => {
+    expect(resolveDiaryCursorMonth(undefined, "2026-10")).toBe("2026-10");
+    expect(resolveDiaryCursorMonth("2026-12", "2026-10")).toBe("2026-10");
+    expect(resolveDiaryCursorMonth("2026-08", "2026-10")).toBe("2026-08");
   });
+});
 
-  it("falls back to the current training week when missing or in the future", () => {
-    expect(resolveDiaryCursorWeek(undefined, "2026-10-12")).toBe("2026-10-12");
-    expect(resolveDiaryCursorWeek("2026-10-19", "2026-10-12")).toBe("2026-10-12");
+describe("formatDiaryMonth", () => {
+  it("names the month and year", () => {
+    expect(formatDiaryMonth("2026-10")).toBe("October 2026");
   });
 });

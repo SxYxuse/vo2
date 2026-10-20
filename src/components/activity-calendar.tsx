@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { cn } from "cn";
 import { ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
@@ -22,8 +22,12 @@ import {
   formatDuration,
 } from "@/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
-import { weekStartKey } from "@/services/training-plan.ts";
-import { diaryWindow, resolveDiaryCursorWeek, stepDiaryWeek } from "@/services/diary-window.ts";
+import {
+  formatDiaryMonth,
+  monthKey,
+  resolveDiaryCursorMonth,
+  stepDiaryMonth,
+} from "@/services/diary-window.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -55,10 +59,8 @@ import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DISABLED_INTERACTIONS = { drag: false, resize: false, selectSlot: false } as const;
-const DIARY_VIEWS: CalendarView[] = ["days"];
+const DIARY_VIEWS: CalendarView[] = ["month"];
 const MONDAY = 1;
-const DESKTOP_WEEKS = 4;
-const MOBILE_WEEKS = 1;
 
 function MissingHeartrateMark() {
   return (
@@ -185,14 +187,15 @@ function VisibleActivitiesPrefetch({ activities }: { activities: CalendarActivit
   return null;
 }
 
-/** Vertical day list: ReUI agenda rows plus rest days, for phone widths. */
-function ActivityWeekListView() {
+/** Vertical day list of the month: ReUI agenda rows plus rest days, for phone widths. */
+function ActivityDayListView() {
   const todayRef = useRef<HTMLDivElement | null>(null);
   const instance = useEventCalendar();
   const settings = useEventCalendarSettings();
   const viewConfig = useEventCalendarViewConfig();
+  // The active range is the month itself; the visible range pads it to whole weeks.
   const visibleRange = useEventCalendarSelector<unknown, EventCalendarDateRange>(
-    (state) => state.visibleRange,
+    (state) => state.activeRange,
     {
       isEqual: (a, b) => getRangeKey(a) === getRangeKey(b),
     },
@@ -289,24 +292,14 @@ function dayKeyDate(key: string, timeZone: string) {
   return new TZDate(year, month - 1, day, timeZone);
 }
 
-function formatDiaryRange(start: string, end: string) {
-  const from = parseISO(`${start}T12:00:00`);
-  const to = parseISO(`${end}T12:00:00`);
-  const sameYear = from.getFullYear() === to.getFullYear();
-  const sameMonth = sameYear && from.getMonth() === to.getMonth();
-  const left = format(from, sameYear ? "MMM d" : "MMM d, yyyy");
-  const right = format(to, sameMonth ? "d, yyyy" : "MMM d, yyyy");
-  return `${left} – ${right}`;
-}
-
 function DiaryNav({
-  range,
-  atCurrentWeek,
+  label,
+  atCurrentMonth,
   onStep,
   onToday,
 }: {
-  range: string;
-  atCurrentWeek: boolean;
+  label: string;
+  atCurrentMonth: boolean;
   onStep: (direction: 1 | -1) => void;
   onToday: () => void;
 }) {
@@ -319,7 +312,7 @@ function DiaryNav({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Previous week"
+          aria-label="Previous month"
           onClick={() => onStep(-1)}
         >
           <ChevronLeftIcon aria-hidden />
@@ -327,15 +320,15 @@ function DiaryNav({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Next week"
-          disabled={atCurrentWeek}
+          aria-label="Next month"
+          disabled={atCurrentMonth}
           onClick={() => onStep(1)}
         >
           <ChevronRightIcon aria-hidden />
         </Button>
       </div>
       <div aria-live="polite" className="ms-3 min-w-0 truncate text-sm font-semibold">
-        {range}
+        {label}
       </div>
     </div>
   );
@@ -344,13 +337,13 @@ function DiaryNav({
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
   initialSettings: CalendarSettings;
-  initialWeek?: string;
+  initialMonth?: string;
 };
 
 export function ActivityCalendar({
   activities,
   initialSettings,
-  initialWeek,
+  initialMonth,
 }: ActivityCalendarProps) {
   const sportTypes = useMemo(
     () =>
@@ -367,15 +360,14 @@ export function ActivityCalendar({
   const navigate = useNavigate();
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
-  const cursorWeek = resolveDiaryCursorWeek(initialWeek, currentWeek);
-  const diary = diaryWindow(cursorWeek, isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS);
-  const anchor = useMemo(() => dayKeyDate(diary.start, timeZone), [diary.start, timeZone]);
-  // The current week stays out of the URL so a bare "/" keeps following today.
-  const showWeek = (week: string) =>
+  const currentMonth = useMemo(() => monthKey(new Date(), timeZone), [timeZone]);
+  const cursorMonth = resolveDiaryCursorMonth(initialMonth, currentMonth);
+  const anchor = useMemo(() => dayKeyDate(`${cursorMonth}-01`, timeZone), [cursorMonth, timeZone]);
+  // The current month stays out of the URL so a bare "/" keeps following today.
+  const showMonth = (month: string) =>
     void navigate({
       to: "/",
-      search: (previous) => ({ ...previous, week: week < currentWeek ? week : undefined }),
+      search: (previous) => ({ ...previous, month: month < currentMonth ? month : undefined }),
       replace: true,
     });
 
@@ -388,9 +380,14 @@ export function ActivityCalendar({
     });
   }, [activities, queryClient]);
 
+  // The month view still lays bars across its padded weeks, even with outside days hidden.
   const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
     return activities
-      .filter((activity) => sportTypes[activity.sportType]?.visible !== false)
+      .filter(
+        (activity) =>
+          sportTypes[activity.sportType]?.visible !== false &&
+          monthKey(new Date(activity.start), timeZone) === cursorMonth,
+      )
       .map((activity) => {
         const dayStart = zonedStartOfDay(new Date(activity.start), timeZone);
         return {
@@ -406,7 +403,7 @@ export function ActivityCalendar({
           data: activity,
         };
       });
-  }, [activities, sportTypes, timeZone]);
+  }, [activities, sportTypes, timeZone, cursorMonth]);
 
   return (
     <Card className="flex h-[calc(100dvh-7.5rem)] min-h-80 flex-none flex-col py-0 md:h-[720px]">
@@ -414,11 +411,12 @@ export function ActivityCalendar({
         {layoutReady ? (
           <EventCalendar
             events={events}
-            view="days"
-            defaultView="days"
+            view="month"
+            defaultView="month"
             views={DIARY_VIEWS}
             date={anchor}
-            dayCount={diary.days}
+            fixedWeeks={false}
+            showOutsideDays={false}
             locale={enUS}
             timeZone={timeZone}
             i18n={{
@@ -441,7 +439,7 @@ export function ActivityCalendar({
               void navigate({
                 to: "/activities/$activityId",
                 params: { activityId },
-                search: { week: cursorWeek },
+                search: { month: cursorMonth },
               });
             }}
             onPointerOver={(event) => {
@@ -462,14 +460,16 @@ export function ActivityCalendar({
           >
             <VisibleActivitiesPrefetch activities={activities} />
             <DiaryNav
-              range={formatDiaryRange(diary.start, diary.end)}
-              atCurrentWeek={cursorWeek >= currentWeek}
-              onStep={(direction) => showWeek(stepDiaryWeek(cursorWeek, direction, currentWeek))}
-              onToday={() => showWeek(currentWeek)}
+              label={formatDiaryMonth(cursorMonth)}
+              atCurrentMonth={cursorMonth >= currentMonth}
+              onStep={(direction) =>
+                showMonth(stepDiaryMonth(cursorMonth, direction, currentMonth))
+              }
+              onToday={() => showMonth(currentMonth)}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <EventCalendarContent
-                components={{ days: isDesktop ? EventCalendarMonthView : ActivityWeekListView }}
+                components={{ month: isDesktop ? EventCalendarMonthView : ActivityDayListView }}
               />
             </div>
           </EventCalendar>

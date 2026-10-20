@@ -129,8 +129,20 @@ The heart rate used as the floor of heart-rate reserve when scoring training loa
 _Avoid_: RHR as a second term, using 60 for everyone when an estimate exists
 
 **Max heart rate**:
-The highest heart rate used as a zone anchor when a sport has no LTHR model.
-_Avoid_: HRmax as a second term, peak HR as a second term
+The highest heart rate used as a zone anchor when a sport has no LTHR model. It is the sport's highest recent peak with sensor spikes dropped, checked against the athlete's age.
+_Avoid_: HRmax as a second term, peak HR as a second term, all-time max
+
+**Efficiency factor**:
+Output per heartbeat on an aerobic session: normalized power ÷ average heart rate on a metered ride, speed ÷ average heart rate on a flat run. Rising efficiency means more work for the same heart rate.
+_Avoid_: EF used alone, aerobic efficiency score, fitness (that is training load)
+
+**Aerobic decoupling**:
+How much output per heartbeat fell from the first to the second half of a steady session after warm-up. Under 5 % means heart rate held steady against output.
+_Avoid_: Cardiac drift (that is heart rate alone), Pa:HR, Pw:HR
+
+**Usual heart rate**:
+The average heart rate the athlete's recent aerobic sessions needed for a given output. An activity is "higher than usual" when it ran 5 bpm or more above it.
+_Avoid_: Expected HR, baseline HR, resting heart rate
 
 **Heart-rate zone**:
 One of five effort bands from recovery through VO2 max. Cycling, running, and swimming cut zones from that sport's LTHR; walking and other sports cut from max heart rate.

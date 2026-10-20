@@ -15,6 +15,7 @@ import {
 } from "./calendar-settings.types.ts";
 import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
 import { toFitnessLoad, type FitnessLoad } from "./training-load.ts";
+import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";
 
@@ -95,12 +96,13 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
   training: TrainingPlan | null;
 }> {
   const session = await getRequiredSession();
-  const [stored, sportTypeRows] = await Promise.all([
+  const [stored, sportTypeRows, previousProfile] = await Promise.all([
     getCalendarSettingsForUser(session.user.id),
     db
       .select({ sportType: activities.sportType })
       .from(activities)
       .where(eq(activities.userId, session.user.id)),
+    getProfileSettingsForUser(session.user.id),
   ]);
   const settings = mergeCalendarSettings(
     {
@@ -153,6 +155,11 @@ export async function saveAppSettingsImpl(value: AppSettingsSave): Promise<{
         },
       }),
   ]);
+
+  // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load.
+  if (previousProfile.birthDate !== value.profile.birthDate) {
+    await refreshTrainingLoadsForUser(session.user.id);
+  }
 
   const training = value.training ?? (await getTrainingPlanForUser(session.user.id));
   logger.info("settings.saved", { hasTraining: Boolean(training) });

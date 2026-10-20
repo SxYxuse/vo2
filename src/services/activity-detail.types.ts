@@ -1,3 +1,4 @@
+import type { ActivityHeart } from "./heart-insights.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import type { RideSummary } from "./ride-analysis.ts";
 
@@ -39,6 +40,8 @@ export type ActivityDetail = {
   chart: ActivityChartPoint[];
   /** Cycling only: terrain breakdown and ride-quality numbers. Null without power or cadence. */
   ride: RideSummary | null;
+  /** Zones, decoupling, and efficiency against the athlete's anchors. Null without heart rate. */
+  heart: ActivityHeart | null;
 };
 
 export type ActivityChartPreview = {

@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { formatSportType, type CalendarSettings } from "./calendar-settings.types.ts";
+import {
+  estimateMaxHrAnchor,
+  type EfficiencyKind,
+  type EfficiencyPoint,
+  type HeartPeak,
+  type MaxHrAnchor,
+} from "./heart-insights.ts";
 import { SPORT_GROUPS, sharesGroupData, sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 
 export const ALL_SPORTS = "all";
@@ -141,12 +148,20 @@ export type HeartRateZoneStat = {
 
 export type HeartRateLthrSource = "estimated-from-max";
 
+/** One activity's time in each zone (same order as `HR_ZONES`), so the page can filter by period. */
+export type HeartRateSession = {
+  start: string;
+  zoneSeconds: number[];
+};
+
 export type HeartRateSport = {
   sportType: string;
   members: string[];
   family: HeartRateFamily | null;
   zoneModel: string;
+  /** Zone anchor: recent max HR without spikes, or the age prediction. */
   maxHeartrate: number | null;
+  maxAnchor: MaxHrAnchor | null;
   lthr: number | null;
   lthrSource: HeartRateLthrSource | null;
   activityCount: number;
@@ -154,6 +169,11 @@ export type HeartRateSport = {
   peakActivityName: string | null;
   peakActivityStart: string | null;
   zones: HeartRateZoneStat[];
+  /** Start of every activity with heart rate, streams or not. */
+  activityStarts: string[];
+  sessions: HeartRateSession[];
+  efficiencyKind: EfficiencyKind | null;
+  efficiency: EfficiencyPoint[];
 };
 
 export type SportLthrAnchors = Partial<
@@ -173,6 +193,8 @@ export type HeartRateData = {
 export type SportBucket = {
   sportType: string;
   histogram: number[];
+  peaks: HeartPeak[];
+  activityStarts: string[];
   activityCount: number;
   maxHeartrate: number;
   peakActivityName: string | null;
@@ -194,23 +216,6 @@ export function emptyHistogram() {
 
 export function isPlausibleBpm(value: number | null | undefined) {
   return value != null && Number.isFinite(value) && value >= BPM_MIN && value <= BPM_MAX;
-}
-
-export function addHeartrateSamples(
-  histogram: number[],
-  heartrate: number[] | null | undefined,
-  time: number[] | null | undefined,
-) {
-  if (!heartrate?.length) return;
-  for (let index = 0; index < heartrate.length; index += 1) {
-    const bpm = Math.round(heartrate[index] ?? 0);
-    if (!isPlausibleBpm(bpm)) continue;
-    const current = time?.[index];
-    const previous = index > 0 ? time?.[index - 1] : undefined;
-    const delta =
-      current != null && previous != null ? Math.max(0, Math.min(30, current - previous)) : 1;
-    histogram[bpm] += delta > 0 ? delta : 1;
-  }
 }
 
 export function histogramSeconds(histogram: number[]) {
@@ -280,6 +285,8 @@ export function createSportBucket(sportType: string): SportBucket {
   return {
     sportType,
     histogram: emptyHistogram(),
+    peaks: [],
+    activityStarts: [],
     activityCount: 0,
     maxHeartrate: 0,
     peakActivityName: null,
@@ -291,13 +298,21 @@ export function noteActivityPeak(
   bucket: SportBucket,
   input: {
     maxHeartrate: number | null;
+    averageHeartrate?: number | null;
     name: string;
     start: string;
   },
 ) {
   bucket.activityCount += 1;
+  bucket.activityStarts.push(input.start);
   if (!isPlausibleBpm(input.maxHeartrate)) return;
   const bpm = Math.round(input.maxHeartrate ?? 0);
+  bucket.peaks.push({
+    bpm,
+    start: input.start,
+    name: input.name,
+    avgBpm: input.averageHeartrate ?? null,
+  });
   if (bpm < bucket.maxHeartrate) return;
   if (
     bpm === bucket.maxHeartrate &&
@@ -311,7 +326,7 @@ export function noteActivityPeak(
   bucket.peakActivityStart = input.start;
 }
 
-function familyLthr(
+export function familyLthr(
   family: HeartRateFamily,
   maxHeartrate: number | null,
   anchors: SportLthrAnchors | undefined,
@@ -325,12 +340,20 @@ function familyLthr(
   return { lthr: estimated, source: estimated ? ("estimated-from-max" as const) : null };
 }
 
-export function toHeartRateSport(bucket: SportBucket, anchors?: SportLthrAnchors): HeartRateSport {
+export function toHeartRateSport(
+  bucket: SportBucket,
+  anchors?: SportLthrAnchors,
+  options: { age?: number | null; now?: Date } = {},
+): HeartRateSport {
   const family = heartRateFamily(bucket.sportType);
   const model = ZONE_MODELS[family];
-  const fromSamples = histogramMaxBpm(bucket.histogram);
-  const maxHeartrate =
-    bucket.maxHeartrate > 0 ? Math.max(bucket.maxHeartrate, fromSamples ?? 0) : fromSamples;
+  const peaks = bucket.peaks.length
+    ? bucket.peaks
+    : bucket.maxHeartrate > 0 && bucket.peakActivityStart
+      ? [{ bpm: bucket.maxHeartrate, start: bucket.peakActivityStart }]
+      : [];
+  const maxAnchor = estimateMaxHrAnchor(peaks, { family, age: options.age, now: options.now });
+  const maxHeartrate = maxAnchor.bpm ?? histogramMaxBpm(bucket.histogram);
   const { lthr, source } = familyLthr(family, maxHeartrate, anchors);
   return {
     sportType: bucket.sportType,
@@ -338,13 +361,52 @@ export function toHeartRateSport(bucket: SportBucket, anchors?: SportLthrAnchors
     family,
     zoneModel: model.label,
     maxHeartrate,
+    maxAnchor,
     lthr,
     lthrSource: source,
     activityCount: bucket.activityCount,
     sampleSeconds: histogramSeconds(bucket.histogram),
-    peakActivityName: bucket.peakActivityName,
-    peakActivityStart: bucket.peakActivityStart,
+    peakActivityName: maxAnchor.peak?.name ?? null,
+    peakActivityStart: maxAnchor.peak?.start ?? null,
     zones: zonesFromHistogram(bucket.histogram, bucket.sportType, maxHeartrate, lthr),
+    activityStarts: bucket.activityStarts,
+    sessions: [],
+    efficiencyKind: null,
+    efficiency: [],
+  };
+}
+
+/** Adds one activity's samples to a sport whose zone bounds are already set. */
+export function addSessionToSport(sport: HeartRateSport, start: string, histogram: number[]) {
+  const zones = zonesFromHistogram(histogram, sport.sportType, sport.maxHeartrate, sport.lthr);
+  const zoneSeconds = zones.map((zone) => zone.seconds);
+  sport.sessions.push({ start, zoneSeconds });
+  sport.sampleSeconds += zoneSeconds.reduce((sum, seconds) => sum + seconds, 0);
+  sport.zones = sport.zones.map((zone, index) => ({
+    ...zone,
+    seconds: zone.seconds + (zoneSeconds[index] ?? 0),
+  }));
+}
+
+/**
+ * Time in zone and activity count for activities since `startMs` (null: all time).
+ * Zone bounds and max HR stay on the anchor so switching period never moves the zones.
+ */
+export function sportForPeriod(sport: HeartRateSport, startMs: number | null): HeartRateSport {
+  if (startMs == null) return sport;
+  const inPeriod = (start: string) => new Date(start).getTime() >= startMs;
+  const sessions = sport.sessions.filter((session) => inPeriod(session.start));
+  const zoneSeconds = HR_ZONES.map((_, index) =>
+    sessions.reduce((sum, session) => sum + (session.zoneSeconds[index] ?? 0), 0),
+  );
+  return {
+    ...sport,
+    activityCount: sport.activityStarts.filter(inPeriod).length,
+    sampleSeconds: zoneSeconds.reduce((sum, seconds) => sum + seconds, 0),
+    zones: sport.zones.map((zone, index) => ({ ...zone, seconds: zoneSeconds[index] ?? 0 })),
+    activityStarts: sport.activityStarts.filter(inPeriod),
+    sessions,
+    efficiency: sport.efficiency.filter((point) => inPeriod(point.start)),
   };
 }
 
@@ -375,6 +437,7 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
     family: null,
     zoneModel: "Each sport uses its own zone model",
     maxHeartrate: peak?.maxHeartrate ?? null,
+    maxAnchor: null,
     lthr: null,
     lthrSource: null,
     activityCount,
@@ -387,6 +450,10 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
       maxBpm: null,
       seconds: zoneSeconds.get(zone.id) ?? 0,
     })),
+    activityStarts: [],
+    sessions: [],
+    efficiencyKind: null,
+    efficiency: [],
   };
 }
 
@@ -400,6 +467,8 @@ export function mergeSportBuckets(buckets: SportBucket[], canonicalType: string)
   const merged = createSportBucket(canonicalType);
   for (const bucket of buckets) {
     merged.activityCount += bucket.activityCount;
+    merged.peaks.push(...bucket.peaks);
+    merged.activityStarts.push(...bucket.activityStarts);
     for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm += 1) {
       merged.histogram[bpm] += bucket.histogram[bpm] ?? 0;
     }
@@ -423,6 +492,7 @@ export function collapseSportBuckets(
   shares: Record<string, boolean> | null | undefined,
   isVisible: (sportType: string) => boolean,
   anchors?: SportLthrAnchors,
+  options: { age?: number | null; now?: Date } = {},
 ): HeartRateSport[] {
   const remaining = new Map(buckets);
   const sports: HeartRateSport[] = [];
@@ -435,7 +505,7 @@ export function collapseSportBuckets(
       members.map((member) => remaining.get(member)!),
       group.canonical,
     );
-    const sport = toHeartRateSport(merged, anchors);
+    const sport = toHeartRateSport(merged, anchors, options);
     sport.members = members;
     sports.push(sport);
     for (const member of members) remaining.delete(member);
@@ -443,7 +513,7 @@ export function collapseSportBuckets(
 
   for (const bucket of remaining.values()) {
     if (!isVisible(bucket.sportType)) continue;
-    sports.push(toHeartRateSport(bucket, anchors));
+    sports.push(toHeartRateSport(bucket, anchors, options));
   }
 
   return sortHeartRateSports(sports.filter((sport) => sport.activityCount > 0));

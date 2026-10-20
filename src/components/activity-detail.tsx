@@ -18,9 +18,10 @@ import {
 } from "@/services/activity-detail.ts";
 import { formatSportType } from "@/services/calendar-settings.ts";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
+import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
-import { weekStartKey } from "@/services/training-plan.ts";
+import { monthKey } from "@/services/diary-window.ts";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,6 +123,7 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           </EmptyHeader>
         </Empty>
       )}
+      {detail.heart ? <ActivityHeartAnalysis heart={detail.heart} start={detail.start} /> : null}
       {detail.ride ? <ActivityRideAnalysis ride={detail.ride} /> : null}
       <Suspense fallback={<Skeleton className="h-48 w-full rounded-lg" />}>
         <ActivityAnalysisCard activityId={detail.id} hasStreams={detail.hasStreams} />
@@ -130,15 +132,15 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   );
 }
 
-/** Returns to the calendar week the activity was opened from, or the activity's own week. */
-function CalendarBackLink({ week, start }: { week?: string; start?: string }) {
+/** Returns to the calendar month the activity was opened from, or the activity's own month. */
+function CalendarBackLink({ month, start }: { month?: string; start?: string }) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const currentWeek = weekStartKey(new Date(), timeZone);
-  const target = week ?? (start ? weekStartKey(new Date(start), timeZone) : currentWeek);
+  const currentMonth = monthKey(new Date(), timeZone);
+  const target = month ?? (start ? monthKey(new Date(start), timeZone) : currentMonth);
   return (
     <Link
       to="/"
-      search={target < currentWeek ? { week: target } : {}}
+      search={target < currentMonth ? { month: target } : {}}
       className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "self-start")}
     >
       <ChevronLeftIcon />
@@ -147,11 +149,11 @@ function CalendarBackLink({ week, start }: { week?: string; start?: string }) {
   );
 }
 
-export function ActivityDetailPending({ week }: { week?: string }) {
+export function ActivityDetailPending({ month }: { month?: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink week={week} />
+        <CalendarBackLink month={month} />
         <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-4 w-80 max-w-full" />
       </div>
@@ -169,11 +171,11 @@ export function ActivityDetailPending({ week }: { week?: string }) {
 export function ActivityDetailView({
   detail,
   color,
-  week,
+  month,
 }: {
   detail: ActivityDetail;
   color?: string;
-  week?: string;
+  month?: string;
 }) {
   useEffect(() => {
     void import("@/components/activity-analysis.tsx");
@@ -187,7 +189,7 @@ export function ActivityDetailView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink week={week} start={detail.start} />
+        <CalendarBackLink month={month} start={detail.start} />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">
             {detail.title}
@@ -216,10 +218,10 @@ export function ActivityDetailView({
   );
 }
 
-export function ActivityDetailMissing({ week }: { week?: string }) {
+export function ActivityDetailMissing({ month }: { month?: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <CalendarBackLink week={week} />
+      <CalendarBackLink month={month} />
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">
