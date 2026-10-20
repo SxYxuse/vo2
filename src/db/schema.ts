@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -9,7 +8,6 @@ import {
   real,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema.ts";
@@ -103,33 +101,6 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   training: jsonb("training"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
-
-export const plannedSessions = pgTable(
-  "planned_sessions",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    date: date("date", { mode: "string" }).notNull(),
-    weekStart: date("week_start", { mode: "string" }).notNull(),
-    sportFamily: text("sport_family").$type<"running" | "cycling">().notNull(),
-    title: text("title").notNull(),
-    targetMinutes: integer("target_minutes").notNull(),
-    targetLoad: real("target_load").notNull(),
-    status: text("status").$type<"planned" | "done" | "adapted">().notNull().default("planned"),
-    note: text("note"),
-    activityId: text("activity_id").references(() => activities.id, { onDelete: "set null" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index("planned_sessions_user_week_idx").on(table.userId, table.weekStart),
-    uniqueIndex("planned_sessions_activity_idx")
-      .on(table.activityId)
-      .where(sql`${table.activityId} is not null`),
-  ],
-);
 
 export const calendarSettings = pgTable("calendar_settings", {
   userId: text("user_id")

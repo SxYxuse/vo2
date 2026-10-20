@@ -8,6 +8,7 @@ import { loadSettingsSnapshot } from "@/services/app-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
+import { loadWeekTarget } from "@/services/week-target.ts";
 
 /** Loader/preload read: use cached data if present, otherwise fetch once. */
 export function loaderQuery<T extends Record<string, unknown>>(options: T) {
@@ -47,6 +48,12 @@ export const activityMapQueryOptions = queryOptions({
 export const fitnessQueryOptions = queryOptions({
   queryKey: ["fitness"],
   queryFn: () => loadFitnessData(),
+  staleTime: 60_000,
+});
+
+export const weekTargetQueryOptions = queryOptions({
+  queryKey: ["week-target"],
+  queryFn: () => loadWeekTarget(),
   staleTime: 60_000,
 });
 

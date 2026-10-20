@@ -12,8 +12,9 @@ import {
 } from "@/services/calendar-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
+  DEFAULT_WEEK_MIX,
   suggestedTargetHours,
-  trainingConsistency,
+  weekMixSchema,
   trainingPlanSchema,
   type TrainingPlan,
 } from "@/services/training-plan.types.ts";
@@ -33,40 +34,25 @@ const trainingFormFields = trainingPlanSchema.extend({
   buildPace: z
     .union([z.literal(""), z.enum(BUILD_PACES)])
     .pipe(z.enum(BUILD_PACES, { error: "Choose how hard you want to build fitness." })),
-  maxDoubleDays: z.number().int().min(0).max(6),
-  workoutStyle: z.enum(["hours", "structured"]),
+  targetMode: z.enum(["auto", "manual"]),
+  weekMix: weekMixSchema,
 });
 
-function withTrainingConsistency<Schema extends z.ZodType>(schema: Schema) {
-  return schema.superRefine((value, ctx) => {
-    const result = trainingConsistency(value as TrainingPlan);
-    if (!result.ok && result.message) {
-      ctx.addIssue({
-        code: "custom",
-        message: result.message,
-        path: ["targetWeeklyHours"],
-      });
-    }
-  });
-}
-
-export const trainingFormSchema = withTrainingConsistency(trainingFormFields);
+export const trainingFormSchema = trainingFormFields;
 
 const sportsFormFields = {
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
 };
 
-export const settingsFormSchema = withTrainingConsistency(
-  profileFormSchema
-    .extend(trainingFormFields.shape)
-    .extend(sportsFormFields)
-    .extend({ calendarPeriod: calendarPeriodSchema }),
-);
+export const settingsFormSchema = profileFormSchema
+  .extend(trainingFormFields.shape)
+  .extend(sportsFormFields)
+  .extend({ calendarPeriod: calendarPeriodSchema });
 
-export const onboardingFormSchema = withTrainingConsistency(
-  profileFormSchema.extend(trainingFormFields.shape).extend(sportsFormFields),
-);
+export const onboardingFormSchema = profileFormSchema
+  .extend(trainingFormFields.shape)
+  .extend(sportsFormFields);
 
 export type ProfileFormValues = z.input<typeof profileFormSchema>;
 export type TrainingFormValues = z.output<typeof trainingFormSchema>;
@@ -87,8 +73,7 @@ export const SPORTS_FIELDS = ["sportTypes", "sportGroupShares"] as const satisfi
   keyof OnboardingFormInput
 >;
 export const TRAINING_WEEK_FIELDS = [
-  "maxRunSessions",
-  "maxRideSessions",
+  "targetMode",
   "hoursIntent",
   "targetWeeklyHours",
   "preferredRestWeekday",
@@ -110,11 +95,10 @@ export function trainingFormDefaults(
   if (plan) {
     return {
       buildPace: plan.buildPace,
-      maxRunSessions: plan.maxRunSessions,
-      maxRideSessions: plan.maxRideSessions,
-      maxDoubleDays: plan.maxDoubleDays,
+      targetMode: plan.targetMode,
       hoursIntent: plan.hoursIntent,
-      workoutStyle: plan.workoutStyle,
+      weekMix: plan.weekMix,
+      keySessionSports: plan.keySessionSports,
       targetWeeklyHours: plan.targetWeeklyHours,
       preferredRestWeekday: plan.preferredRestWeekday,
       timeZone: plan.timeZone || timeZone,
@@ -122,11 +106,10 @@ export function trainingFormDefaults(
   }
   return {
     buildPace: "",
-    maxRunSessions: 3,
-    maxRideSessions: 2,
-    maxDoubleDays: 0,
+    targetMode: "auto",
     hoursIntent: "keep",
-    workoutStyle: "hours",
+    weekMix: DEFAULT_WEEK_MIX,
+    keySessionSports: {},
     targetWeeklyHours: suggestedTargetHours(avgHours, "keep"),
     preferredRestWeekday: 0,
     timeZone,

@@ -1,5 +1,7 @@
 # Remaining-week work lives in a bucket, not on a timetable
 
+Superseded by [0016](0016-week-target-replaces-the-week-bucket.md).
+
 A training plan does not pin Monday 18:00 run, Wednesday ride. It fills a week bucket of planned sessions (running and cycling only) with a duration and load. The athlete picks a session when they have a time window. Completed activities are matched to open sessions by sport family and duration, not by title or start time.
 
 Most training apps write a dated schedule. That fights a life where the long ride moves to Sunday. A bucket keeps the week's work honest without pretending VO2 knows the athlete's calendar. Swimming, walking, and other sport types still appear as activities; they are not planned. Replanning rewrites open sessions (adapted) and leaves done ones alone.

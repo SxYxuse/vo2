@@ -28,11 +28,7 @@ import {
   stopsAfterNewestPage,
   storedPauseResult,
 } from "./strava-sync.types.ts";
-import {
-  adaptPlannedWeek,
-  getTrainingPlanForUser,
-  listPlannedSessions,
-} from "./training-plan.server.ts";
+import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { athleteExists } from "./athlete-deletion.server.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 
@@ -78,12 +74,10 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       activities: [],
       settings: DEFAULT_CALENDAR_SETTINGS,
       training: null,
-      plannedSessions: [],
     };
   }
 
-  const plannedFrom = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
-  const [rows, storedSettings, training, planned, streamedWithoutFlag] = await Promise.all([
+  const [rows, storedSettings, training, streamedWithoutFlag] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -101,7 +95,6 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       .orderBy(activities.startDate),
     getCalendarSettingsForUser(session.user.id),
     getTrainingPlanForUser(session.user.id),
-    listPlannedSessions(session.user.id, plannedFrom),
     db
       .select({ activityId: activityStreams.activityId })
       .from(activities)
@@ -121,14 +114,12 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
   logger.debug("home.loaded", {
     activityCount: calendarActivities.length,
     streamsPending,
-    plannedCount: planned.length,
   });
 
   return {
     signedIn: true,
     activities: calendarActivities,
     training,
-    plannedSessions: planned,
     settings: mergeCalendarSettings(
       storedSettings,
       rows.map((row) => row.sportType),
@@ -366,13 +357,6 @@ async function runSync(userId: string): Promise<SyncResult> {
 
   if (remainingSyncBudgetMs(startedAt) > SYNC_POSTPROCESS_MIN_MS) {
     await refreshTrainingLoadsIfNeeded(userId);
-    if (activitiesUpserted > 0) {
-      try {
-        await adaptPlannedWeek(userId);
-      } catch (error) {
-        logger.warn("sync.adapt_week_failed", errorFields(error));
-      }
-    }
   } else {
     logger.debug("sync.skip_postprocess_budget");
   }

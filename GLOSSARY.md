@@ -1,6 +1,6 @@
 # VO2
 
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and fills the rest of the week with planned sessions.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and sets a week target with the best use of the time left.
 
 ## People
 
@@ -28,7 +28,7 @@ _Avoid_: Sport, discipline
 
 **Sport group**:
 A display grouping of related sport types: cycling, running, swimming, or walking.
-_Avoid_: Sport family (that term is reserved for planning)
+_Avoid_: Sport family (that term is reserved for the week split)
 
 **Hidden sport type**:
 A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form (ADR 0015).
@@ -43,7 +43,7 @@ Distance covered per time, in km/h. Used for cycling and for sport types that ar
 _Avoid_: Pace, velocity, kph
 
 **Sport family**:
-The planning axis for remaining-week work: running or cycling only.
+How the week target splits time: running, cycling, or other. Recommended sessions are runs or rides only.
 _Avoid_: Sport group, sport type
 
 **Sync**:
@@ -57,7 +57,7 @@ _Avoid_: Cache, mirror
 ## Planning
 
 **Training plan**:
-The athlete's standing constraints for how a week is filled: build pace, hours, run/ride counts, rest day, and workout style.
+The athlete's standing choices for a week: build pace, how the week target is set, rest day, and key sessions.
 _Avoid_: Program, schedule, calendar
 
 **Build pace**:
@@ -65,36 +65,56 @@ How aggressively fitness should rise this block: hold, slow, steady, fast, or ov
 _Avoid_: Intensity, ramp rate, Pace (time per distance)
 
 **Hours intent**:
-Whether this block should cut, keep, or add weekly volume relative to recent weeks.
+Whether fixed weekly hours should cut, keep, or add volume relative to recent weeks.
 _Avoid_: Volume target (the numeric hours live on the training plan)
 
-**Workout style**:
-Hours of easy aerobic work, or structured intervals when form allows.
-_Avoid_: Polarized, sweet-spot
+**Week mix**:
+A range of sessions the athlete does a week, and what share of them are key sessions (for example 4–6 sessions at 25 / 75: one key, three to five easy). Key sessions come from the low end of the range; the number of easy sessions settles within it as the week goes. The athlete sets the mix, seeded from their last 3 months; VO2 builds the sessions.
+_Avoid_: Workout style, polarized split, session caps
+
+**Key session**:
+A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the build pace (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
+_Avoid_: Workout, quality session, planned session
+
+**Easy session**:
+One of the week mix's non-key sessions. Easy time left is shared evenly over the easy sessions still to do; any activity of 20 minutes or more that did not tick off a key session fills one.
+_Avoid_: Filler, recovery (recovery is a separate, shorter pick when form is very low)
 
 **Training week**:
-Monday through Sunday in the athlete's timezone. Planned work is scoped to the current week, not a season.
+Monday through Sunday in the athlete's timezone. The week target is scoped to the current week, not a season.
 _Avoid_: Microcycle, calendar week
 
-**Planned session**:
-A run or ride still to do this week, with a target duration and training load, not a clock time.
-_Avoid_: Workout, event, appointment
+**Week target**:
+The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the build pace, or fixed by the athlete. Every activity counts toward it.
+_Avoid_: Bucket, quota, goal (too vague)
 
-**Week bucket**:
-The pool of open planned sessions for the current training week. The athlete picks a session when they have a time window.
-_Avoid_: Schedule, timetable, calendar
+**Time left**:
+Week target minus the time already done this week. Split into key sessions still open and easy time, and by sport family.
+_Avoid_: Remaining sessions, still to fill
 
-**Adapted session**:
-A planned session rewritten after new completed work, still open until it is done.
-_Avoid_: Updated (UI badge only)
+**Usual pace**:
+Where the athlete normally is by this weekday, from the shape of their last eight weeks. Used to say ahead, on track, or behind.
+_Avoid_: Expected, schedule
 
-**Session match**:
-Linking a completed activity to a planned session when sport family and duration fit.
-_Avoid_: Auto-assign, pairing
+**Hard time**:
+Minutes at heart-rate zone 3 or above. Estimated from load per hour when an activity has no heart-rate stream. Used to keep the day after hard work easy.
+_Avoid_: Intensity minutes, quality time
+
+**Today's choice**:
+What the athlete says about today: the time they have, the sports in order (up to three parts, such as swim then ride, or ride then strength), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it. A key session goes on the first ride or run part; the other parts are easy.
+_Avoid_: Override, preference
+
+**Today's pick**:
+The one session VO2 builds for today's choice: the next key session that fits, otherwise an easy session. When the choice goes against what VO2 would pick, the pick carries warnings with the cost (for example two hard days in a row) and VO2's own pick stays one tap away.
+_Avoid_: Planned session, workout of the day
 
 **Double day**:
-Two planned sessions stacked on one calendar day, capped by the training plan.
-_Avoid_: Brick (a brick is a specific stacked run after a ride)
+A date with two or more sessions of 20 minutes or more, any sports. The week mix sets how many a week the athlete is fine with; VO2 counts the ones done, plans extra easy sessions on the rest, and suggests adding a second sport when the week needs it.
+_Avoid_: Brick (a brick is one specific double: a run straight after a ride)
+
+**Dropped key session**:
+A key session left out of this week because there are more open key sessions than training days left. Its time moves to easy. Doing it anyway still ticks it off.
+_Avoid_: Missed, failed
 
 ## Load and form
 

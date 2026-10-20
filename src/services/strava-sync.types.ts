@@ -1,5 +1,5 @@
 import type { CalendarSettings } from "./calendar-settings.types.ts";
-import type { PlannedSession, TrainingPlan } from "./training-plan.types.ts";
+import type { TrainingPlan } from "./training-plan.types.ts";
 
 export type CalendarActivity = {
   id: string;
@@ -89,7 +89,6 @@ export type HomeData = {
   activities: CalendarActivity[];
   settings: CalendarSettings;
   training: TrainingPlan | null;
-  plannedSessions: PlannedSession[];
 };
 
 export type SyncResult = {

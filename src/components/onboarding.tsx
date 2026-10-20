@@ -9,6 +9,7 @@ import { useForm, useWatch } from "react-hook-form";
 
 import {
   activityMapQueryOptions,
+  weekTargetQueryOptions,
   appShellQueryOptions,
   heartRateQueryOptions,
   homeQueryOptions,
@@ -83,7 +84,7 @@ const STEPS = [
   {
     id: "week",
     title: "Your week",
-    description: "Session caps, hours, and a preferred rest day.",
+    description: "How the weekly target is set, and a preferred rest day.",
   },
   {
     id: "ready",
@@ -184,6 +185,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
       void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
+      void queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey });
       setSaveError(null);
       setStepIndex(STEPS.length - 1);
     },
@@ -292,7 +294,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
               : step.id === "pace" && !hasActivityHistory
                 ? "How hard you want this block to push — fitness and form come after activities are copied."
                 : step.id === "week" && !hasActivityHistory
-                  ? "How many runs, rides, and hours you want each week."
+                  ? "How many hours you want to train each week."
                   : step.description}
           </p>
         </CardHeader>

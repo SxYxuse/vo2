@@ -113,6 +113,13 @@
       "when": 1792481133542,
       "tag": "0015_drop_weight_height",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792489400022,
+      "tag": "0016_drop_planned_sessions",
+      "breakpoints": true
     }
   ]
 }

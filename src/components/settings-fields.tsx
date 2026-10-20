@@ -14,12 +14,11 @@ import { ageFromBirthDate, formatBirthDate, parseBirthDate } from "@/services/ap
 import {
   BUILD_PACES,
   HOURS_INTENTS,
+  TARGET_MODES,
   WEEKDAYS,
-  WORKOUT_STYLES,
   formatHours,
   hasRecentWeeklyHours,
   suggestedTargetHours,
-  trainingConsistency,
   type HoursIntent,
 } from "@/services/training-plan.ts";
 import { CALENDAR_PERIODS } from "@/services/calendar-settings.ts";
@@ -45,19 +44,8 @@ import {
 } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-export const SESSION_COUNTS = [0, 1, 2, 3, 4, 5, 6, 7];
-export const DOUBLE_DAY_COUNTS = [0, 1, 2, 3, 4, 5, 6];
 
 export function ProfileFields<T extends ProfileFormValues>({
   idPrefix,
@@ -200,51 +188,6 @@ export function TrainingPaceFields<T extends TrainingFormInput>({
   );
 }
 
-export function TrainingDoubleDaysField<T extends TrainingFormInput>({
-  idPrefix,
-  control,
-}: {
-  idPrefix: string;
-  control: Control<T>;
-}) {
-  return (
-    <Controller
-      name={"maxDoubleDays" as FieldPath<T>}
-      control={control}
-      render={({ field, fieldState }) => (
-        <Field data-invalid={fieldState.invalid}>
-          <FieldLabel htmlFor={`${idPrefix}-double-days`}>Days with two sessions</FieldLabel>
-          <Select
-            value={String(field.value)}
-            onValueChange={(next) => {
-              if (next == null) return;
-              field.onChange(Number(next));
-            }}
-          >
-            <SelectTrigger id={`${idPrefix}-double-days`} aria-invalid={fieldState.invalid}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {DOUBLE_DAY_COUNTS.map((count) => (
-                  <SelectItem key={count} value={String(count)}>
-                    {count === 0 ? "None" : count === 1 ? "1 day" : `${count} days`}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <FieldDescription>
-            How many days you are OK stacking a ride and a run. The bucket does not assign those
-            days — you pick when to double up.
-          </FieldDescription>
-          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-        </Field>
-      )}
-    />
-  );
-}
-
 export function TrainingWeekFields<T extends TrainingFormInput>({
   idPrefix,
   control,
@@ -256,174 +199,123 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
   setValue: UseFormSetValue<T>;
   avgHours: number;
 }) {
-  const maxRunSessions = useWatch({
-    control,
-    name: "maxRunSessions" as FieldPath<T>,
-  }) as number;
-  const maxRideSessions = useWatch({
-    control,
-    name: "maxRideSessions" as FieldPath<T>,
-  }) as number;
-  const targetWeeklyHours = useWatch({
-    control,
-    name: "targetWeeklyHours" as FieldPath<T>,
-  }) as number;
-  const consistency = trainingConsistency({
-    maxRunSessions,
-    maxRideSessions,
-    targetWeeklyHours,
-  });
-  const hoursMax = Math.min(30, Math.max(12, Math.ceil((avgHours || 5) * 1.5), targetWeeklyHours));
+  const targetMode = useWatch({ control, name: "targetMode" as FieldPath<T> }) as string;
+  const hoursMax = Math.min(30, Math.max(12, Math.ceil((avgHours || 5) * 1.5)));
   const hasHistory = hasRecentWeeklyHours(avgHours);
+  const showHours = targetMode === "manual" || !hasHistory;
 
   return (
     <FieldGroup>
-      <FieldSet>
-        <FieldLegend>Weekly sessions</FieldLegend>
-        <FieldDescription>
-          {hasHistory
-            ? "Caps for suggested run and ride sessions in the week bucket. Other sports still count toward load."
-            : "How many runs and rides to put in the week bucket each week. Other sports still count toward load once activities are copied."}
-        </FieldDescription>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Controller
-            name={"maxRunSessions" as FieldPath<T>}
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${idPrefix}-max-run`}>Max runs</FieldLabel>
-                <Select
-                  value={String(field.value)}
-                  onValueChange={(next) => {
-                    if (next == null) return;
-                    field.onChange(Number(next));
-                  }}
-                >
-                  <SelectTrigger id={`${idPrefix}-max-run`} aria-invalid={fieldState.invalid}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {SESSION_COUNTS.map((count) => (
-                        <SelectItem key={count} value={String(count)}>
-                          {count} {count === 1 ? "run" : "runs"}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-              </Field>
-            )}
-          />
-          <Controller
-            name={"maxRideSessions" as FieldPath<T>}
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${idPrefix}-max-ride`}>Max rides</FieldLabel>
-                <Select
-                  value={String(field.value)}
-                  onValueChange={(next) => {
-                    if (next == null) return;
-                    field.onChange(Number(next));
-                  }}
-                >
-                  <SelectTrigger id={`${idPrefix}-max-ride`} aria-invalid={fieldState.invalid}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {SESSION_COUNTS.map((count) => (
-                        <SelectItem key={count} value={String(count)}>
-                          {count} {count === 1 ? "ride" : "rides"}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-              </Field>
-            )}
-          />
-        </div>
-      </FieldSet>
-      <FieldSet>
-        <FieldLegend>Weekly hours</FieldLegend>
-        <FieldDescription>
-          {hasHistory
-            ? `Your last 3 months average ${formatHours(avgHours)}. Choose whether to cut back, keep that volume, or add hours.`
-            : "No activities copied from Strava yet, so there is no recent-weeks baseline. Choose how many hours you want to train each week."}
-        </FieldDescription>
-        {hasHistory ? (
-          <Controller
-            name={"hoursIntent" as FieldPath<T>}
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <RadioGroup
-                  name={field.name}
-                  value={field.value as string}
-                  onValueChange={(next) => {
-                    if (!next) return;
-                    field.onChange(next);
-                    setValue(
-                      "targetWeeklyHours" as FieldPath<T>,
-                      suggestedTargetHours(avgHours, next as HoursIntent) as never,
-                      { shouldValidate: true },
-                    );
-                  }}
-                >
-                  {HOURS_INTENTS.map((intent) => {
-                    const id = `${idPrefix}-hours-${intent.id}`;
-                    return (
-                      <Field key={intent.id} orientation="horizontal">
-                        <RadioGroupItem value={intent.id} id={id} />
-                        <FieldLabel htmlFor={id} className="font-normal">
-                          {intent.label}
-                        </FieldLabel>
-                      </Field>
-                    );
-                  })}
-                </RadioGroup>
-                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-              </Field>
-            )}
-          />
-        ) : null}
-        <Controller
-          name={"targetWeeklyHours" as FieldPath<T>}
-          control={control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid || !consistency.ok}>
-              <FieldLabel htmlFor={`${idPrefix}-hours-slider`}>
-                Target {formatHours(field.value as number)} a week
-              </FieldLabel>
-              <Slider
-                id={`${idPrefix}-hours-slider`}
-                min={0.5}
-                max={hoursMax}
-                step={0.5}
-                value={[field.value as number]}
-                onValueChange={(next) => {
-                  const value = Array.isArray(next) ? next[0] : next;
-                  if (typeof value !== "number") return;
-                  field.onChange(value);
-                }}
-              />
-              {fieldState.invalid ? (
-                <FieldError errors={[fieldState.error]} />
-              ) : !consistency.ok && consistency.message ? (
-                <FieldError>{consistency.message}</FieldError>
-              ) : (
-                <FieldDescription>
-                  Kept in range with {maxRunSessions + maxRideSessions} run and ride sessions.
-                </FieldDescription>
+      <Controller
+        name={"targetMode" as FieldPath<T>}
+        control={control}
+        render={({ field, fieldState }) => (
+          <FieldSet data-invalid={fieldState.invalid}>
+            <FieldLegend>Weekly target</FieldLegend>
+            <FieldDescription>
+              Hours are the headline on the Week target page. Training load follows your build pace
+              either way.
+            </FieldDescription>
+            <RadioGroup
+              name={field.name}
+              value={field.value as string}
+              onValueChange={(next) => {
+                if (!next) return;
+                field.onChange(next);
+              }}
+              className="gap-2"
+            >
+              {TARGET_MODES.map((mode) => {
+                const id = `${idPrefix}-target-${mode.id}`;
+                return (
+                  <FieldLabel key={mode.id} htmlFor={id} className="w-full">
+                    <Field orientation="horizontal" className="items-start rounded-lg border p-3">
+                      <RadioGroupItem value={mode.id} id={id} />
+                      <FieldContent>
+                        <FieldTitle>{mode.label}</FieldTitle>
+                        <FieldDescription>{mode.hint}</FieldDescription>
+                      </FieldContent>
+                    </Field>
+                  </FieldLabel>
+                );
+              })}
+            </RadioGroup>
+            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+          </FieldSet>
+        )}
+      />
+      {showHours ? (
+        <FieldSet>
+          <FieldLegend>{targetMode === "manual" ? "Weekly hours" : "Starting hours"}</FieldLegend>
+          <FieldDescription>
+            {targetMode !== "manual"
+              ? "No recent history yet. VO2 uses these hours until it can set the target from your fitness."
+              : hasHistory
+                ? `Your last 3 months average ${formatHours(avgHours)}. Choose whether to cut back, keep that volume, or add hours.`
+                : "No activities copied from Strava yet, so there is no recent-weeks baseline. Choose how many hours you want to train each week."}
+          </FieldDescription>
+          {hasHistory ? (
+            <Controller
+              name={"hoursIntent" as FieldPath<T>}
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <RadioGroup
+                    name={field.name}
+                    value={field.value as string}
+                    onValueChange={(next) => {
+                      if (!next) return;
+                      field.onChange(next);
+                      setValue(
+                        "targetWeeklyHours" as FieldPath<T>,
+                        suggestedTargetHours(avgHours, next as HoursIntent) as never,
+                        { shouldValidate: true },
+                      );
+                    }}
+                  >
+                    {HOURS_INTENTS.map((intent) => {
+                      const id = `${idPrefix}-hours-${intent.id}`;
+                      return (
+                        <Field key={intent.id} orientation="horizontal">
+                          <RadioGroupItem value={intent.id} id={id} />
+                          <FieldLabel htmlFor={id} className="font-normal">
+                            {intent.label}
+                          </FieldLabel>
+                        </Field>
+                      );
+                    })}
+                  </RadioGroup>
+                  {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+                </Field>
               )}
-            </Field>
-          )}
-        />
-      </FieldSet>
+            />
+          ) : null}
+          <Controller
+            name={"targetWeeklyHours" as FieldPath<T>}
+            control={control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={`${idPrefix}-hours-slider`}>
+                  Target {formatHours(field.value as number)} a week
+                </FieldLabel>
+                <Slider
+                  id={`${idPrefix}-hours-slider`}
+                  min={0.5}
+                  max={Math.max(hoursMax, field.value as number)}
+                  step={0.5}
+                  value={[field.value as number]}
+                  onValueChange={(next) => {
+                    const value = Array.isArray(next) ? next[0] : next;
+                    if (typeof value !== "number") return;
+                    field.onChange(value);
+                  }}
+                />
+                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+              </Field>
+            )}
+          />
+        </FieldSet>
+      ) : null}
       <Controller
         name={"preferredRestWeekday" as FieldPath<T>}
         control={control}
@@ -431,14 +323,14 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
           <FieldSet data-invalid={fieldState.invalid}>
             <FieldLegend>Preferred rest day</FieldLegend>
             <FieldDescription>
-              A reminder in the weekly bucket. Workouts are not pinned to other days, so you can
-              still train here if that is when you have time.
+              Left out when the remaining time is spread over the week. You can still train that day
+              if it is when you have time.
             </FieldDescription>
             <ToggleGroup
               size="sm"
               variant="outline"
               spacing={0}
-              value={[String(field.value)]}
+              value={[String(field.value as number)]}
               onValueChange={(next) => {
                 const value = next[0];
                 if (value == null) return;
@@ -452,73 +344,6 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </FieldSet>
-        )}
-      />
-    </FieldGroup>
-  );
-}
-
-export function TrainingStyleFields<T extends TrainingFormInput>({
-  idPrefix,
-  control,
-  onOpenSports,
-}: {
-  idPrefix: string;
-  control: Control<T>;
-  onOpenSports?: () => void;
-}) {
-  const workoutStyle = useWatch({ control, name: "workoutStyle" as FieldPath<T> });
-
-  return (
-    <FieldGroup>
-      <Controller
-        name={"workoutStyle" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <FieldSet data-invalid={fieldState.invalid}>
-            <FieldLegend>Suggested sessions</FieldLegend>
-            <FieldDescription>
-              Hours of training keeps the weekly bucket as easy aerobic volume. Intervals and zones
-              add threshold, VO2, and tempo when form allows — watts if that sport has a power
-              meter, heart rate if it has a belt or watch, otherwise RPE.
-            </FieldDescription>
-            <RadioGroup
-              name={field.name}
-              value={field.value as string}
-              onValueChange={(next) => {
-                if (!next) return;
-                field.onChange(next);
-              }}
-              className="gap-2"
-            >
-              {WORKOUT_STYLES.map((style) => {
-                const id = `${idPrefix}-style-${style.id}`;
-                return (
-                  <FieldLabel key={style.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start rounded-lg border p-3">
-                      <RadioGroupItem value={style.id} id={id} />
-                      <FieldContent>
-                        <FieldTitle>{style.label}</FieldTitle>
-                        <FieldDescription>{style.hint}</FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                );
-              })}
-            </RadioGroup>
-            {workoutStyle === "structured" && onOpenSports ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="self-start"
-                onClick={onOpenSports}
-              >
-                Set collectors per sport
-              </Button>
-            ) : null}
             {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
           </FieldSet>
         )}

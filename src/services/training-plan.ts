@@ -1,55 +1,53 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 
-import type { PlannedSession, TrainingPlan } from "./training-plan.types.ts";
-import { trainingPlanSchema } from "./training-plan.types.ts";
+import type { TrainingPlan } from "./training-plan.types.ts";
+import {
+  keySessionSportSchema,
+  trainingPlanSchema,
+  withKeySessionSport,
+} from "./training-plan.types.ts";
 
 export type {
   BuildPace,
   HoursIntent,
-  PlannedSession,
+  TargetMode,
   TrainingPlan,
-  WorkoutStyle,
+  KeySession,
+  KeySessionKind,
+  SessionHistory,
+  WeekMix,
+  KeySessionPresetId,
+  TargetZone,
 } from "./training-plan.types.ts";
 export {
   BUILD_PACES,
   HOURS_INTENTS,
-  TIME_WINDOWS,
+  TARGET_MODES,
   WEEKDAYS,
-  WORKOUT_STYLES,
+  HR_TARGET_ZONES,
+  KEY_SESSION_PRESETS,
+  KEY_SHARE_PRESETS,
+  MAX_SESSIONS_PER_WEEK,
+  MAX_KEY_SESSIONS,
   addDayKey,
-  assignActivitiesToSessions,
   dayKey,
-  doneWeekSessions,
-  durationFitsPlan,
   formatHours,
   hasRecentWeeklyHours,
-  hoursStillToFill,
+  easySessionRange,
   isTrainingPlanComplete,
-  openWeekBucket,
+  keySessionCount,
+  keySessionFromPreset,
+  keySessionMinutes,
+  keySessionName,
+  keySessionWorkMinutes,
   parseTrainingPlan,
   recentAverageWeeklyHours,
-  sessionFitsWindow,
-  sessionRole,
+  recentSessionHistory,
   suggestedTargetHours,
-  trainingConsistency,
   trainingPlanSchema,
   weekStartKey,
+  zoneLabel,
 } from "./training-plan.types.ts";
-
-export const PLAN_EVENT_PREFIX = "plan:";
-
-export function plannedEventId(id: string) {
-  return `${PLAN_EVENT_PREFIX}${id}`;
-}
-
-export function isPlannedEventId(id: string) {
-  return id.startsWith(PLAN_EVENT_PREFIX);
-}
-
-export function plannedSessionIdFromEvent(id: string) {
-  return id.slice(PLAN_EVENT_PREFIX.length);
-}
 
 export const saveTrainingPlan = createServerFn({ method: "POST" })
   .validator(trainingPlanSchema)
@@ -61,9 +59,16 @@ export const saveTrainingPlan = createServerFn({ method: "POST" })
     return data;
   });
 
-export const suggestWeek = createServerFn({ method: "POST" })
-  .validator(z.object({ timeZone: z.string().min(1) }))
-  .handler(async ({ data }): Promise<PlannedSession[]> => {
-    const { suggestWeekImpl } = await import("./training-plan.server.ts");
-    return suggestWeekImpl(data.timeZone);
+export const saveKeySessionSport = createServerFn({ method: "POST" })
+  .validator(keySessionSportSchema)
+  .handler(async ({ data }): Promise<TrainingPlan> => {
+    const { getRequiredSession } = await import("@/lib/session.server.ts");
+    const { getTrainingPlanForUser, saveTrainingPlanForUser } =
+      await import("./training-plan.server.ts");
+    const session = await getRequiredSession();
+    const plan = await getTrainingPlanForUser(session.user.id);
+    if (!plan) throw new Error("Finish your training plan first.");
+    const next = { ...plan, keySessionSports: withKeySessionSport(plan.keySessionSports, data) };
+    await saveTrainingPlanForUser(session.user.id, next);
+    return next;
   });

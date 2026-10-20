@@ -8,6 +8,7 @@ import { useForm, type FieldErrors } from "react-hook-form";
 
 import {
   activityMapQueryOptions,
+  weekTargetQueryOptions,
   appShellQueryOptions,
   fitnessQueryOptions,
   heartRateQueryOptions,
@@ -30,7 +31,11 @@ import {
 } from "@/lib/settings-sections.ts";
 import { saveAppSettings } from "@/services/app-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
+import {
+  hasRecentWeeklyHours,
+  recentAverageWeeklyHours,
+  recentSessionHistory,
+} from "@/services/training-plan.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -48,11 +53,10 @@ import {
   CalendarPeriodField,
   ProfileFields,
   TrainingPaceFields,
-  TrainingStyleFields,
-  TrainingDoubleDaysField,
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
+import { WeekMixFields } from "@/components/week-mix-fields.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
@@ -157,6 +161,7 @@ export function SettingsForm({
       void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey });
       void queryClient.invalidateQueries({ queryKey: ["activity"] });
+      void queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey });
       setSaveError(null);
       toast.add({ type: "success", title: "Settings saved" });
     },
@@ -237,10 +242,11 @@ export function SettingsForm({
                   setValue={form.setValue}
                   avgHours={avgHours}
                 />
-                <TrainingDoubleDaysField idPrefix="settings" control={form.control} />
-                <TrainingStyleFields
+                <FieldSeparator />
+                <WeekMixFields
                   idPrefix="settings"
                   control={form.control}
+                  history={data.fitnessLoads ? recentSessionHistory(data.fitnessLoads) : null}
                   onOpenSports={() => setSection("sports")}
                 />
               </FieldGroup>
