@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 
 import { authClient } from "@/lib/auth-client.ts";
-import { appShellQueryOptions } from "@/lib/queries.ts";
+import { afterSignOut } from "@/lib/query-events.ts";
 
 /**
  * Ends the session, drops every cached athlete query, and returns to sign-in.
@@ -16,14 +16,7 @@ export function useSignOut() {
     async ({ ignoreBlocker = false }: { ignoreBlocker?: boolean } = {}) => {
       // Offline or an already-deleted session must not strand the athlete here.
       await authClient.signOut().catch(() => undefined);
-      queryClient.setQueryData(appShellQueryOptions.queryKey, {
-        signedIn: false,
-        training: null,
-        hasProfile: false,
-      });
-      queryClient.removeQueries({
-        predicate: (query) => query.queryKey[0] !== "app-shell",
-      });
+      afterSignOut(queryClient);
       await router.invalidate();
       await router.navigate({ to: "/", replace: true, ignoreBlocker });
     },

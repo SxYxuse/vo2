@@ -7,15 +7,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { CalendarDaysIcon, CheckIcon, ChevronLeftIcon } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 
-import {
-  activityMapQueryOptions,
-  weekTargetQueryOptions,
-  appShellQueryOptions,
-  heartRateQueryOptions,
-  homeQueryOptions,
-  settingsSnapshotQueryOptions,
-  syncStatusQueryOptions,
-} from "@/lib/queries.ts";
+import { settingsSnapshotQueryOptions, syncStatusQueryOptions } from "@/lib/queries.ts";
+import { afterProfileSaved, afterSettingsSaved } from "@/lib/query-events.ts";
 import {
   PROFILE_FIELDS,
   SPORTS_FIELDS,
@@ -170,29 +163,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const save = useMutation({
     mutationFn: saveAthleteSettings,
     onSuccess: (saved) => {
-      queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
-        current ? { ...current, settings: saved.settings, training: saved.training } : current,
-      );
-      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              profile: saved.profile,
-              settings: saved.settings,
-              training: saved.training,
-            }
-          : current,
-      );
-      // Keeps the onboarding route on "You're set" instead of the profile prompt.
-      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
-        current ? { ...current, training: saved.training, hasProfile: true } : current,
-      );
-      void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey });
+      // Marking the profile done keeps the onboarding route on "You're set" instead of the
+      // profile prompt.
+      void afterSettingsSaved(queryClient, saved, { profileDone: true });
       setSaveError(null);
       setStepIndex(STEPS.length - 1);
     },
@@ -434,11 +407,7 @@ export function ProfilePrompt() {
   const save = useMutation({
     mutationFn: saveProfile,
     onSuccess: async () => {
-      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
-        current ? { ...current, hasProfile: true } : current,
-      );
-      // Age reshapes max HR, zones, and training load on every page.
-      void queryClient.invalidateQueries();
+      void afterProfileSaved(queryClient);
       await navigate({ to: "/" });
     },
   });

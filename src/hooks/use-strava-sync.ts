@@ -4,16 +4,8 @@ import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-quer
 import { useRouter } from "@tanstack/react-router";
 
 import { authClient } from "@/lib/auth-client.ts";
-import {
-  activityMapQueryOptions,
-  appShellQueryOptions,
-  fitnessQueryOptions,
-  weekTargetQueryOptions,
-  heartRateQueryOptions,
-  homeQueryOptions,
-  settingsSnapshotQueryOptions,
-  syncStatusQueryOptions,
-} from "@/lib/queries.ts";
+import { syncStatusQueryOptions } from "@/lib/queries.ts";
+import { afterLocalCopyChanged } from "@/lib/query-events.ts";
 import { syncStrava } from "@/services/strava-sync.ts";
 import {
   isTransientSyncError,
@@ -142,17 +134,7 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
           }
           activitiesUpserted += result.activitiesUpserted;
           streamsFetched += result.streamsFetched;
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: syncStatusQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
-            queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
-            router.invalidate(),
-          ]);
+          await Promise.all([afterLocalCopyChanged(queryClient), router.invalidate()]);
           if (result.alreadyRunning || result.done || result.pausedUntil || result.lastError) {
             finishSyncToast(notify, toastId, result, activitiesUpserted, streamsFetched);
             return result;
