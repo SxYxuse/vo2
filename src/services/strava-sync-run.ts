@@ -40,13 +40,7 @@ export type StravaReader = {
   };
 };
 
-export type StoredSyncRun = {
-  status: string;
-  pausedUntil: Date | null;
-  lastError: string | null;
-  shortLimitRemaining: number | null;
-  dailyLimitRemaining: number | null;
-};
+export type StoredSyncRun = NonNullable<Parameters<typeof storedPauseResult>[0]>;
 
 export type RecordedSyncRun = {
   status: Exclude<SyncKind, "never">;

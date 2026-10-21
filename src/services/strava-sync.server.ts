@@ -381,7 +381,14 @@ async function storeStreams(activityId: string, streams: StreamSet) {
     });
   await db
     .update(activities)
-    .set({ streamsSyncedAt: now, hasHeartrate, updatedAt: now })
+    .set({
+      streamsSyncedAt: now,
+      hasHeartrate,
+      updatedAt: now,
+      // A power ride without weighted watts is scored from its watts stream, which arrives after
+      // history: rescore it.
+      ...(streams.watts?.data?.length ? { trainingLoad: null, loadSource: null } : {}),
+    })
     .where(eq(activities.id, activityId));
 }
 

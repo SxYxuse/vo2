@@ -264,7 +264,7 @@ describe("syncAthlete", () => {
   it("stops copying streams when the request budget runs out", async () => {
     const local = fakeStore();
     let clock = NOW;
-    // Each read takes 2.5 s of the 6 s request budget.
+    // Each read takes 2.5 s of the request budget (SYNC_REQUEST_BUDGET_MS).
     const strava = fakeStrava([activity(1, 1), activity(2, 2)], { onRead: () => (clock += 2_500) });
     const sync = () =>
       syncAthlete({ store: local.store, openStrava: async () => strava, now: () => clock });
