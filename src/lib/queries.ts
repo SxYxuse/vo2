@@ -7,7 +7,8 @@ import { loadAppShell } from "@/services/app-shell.ts";
 import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
-import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";
+import { loadHomeData } from "@/services/home-data.ts";
+import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
 
