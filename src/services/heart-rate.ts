@@ -152,6 +152,8 @@ export type HeartRateLthrSource = "estimated-from-max";
 export type HeartRateSession = {
   start: string;
   zoneSeconds: number[];
+  /** Time-weighted average of the plausible samples; null without any. */
+  avgBpm: number | null;
 };
 
 export type HeartRateSport = {
@@ -220,6 +222,16 @@ export function isPlausibleBpm(value: number | null | undefined) {
 
 export function histogramSeconds(histogram: number[]) {
   return histogram.reduce((sum, seconds) => sum + seconds, 0);
+}
+
+export function histogramAvgBpm(histogram: number[]) {
+  let sum = 0;
+  let seconds = 0;
+  for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm += 1) {
+    sum += bpm * (histogram[bpm] ?? 0);
+    seconds += histogram[bpm] ?? 0;
+  }
+  return seconds > 0 ? Math.round((sum / seconds) * 10) / 10 : null;
 }
 
 export function histogramMaxBpm(histogram: number[]) {
@@ -380,7 +392,7 @@ export function toHeartRateSport(
 export function addSessionToSport(sport: HeartRateSport, start: string, histogram: number[]) {
   const zones = zonesFromHistogram(histogram, sport.sportType, sport.maxHeartrate, sport.lthr);
   const zoneSeconds = zones.map((zone) => zone.seconds);
-  sport.sessions.push({ start, zoneSeconds });
+  sport.sessions.push({ start, zoneSeconds, avgBpm: histogramAvgBpm(histogram) });
   sport.sampleSeconds += zoneSeconds.reduce((sum, seconds) => sum + seconds, 0);
   sport.zones = sport.zones.map((zone, index) => ({
     ...zone,
@@ -415,8 +427,10 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
   let sampleSeconds = 0;
   let activityCount = 0;
   let peak: HeartRateSport | null = null;
+  const sessions: HeartRateSession[] = [];
   for (const sport of sports) {
     activityCount += sport.activityCount;
+    sessions.push(...sport.sessions);
     sampleSeconds += sport.sampleSeconds;
     for (const zone of sport.zones) {
       zoneSeconds.set(zone.id, (zoneSeconds.get(zone.id) ?? 0) + zone.seconds);
@@ -451,7 +465,7 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
       seconds: zoneSeconds.get(zone.id) ?? 0,
     })),
     activityStarts: [],
-    sessions: [],
+    sessions: sessions.sort((a, b) => a.start.localeCompare(b.start)),
     efficiencyKind: null,
     efficiency: [],
   };

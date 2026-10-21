@@ -260,6 +260,7 @@ async function buildActivityHeart(
     decoupling: analysis?.decoupling ?? null,
     efficiency,
     usual,
+    peaks: analysis?.peaks ?? [],
     avgTempC: analysis?.avgTempC ?? null,
   };
 }

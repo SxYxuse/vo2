@@ -19,6 +19,7 @@ import {
 } from "@/services/heart-rate.ts";
 import { FITNESS_PERIODS, periodStartMs } from "@/services/training-load.ts";
 import { EfficiencyTrendCard } from "@/components/heart-rate-efficiency.tsx";
+import { HeartRateReportCard } from "@/components/heart-rate-report.tsx";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
 import { StatCard } from "@/components/stat-card.tsx";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
@@ -265,6 +266,7 @@ export function HeartRateZones({
           )}
         </CardContent>
       </Card>
+      {period ? <HeartRateReportCard sport={selected} period={period} /> : null}
       {selected.efficiencyKind && period ? (
         <EfficiencyTrendCard sport={selected} period={period} />
       ) : null}

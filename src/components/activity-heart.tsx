@@ -31,6 +31,8 @@ import { StatCard, type StatCardProps } from "@/components/stat-card.tsx";
 const STAT_INFO = {
   efficiency:
     "Output per heartbeat: normalized power ÷ average heart rate on rides with a power meter, speed ÷ average heart rate on flat runs. Compared with the median of your aerobic sessions in the 6 weeks before. Higher means more work for the same heart rate.",
+  peaks:
+    "Highest average heart rate you held for 1, 5, and 20 minutes in this session. Steadier than the single max, which a sensor spike can set. Compared with the max HR your zones use.",
   usual:
     "The average heart rate your aerobic sessions of the last 90 days needed for this output. A gap of 5 bpm or more is worth a look: fatigue, heat, sleep, and illness all raise it.",
 } as const;
@@ -103,6 +105,23 @@ function usualStat(heart: ActivityHeart): StatCardProps | null {
   };
 }
 
+const PEAK_LABEL: Record<number, string> = {
+  60: "Best 1 min",
+  300: "Best 5 min",
+  1200: "Best 20 min",
+};
+
+function peakStats(heart: ActivityHeart): StatCardProps[] {
+  return heart.peaks.map((peak) => ({
+    label: PEAK_LABEL[peak.seconds] ?? `Best ${Math.round(peak.seconds / 60)} min`,
+    value: `${peak.bpm} bpm`,
+    hint: heart.maxHeartrate
+      ? `${Math.round((peak.bpm / heart.maxHeartrate) * 100)}% of max`
+      : undefined,
+    info: STAT_INFO.peaks,
+  }));
+}
+
 /** Morning form (yesterday's fitness minus fatigue) on the activity's day, from the cached PMC. */
 function useFormOnDay(start: string) {
   const { data } = useQuery(fitnessQueryOptions);
@@ -127,6 +146,7 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
   const stats = [decouplingStat(heart), efficiencyStat(heart), usualStat(heart)].filter(
     (stat): stat is StatCardProps => stat != null,
   );
+  const peaks = peakStats(heart);
   const context = heart.usual
     ? explainHeartGap({ gapBpm: heart.usual.gapBpm, tsb, tempC: heart.avgTempC })
     : null;
@@ -135,7 +155,7 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
     heart.lthr ? `LTHR ${heart.lthr}` : null,
   ].filter(Boolean);
 
-  if (!zones?.length && !stats.length) return null;
+  if (!zones?.length && !stats.length && !peaks.length) return null;
 
   return (
     <ActivityDetailSection
@@ -205,6 +225,14 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
               </Item>
             ))}
           </ItemGroup>
+        </div>
+      ) : null}
+
+      {peaks.length ? (
+        <div className="grid grid-cols-3 gap-2">
+          {peaks.map((stat) => (
+            <StatCard key={stat.label} {...stat} />
+          ))}
         </div>
       ) : null}
 
