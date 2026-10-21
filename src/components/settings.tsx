@@ -6,15 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
 import { useForm, type FieldErrors } from "react-hook-form";
 
-import {
-  activityMapQueryOptions,
-  weekTargetQueryOptions,
-  appShellQueryOptions,
-  fitnessQueryOptions,
-  heartRateQueryOptions,
-  homeQueryOptions,
-  settingsSnapshotQueryOptions,
-} from "@/lib/queries.ts";
+import { settingsSnapshotQueryOptions } from "@/lib/queries.ts";
+import { afterSettingsSaved } from "@/lib/query-events.ts";
 import {
   profileFromForm,
   settingsFormDefaults,
@@ -138,30 +131,7 @@ export function SettingsForm({
   const save = useMutation({
     mutationFn: saveAthleteSettings,
     onSuccess: (saved) => {
-      queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
-        current ? { ...current, settings: saved.settings, training: saved.training } : current,
-      );
-      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
-        current
-          ? {
-              ...current,
-              profile: saved.profile,
-              settings: saved.settings,
-              training: saved.training,
-            }
-          : current,
-      );
-      queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
-        current ? { ...current, training: saved.training } : current,
-      );
-      void queryClient.invalidateQueries({ queryKey: appShellQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: heartRateQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: activityMapQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey });
-      void queryClient.invalidateQueries({ queryKey: ["activity"] });
-      void queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey });
+      void afterSettingsSaved(queryClient, saved);
       setSaveError(null);
       toast.add({ type: "success", title: "Settings saved" });
     },
