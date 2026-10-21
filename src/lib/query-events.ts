@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import {
+  activityDetailQueryOptions,
   appShellQueryOptions,
   homeQueryOptions,
   settingsSnapshotQueryOptions,
@@ -13,7 +14,7 @@ import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
  * screen refetch, and a new query is covered without editing a key list.
  */
 
-/** Settings and training plan show at once; every view built on them refetches. */
+/** Settings and training plan show at once; every view built on them goes stale. */
 export function afterSettingsSaved(
   queryClient: QueryClient,
   saved: SavedAthleteSettings,
@@ -43,9 +44,15 @@ export function afterProfileSaved(queryClient: QueryClient) {
   return queryClient.invalidateQueries();
 }
 
-/** A sync call copied activities or streams, so every view of the local copy refetches. */
-export function afterLocalCopyChanged(queryClient: QueryClient) {
-  return queryClient.invalidateQueries();
+/** A sync call copied activities or streams, so every view of the local copy goes stale. */
+export async function afterLocalCopyChanged(queryClient: QueryClient) {
+  const detail = activityDetailQueryOptions("").queryKey[0];
+  await Promise.all([
+    queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== detail }),
+    // Sync resumes on its own while the app is open, so refetching an open activity's streams
+    // after every call would download them again on each pass of a long stream copy.
+    queryClient.invalidateQueries({ queryKey: [detail], refetchType: "none" }),
+  ]);
 }
 
 /** Nothing cached for the athlete may outlive the session; the shell shows signed out at once. */
