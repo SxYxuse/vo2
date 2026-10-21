@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { appSettingsSaveSchema } from "./app-settings.types.ts";
+import { athleteSettingsSaveSchema } from "./athlete-settings.ts";
 
 const profile = { birthDate: "1990-05-14", weightKg: 72 };
 
@@ -8,9 +8,9 @@ function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
 }
 
-describe("appSettingsSaveSchema", () => {
+describe("athleteSettingsSaveSchema", () => {
   it("rejects a save that hides every sport type", () => {
-    const result = appSettingsSaveSchema.safeParse({
+    const result = athleteSettingsSaveSchema.safeParse({
       profile,
       sportTypes: { Run: sport(false), Ride: sport(false) },
       sportGroupShares: {},
@@ -20,7 +20,7 @@ describe("appSettingsSaveSchema", () => {
   });
 
   it("accepts a save that keeps one sport type shown", () => {
-    const result = appSettingsSaveSchema.safeParse({
+    const result = athleteSettingsSaveSchema.safeParse({
       profile,
       sportTypes: { Run: sport(false), Ride: sport(true) },
       sportGroupShares: {},
@@ -30,7 +30,7 @@ describe("appSettingsSaveSchema", () => {
   });
 
   it("accepts a save before any sport type has been copied", () => {
-    const result = appSettingsSaveSchema.safeParse({
+    const result = athleteSettingsSaveSchema.safeParse({
       profile,
       sportTypes: {},
       sportGroupShares: {},
@@ -40,7 +40,7 @@ describe("appSettingsSaveSchema", () => {
   });
 
   it("rejects a save that clears the birthday", () => {
-    const result = appSettingsSaveSchema.safeParse({
+    const result = athleteSettingsSaveSchema.safeParse({
       profile: { ...profile, birthDate: null },
       sportTypes: {},
       sportGroupShares: {},
@@ -50,7 +50,7 @@ describe("appSettingsSaveSchema", () => {
   });
 
   it("rejects a save that clears the weight", () => {
-    const result = appSettingsSaveSchema.safeParse({
+    const result = athleteSettingsSaveSchema.safeParse({
       profile: { ...profile, weightKg: null },
       sportTypes: {},
       sportGroupShares: {},

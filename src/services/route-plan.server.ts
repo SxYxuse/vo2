@@ -4,7 +4,7 @@ import { db } from "@/db/index.ts";
 import { activities, athleteMetrics, routePlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
-import { getProfileSettingsForUser } from "./app-settings.server.ts";
+import { getAthleteProfile } from "./athlete-settings.server.ts";
 import {
   hasPlanningKit,
   loadFuelCatalog,
@@ -41,7 +41,7 @@ import { SPORT_GROUPS } from "./sport-groups.ts";
 type Chosen = { spec: ProposalSpec; plan: FuelPlan };
 
 async function requireWeight(userId: string) {
-  const { weightKg } = await getProfileSettingsForUser(userId);
+  const { weightKg } = await getAthleteProfile(userId);
   // Onboarding asks for it, so this only trips on a profile edited outside the app.
   if (weightKg == null) throw new Error("Add your weight in Settings to plan fuel.");
   return weightKg;

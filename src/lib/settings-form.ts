@@ -3,15 +3,13 @@ import { z } from "zod";
 import {
   MAX_WEIGHT_KG,
   MIN_WEIGHT_KG,
-  type ProfileSave,
-  type ProfileSettings,
-  profileSaveSchema,
-} from "@/services/app-settings.types.ts";
-import {
   calendarPeriodSchema,
+  profileSaveSchema,
   shownSportTypesSchema,
   type CalendarPeriod,
-} from "@/services/calendar-settings.types.ts";
+  type ProfileSave,
+  type ProfileSettings,
+} from "@/services/athlete-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   DEFAULT_WEEK_MIX,

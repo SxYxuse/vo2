@@ -1,4 +1,4 @@
-import type { CalendarSettings } from "./calendar-settings.types.ts";
+import type { AthleteSettings } from "./athlete-settings.types.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";
 
 export type CalendarActivity = {
@@ -87,7 +87,7 @@ export function autoResumePlan(
 export type HomeData = {
   signedIn: boolean;
   activities: CalendarActivity[];
-  settings: CalendarSettings;
+  settings: AthleteSettings;
   training: TrainingPlan | null;
 };
 

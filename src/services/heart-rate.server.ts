@@ -4,9 +4,8 @@ import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { ageFromBirthDate } from "./app-settings.types.ts";
-import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
-import { mergeCalendarSettings } from "./calendar-settings.types.ts";
+import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { ageFromBirthDate, isSportTypeShown } from "./athlete-settings.types.ts";
 import { efficiencyKindFor, histogramFromStreams, toEfficiencyPoint } from "./heart-insights.ts";
 import {
   ALL_SPORTS,
@@ -48,7 +47,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     return { signedIn: false, overall: EMPTY_OVERALL, sports: [], sportTypes: {} };
   }
 
-  const [rows, storedSettings, metricsRows] = await Promise.all([
+  const [rows, settings, metricsRows] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -67,7 +66,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
       })
       .from(activities)
       .where(eq(activities.userId, session.user.id)),
-    getCalendarSettingsForUser(session.user.id),
+    getAthleteSettings(session.user.id),
     db
       .select({
         cyclingLthr: athleteMetrics.cyclingLthr,
@@ -99,10 +98,6 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     if (row.hasHeartrate) streamIds.push(row.id);
   }
 
-  const settings = mergeCalendarSettings(
-    storedSettings,
-    rows.map((row) => row.sportType),
-  );
   const metrics = metricsRows[0];
   const lthrAnchors: SportLthrAnchors = {};
   const cyclingLthr = metrics?.cyclingLthr ?? metrics?.lthr ?? null;
@@ -130,7 +125,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
   const sports = collapseSportBuckets(
     bySport,
     settings.sportGroupShares,
-    (sportType) => settings.sportTypes[sportType]?.visible !== false,
+    (sportType) => isSportTypeShown(settings.sportTypes, sportType),
     lthrAnchors,
     { age: ageFromBirthDate(metrics?.birthDate ?? null) },
   );

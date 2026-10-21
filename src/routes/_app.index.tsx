@@ -63,7 +63,7 @@ function CalendarPage() {
           Completed Strava activities. Time left this week lives in the Week target.
         </p>
       </div>
-      {signedIn && activities.length === 0 ? (
+      {signedIn && Object.keys(settings.sportTypes).length === 0 ? (
         <Empty className="min-h-64 border">
           <EmptyHeader>
             <EmptyMedia variant="icon">

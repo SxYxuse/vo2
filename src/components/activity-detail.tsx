@@ -16,7 +16,7 @@ import {
   locomotionFor,
   type ActivityDetail,
 } from "@/services/activity-detail.ts";
-import { formatSportType } from "@/services/calendar-settings.ts";
+import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
 import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";

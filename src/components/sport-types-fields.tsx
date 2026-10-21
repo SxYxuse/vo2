@@ -10,8 +10,8 @@ import {
   heartRateCollectorLabel,
   sortSportTypeKeys,
   sportOffersPower,
-  type CalendarSettings,
-} from "@/services/calendar-settings.ts";
+  type AthleteSettings,
+} from "@/services/athlete-settings.types.ts";
 import { SPORT_GROUPS } from "@/services/sport-groups.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
@@ -63,7 +63,7 @@ export function SportTypesFields<T extends SportsFormInput>({
   control: Control<T>;
 }) {
   const sportTypes = (useWatch({ control, name: "sportTypes" as FieldPath<T> }) ??
-    {}) as CalendarSettings["sportTypes"];
+    {}) as AthleteSettings["sportTypes"];
   const { errors } = useFormState({ control, name: "sportTypes" as FieldPath<T> });
   const sportTypesError = (errors as { sportTypes?: { message?: string } }).sportTypes;
 

@@ -3,7 +3,7 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
-import { ageFromBirthDate } from "./app-settings.types.ts";
+import { ageFromBirthDate } from "./athlete-settings.types.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import {
   activityTrainingLoad,

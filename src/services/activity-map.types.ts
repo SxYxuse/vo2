@@ -1,4 +1,4 @@
-import { formatSportType, type CalendarSettings } from "./calendar-settings.types.ts";
+import { formatSportType, type AthleteSettings } from "./athlete-settings.types.ts";
 import { ALL_SPORTS } from "./heart-rate.ts";
 import { SPORT_GROUPS, sharesGroupData } from "./sport-groups.ts";
 
@@ -14,8 +14,8 @@ export type ActivityMapTrack = {
 export type ActivityMapData = {
   signedIn: boolean;
   tracks: ActivityMapTrack[];
-  sportTypes: CalendarSettings["sportTypes"];
-  sportGroupShares: CalendarSettings["sportGroupShares"];
+  sportTypes: AthleteSettings["sportTypes"];
+  sportGroupShares: AthleteSettings["sportGroupShares"];
 };
 
 export type MapSportOption = {
@@ -61,10 +61,9 @@ export function decodePolyline(encoded: string): LngLat[] {
 
 export function mapSportOptions(
   sportTypes: string[],
-  shares: CalendarSettings["sportGroupShares"],
-  isVisible: (sportType: string) => boolean,
+  shares: AthleteSettings["sportGroupShares"],
 ): MapSportOption[] {
-  const remaining = new Set(sportTypes.filter(isVisible));
+  const remaining = new Set(sportTypes);
   const options: MapSportOption[] = [];
   for (const group of SPORT_GROUPS) {
     if (!sharesGroupData(shares, group.id)) continue;

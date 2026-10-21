@@ -9,7 +9,7 @@ import {
   type ActivityChartPreview,
   type ActivityDetail,
 } from "./activity-detail.types.ts";
-import { ageFromBirthDate } from "./app-settings.types.ts";
+import { ageFromBirthDate } from "./athlete-settings.types.ts";
 import {
   buildHeartAnalysis,
   denseHistogram,

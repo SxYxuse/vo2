@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { formatSportType, type CalendarSettings } from "./calendar-settings.types.ts";
+import { formatSportType, type AthleteSettings } from "./athlete-settings.types.ts";
 import {
   estimateMaxHrAnchor,
   type EfficiencyKind,
@@ -189,7 +189,7 @@ export type HeartRateData = {
   signedIn: boolean;
   overall: HeartRateSport;
   sports: HeartRateSport[];
-  sportTypes: CalendarSettings["sportTypes"];
+  sportTypes: AthleteSettings["sportTypes"];
 };
 
 export type SportBucket = {

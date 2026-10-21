@@ -105,7 +105,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const calendarSettings = pgTable("calendar_settings", {
+/** The table keeps its older name; renaming it would need a migration. */
+export const athleteSettings = pgTable("calendar_settings", {
   userId: text("user_id")
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),

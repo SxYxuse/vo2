@@ -7,7 +7,7 @@ import { CheckIcon, ChevronDownIcon, RefreshCwIcon, Trash2Icon } from "lucide-re
 
 import { routePlansQueryOptions } from "@/lib/queries.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
-import { formatSportType } from "@/services/calendar-settings.types.ts";
+import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { planningProducts, type FuelProduct } from "@/services/fuel-catalog.ts";
 import {
   formatAroundTime,

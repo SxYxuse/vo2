@@ -15,8 +15,8 @@ import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts"
 import { getStravaAccessToken } from "@/lib/strava-token.server.ts";
 import { CLEARED_DERIVED_CACHES, staleDerivedCacheIds } from "./activity-derived-cache.ts";
 import { buildChartPreview } from "./activity-detail.types.ts";
-import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
-import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
+import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
 import type { CalendarActivity, HomeData, SyncResult, SyncStatus } from "./strava-sync.types.ts";
 import {
   deriveSyncKind,
@@ -73,12 +73,12 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     return {
       signedIn: false,
       activities: [],
-      settings: DEFAULT_CALENDAR_SETTINGS,
+      settings: DEFAULT_ATHLETE_SETTINGS,
       training: null,
     };
   }
 
-  const [rows, storedSettings, training, streamedWithoutFlag] = await Promise.all([
+  const [rows, settings, training, streamedWithoutFlag] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -94,7 +94,7 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       .from(activities)
       .where(eq(activities.userId, session.user.id))
       .orderBy(activities.startDate),
-    getCalendarSettingsForUser(session.user.id),
+    getAthleteSettings(session.user.id),
     getTrainingPlanForUser(session.user.id),
     db
       .select({ activityId: activityStreams.activityId })
@@ -109,6 +109,7 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
   for (const row of rows) {
     const hasStreams = Boolean(row.streamsSyncedAt) || hasStoredStreams.has(row.id);
     if (!hasStreams) streamsPending += 1;
+    if (!isSportTypeShown(settings.sportTypes, row.sportType)) continue;
     calendarActivities.push(toCalendarActivity(row, hasStreams));
   }
 
@@ -121,10 +122,7 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     signedIn: true,
     activities: calendarActivities,
     training,
-    settings: mergeCalendarSettings(
-      storedSettings,
-      rows.map((row) => row.sportType),
-    ),
+    settings,
   };
 }
 

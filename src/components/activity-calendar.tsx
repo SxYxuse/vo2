@@ -13,9 +13,9 @@ import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import {
   formatSportType,
-  mergeCalendarSettings,
-  type CalendarSettings,
-} from "@/services/calendar-settings.ts";
+  sportTypeColor,
+  type AthleteSettings,
+} from "@/services/athlete-settings.types.ts";
 import {
   formatActivityClockRange,
   formatDistanceKm,
@@ -347,19 +347,12 @@ function DiaryNav({
 
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
-  initialSettings: CalendarSettings;
+  initialSettings: AthleteSettings;
   diary: DiarySearch;
 };
 
 export function ActivityCalendar({ activities, initialSettings, diary }: ActivityCalendarProps) {
-  const sportTypes = useMemo(
-    () =>
-      mergeCalendarSettings(
-        initialSettings,
-        activities.map((activity) => activity.sportType),
-      ).sportTypes,
-    [activities, initialSettings],
-  );
+  const sportTypes = initialSettings.sportTypes;
   const isDesktopMedia = useDesktopMedia();
   const layoutReady = isDesktopMedia !== null;
   const isDesktop = isDesktopMedia === true;
@@ -403,9 +396,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
   const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
     return activities
       .filter(
-        (activity) =>
-          sportTypes[activity.sportType]?.visible !== false &&
-          (!byMonth || monthKey(new Date(activity.start), timeZone) === cursorMonth),
+        (activity) => !byMonth || monthKey(new Date(activity.start), timeZone) === cursorMonth,
       )
       .map((activity) => {
         const dayStart = zonedStartOfDay(new Date(activity.start), timeZone);
@@ -415,7 +406,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
           start: dayStart,
           end: addDays(dayStart, 1),
           allDay: true,
-          color: sportTypes[activity.sportType]?.color ?? "var(--color-ds-gray-700)",
+          color: sportTypeColor(sportTypes, activity.sportType),
           readOnly: true,
           draggable: false,
           resizable: false,

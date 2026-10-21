@@ -7,7 +7,7 @@ import { RouteUploadForm } from "@/components/route-upload-form.tsx";
 import { SignInPanel } from "@/components/sync-panel.tsx";
 import { loaderQuery, routePlansQueryOptions } from "@/lib/queries.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
-import { formatSportType } from "@/services/calendar-settings.types.ts";
+import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { formatAroundTime } from "@/services/fuel-plan.ts";
 import type { RoutePlanSummary } from "@/services/route-plan.ts";
 import { Badge } from "@/components/ui/badge";

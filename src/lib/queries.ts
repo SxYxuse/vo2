@@ -4,7 +4,7 @@ import { getActivityAnalysis, getAnalysisStatus } from "@/services/activity-anal
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadAppShell } from "@/services/app-shell.ts";
-import { loadSettingsSnapshot } from "@/services/app-settings.ts";
+import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
 import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";

@@ -1,3 +1,4 @@
+import { differenceInYears, isValid } from "date-fns";
 import { z } from "zod";
 
 import {
@@ -66,7 +67,7 @@ export const CALENDAR_PERIODS = [
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
-export const calendarSettingsSchema = z.object({
+const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
   calendarPeriod: calendarPeriodSchema.default("month"),
@@ -81,13 +82,24 @@ export function hidesEverySportType(sportTypes: Record<string, { visible: boolea
 }
 
 /** Sport type settings for a save: once any type is copied, at least one must stay shown. */
-export const shownSportTypesSchema = calendarSettingsSchema.shape.sportTypes.refine(
+export const shownSportTypesSchema = athleteSettingsSchema.shape.sportTypes.refine(
   (sportTypes) => !hidesEverySportType(sportTypes),
   { error: SHOW_ONE_SPORT_MESSAGE },
 );
 
 type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
-export type CalendarSettings = z.infer<typeof calendarSettingsSchema>;
+export type AthleteSettings = z.infer<typeof athleteSettingsSchema>;
+export type SportTypeSettings = AthleteSettings["sportTypes"];
+
+/** Hidden sport types stay out of the calendar, map, and heart-rate views only (ADR 0018). */
+export function isSportTypeShown(sportTypes: SportTypeSettings, sportType: string) {
+  return sportTypes[sportType]?.visible !== false;
+}
+
+/** Falls back to the sport type's default for a type the settings don't know yet. */
+export function sportTypeColor(sportTypes: SportTypeSettings, sportType: string) {
+  return sportTypes[sportType]?.color ?? defaultColorForSport(sportType);
+}
 
 export type SportCollectors = {
   heartRate: boolean;
@@ -112,41 +124,15 @@ export function heartRateCollectorLabel(sportType: string) {
   return "Heart rate";
 }
 
-function sportPowerEnabled(sportType: string, power: boolean | undefined) {
-  return sportOffersPower(sportType) && power === true;
-}
-
-function withSportCollectors(value: unknown) {
-  if (!value || typeof value !== "object") return value;
-  const raw = value as Record<string, unknown>;
-  const sportTypes = raw.sportTypes;
-  if (!sportTypes || typeof sportTypes !== "object") return raw;
-  return {
-    ...raw,
-    sportTypes: Object.fromEntries(
-      Object.entries(sportTypes as Record<string, Record<string, unknown>>).map(
-        ([sportType, setting]) => [
-          sportType,
-          {
-            ...setting,
-            heartRate: setting.heartRate !== false,
-            power: sportPowerEnabled(sportType, setting.power === true),
-          },
-        ],
-      ),
-    ),
-  };
-}
-
+/** Sensors are still worn when a sport type is hidden, so hidden types count (ADR 0018). */
 export function familyCollectors(
-  sportTypes: CalendarSettings["sportTypes"],
+  sportTypes: SportTypeSettings,
   family: "running" | "cycling",
 ): SportCollectors {
   const members = SPORT_GROUPS.find((group) => group.id === family)?.members ?? [];
   const pool = members
     .map((sportType) => sportTypes[sportType])
-    .filter((setting): setting is SportTypeSetting => Boolean(setting))
-    .filter((setting) => setting.visible !== false);
+    .filter((setting): setting is SportTypeSetting => Boolean(setting));
   if (!pool.length) return EMPTY_COLLECTORS;
   const withPower = pool.filter((setting) => setting.power).length;
   return {
@@ -156,7 +142,7 @@ export function familyCollectors(
   };
 }
 
-export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
+export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
   calendarPeriod: "month",
@@ -166,10 +152,10 @@ export function formatSportType(sportType: string) {
   return sportType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
 }
 
-export function sortSportTypeKeys(sportTypes: CalendarSettings["sportTypes"]) {
+export function sortSportTypeKeys(sportTypes: SportTypeSettings) {
   return Object.keys(sportTypes).sort((a, b) => {
-    const aVisible = sportTypes[a]?.visible !== false;
-    const bVisible = sportTypes[b]?.visible !== false;
+    const aVisible = isSportTypeShown(sportTypes, a);
+    const bVisible = isSportTypeShown(sportTypes, b);
     if (aVisible !== bVisible) return aVisible ? -1 : 1;
     return formatSportType(a).localeCompare(formatSportType(b));
   });
@@ -185,60 +171,106 @@ function detectedSportTypes(sportTypes: string[]) {
   );
 }
 
-export function parseCalendarSettings(value: unknown): CalendarSettings | null {
-  const parsed = calendarSettingsSchema.safeParse(withSportCollectors(value));
+/** Older rows lack sensors, and colours predate the Geist 700 palette. */
+function normalizeSportTypeSetting(sportType: string, setting: Record<string, unknown>) {
+  return {
+    ...setting,
+    color: typeof setting.color === "string" ? coerceToGeist700(setting.color) : setting.color,
+    heartRate: setting.heartRate !== false,
+    power: sportOffersPower(sportType) && setting.power === true,
+  };
+}
+
+/** Validates a stored or submitted value and normalises every sport type in it. */
+export function parseAthleteSettings(value: unknown): AthleteSettings | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const sportTypes =
+    raw.sportTypes && typeof raw.sportTypes === "object"
+      ? Object.fromEntries(
+          Object.entries(raw.sportTypes as Record<string, Record<string, unknown>>).map(
+            ([sportType, setting]) => [sportType, normalizeSportTypeSetting(sportType, setting)],
+          ),
+        )
+      : raw.sportTypes;
+  const parsed = athleteSettingsSchema.safeParse({ ...raw, sportTypes });
   if (!parsed.success) return null;
   return {
     ...parsed.data,
     sportGroupShares: mergeSportGroupShares(parsed.data.sportGroupShares),
-    sportTypes: Object.fromEntries(
-      Object.entries(parsed.data.sportTypes).map(([sportType, setting]) => [
-        sportType,
-        {
-          visible: setting.visible,
-          color: coerceToGeist700(setting.color),
-          heartRate: setting.heartRate !== false,
-          power: sportPowerEnabled(sportType, setting.power),
-        },
-      ]),
-    ),
   };
 }
 
-export function mergeCalendarSettings(
-  stored: CalendarSettings | null | undefined,
+/** Keeps exactly the sport types in the local copy, adding defaults for new ones. */
+export function mergeAthleteSettings(
+  stored: AthleteSettings | null,
   sportTypeNames: string[],
-): CalendarSettings {
-  const base = stored
-    ? {
-        ...DEFAULT_CALENDAR_SETTINGS,
-        ...stored,
-        sportTypes: stored.sportTypes ?? {},
-        sportGroupShares: mergeSportGroupShares(stored.sportGroupShares),
-      }
-    : DEFAULT_CALENDAR_SETTINGS;
-
-  const sportTypes: Record<string, SportTypeSetting> = {};
+): AthleteSettings {
+  const base = stored ?? DEFAULT_ATHLETE_SETTINGS;
+  const sportTypes: SportTypeSettings = {};
   for (const sportType of detectedSportTypes(sportTypeNames)) {
-    const storedType = base.sportTypes[sportType];
-    sportTypes[sportType] = storedType
-      ? {
-          visible: storedType.visible,
-          color: coerceToGeist700(storedType.color),
-          heartRate: storedType.heartRate !== false,
-          power: sportPowerEnabled(sportType, storedType.power),
-        }
-      : {
-          visible: true,
-          color: defaultColorForSport(sportType),
-          heartRate: true,
-          power: false,
-        };
+    sportTypes[sportType] = base.sportTypes[sportType] ?? {
+      visible: true,
+      color: defaultColorForSport(sportType),
+      heartRate: true,
+      power: false,
+    };
   }
-
   return {
     ...base,
     sportTypes,
     sportGroupShares: mergeSportGroupShares(base.sportGroupShares),
   };
+}
+
+const birthDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+export const MIN_WEIGHT_KG = 30;
+export const MAX_WEIGHT_KG = 200;
+const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
+
+/** Stored profile: athletes who onboarded before a field was required may lack it. */
+export const profileSettingsSchema = z.object({
+  birthDate: birthDateSchema.nullable(),
+  weightKg: weightKgSchema.nullable(),
+});
+
+/** Every save carries a birthday and a weight, so neither can be cleared once set. */
+export const profileSaveSchema = z.object({
+  birthDate: birthDateSchema,
+  weightKg: weightKgSchema,
+});
+
+export type ProfileSettings = z.infer<typeof profileSettingsSchema>;
+export type ProfileSave = z.infer<typeof profileSaveSchema>;
+
+export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
+  birthDate: null,
+  weightKg: null,
+};
+
+/** Age and weight are both required before the app opens. */
+export function isProfileComplete(profile: ProfileSettings) {
+  return profile.birthDate != null && profile.weightKg != null;
+}
+
+export function parseBirthDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  const date = new Date(year, month - 1, day);
+  return isValid(date) ? date : null;
+}
+
+export function formatBirthDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function ageFromBirthDate(value: string | null, now = new Date()) {
+  if (!value) return null;
+  const birth = parseBirthDate(value);
+  if (!birth || birth > now) return null;
+  return differenceInYears(now, birth);
 }
