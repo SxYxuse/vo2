@@ -509,6 +509,17 @@ function indexedElevationClimbs(samples: ActivitySample[], sportType?: string) {
     .sort((a, b) => b.elevationDeltaM - a.elevationDeltaM);
 }
 
+/** Every sustained climb, in route order: fuel planning colours and times all of them. */
+export function allElevationClimbs(
+  samples: ActivitySample[],
+  sportType?: string,
+): TerrainSegment[] {
+  return indexedTerrainSegments(samples, sportType)
+    .filter((segment) => segment.kind === "climb")
+    .sort((a, b) => a.startSec - b.startSec)
+    .map(withoutIndexes);
+}
+
 export function detectElevationSegments(
   samples: ActivitySample[],
   sportType?: string,

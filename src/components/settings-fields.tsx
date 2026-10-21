@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, WeightIcon } from "lucide-react";
 import {
   Controller,
   useWatch,
@@ -42,6 +42,12 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
@@ -64,6 +70,7 @@ export function ProfileFields<T extends ProfileFormValues>({
         <FieldDescription>From your Strava account.</FieldDescription>
       </Field>
       <BirthDateField idPrefix={idPrefix} control={control} />
+      <WeightField idPrefix={idPrefix} control={control} />
     </FieldGroup>
   );
 }
@@ -122,6 +129,50 @@ export function BirthDateField<T extends ProfileFormValues>({
           <FieldDescription>
             Your age predicts your max heart rate, which sets heart-rate zones and training load.
           </FieldDescription>
+          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
+        </Field>
+      )}
+    />
+  );
+}
+
+export function WeightField<T extends ProfileFormValues>({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<T>;
+}) {
+  return (
+    <Controller
+      name={"weightKg" as FieldPath<T>}
+      control={control}
+      render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor={`${idPrefix}-weight`}>Weight</FieldLabel>
+          <InputGroup className="max-w-48">
+            {/* Text, not number: comma-decimal keyboards can't type "72.5" into a number input. */}
+            <InputGroupInput
+              id={`${idPrefix}-weight`}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="72"
+              name={field.name}
+              value={field.value as string}
+              aria-invalid={fieldState.invalid}
+              onBlur={field.onBlur}
+              onChange={field.onChange}
+              ref={field.ref}
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupText>
+                <WeightIcon />
+                kg
+              </InputGroupText>
+            </InputGroupAddon>
+          </InputGroup>
+          <FieldDescription>Caps the caffeine in your fuel plans.</FieldDescription>
           {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
         </Field>
       )}

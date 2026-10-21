@@ -6,6 +6,7 @@ import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadAppShell } from "@/services/app-shell.ts";
 import { loadSettingsSnapshot } from "@/services/app-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
+import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
 import { loadHomeData, loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
@@ -84,5 +85,19 @@ export function activityDetailQueryOptions(id: string) {
     queryFn: () => getActivityDetail({ data: { id } }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
+  });
+}
+
+export const routePlansQueryOptions = queryOptions({
+  queryKey: ["route-plans"],
+  queryFn: () => listRoutePlans(),
+  staleTime: 60_000,
+});
+
+export function routePlanQueryOptions(id: string) {
+  return queryOptions({
+    queryKey: ["route-plans", id],
+    queryFn: () => getRoutePlan({ data: { id } }),
+    staleTime: 60_000,
   });
 }

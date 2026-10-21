@@ -6,14 +6,20 @@ import { trainingPlanSchema } from "./training-plan.types.ts";
 
 const birthDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-/** Stored profile: athletes who onboarded before the birthday was required may have none. */
+export const MIN_WEIGHT_KG = 30;
+export const MAX_WEIGHT_KG = 200;
+const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
+
+/** Stored profile: athletes who onboarded before a field was required may lack it. */
 export const profileSettingsSchema = z.object({
   birthDate: birthDateSchema.nullable(),
+  weightKg: weightKgSchema.nullable(),
 });
 
-/** Every save carries a birthday, so it can't be cleared once set. */
+/** Every save carries a birthday and a weight, so neither can be cleared once set. */
 export const profileSaveSchema = z.object({
   birthDate: birthDateSchema,
+  weightKg: weightKgSchema,
 });
 
 export const appSettingsSaveSchema = z.object({
@@ -30,7 +36,13 @@ export type AppSettingsSave = z.infer<typeof appSettingsSaveSchema>;
 
 export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   birthDate: null,
+  weightKg: null,
 };
+
+/** Age and weight are both required before the app opens. */
+export function isProfileComplete(profile: ProfileSettings) {
+  return profile.birthDate != null && profile.weightKg != null;
+}
 
 export function parseBirthDate(value: string) {
   const [year, month, day] = value.split("-").map(Number);

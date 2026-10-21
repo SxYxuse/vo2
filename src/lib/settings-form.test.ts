@@ -3,6 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   onboardingFormDefaults,
   onboardingFormSchema,
+  profileFormSchema,
+  profileFromForm,
   settingsFormDefaults,
   settingsFormSchema,
 } from "./settings-form.ts";
@@ -18,7 +20,7 @@ const plan = {
   timeZone: "Europe/Paris",
 } as const;
 
-const profile = { birthDate: "1990-05-14" };
+const profile = { birthDate: "1990-05-14", weightKg: 72 };
 
 function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
@@ -63,7 +65,7 @@ describe("settingsFormSchema", () => {
   it("flags the profile section when the birthday is missing", () => {
     const result = settingsFormSchema.safeParse(
       settingsFormDefaults({
-        profile: { birthDate: null },
+        profile: { birthDate: null, weightKg: 72 },
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
@@ -73,6 +75,35 @@ describe("settingsFormSchema", () => {
     );
 
     expect(issuePaths(result)).toEqual(["birthDate"]);
+  });
+
+  it("flags the profile section when the weight is missing", () => {
+    const result = settingsFormSchema.safeParse(
+      settingsFormDefaults({
+        profile: { birthDate: "1990-05-14", weightKg: null },
+        training: plan,
+        sportTypes: {},
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+    );
+
+    expect(issuePaths(result)).toEqual(["weightKg"]);
+  });
+});
+
+describe("profileFormSchema", () => {
+  it.each(["29.9", "200.1", "abc"])("rejects a weight of %s", (weightKg) => {
+    const result = profileFormSchema.safeParse({ birthDate: "1990-05-14", weightKg });
+
+    expect(issuePaths(result)).toEqual(["weightKg"]);
+  });
+
+  it("reads a comma decimal and keeps one decimal", () => {
+    const values = profileFormSchema.parse({ birthDate: "1990-05-14", weightKg: " 72,46 " });
+
+    expect(profileFromForm(values)).toEqual({ birthDate: "1990-05-14", weightKg: 72.5 });
   });
 });
 
@@ -135,6 +166,6 @@ describe("onboardingFormSchema", () => {
       }),
     );
 
-    expect(issuePaths(result)).toEqual(["birthDate"]);
+    expect(issuePaths(result)).toEqual(["birthDate", "weightKg"]);
   });
 });

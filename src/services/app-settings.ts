@@ -48,9 +48,9 @@ export const saveAppSettings = createServerFn({ method: "POST" })
   });
 
 /** Collects the birthday from athletes who onboarded before it was required. */
-export const saveBirthDate = createServerFn({ method: "POST" })
+export const saveProfile = createServerFn({ method: "POST" })
   .validator(profileSaveSchema)
   .handler(async ({ data }): Promise<void> => {
-    const { saveBirthDateImpl } = await import("./app-settings.server.ts");
-    await saveBirthDateImpl(data);
+    const { saveProfileImpl } = await import("./app-settings.server.ts");
+    await saveProfileImpl(data);
   });

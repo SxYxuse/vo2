@@ -9,8 +9,12 @@ The person whose training VO2 tracks. One athlete is one Strava account.
 _Avoid_: User, account, client
 
 **Athlete deletion**:
-Permanently removing an athlete and their whole local copy, training plan, planned sessions, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
+Permanently removing an athlete and their whole local copy, training plan, routes and fuel plans, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
 _Avoid_: Account deletion, deactivation, closing an account
+
+**Body weight**:
+The athlete's weight in kilograms, asked during onboarding with the birthday. It caps caffeine in fuel plans.
+_Avoid_: Mass, BMI
 
 ## Completed work
 
@@ -167,3 +171,33 @@ _Avoid_: Expected HR, baseline HR, resting heart rate
 **Heart-rate zone**:
 One of five effort bands from recovery through VO2 max. Cycling, running, and swimming cut zones from that sport's LTHR; walking and other sports cut from max heart rate.
 _Avoid_: Polar zone, Coggan zone, power zone
+
+## Fuelling
+
+**Route**:
+A GPX file the athlete uploads for a session they plan to do, with its predicted time along the way. It is not an activity and does not count toward the week target.
+_Avoid_: Planned session, course, track
+
+**Climb**:
+A sustained uphill on a route, found with the same detection as climbs in activity analysis. Fuel plans treat every climb, not only the biggest ones.
+_Avoid_: Major climb, hard effort, key climb
+
+**Carb target**:
+Grams of carbohydrate per hour the athlete wants on a route. Defaults to 80 g/h for rides, 60 for runs, and 40 for hikes.
+_Avoid_: Fuel rate, CHO rate
+
+**Fuel plan**:
+The products chosen for one route and the intakes that take them, reaching the carb target within the bottles carried.
+_Avoid_: Nutrition plan, fuelling strategy
+
+**Intake**:
+One entry in a fuel plan: what to take, how much, around which time from the start and kilometre, and why.
+_Avoid_: Feed, dose
+
+**Fuel product**:
+A gel, chew, drink mix, or bar from the stored MNSTRY catalog. Its carbs, glucose:fructose ratio, and caffeine come only from what the store states; a value the store doesn't state stays missing.
+_Avoid_: Supplement, nutrition item, SKU
+
+**Your products**:
+The fuel products the athlete has ticked as theirs. Fuel plans and swaps use only these.
+_Avoid_: Pantry, inventory, stock

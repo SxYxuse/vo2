@@ -1,0 +1,1 @@
+ALTER TABLE "athlete_metrics" ADD COLUMN "weight_kg" real;
