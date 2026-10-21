@@ -20,6 +20,7 @@ import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
+import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -50,6 +51,12 @@ const TRAINING_NAV_ITEMS = [
   { title: "Week target", to: "/week", icon: TargetIcon },
   { title: "Fuel", to: "/fuel", icon: RouteIcon },
 ] as const;
+
+/**
+ * Phones get 44px footer buttons so they are easy to tap clear of the rounded screen corner.
+ * Sized in rem because this theme's --spacing is 0.24rem, so size-11 would be only 42px.
+ */
+const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 
 const NAV_ITEMS = [
   { title: "Map", to: "/map", icon: MapIcon },
@@ -180,11 +187,18 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
-      <SidebarFooter className="flex-row items-center group-data-[collapsible=icon]:flex-col">
+      <SidebarFooter
+        className={cn(
+          "flex-row items-center group-data-[collapsible=icon]:flex-col",
+          isMobile
+            ? "px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+            : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
+        )}
+      >
         {inSettings ? (
           <SidebarMenuButton
             tooltip="Back"
-            className="flex-1"
+            className={cn("flex-1", isMobile && "h-[2.75rem] [&_svg]:size-5")}
             onClick={() => {
               if (isMobile) setOpenMobile(false);
               void router.navigate({ href: lastHref.current ?? "/" });
@@ -197,7 +211,7 @@ export function AppSidebar() {
           <SidebarMenuButton
             tooltip="Settings"
             aria-label="Settings"
-            className="w-auto"
+            className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
             render={
               <Link to="/settings/$section" params={{ section: "profile" }} preload="intent" />
             }
@@ -217,17 +231,18 @@ export function AppSidebar() {
 
 function SidebarThemeButton() {
   const { mounted, current, next, toggle } = useThemeToggle();
+  const { isMobile } = useSidebar();
   const label = mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme";
 
   return (
     <SidebarMenuButton
       tooltip={label}
       aria-label={label}
-      className="w-auto"
+      className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
       disabled={!mounted}
       onClick={toggle}
     >
-      {mounted ? <current.icon /> : <span aria-hidden className="size-4" />}
+      {mounted ? <current.icon /> : <span aria-hidden className={isMobile ? "size-5" : "size-4"} />}
     </SidebarMenuButton>
   );
 }
@@ -248,16 +263,19 @@ function SidebarUserMenu() {
               render={
                 <SidebarMenuButton
                   aria-label={user?.name ?? "Account"}
-                  className="w-auto rounded-full p-1 data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center"
+                  className={cn(
+                    "rounded-full p-1 data-open:bg-sidebar-accent group-data-[collapsible=icon]:justify-center",
+                    isMobile ? MOBILE_FOOTER_BUTTON : "w-auto",
+                  )}
                 />
               }
             >
               {isPending ? (
-                <Avatar size="sm">
+                <Avatar size={isMobile ? "default" : "sm"}>
                   <AvatarFallback>V</AvatarFallback>
                 </Avatar>
               ) : (
-                <Avatar size="sm">
+                <Avatar size={isMobile ? "default" : "sm"}>
                   {user?.image ? <AvatarImage src={user.image} alt={user.name} /> : null}
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
