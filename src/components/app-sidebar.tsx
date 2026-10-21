@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -67,11 +67,12 @@ const NAV_ITEMS = [
 function SidebarNavMenu({
   items,
   pathname,
+  onLinkClick,
 }: {
   items: ReadonlyArray<(typeof TRAINING_NAV_ITEMS)[number] | (typeof NAV_ITEMS)[number]>;
   pathname: string;
+  onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  const { isMobile, setOpenMobile } = useSidebar();
   return (
     <SidebarMenu>
       {items.map((item) => (
@@ -83,15 +84,7 @@ function SidebarNavMenu({
                 : pathname === item.to
             }
             tooltip={item.title}
-            render={
-              <Link
-                to={item.to}
-                preload="viewport"
-                onClick={() => {
-                  if (isMobile) setOpenMobile(false);
-                }}
-              />
-            }
+            render={<Link to={item.to} preload="viewport" onClick={onLinkClick} />}
           >
             <item.icon />
             <span>{item.title}</span>
@@ -102,8 +95,13 @@ function SidebarNavMenu({
   );
 }
 
-function SettingsNavMenu({ pathname }: { pathname: string }) {
-  const { isMobile, setOpenMobile } = useSidebar();
+function SettingsNavMenu({
+  pathname,
+  onLinkClick,
+}: {
+  pathname: string;
+  onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+}) {
   return (
     <SidebarMenu>
       {SETTINGS_SECTIONS.map((item) => (
@@ -112,13 +110,7 @@ function SettingsNavMenu({ pathname }: { pathname: string }) {
             isActive={pathname === `/settings/${item.id}`}
             tooltip={item.label}
             render={
-              <Link
-                to="/settings/$section"
-                params={{ section: item.id }}
-                onClick={() => {
-                  if (isMobile) setOpenMobile(false);
-                }}
-              />
+              <Link to="/settings/$section" params={{ section: item.id }} onClick={onLinkClick} />
             }
           >
             <item.icon />
@@ -140,10 +132,49 @@ function useLastHrefOutsideSettings() {
   return lastHref;
 }
 
-export function AppSidebar() {
+/**
+ * Router state is a sync external store, so React renders the next page in one blocking task
+ * and nothing paints until it is built (a few hundred ms for the calendar). Show the
+ * destination in the sidebar first, let that paint, then navigate, so a tap answers at once.
+ */
+function useSidebarNavigate() {
   const router = useRouter();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const routerPathname = useRouterState({ select: (state) => state.location.pathname });
   const { isMobile, setOpenMobile } = useSidebar();
+  const [pendingPathname, setPendingPathname] = useState<string | null>(null);
+
+  const navigate = (href: string, { keepOpen = false } = {}) => {
+    if (isMobile && !keepOpen) setOpenMobile(false);
+    setPendingPathname(new URL(href, window.location.origin).pathname);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        void router.navigate({ href }).finally(() => setPendingPathname(null));
+      }, 0);
+    });
+  };
+
+  const onLinkClick = (event: MouseEvent<HTMLAnchorElement>, options?: { keepOpen?: boolean }) => {
+    const href = event.currentTarget.getAttribute("href");
+    if (
+      !href ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    navigate(href, options);
+  };
+
+  return { pathname: pendingPathname ?? routerPathname, navigate, onLinkClick };
+}
+
+export function AppSidebar() {
+  const { pathname, navigate, onLinkClick } = useSidebarNavigate();
+  const { isMobile } = useSidebar();
   const lastHref = useLastHrefOutsideSettings();
   const inSettings = isSettingsPath(pathname);
 
@@ -168,7 +199,7 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel>Settings</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SettingsNavMenu pathname={pathname} />
+              <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
@@ -176,12 +207,16 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupLabel>Training</SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarNavMenu items={TRAINING_NAV_ITEMS} pathname={pathname} />
+                <SidebarNavMenu
+                  items={TRAINING_NAV_ITEMS}
+                  pathname={pathname}
+                  onLinkClick={onLinkClick}
+                />
               </SidebarGroupContent>
             </SidebarGroup>
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} />
+                <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} onLinkClick={onLinkClick} />
               </SidebarGroupContent>
             </SidebarGroup>
           </>
@@ -199,10 +234,7 @@ export function AppSidebar() {
           <SidebarMenuButton
             tooltip="Back"
             className={cn("flex-1", isMobile && "h-[2.75rem] [&_svg]:size-5")}
-            onClick={() => {
-              if (isMobile) setOpenMobile(false);
-              void router.navigate({ href: lastHref.current ?? "/" });
-            }}
+            onClick={() => navigate(lastHref.current ?? "/")}
           >
             <ArrowLeftIcon />
             <span>Back</span>
@@ -213,7 +245,13 @@ export function AppSidebar() {
             aria-label="Settings"
             className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
             render={
-              <Link to="/settings/$section" params={{ section: "profile" }} preload="intent" />
+              <Link
+                to="/settings/$section"
+                params={{ section: "profile" }}
+                preload="intent"
+                // Phones keep the sheet open so the athlete can pick a section.
+                onClick={(event) => onLinkClick(event, { keepOpen: true })}
+              />
             }
           >
             <Settings2Icon />
