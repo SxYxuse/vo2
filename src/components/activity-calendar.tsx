@@ -21,7 +21,7 @@ import {
   formatDistanceKm,
   formatDuration,
 } from "@/services/activity-detail.ts";
-import { isMissingHeartrate, type CalendarActivity } from "@/services/strava-sync.types.ts";
+import { isMissingHeartrate, type CalendarActivity } from "@/services/home-data.types.ts";
 import {
   diaryWindow,
   formatDiaryMonth,

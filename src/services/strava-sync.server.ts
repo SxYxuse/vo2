@@ -2,129 +2,17 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db, pool } from "@/db/index.ts";
 import { activities, activityStreams, syncRuns } from "@/db/schema.ts";
-import {
-  DEFAULT_STREAM_KEYS,
-  StravaApi,
-  StravaApiError,
-  type StreamSet,
-  type SummaryActivity,
-} from "@/integrations/strava/client.ts";
-import { StravaDailyLimitError, StravaShortLimitError } from "@/integrations/strava/rate-limit.ts";
+import { StravaApi, type StreamSet, type SummaryActivity } from "@/integrations/strava/client.ts";
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getStravaAccessToken } from "@/lib/strava-token.server.ts";
 import { CLEARED_DERIVED_CACHES, staleDerivedCacheIds } from "./activity-derived-cache.ts";
 import { buildChartPreview } from "./activity-detail.types.ts";
-import { getAthleteSettings } from "./athlete-settings.server.ts";
-import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
-import type { CalendarActivity, HomeData, SyncResult, SyncStatus } from "./strava-sync.types.ts";
-import {
-  deriveSyncKind,
-  historyCompleteFromRun,
-  isAbortError,
-  isOverSyncBudget,
-  remainingSyncBudgetMs,
-  SYNC_POSTPROCESS_MIN_MS,
-  stopsAfterNewestPage,
-  storedPauseResult,
-  STRAVA_RECONNECT_MESSAGE,
-} from "./strava-sync.types.ts";
-import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { athleteExists } from "./athlete-deletion.server.ts";
+import { syncAthlete, type SyncStore } from "./strava-sync-run.ts";
+import type { SyncResult, SyncStatus } from "./strava-sync.types.ts";
+import { deriveSyncKind, historyCompleteFromRun } from "./strava-sync.types.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
-
-const ACTIVITY_PAGE_SIZE = 200;
-const ACTIVITY_PAGES_PER_CALL = 1;
-const STREAM_BATCH_SIZE = 25;
-const STREAM_RETRY_ATTEMPTS = 3;
-/** Re-pull this many already-stored activities so title/sport edits land after a late Strava change. */
-const RECENT_REFRESH_COUNT = 3;
-
-function toCalendarActivity(
-  row: {
-    id: string;
-    name: string;
-    sportType: string;
-    startDate: Date;
-    elapsedTime: number;
-    movingTime: number;
-    distance: number | null;
-    hasHeartrate: boolean;
-  },
-  hasStreams: boolean,
-): CalendarActivity {
-  return {
-    id: row.id,
-    title: row.name,
-    start: row.startDate.toISOString(),
-    end: new Date(row.startDate.getTime() + row.elapsedTime * 1000).toISOString(),
-    sportType: row.sportType,
-    distance: row.distance,
-    movingTime: row.movingTime,
-    hasStreams,
-    hasHeartrate: row.hasHeartrate,
-  };
-}
-
-export async function loadHomeDataImpl(): Promise<HomeData> {
-  const session = await getOptionalSession();
-  if (!session) {
-    logger.debug("home.anonymous");
-    return {
-      signedIn: false,
-      activities: [],
-      settings: DEFAULT_ATHLETE_SETTINGS,
-      training: null,
-    };
-  }
-
-  const [rows, settings, training, streamedWithoutFlag] = await Promise.all([
-    db
-      .select({
-        id: activities.id,
-        name: activities.name,
-        sportType: activities.sportType,
-        startDate: activities.startDate,
-        elapsedTime: activities.elapsedTime,
-        movingTime: activities.movingTime,
-        distance: activities.distance,
-        streamsSyncedAt: activities.streamsSyncedAt,
-        hasHeartrate: activities.hasHeartrate,
-      })
-      .from(activities)
-      .where(eq(activities.userId, session.user.id))
-      .orderBy(activities.startDate),
-    getAthleteSettings(session.user.id),
-    getTrainingPlanForUser(session.user.id),
-    db
-      .select({ activityId: activityStreams.activityId })
-      .from(activities)
-      .innerJoin(activityStreams, eq(activityStreams.activityId, activities.id))
-      .where(and(eq(activities.userId, session.user.id), isNull(activities.streamsSyncedAt))),
-  ]);
-
-  const hasStoredStreams = new Set(streamedWithoutFlag.map((row) => row.activityId));
-  const calendarActivities: CalendarActivity[] = [];
-  let streamsPending = 0;
-  for (const row of rows) {
-    const hasStreams = Boolean(row.streamsSyncedAt) || hasStoredStreams.has(row.id);
-    if (!hasStreams) streamsPending += 1;
-    if (!isSportTypeShown(settings.sportTypes, row.sportType)) continue;
-    calendarActivities.push(toCalendarActivity(row, hasStreams));
-  }
-
-  logger.debug("home.loaded", {
-    activityCount: calendarActivities.length,
-    streamsPending,
-  });
-
-  return {
-    signedIn: true,
-    activities: calendarActivities,
-    training,
-    settings,
-  };
-}
 
 export async function loadSyncStatusImpl(): Promise<SyncStatus> {
   const session = await getOptionalSession();
@@ -207,30 +95,14 @@ async function activityCopyCounts(userId: string) {
 export async function syncStravaImpl(): Promise<SyncResult> {
   const session = await getRequiredSession();
   const userId = session.user.id;
-  const result = await withAthleteSyncLock(userId, async () => {
-    // Read the pause inside the lock: a sync that just finished on another device may have set it.
-    const [run, { streamsPending }] = await Promise.all([
-      db
-        .select({
-          status: syncRuns.status,
-          pausedUntil: syncRuns.pausedUntil,
-          lastError: syncRuns.lastError,
-          shortLimitRemaining: syncRuns.shortLimitRemaining,
-          dailyLimitRemaining: syncRuns.dailyLimitRemaining,
-        })
-        .from(syncRuns)
-        .where(eq(syncRuns.userId, userId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-      activityCopyCounts(userId),
-    ]);
-    const paused = storedPauseResult(run, streamsPending);
-    if (paused) {
-      logger.info("sync.skip_paused", { pausedUntil: paused.pausedUntil });
-      return paused;
-    }
-    return runSync(userId);
-  });
+  // The stored pause is read inside the lock: a sync that just finished on another device may
+  // have set it.
+  const result = await withAthleteSyncLock(userId, () =>
+    syncAthlete({
+      store: postgresSyncStore(userId),
+      openStrava: async () => new StravaApi(await getStravaAccessToken(userId)),
+    }),
+  );
   if (result) return result;
   logger.info("sync.already_running");
   return {
@@ -243,6 +115,62 @@ export async function syncStravaImpl(): Promise<SyncResult> {
     lastError: null,
     alreadyRunning: true,
     rateLimit: { shortRemaining: 0, dailyRemaining: 0, nextWindowAt: new Date().toISOString() },
+  };
+}
+
+function postgresSyncStore(userId: string): SyncStore {
+  return {
+    readRun: () =>
+      db
+        .select({
+          status: syncRuns.status,
+          pausedUntil: syncRuns.pausedUntil,
+          lastError: syncRuns.lastError,
+          shortLimitRemaining: syncRuns.shortLimitRemaining,
+          dailyLimitRemaining: syncRuns.dailyLimitRemaining,
+        })
+        .from(syncRuns)
+        .where(eq(syncRuns.userId, userId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+    async recordRun(run) {
+      const fields = { ...run, updatedAt: new Date() };
+      await db
+        .insert(syncRuns)
+        .values({ userId, ...fields })
+        .onConflictDoUpdate({ target: syncRuns.userId, set: fields });
+    },
+    streamsPending: async () => (await activityCopyCounts(userId)).streamsPending,
+    async newestStartDates(limit) {
+      const rows = await db
+        .select({ startDate: activities.startDate })
+        .from(activities)
+        .where(eq(activities.userId, userId))
+        .orderBy(desc(activities.startDate))
+        .limit(limit);
+      return rows.map((row) => row.startDate);
+    },
+    async oldestStartDate() {
+      const [row] = await db
+        .select({ startDate: activities.startDate })
+        .from(activities)
+        .where(eq(activities.userId, userId))
+        .orderBy(asc(activities.startDate))
+        .limit(1);
+      return row?.startDate ?? null;
+    },
+    upsertActivities: (items) => insertActivityRows(userId, items),
+    activitiesWithoutStreams: (limit) =>
+      db
+        .select({ id: activities.id, manual: activities.manual })
+        .from(activities)
+        .where(and(eq(activities.userId, userId), isNull(activities.streamsSyncedAt)))
+        .orderBy(desc(activities.startDate))
+        .limit(limit),
+    storeStreams,
+    stampStoredStreams: () => stampStoredStreams(userId),
+    athleteExists: () => athleteExists(userId),
+    refreshTrainingLoads: () => refreshTrainingLoadsIfNeeded(userId),
   };
 }
 
@@ -277,251 +205,23 @@ async function withAthleteSyncLock<T>(userId: string, run: () => Promise<T>): Pr
   }
 }
 
-async function runSync(userId: string): Promise<SyncResult> {
-  logger.info("sync.start");
-  const startedAt = Date.now();
-  const [, accessToken] = await Promise.all([
-    stampStoredStreams(userId),
-    getStravaAccessToken(userId),
-  ]);
-  const api = new StravaApi(accessToken);
-  let activitiesUpserted = 0;
-  let streamsFetched = 0;
-  let historyComplete = false;
-  let lastError: string | null = null;
-  let pausedUntil: Date | null = null;
-  let athleteDeleted = false;
+/**
+ * Every sync re-reads the newest few activities, so clearing their load unconditionally would
+ * recompute the whole history on each call. A cleared load is what triggers the recompute.
+ */
+const LOAD_INPUTS_CHANGED = sql.raw(`(
+  activities.sport_type, activities.start_date, activities.moving_time,
+  activities.average_heartrate, activities.max_heartrate, activities.average_watts,
+  activities.weighted_average_watts, activities.device_watts
+) is distinct from (
+  excluded.sport_type, excluded.start_date, excluded.moving_time,
+  excluded.average_heartrate, excluded.max_heartrate, excluded.average_watts,
+  excluded.weighted_average_watts, excluded.device_watts
+)`);
 
-  try {
-    let newerCaughtUp = false;
-    let olderCaughtUp = false;
-    const firstCopy = (await oldestActivityEpoch(userId)) == null;
-    let newestOnly = false;
-    if (!isOverSyncBudget(startedAt)) {
-      const newer = await upsertNewerActivities(api, userId, String(userId));
-      activitiesUpserted += newer.upserted;
-      newerCaughtUp = newer.caughtUp;
-      newestOnly = stopsAfterNewestPage({ firstCopy, newestUpserted: newer.upserted });
-    }
-    if (!newestOnly && !isOverSyncBudget(startedAt)) {
-      const older = await upsertOlderActivities(api, userId, String(userId));
-      activitiesUpserted += older.upserted;
-      olderCaughtUp = older.caughtUp;
-    }
-    historyComplete = newerCaughtUp && olderCaughtUp;
-    // History first: older pages are 200 activities per read and settle fitness; streams cost a
-    // read each and only feed maps and charts.
-    if (historyComplete && !isOverSyncBudget(startedAt)) {
-      streamsFetched = await syncPendingStreams(api, userId, startedAt);
-    }
-  } catch (error) {
-    if (error instanceof StravaDailyLimitError) {
-      pausedUntil = startOfNextUtcDay();
-      lastError = error.message;
-      logger.warn("sync.daily_limit", { pausedUntil: pausedUntil.toISOString() });
-    } else if (error instanceof StravaShortLimitError) {
-      pausedUntil = new Date(api.rateLimit.snapshot().nextWindowAt);
-      lastError = error.message;
-      logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
-    } else if (error instanceof StravaApiError && error.status === 401) {
-      lastError = STRAVA_RECONNECT_MESSAGE;
-      logger.warn("sync.strava_unauthorized", errorFields(error));
-    } else if (isAbortError(error)) {
-      logger.warn("sync.request_aborted", errorFields(error));
-    } else if (!(await athleteExists(userId))) {
-      athleteDeleted = true;
-    } else {
-      lastError = error instanceof Error ? error.message : "Sync failed";
-      logger.error("sync.failed", errorFields(error));
-    }
-  }
-
-  // Athlete deletion ran mid-sync: stop quietly, there is nothing left to write to.
-  if (athleteDeleted || !(await athleteExists(userId))) {
-    logger.info("sync.stopped_athlete_deleted");
-    const snapshot = api.rateLimit.snapshot();
-    return {
-      activitiesUpserted,
-      streamsFetched,
-      streamsPending: 0,
-      historyComplete: false,
-      done: false,
-      pausedUntil: null,
-      lastError: null,
-      alreadyRunning: false,
-      rateLimit: {
-        shortRemaining: snapshot.shortRemaining,
-        dailyRemaining: snapshot.dailyRemaining,
-        nextWindowAt: snapshot.nextWindowAt,
-      },
-    };
-  }
-
-  if (remainingSyncBudgetMs(startedAt) > SYNC_POSTPROCESS_MIN_MS) {
-    await refreshTrainingLoadsIfNeeded(userId);
-  } else {
-    logger.debug("sync.skip_postprocess_budget");
-  }
-
-  const { streamsPending } = await activityCopyCounts(userId);
-  const snapshot = api.rateLimit.snapshot();
-  if (!pausedUntil && snapshot.shortRemaining <= 5 && (!historyComplete || streamsPending > 0)) {
-    pausedUntil = new Date(snapshot.nextWindowAt);
-  }
-  const done = streamsPending === 0 && historyComplete && !pausedUntil;
-  const status = pausedUntil
-    ? "paused"
-    : lastError && !pausedUntil
-      ? "failed"
-      : done
-        ? "complete"
-        : "incomplete";
-  await db
-    .insert(syncRuns)
-    .values({
-      userId: userId,
-      status,
-      activitiesUpserted,
-      streamsFetched,
-      streamsPending,
-      shortLimitRemaining: snapshot.shortRemaining,
-      dailyLimitRemaining: snapshot.dailyRemaining,
-      pausedUntil,
-      lastError,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: syncRuns.userId,
-      set: {
-        status,
-        activitiesUpserted,
-        streamsFetched,
-        streamsPending,
-        shortLimitRemaining: snapshot.shortRemaining,
-        dailyLimitRemaining: snapshot.dailyRemaining,
-        pausedUntil,
-        lastError,
-        updatedAt: new Date(),
-      },
-    });
-
-  if (lastError && !pausedUntil) {
-    throw new Error(lastError);
-  }
-
-  logger.info("sync.end", {
-    activitiesUpserted,
-    streamsFetched,
-    streamsPending,
-    historyComplete,
-    done,
-    status,
-    pausedUntil: pausedUntil?.toISOString() ?? null,
-    lastError,
-    shortRemaining: snapshot.shortRemaining,
-    dailyRemaining: snapshot.dailyRemaining,
-  });
-
-  return {
-    activitiesUpserted,
-    streamsFetched,
-    streamsPending,
-    historyComplete,
-    done,
-    pausedUntil: pausedUntil?.toISOString() ?? null,
-    lastError,
-    alreadyRunning: false,
-    rateLimit: {
-      shortRemaining: snapshot.shortRemaining,
-      dailyRemaining: snapshot.dailyRemaining,
-      nextWindowAt: snapshot.nextWindowAt,
-    },
-  };
-}
-
-async function activityListAfter(userId: string) {
-  const rows = await db
-    .select({ startDate: activities.startDate })
-    .from(activities)
-    .where(eq(activities.userId, userId))
-    .orderBy(desc(activities.startDate))
-    .limit(RECENT_REFRESH_COUNT);
-  const oldestLookback = rows.at(-1);
-  if (!oldestLookback) return undefined;
-  // `after` is exclusive. Step back one second so the lookback activities themselves return
-  // alongside anything newer — late title or sport-type edits on Strava then upsert.
-  return Math.floor(oldestLookback.startDate.getTime() / 1000) - 1;
-}
-
-async function oldestActivityEpoch(userId: string) {
-  const [row] = await db
-    .select({ startDate: activities.startDate })
-    .from(activities)
-    .where(eq(activities.userId, userId))
-    .orderBy(asc(activities.startDate))
-    .limit(1);
-  if (!row) return undefined;
-  return Math.floor(row.startDate.getTime() / 1000);
-}
-
-async function upsertNewerActivities(api: StravaApi, userId: string, fallbackAthleteId: string) {
-  const after = await activityListAfter(userId);
-  return upsertActivityPages(api, userId, fallbackAthleteId, { after });
-}
-
-async function upsertOlderActivities(api: StravaApi, userId: string, fallbackAthleteId: string) {
-  const before = await oldestActivityEpoch(userId);
-  if (before == null) return { upserted: 0, caughtUp: true };
-  return upsertActivityPages(api, userId, fallbackAthleteId, { before });
-}
-
-async function upsertActivityPages(
-  api: StravaApi,
-  userId: string,
-  fallbackAthleteId: string,
-  bounds: { after?: number; before?: number },
-) {
-  let page = 1;
-  let upserted = 0;
-  while (page <= ACTIVITY_PAGES_PER_CALL) {
-    const pageItems = await api.listAthleteActivities({
-      page,
-      perPage: ACTIVITY_PAGE_SIZE,
-      after: bounds.after,
-      before: bounds.before,
-    });
-    logger.debug("sync.activities_page", {
-      page,
-      count: pageItems.length,
-      after: bounds.after ?? null,
-      before: bounds.before ?? null,
-    });
-    if (pageItems.length === 0) return { upserted, caughtUp: true };
-    if (
-      bounds.before != null &&
-      !pageItems.some((activity) => activityStartsBefore(activity, bounds.before!))
-    ) {
-      return { upserted, caughtUp: true };
-    }
-    upserted += await insertActivityRows(userId, pageItems, fallbackAthleteId);
-    if (pageItems.length < ACTIVITY_PAGE_SIZE) return { upserted, caughtUp: true };
-    page += 1;
-  }
-  return { upserted, caughtUp: false };
-}
-
-function activityStartsBefore(activity: SummaryActivity, beforeEpoch: number) {
-  if (!activity.start_date) return false;
-  return Math.floor(new Date(activity.start_date).getTime() / 1000) < beforeEpoch;
-}
-
-async function insertActivityRows(
-  userId: string,
-  pageItems: SummaryActivity[],
-  fallbackAthleteId: string,
-) {
+async function insertActivityRows(userId: string, pageItems: SummaryActivity[]) {
   const rows = pageItems.flatMap((activity) => {
-    const row = activityInsertRow(userId, activity, fallbackAthleteId);
+    const row = activityInsertRow(userId, activity);
     return row ? [row] : [];
   });
   if (rows.length === 0) return 0;
@@ -561,8 +261,8 @@ async function insertActivityRows(
         weightedAverageWatts: sql`excluded.weighted_average_watts`,
         deviceWatts: sql`excluded.device_watts`,
         manual: sql`excluded.manual`,
-        trainingLoad: sql`null`,
-        loadSource: sql`null`,
+        trainingLoad: sql`case when ${LOAD_INPUTS_CHANGED} then null else activities.training_load end`,
+        loadSource: sql`case when ${LOAD_INPUTS_CHANGED} then null else activities.load_source end`,
         updatedAt: sql`excluded.updated_at`,
       },
     });
@@ -577,13 +277,13 @@ async function insertActivityRows(
   return rows.length;
 }
 
-function activityInsertRow(userId: string, activity: SummaryActivity, fallbackAthleteId: string) {
+function activityInsertRow(userId: string, activity: SummaryActivity) {
   if (activity.id == null || !activity.start_date) return null;
   const metrics = metricsFromSummary(activity);
   return {
     id: String(activity.id),
     userId,
-    athleteId: String(activity.athlete?.id ?? fallbackAthleteId),
+    athleteId: String(activity.athlete?.id ?? userId),
     name: activity.name ?? "Untitled activity",
     sportType: String(activity.sport_type ?? activity.type ?? "Workout"),
     startDate: new Date(activity.start_date),
@@ -623,56 +323,8 @@ function metricsFromSummary(activity: SummaryActivity) {
   };
 }
 
-async function syncPendingStreams(api: StravaApi, userId: string, startedAt: number) {
-  const pending = await db
-    .select({ id: activities.id, manual: activities.manual })
-    .from(activities)
-    .where(and(eq(activities.userId, userId), isNull(activities.streamsSyncedAt)))
-    .orderBy(desc(activities.startDate))
-    .limit(STREAM_BATCH_SIZE);
-
-  logger.debug("sync.streams_batch", { pending: pending.length });
-  let fetched = 0;
-  for (const row of pending) {
-    if (isOverSyncBudget(startedAt)) {
-      logger.debug("sync.budget_stop", { fetched, pending: pending.length });
-      break;
-    }
-    if (api.rateLimit.shortRemaining <= 5) break;
-    const streams = row.manual ? {} : await fetchStreamsWithRetry(api, row.id);
-    await storeStreams(row.id, streams);
-    fetched += 1;
-  }
-  return fetched;
-}
-
 function hasHeartrateSamples(values: number[] | null | undefined) {
   return Boolean(values?.some((value) => value > 0));
-}
-
-function shouldRetryStreamFetch(error: unknown) {
-  if (error instanceof StravaDailyLimitError || error instanceof StravaShortLimitError) {
-    return false;
-  }
-  if (error instanceof StravaApiError) {
-    if (error.status === 404) return false;
-    if (error.status >= 400 && error.status < 500) return false;
-  }
-  return true;
-}
-
-async function fetchStreamsWithRetry(api: StravaApi, activityId: string) {
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= STREAM_RETRY_ATTEMPTS; attempt += 1) {
-    try {
-      return await api.getActivityStreams(activityId, DEFAULT_STREAM_KEYS);
-    } catch (error) {
-      lastError = error;
-      if (!shouldRetryStreamFetch(error) || attempt === STREAM_RETRY_ATTEMPTS) throw error;
-      logger.warn("sync.stream_retry", { activityId, attempt, ...errorFields(error) });
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("Stream copy failed");
 }
 
 async function storeStreams(activityId: string, streams: StreamSet) {
@@ -729,12 +381,15 @@ async function storeStreams(activityId: string, streams: StreamSet) {
     });
   await db
     .update(activities)
-    .set({ streamsSyncedAt: now, hasHeartrate, updatedAt: now })
+    .set({
+      streamsSyncedAt: now,
+      hasHeartrate,
+      updatedAt: now,
+      // A power ride without weighted watts is scored from its watts stream, which arrives after
+      // history: rescore it.
+      ...(streams.watts?.data?.length ? { trainingLoad: null, loadSource: null } : {}),
+    })
     .where(eq(activities.id, activityId));
-}
-
-function startOfNextUtcDay(now = new Date()) {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
 }
 
 async function stampStoredStreams(userId: string) {
