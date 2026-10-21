@@ -12,6 +12,7 @@ import {
 
 import {
   ageFromBirthDate,
+  CALENDAR_PERIODS,
   formatBirthDate,
   parseBirthDate,
 } from "@/services/athlete-settings.types.ts";
@@ -25,7 +26,6 @@ import {
   suggestedTargetHours,
   type HoursIntent,
 } from "@/services/training-plan.ts";
-import { CALENDAR_PERIODS } from "@/services/athlete-settings.types.ts";
 import type {
   ProfileFormValues,
   SettingsFormInput,

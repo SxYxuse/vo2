@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, athleteMetrics, calendarSettings } from "@/db/schema.ts";
+import { activities, athleteMetrics, athleteSettings } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import {
@@ -24,9 +24,9 @@ import { getTrainingPlanForUser } from "./training-plan.server.ts";
 
 async function storedAthleteSettings(userId: string) {
   const [row] = await db
-    .select({ value: calendarSettings.value })
-    .from(calendarSettings)
-    .where(eq(calendarSettings.userId, userId))
+    .select({ value: athleteSettings.value })
+    .from(athleteSettings)
+    .where(eq(athleteSettings.userId, userId))
     .limit(1);
   return row ? parseAthleteSettings(row.value) : null;
 }
@@ -142,10 +142,10 @@ export async function saveAthleteSettingsImpl(
         },
       });
     await tx
-      .insert(calendarSettings)
+      .insert(athleteSettings)
       .values({ userId, value: settings, updatedAt })
       .onConflictDoUpdate({
-        target: calendarSettings.userId,
+        target: athleteSettings.userId,
         set: { value: settings, updatedAt },
       });
   });

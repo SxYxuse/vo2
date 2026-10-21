@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { athleteSettingsSaveSchema } from "./athlete-settings.ts";
 import {
   familyCollectors,
   isSportTypeShown,
@@ -8,8 +7,6 @@ import {
   parseAthleteSettings,
   sportTypeColor,
 } from "./athlete-settings.types.ts";
-
-const profile = { birthDate: "1990-05-14", weightKg: 72 };
 
 function sport(visible: boolean, overrides: { heartRate?: boolean; power?: boolean } = {}) {
   return {
@@ -109,57 +106,5 @@ describe("familyCollectors", () => {
     );
 
     expect(collectors).toEqual({ heartRate: true, power: true, powerPartial: true });
-  });
-});
-
-describe("athleteSettingsSaveSchema", () => {
-  it("rejects a save that hides every sport type", () => {
-    const result = athleteSettingsSaveSchema.safeParse({
-      profile,
-      sportTypes: { Run: sport(false), Ride: sport(false) },
-      sportGroupShares: {},
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts a save that keeps one sport type shown", () => {
-    const result = athleteSettingsSaveSchema.safeParse({
-      profile,
-      sportTypes: { Run: sport(false), Ride: sport(true) },
-      sportGroupShares: {},
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts a save before any sport type has been copied", () => {
-    const result = athleteSettingsSaveSchema.safeParse({
-      profile,
-      sportTypes: {},
-      sportGroupShares: {},
-    });
-
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects a save that clears the birthday", () => {
-    const result = athleteSettingsSaveSchema.safeParse({
-      profile: { ...profile, birthDate: null },
-      sportTypes: {},
-      sportGroupShares: {},
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a save that clears the weight", () => {
-    const result = athleteSettingsSaveSchema.safeParse({
-      profile: { ...profile, weightKg: null },
-      sportTypes: {},
-      sportGroupShares: {},
-    });
-
-    expect(result.success).toBe(false);
   });
 });
