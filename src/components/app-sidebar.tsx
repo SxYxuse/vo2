@@ -180,7 +180,7 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
-      <SidebarFooter className="flex-row items-center group-data-[collapsible=icon]:flex-col">
+      <SidebarFooter className="flex-row items-center pb-[max(0.5rem,env(safe-area-inset-bottom))] group-data-[collapsible=icon]:flex-col">
         {inSettings ? (
           <SidebarMenuButton
             tooltip="Back"
