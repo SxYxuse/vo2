@@ -3,6 +3,7 @@
 import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 
+import { authClient } from "@/lib/auth-client.ts";
 import {
   activityMapQueryOptions,
   appShellQueryOptions,
@@ -16,6 +17,7 @@ import {
 import { syncStrava } from "@/services/strava-sync.ts";
 import {
   isTransientSyncError,
+  needsStravaReconnect,
   SYNC_TRANSIENT_RETRIES,
   type SyncResult,
 } from "@/services/strava-sync.types.ts";
@@ -164,6 +166,24 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
         }
       } catch (caught) {
         void queryClient.invalidateQueries({ queryKey: syncStatusQueryOptions.queryKey });
+        if (needsStravaReconnect(caught)) {
+          notify.update(toastId, {
+            type: "error",
+            title: "Reconnect Strava",
+            description: caught.message,
+            timeout: 0,
+            actionProps: {
+              children: "Reconnect",
+              // Signing in again stores a fresh token pair on the same account.
+              onClick: () =>
+                void authClient.signIn.social({
+                  provider: "strava",
+                  callbackURL: window.location.pathname,
+                }),
+            },
+          });
+          throw caught;
+        }
         notify.update(toastId, {
           type: "error",
           title: "Strava sync failed",

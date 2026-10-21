@@ -24,19 +24,38 @@ beforeEach(() => {
     if (!request.url.startsWith(MOCK_URL)) {
       throw new Error(`Unexpected network call to ${request.url}`);
     }
-    return Promise.resolve(handleMockStravaRequest(request));
+    return handleMockStravaRequest(request);
   });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
+type MockTokens = { access_token: string; refresh_token: string; athlete: { id: number } };
+
+async function requestTokens(params: Record<string, string>) {
+  return mockRequest("/oauth/token", { method: "POST", body: new URLSearchParams(params) });
+}
+
+async function signIn() {
+  return (await (
+    await requestTokens({ grant_type: "authorization_code", code: "mock" })
+  ).json()) as MockTokens;
+}
+
+async function athleteStatus(accessToken: string) {
+  return (
+    await mockRequest("/api/v3/athlete", { headers: { Authorization: `Bearer ${accessToken}` } })
+  ).status;
+}
+
 describe("mock Strava OAuth", () => {
-  it("authorize redirects straight back to the callback with a code and the same state", () => {
+  it("authorize redirects straight back to the callback with a code and the same state", async () => {
     const callback = `${APP_URL}/api/auth/callback/strava`;
-    const response = mockRequest(
+    const response = await mockRequest(
       `/oauth/authorize?redirect_uri=${encodeURIComponent(callback)}&state=abc&response_type=code`,
     );
 
@@ -48,20 +67,49 @@ describe("mock Strava OAuth", () => {
   });
 
   it("token exchange returns an access token for the mock athlete", async () => {
-    const response = mockRequest("/oauth/token", {
-      method: "POST",
-      body: new URLSearchParams({ grant_type: "authorization_code", code: "mock" }),
-    });
-    const body = (await response.json()) as { access_token: string; athlete: { id: number } };
+    const body = await signIn();
 
-    expect(body.access_token).toBeTruthy();
+    expect(await athleteStatus(body.access_token)).toBe(200);
     expect(body.athlete.id).toBe(1);
+  });
+
+  it("rejects an expired access token until the refresh token issues a new one", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const tokens = await signIn();
+    vi.setSystemTime(Date.now() + 11 * 60 * 1000);
+
+    expect(await athleteStatus(tokens.access_token)).toBe(401);
+    const refreshed = (await (
+      await requestTokens({ grant_type: "refresh_token", refresh_token: tokens.refresh_token })
+    ).json()) as MockTokens;
+    expect(await athleteStatus(refreshed.access_token)).toBe(200);
+  });
+
+  it("deauthorize revokes every token issued so far, and a new sign-in works again", async () => {
+    const other = await signIn();
+    const tokens = await signIn();
+
+    expect(await new StravaApi(tokens.access_token).deauthorize()).toEqual({
+      access_token: tokens.access_token,
+    });
+    expect(await athleteStatus(other.access_token)).toBe(401);
+    const refresh = await requestTokens({
+      grant_type: "refresh_token",
+      refresh_token: other.refresh_token,
+    });
+    expect(refresh.status).toBe(400);
+    expect(await athleteStatus((await signIn()).access_token)).toBe(200);
   });
 });
 
 describe("StravaApi against mock Strava", () => {
+  let accessToken = "";
+  beforeEach(async () => {
+    accessToken = (await signIn()).access_token;
+  });
+
   it("pages about eight weeks of Ride and Run activities, newest first", async () => {
-    const api = new StravaApi("mock-token");
+    const api = new StravaApi(accessToken);
     const firstPage = await api.listAthleteActivities({ page: 1, perPage: 10 });
     const all = await api.listAthleteActivities({ page: 1, perPage: 200 });
     const secondPage = await api.listAthleteActivities({ page: 2, perPage: 10 });
@@ -78,7 +126,7 @@ describe("StravaApi against mock Strava", () => {
   });
 
   it("honors after so a resync only returns newer activities", async () => {
-    const api = new StravaApi("mock-token");
+    const api = new StravaApi(accessToken);
     const [newest] = await api.listAthleteActivities({ page: 1, perPage: 1 });
     const newestSec = Math.floor(Date.parse(newest?.start_date ?? "") / 1000);
 
@@ -87,7 +135,7 @@ describe("StravaApi against mock Strava", () => {
   });
 
   it("serves GPS, power and heart-rate streams for an outdoor ride, and no power for a run", async () => {
-    const api = new StravaApi("mock-token");
+    const api = new StravaApi(accessToken);
     const activities = await api.listAthleteActivities();
     const ride = activities.find((activity) => activity.sport_type === "Ride");
     const run = activities.find((activity) => activity.sport_type === "Run");
@@ -105,12 +153,6 @@ describe("StravaApi against mock Strava", () => {
   });
 
   it("returns no streams for an unknown activity", async () => {
-    expect(await new StravaApi("mock-token").getActivityStreams(42)).toEqual({});
-  });
-
-  it("deauthorize revokes the token it holds", async () => {
-    expect(await new StravaApi("mock-token").deauthorize()).toEqual({
-      access_token: "mock-token",
-    });
+    expect(await new StravaApi(accessToken).getActivityStreams(42)).toEqual({});
   });
 });

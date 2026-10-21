@@ -27,6 +27,7 @@ import {
   SYNC_POSTPROCESS_MIN_MS,
   stopsAfterNewestPage,
   storedPauseResult,
+  STRAVA_RECONNECT_MESSAGE,
 } from "./strava-sync.types.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { athleteExists } from "./athlete-deletion.server.ts";
@@ -324,6 +325,9 @@ async function runSync(userId: string): Promise<SyncResult> {
       pausedUntil = new Date(api.rateLimit.snapshot().nextWindowAt);
       lastError = error.message;
       logger.warn("sync.short_limit", { pausedUntil: pausedUntil.toISOString() });
+    } else if (error instanceof StravaApiError && error.status === 401) {
+      lastError = STRAVA_RECONNECT_MESSAGE;
+      logger.warn("sync.strava_unauthorized", errorFields(error));
     } else if (isAbortError(error)) {
       logger.warn("sync.request_aborted", errorFields(error));
     } else if (!(await athleteExists(userId))) {
