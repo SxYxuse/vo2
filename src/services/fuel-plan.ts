@@ -1,5 +1,5 @@
 import type { FuelProduct } from "./fuel-catalog.ts";
-import type { MajorClimb, PredictedStep, RouteSportGroup } from "./route-prediction.ts";
+import type { PredictedStep, RouteClimb, RouteSportGroup } from "./route-prediction.ts";
 
 /** Default carbs per hour by sport group (ADR 0017); the athlete can change it per route. */
 export const DEFAULT_CARB_TARGET: Record<RouteSportGroup, number> = {
@@ -8,7 +8,7 @@ export const DEFAULT_CARB_TARGET: Record<RouteSportGroup, number> = {
   walking: 40,
 };
 export const MAX_CARBS_PER_HOUR = 120;
-/** Drink servings rarely land on whole grams: two ¼ bottles of 20.4 g plus two gels is 120.8. */
+/** Drink sips rarely land on whole grams: two sips of 20.4 g plus two gels is 120.8. */
 const ROUNDING_G = 2;
 
 export const DEFAULT_BOTTLES: Record<RouteSportGroup, { count: number; ml: number }> = {
@@ -37,8 +37,14 @@ export const LEAD_MIN = {
 const READY_MARGIN_SEC = 3 * 60;
 const SLOT_SEC = 5 * 60;
 const MIN_SOLID_GAP_SEC = 15 * 60;
-/** Sips spread the mix over the session, never closer than 15 min or further than 30. */
-const SIP_EVERY_SEC: [number, number] = [15 * 60, 30 * 60];
+/** The athlete takes a sip every 15-20 minutes; the plan counts one every 20. */
+export const SIP_EVERY_MIN = [15, 20] as const;
+const SIP_SEC = SIP_EVERY_MIN[1] * 60;
+/** Strongest mix the plan makes: POWER CARB's own strength, about 160 g of carbs per litre. */
+const MAX_DRINK_G_PER_ML = 0.165;
+/** Below this the athlete runs short of fluid, so the plan asks for a refill. */
+const MIN_FLUID_ML_PER_HOUR = 400;
+const REFILL_ML_PER_HOUR = 500;
 /** Solid food needs a session long enough to digest it. */
 const BAR_MIN_ELAPSED_SEC = 2 * 3600;
 const CAFFEINE_MG_PER_KG = 3;
@@ -47,7 +53,7 @@ const RATIO_RULE_FROM_GPH = 60;
 const RATIO_SHARE = 0.8;
 const ROLLING_RANGE = [0.8, 1.25] as const;
 
-export type FuelRole = "drink" | "gel" | "bar" | "caffeine";
+export type FuelRole = "drink" | "gel" | "bar" | "jelly" | "caffeine";
 
 /** A proposal before the numbers: products per role and the share of carbs each covers. */
 export type ProposalSpec = {
@@ -57,11 +63,12 @@ export type ProposalSpec = {
   drinkId: string | null;
   /** Share of total carbs the drink should cover, before the bottle limit. */
   drinkShare: number;
-  /** Gels or chews, used in turn. */
+  /** Gels used in turn. */
   gelIds: string[];
-  barId: string | null;
-  barShare: number;
-  /** One caffeinated product, timed to peak at the last major climb in the second half. */
+  /** One solid: a jelly, a bar, or chews. */
+  solidId: string | null;
+  solidShare: number;
+  /** One caffeinated product, timed to peak at the last climb in the second half. */
   caffeineId: string | null;
 };
 
@@ -73,7 +80,7 @@ export type Intake = {
   km: number;
   productId: string;
   role: FuelRole;
-  /** Servings, or a quarter-bottle fraction for drink sips. */
+  /** Servings, or the share of the mix for a drink sip. */
   amount: number;
   carbsG: number;
   caffeineMg: number;
@@ -91,14 +98,15 @@ export type FuelPlan = {
   caffeineMg: number;
   drink: {
     productId: string;
-    /** Bottles with mix; the last one may be partly filled. */
+    /** Bottles with mix, each mixed to carbsPerBottleG and sipped through the session. */
     bottles: number;
-    quarters: number;
     carbsPerBottleG: number;
     powderPerBottleG: number | null;
   } | null;
   waterBottles: number;
   bottleMl: number;
+  /** The bottles' fluid per hour, and where to refill when that is too little. */
+  fluid: { mlPerHour: number; refill: { atSec: number; km: number } | null };
   items: { productId: string; role: FuelRole; count: number; carbsG: number }[];
   intakes: Intake[];
   notes: string[];
@@ -110,9 +118,10 @@ export type FuelPlanInput = {
   sportGroup: RouteSportGroup;
   elapsedSec: number;
   steps: Pick<PredictedStep, "atSec" | "distanceM" | "gradePct">[];
-  climbs: MajorClimb[];
+  climbs: RouteClimb[];
   carbTarget: number;
-  bottles: { count: number; ml: number };
+  /** `mix`: bottles the athlete fills with drink mix; null or absent lets the plan decide. */
+  bottles: { count: number; ml: number; mix?: number | null };
   bodyWeightKg: number;
   products: FuelProduct[];
 };
@@ -138,10 +147,20 @@ function hasStatedCaffeine(product: FuelProduct) {
 export function rolesFor(product: FuelProduct): FuelRole[] {
   if (product.kind === "drink") return ["drink"];
   if (product.kind === "bar") return ["bar"];
-  if (product.kind === "gel" || product.kind === "chew") {
+  if (product.kind === "jelly" || product.kind === "chew") {
+    return hasStatedCaffeine(product) ? ["caffeine"] : ["jelly"];
+  }
+  if (product.kind === "gel") {
     return hasStatedCaffeine(product) ? ["caffeine"] : ["gel"];
   }
   return [];
+}
+
+function solidRole(product: FuelProduct): Extract<FuelRole, "bar" | "jelly"> | null {
+  return (
+    rolesFor(product).find((role): role is "bar" | "jelly" => role === "bar" || role === "jelly") ??
+    null
+  );
 }
 
 function windowFor(elapsedSec: number) {
@@ -163,18 +182,25 @@ function kmAt(steps: FuelPlanInput["steps"], atSec: number) {
   return round((stepAt(steps, atSec)?.distanceM ?? 0) / 1000, 1);
 }
 
-/** Solids stay off climbs and steep descents on rides; on foot only steep descents are out. */
-function terrainAllows(input: FuelPlanInput, role: FuelRole, atSec: number) {
-  const grade = stepAt(input.steps, atSec)?.gradePct ?? 0;
-  if (input.sportGroup === "cycling") {
-    if (role === "bar") return grade < 4 && grade > -4;
-    return grade > -6;
-  }
-  return grade > -6;
+function solidReason(role: "bar" | "jelly") {
+  return role === "bar" ? "solid food early, on flat ground" : "solid food while the road is easy";
 }
 
-function climbAt(climbs: MajorClimb[], atSec: number) {
+function climbAt(climbs: RouteClimb[], atSec: number) {
   return climbs.some((climb) => atSec >= climb.startSec && atSec <= climb.endSec);
+}
+
+/**
+ * On rides, bars and jelly stay off climbs (chewing at threshold is hard) and steep descents;
+ * gels only stay off steep descents. On foot only steep descents are out.
+ */
+export function terrainAllows(input: FuelPlanInput, role: FuelRole, atSec: number) {
+  const grade = stepAt(input.steps, atSec)?.gradePct ?? 0;
+  if (input.sportGroup === "cycling" && (role === "bar" || role === "jelly")) {
+    if (climbAt(input.climbs, atSec)) return false;
+    return role === "bar" ? grade < 4 && grade > -4 : grade < 4 && grade > -6;
+  }
+  return grade > -6;
 }
 
 /** Suggested times read "around 1:45": rounded to 5 minutes from the start, not a clock time. */
@@ -189,7 +215,7 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
   const product = (id: string | null) => (id == null ? null : (byId.get(id) ?? null));
   const issues: string[] = [];
   const notes: string[] = [];
-  for (const id of [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds]) {
+  for (const id of [spec.drinkId, spec.solidId, spec.caffeineId, ...spec.gelIds]) {
     // The input holds the athlete's own products, so a missing id is one they don't have.
     if (id != null && !byId.has(id)) issues.push(`${id} isn't one of your products.`);
   }
@@ -202,40 +228,62 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
   const bottleMl = input.bottles.ml;
   const bottleCount = Math.max(0, Math.floor(input.bottles.count));
 
-  // Drink: quarter bottles at the store's concentration, within the bottles and the fluid cap.
+  // Drink: the bottles the athlete fills with mix, or as many as the share needs at the store's
+  // strength; mixed stronger (up to POWER CARB's strength) when they are too few. The athlete
+  // sips it all session.
   const drinkProduct = product(spec.drinkId);
   let drink: FuelPlan["drink"] = null;
   if (drinkProduct?.serving?.mixMl && drinkProduct.carbsG != null && bottleCount > 0) {
-    const carbsPerBottleG = (drinkProduct.carbsG / drinkProduct.serving.mixMl) * bottleMl;
+    const storeStrength = drinkProduct.carbsG / drinkProduct.serving.mixMl;
+    const maxPerBottle = Math.max(storeStrength, MAX_DRINK_G_PER_ML) * bottleMl;
     const wanted = clamp(spec.drinkShare, 0, 1) * targetCarbsG;
-    const maxQuarters = Math.min(
-      bottleCount * 4,
-      Math.floor(
-        ((FLUID_ML_PER_HOUR[input.sportGroup] * Math.max(windowHours, 0.25)) / bottleMl) * 4,
-      ),
+    // No more mix than the athlete can drink in the session.
+    const drinkable = Math.max(
+      1,
+      Math.floor((FLUID_ML_PER_HOUR[input.sportGroup] * Math.max(hours, 0.25)) / bottleMl),
     );
-    const quarters = Math.min(maxQuarters, Math.round(wanted / (carbsPerBottleG / 4)));
-    if (quarters > 0) {
+    const bottles =
+      input.bottles.mix != null
+        ? clamp(Math.floor(input.bottles.mix), 1, bottleCount)
+        : clamp(
+            Math.ceil(wanted / (storeStrength * bottleMl)),
+            1,
+            Math.min(bottleCount, drinkable),
+          );
+    const carbsPerBottleG = round(Math.min(maxPerBottle, wanted / bottles), 1);
+    if (wanted > 0 && carbsPerBottleG > 0) {
       drink = {
         productId: drinkProduct.id,
-        bottles: Math.ceil(quarters / 4),
-        quarters,
-        carbsPerBottleG: round(carbsPerBottleG, 1),
+        bottles,
+        carbsPerBottleG,
         powderPerBottleG:
           drinkProduct.serving.grams == null
             ? null
-            : round((drinkProduct.serving.grams / drinkProduct.serving.mixMl) * bottleMl),
+            : round((drinkProduct.serving.grams / drinkProduct.carbsG) * carbsPerBottleG),
       };
-      const drinkCarbs = (quarters * carbsPerBottleG) / 4;
-      if (drinkCarbs < wanted - carbsPerBottleG / 4) {
-        notes.push(`Your bottles cover ${round(drinkCarbs)} g of carbs; the rest comes from food.`);
+      if (bottles * carbsPerBottleG < wanted - carbsPerBottleG / 4) {
+        notes.push(
+          `Your bottles cover ${round(bottles * carbsPerBottleG)} g of carbs; the rest comes from food.`,
+        );
       }
     }
   }
-  const drinkCarbs = drink ? (drink.quarters * drink.carbsPerBottleG) / 4 : 0;
+  const drinkCarbs = drink ? drink.bottles * drink.carbsPerBottleG : 0;
   const waterBottles = bottleCount - (drink?.bottles ?? 0);
 
-  // Caffeine: one serving against the last major climb in the second half, under the cap.
+  // Fluid: the bottles carried, sipped evenly; too little per hour needs a refill on the way.
+  const fluidMl = bottleCount * bottleMl;
+  const mlPerHour = hours > 0 ? round(fluidMl / hours / 10) * 10 : 0;
+  const refillSec = Math.min(input.elapsedSec, (fluidMl / REFILL_ML_PER_HOUR) * 3600);
+  const fluid: FuelPlan["fluid"] = {
+    mlPerHour,
+    refill:
+      hours > 1 && mlPerHour < MIN_FLUID_ML_PER_HOUR
+        ? { atSec: round(refillSec), km: kmAt(input.steps, refillSec) }
+        : null,
+  };
+
+  // Caffeine: one serving against the last climb in the second half, under the cap.
   const capMg = CAFFEINE_MG_PER_KG * input.bodyWeightKg;
   const caffeineProduct = product(spec.caffeineId);
   // The climb must start late enough for caffeine taken in the window to peak near it.
@@ -256,13 +304,22 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
   }
   const caffeineCarbs = caffeineCount * (caffeineProduct?.carbsG ?? 0);
 
-  // Bars: rides long enough to digest them, in the first half.
-  const barProduct = product(spec.barId);
-  const barCount =
-    barProduct && input.sportGroup === "cycling" && input.elapsedSec >= BAR_MIN_ELAPSED_SEC
-      ? Math.max(0, Math.round((clamp(spec.barShare, 0, 1) * targetCarbsG) / carbsOf(barProduct)))
+  // One solid: bars only on long rides; jelly and chews go on any session.
+  const solidProduct = product(spec.solidId);
+  const solidKind = solidProduct ? solidRole(solidProduct) : null;
+  const solidAllowed =
+    solidProduct != null &&
+    solidKind != null &&
+    (solidKind !== "bar" ||
+      (input.sportGroup === "cycling" && input.elapsedSec >= BAR_MIN_ELAPSED_SEC));
+  const solidCount =
+    solidAllowed && solidProduct
+      ? Math.max(
+          0,
+          Math.round((clamp(spec.solidShare, 0, 1) * targetCarbsG) / carbsOf(solidProduct)),
+        )
       : 0;
-  const barCarbs = barCount * (barProduct?.carbsG ?? 0);
+  const solidCarbs = solidCount * (solidProduct?.carbsG ?? 0);
 
   // Gels fill the rest, rounding down unless most of a gel is still missing.
   const gels = spec.gelIds.flatMap((id) => {
@@ -272,7 +329,7 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
   const gelCarbs = gels.length
     ? gels.reduce((sum, item) => sum + carbsOf(item), 0) / gels.length
     : 0;
-  const remaining = targetCarbsG - drinkCarbs - caffeineCarbs - barCarbs;
+  const remaining = targetCarbsG - drinkCarbs - caffeineCarbs - solidCarbs;
   const gelCount = gelCarbs > 0 ? Math.max(0, Math.floor(remaining / gelCarbs + 0.25)) : 0;
   if (remaining > gelCarbs / 2 && gels.length === 0) {
     issues.push("Nothing covers the carbs the bottles can't.");
@@ -287,19 +344,22 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
       caffeineCount && caffeineProduct && lateClimb
         ? { product: caffeineProduct, climb: lateClimb }
         : null,
-    bar: barProduct ? { product: barProduct, count: barCount } : null,
+    solid:
+      solidProduct && solidKind && solidCount > 0
+        ? { product: solidProduct, role: solidKind, count: solidCount }
+        : null,
     gels: Array.from({ length: gelCount }, (_, index) => gels[index % gels.length] as FuelProduct),
     gelProducts: gels,
     windowRate: windowHours > 0 ? targetCarbsG / windowHours : 0,
   };
-  const plannedCarbs = drinkCarbs + caffeineCarbs + barCarbs + gelCount * gelCarbs;
+  const plannedCarbs = drinkCarbs + caffeineCarbs + solidCarbs + gelCount * gelCarbs;
 
-  const assemble = (intakes: Intake[]): FuelPlan => {
+  const assemble = ({ intakes, notes: scheduleNotes }: ReturnType<typeof scheduleIntakes>) => {
     const totalCarbsG = round(intakes.reduce((sum, intake) => sum + intake.carbsG, 0));
-    const planNotes = [...notes];
+    const planNotes = [...notes, ...scheduleNotes];
     if (plannedCarbs - totalCarbsG >= gelCarbs / 2 && gelCarbs > 0) {
       planNotes.push(
-        `${round(plannedCarbs - totalCarbsG)} g didn't fit without packing too much into one hour.`,
+        `${round(plannedCarbs - totalCarbsG)} g didn't fit without going over ${MAX_CARBS_PER_HOUR} g in an hour.`,
       );
     }
     const counts = new Map<string, FuelPlan["items"][number]>();
@@ -325,6 +385,7 @@ export function solveFuelPlan(input: FuelPlanInput, spec: ProposalSpec): FuelPla
       drink,
       waterBottles,
       bottleMl,
+      fluid,
       items: [...counts.values()],
       intakes,
       notes: planNotes,
@@ -348,8 +409,8 @@ type Schedule = {
   drink: FuelPlan["drink"];
   drinkProduct: FuelProduct | null;
   waterBottles: number;
-  caffeine: { product: FuelProduct; climb: MajorClimb } | null;
-  bar: { product: FuelProduct; count: number } | null;
+  caffeine: { product: FuelProduct; climb: RouteClimb } | null;
+  solid: { product: FuelProduct; role: Extract<FuelRole, "bar" | "jelly">; count: number } | null;
   gels: FuelProduct[];
   /** The proposal's gels, for carbs a bar or caffeine can't carry. */
   gelProducts: FuelProduct[];
@@ -361,20 +422,19 @@ function scheduleIntakes(
   input: FuelPlanInput,
   plan: Schedule,
   strategy: "even" | "closest",
-): Intake[] {
+): { intakes: Intake[]; notes: string[] } {
   const { window } = plan;
   const intakes: Intake[] = [];
+  const skipped: string[] = [];
   const steps = input.steps;
 
-  // Sips: a quarter bottle at a time, spread over the window until the mix runs out.
-  const sipTimes: number[] = [];
+  // Sips: a little every 15-20 minutes over the whole window. The athlete isn't told each one;
+  // they are listed so every hour's carbs add up.
   if (plan.drink && plan.drinkProduct) {
-    const [fastest, slowest] = SIP_EVERY_SEC;
-    const every = clamp((window.end - window.start) / plan.drink.quarters, fastest, slowest);
-    for (let index = 0; index < plan.drink.quarters; index += 1) {
-      const atSec = Math.min(window.end, window.start + index * every);
-      sipTimes.push(atSec);
-      const bottle = Math.floor(index / 4) + 1;
+    const count = Math.floor((window.end - window.start) / SIP_SEC) + 1;
+    const carbs = (plan.drink.bottles * plan.drink.carbsPerBottleG) / count;
+    for (let index = 0; index < count; index += 1) {
+      const atSec = window.start + index * SIP_SEC;
       intakes.push({
         atSec: round(atSec),
         earliestSec: round(Math.max(window.start, atSec - SLOT_SEC)),
@@ -382,17 +442,17 @@ function scheduleIntakes(
         km: kmAt(steps, atSec),
         productId: plan.drinkProduct.id,
         role: "drink",
-        amount: 0.25,
-        carbsG: round(plan.drink.carbsPerBottleG / 4, 1),
+        amount: round(1 / count, 3),
+        carbsG: round(carbs, 1),
         caffeineMg: 0,
         readyAtSec: round(atSec + LEAD_MIN.drink * 60),
         withFluid: true,
-        reason: `¼ of bottle ${bottle}`,
+        reason: "a sip",
       });
     }
   }
-  const lastSip = sipTimes.at(-1) ?? -Infinity;
-  const withFluidAt = (atSec: number) => plan.waterBottles > 0 || atSec <= lastSip + SLOT_SEC;
+  const hasFluid = plan.drink != null || plan.waterBottles > 0;
+  const withFluidAt = (_atSec: number) => hasFluid;
   const solidLead = (product: FuelProduct, atSec: number) =>
     product.kind === "bar"
       ? LEAD_MIN.bar
@@ -451,15 +511,43 @@ function scheduleIntakes(
       if (candidate < window.start || candidate > window.end) continue;
       if (!terrainAllows(input, role, candidate) || tooClose(candidate)) continue;
       if (!fitsHour(candidate, carbs)) continue;
-      if (role === "bar" && climbAt(input.climbs, candidate)) continue;
       return candidate;
     }
     return null;
   };
 
-  // 1. One gel ready at the start of each major climb: fuelling ahead of the hard part comes first.
+  // 1. Caffeine first, so the gels for earlier climbs can't take its hour: it peaks as the last
+  // climb starts, give or take 20 minutes, and fuels that climb.
   const gels = [...plan.gels];
-  for (const climb of input.climbs) {
+  let caffeineClimb: RouteClimb | null = null;
+  if (plan.caffeine) {
+    const { climb, product } = plan.caffeine;
+    const target = climb.startSec - LEAD_MIN.caffeinePeak * 60;
+    const at = settle("caffeine", target, carbsOf(product), [0, -5, 5, -10, 10, -15, -20]);
+    if (at != null) {
+      caffeineClimb = climb;
+      addSolid(
+        product,
+        "caffeine",
+        at,
+        [at - 10 * 60, at + 10 * 60],
+        `caffeine peaks for the climb at km ${climb.startKm}, around ${formatAroundTime(climb.startSec)}`,
+      );
+    } else if (plan.gelProducts[0]) {
+      // No room before the climb: a plain gel keeps the carbs.
+      gels.push(plan.gelProducts[0]);
+      skipped.push(
+        `${product.name} didn't fit before the last climb, so a plain gel takes its place.`,
+      );
+    }
+  }
+
+  // 2. One gel ready at the start of each other climb, hardest first, so small rollers don't
+  // steal them.
+  for (const climb of [...input.climbs].sort(
+    (a, b) => b.gainM - a.gainM || a.startSec - b.startSec,
+  )) {
+    if (climb === caffeineClimb) continue;
     const gel = gels[0];
     if (!gel) break;
     const lead = solidLead(gel, climb.startSec) * 60;
@@ -477,28 +565,9 @@ function scheduleIntakes(
     );
   }
 
-  // 2. Caffeine peaks as the last major climb starts, give or take 20 minutes.
-  if (plan.caffeine) {
-    const { climb, product } = plan.caffeine;
-    const target = climb.startSec - LEAD_MIN.caffeinePeak * 60;
-    const at = settle("caffeine", target, carbsOf(product), [0, -5, 5, -10, 10, -15, -20]);
-    if (at != null) {
-      addSolid(
-        product,
-        "caffeine",
-        at,
-        [at - 10 * 60, at + 10 * 60],
-        `caffeine peaks for the climb at km ${climb.startKm}, around ${formatAroundTime(climb.startSec)}`,
-      );
-    } else if (plan.gelProducts[0]) {
-      // No room before the climb: a plain gel keeps the carbs.
-      gels.push(plan.gelProducts[0]);
-    }
-  }
-
-  // 3. Bars, then gels, each go where every hour comes closest to the rate the target needs,
-  // counting the sips and fixed intakes around them. Bars only go in the first half, while
-  // there's time to digest them; any that don't fit become gels.
+  // 3. Solids, then leftover gels, each go where every hour comes closest to the rate the
+  // target needs. Bars only go in the first half, on the flat; jelly and chews can go later.
+  // Solids that don't fit become gels.
   const half = window.start + (window.end - window.start) / 2;
   const rate = plan.windowRate / 3600;
   // Hours on the same grid the plan check uses; a window under an hour is judged whole.
@@ -522,23 +591,23 @@ function scheduleIntakes(
     !tooClose(t) &&
     fitsHour(t, carbs) &&
     terrainAllows(input, role, t) &&
-    (role !== "bar" || (t <= half && !climbAt(input.climbs, t)));
+    (role !== "bar" || t <= half);
   const reasonAt = (role: FuelRole, t: number) =>
-    role === "bar"
-      ? "solid food early, on flat ground"
+    role === "bar" || role === "jelly"
+      ? solidReason(role)
       : climbAt(input.climbs, t)
         ? "keeps carbs coming on the climb"
         : "keeps carbs steady";
 
-  const queue: { product: FuelProduct; role: FuelRole }[] = [
-    ...Array.from({ length: plan.bar?.count ?? 0 }, () => ({
-      product: plan.bar?.product as FuelProduct,
-      role: "bar" as const,
+  const queue: { product: FuelProduct; role: FuelRole; retried?: boolean }[] = [
+    ...Array.from({ length: plan.solid?.count ?? 0 }, () => ({
+      product: plan.solid?.product as FuelProduct,
+      role: (plan.solid?.role ?? "jelly") as FuelRole,
     })),
     ...gels.map((product) => ({ product, role: "gel" as const })),
   ];
-  // "even" first tries a regular grid per role (bars over the first half, gels over the whole
-  // window); "closest" goes straight to the best-scoring slot.
+  // "even" first tries a regular grid per role (bars over the first half, solids and gels over
+  // the whole window); "closest" goes straight to the best-scoring slot.
   const evenSlot = (role: FuelRole, index: number) => {
     const count = queue.filter((item) => item.role === role).length + index + 1;
     const end = role === "bar" ? half : window.end;
@@ -546,6 +615,7 @@ function scheduleIntakes(
     return Math.round(at / SLOT_SEC) * SLOT_SEC;
   };
   const placedByRole: Partial<Record<FuelRole, number>> = {};
+  let converted = 0;
   while (queue.length > 0) {
     const next = queue.shift() as (typeof queue)[number];
     const carbs = carbsOf(next.product);
@@ -567,9 +637,44 @@ function scheduleIntakes(
         best = t;
       }
     }
+    const isSolid = next.role === "bar" || next.role === "jelly";
+    if (best == null && isSolid && !next.retried) {
+      // Try again once the gels are down: they may leave a better gap.
+      queue.push({ ...next, retried: true });
+      continue;
+    }
+    if (best == null && isSolid && !placedByRole[next.role]) {
+      // Every plan keeps its one solid. With the hours full it takes a gel's place where the
+      // terrain suits it: one that only keeps carbs steady first, else one before a climb (the
+      // carbs still arrive, just as food).
+      const latestSolid = window.start + (window.end - window.start) * 0.75;
+      // Earliest first: solid food digests best early.
+      const swappable = solids
+        .filter(
+          (intake) =>
+            intake.role === "gel" &&
+            terrainAllows(input, next.role, intake.atSec) &&
+            (next.role !== "bar" || intake.atSec <= latestSolid) &&
+            Math.abs(intake.carbsG - carbs) <= 10,
+        )
+        .sort((a, b) => a.atSec - b.atSec);
+      const swap =
+        swappable.find((intake) => intake.reason === reasonAt("gel", intake.atSec)) ?? swappable[0];
+      if (swap) {
+        solids.splice(solids.indexOf(swap), 1);
+        for (const hour of hours) {
+          if (swap.atSec >= hour.start && swap.atSec < hour.start + span) {
+            hour.total -= swap.carbsG;
+          }
+        }
+        best = swap.atSec;
+      }
+    }
     if (best == null) {
-      const gel = plan.gelProducts[0];
-      if (next.role === "bar" && gel) {
+      // A solid that doesn't fit becomes gels, still rotating through the plan's flavours.
+      const gel = plan.gelProducts[converted % Math.max(1, plan.gelProducts.length)];
+      if (isSolid && gel) {
+        converted += 1;
         const extra = Math.round(carbs / carbsOf(gel));
         queue.push(
           ...Array.from({ length: extra }, () => ({ product: gel, role: "gel" as const })),
@@ -586,12 +691,17 @@ function scheduleIntakes(
       next.product,
       next.role,
       at,
-      next.role === "bar" ? [at - 10 * 60, at + 10 * 60] : [at - SLOT_SEC, at + SLOT_SEC],
+      isSolid ? [at - 10 * 60, at + 10 * 60] : [at - SLOT_SEC, at + SLOT_SEC],
       reasonAt(next.role, at),
     );
   }
 
-  return [...intakes, ...solids].sort((a, b) => a.atSec - b.atSec || a.role.localeCompare(b.role));
+  return {
+    intakes: [...intakes, ...solids].sort(
+      (a, b) => a.atSec - b.atSec || a.role.localeCompare(b.role),
+    ),
+    notes: skipped,
+  };
 }
 
 /** Rules every plan is held to; each failure is a sentence the athlete can read. */
@@ -639,7 +749,7 @@ export function checkPlan(input: FuelPlanInput, plan: FuelPlan): string[] {
     }
   }
 
-  const drinkMl = plan.drink ? (plan.drink.quarters / 4) * plan.bottleMl : 0;
+  const drinkMl = plan.drink ? plan.drink.bottles * plan.bottleMl : 0;
   if (drinkMl > input.bottles.count * input.bottles.ml) {
     issues.push("The plan needs more drink than your bottles hold.");
   }
@@ -663,33 +773,75 @@ function pick<T>(items: T[], preferred: (item: T) => boolean) {
   return items.find(preferred) ?? items[0] ?? null;
 }
 
+const DRINK_LINE_ORDER = ["SLOW CARB", "FAST CARB", "POWER CARB"];
+
+function slugLine(line: string) {
+  return line.toLowerCase().replaceAll(" ", "-");
+}
+
+/** Up to three plain gels, the given ones first, so a long session rotates flavours. */
+export function withGelVariety(spec: ProposalSpec, products: FuelProduct[]): ProposalSpec {
+  const others = products
+    .filter((product) => rolesFor(product).includes("gel") && product.carbsG != null)
+    .map((product) => product.id)
+    .sort()
+    .filter((id) => !spec.gelIds.includes(id));
+  return { ...spec, gelIds: [...spec.gelIds, ...others].slice(0, Math.max(3, spec.gelIds.length)) };
+}
+
+/** How each starting proposal splits the carbs, so the three differ by more than a flavour. */
+const STYLES = [
+  { label: null, drink: 0, solid: 0 },
+  { label: "more from the bottles", drink: 0.2, solid: -0.1 },
+  { label: "more solid food", drink: -0.1, solid: 0.15 },
+] as const;
+
 /**
- * Three distinct starting proposals the coach model may refine: drink-led, gel-led, and solids
- * early on rides (chews on foot). Above 90 g/h they prefer 1:0.8 products, else 2:1.
+ * Up to three starting proposals the coach model may refine. Each has a drink mix, one solid
+ * (jelly, bar, or chews), and the athlete's gels in turn. They differ by drink line and solid
+ * when the athlete has more than one, and by how much of the carbs the drink and solid cover.
+ * Above 90 g/h they prefer 1:0.8 products, else 2:1.
  */
 export function defaultProposals(input: FuelPlanInput): ProposalSpec[] {
   const ratio = input.carbTarget >= 90 ? "1:0.8" : "2:1";
   const sorted = [...input.products].sort((a, b) => a.id.localeCompare(b.id));
   const byRole = (role: FuelRole) => sorted.filter((product) => rolesFor(product).includes(role));
   const preferRatio = (product: FuelProduct) => product.glucoseFructose === ratio;
+  const better = (candidate: FuelProduct, current: FuelProduct | undefined) =>
+    !current ||
+    (preferRatio(candidate) && !preferRatio(current)) ||
+    (preferRatio(candidate) === preferRatio(current) && carbsOf(candidate) > carbsOf(current));
 
-  const drinks = byRole("drink");
-  // A stronger mix when the target is high, so the bottles carry more of it.
-  const drinkPick =
-    pick(
-      drinks,
-      (product) => preferRatio(product) && carbsOf(product) >= (input.carbTarget >= 70 ? 75 : 0),
-    ) ?? null;
+  const drinksByLine = new Map<string, FuelProduct>();
+  for (const drink of byRole("drink")) {
+    const current = drinksByLine.get(drink.line);
+    if (better(drink, current)) drinksByLine.set(drink.line, drink);
+  }
+  const drinks = [
+    ...DRINK_LINE_ORDER.flatMap((line) => {
+      const drink = drinksByLine.get(line);
+      return drink ? [drink] : [];
+    }),
+    ...[...drinksByLine.values()].filter((drink) => !DRINK_LINE_ORDER.includes(drink.line)),
+  ];
+
   const gels = byRole("gel");
-  const plainGels = gels.filter((product) => product.kind === "gel");
-  const chews = gels.filter((product) => product.kind === "chew");
-  const gelA = pick(plainGels, preferRatio);
+  const gelA = pick(gels, preferRatio);
   const gelB = pick(
-    plainGels.filter((product) => product.id !== gelA?.id),
+    gels.filter((product) => product.id !== gelA?.id),
     preferRatio,
   );
-  const chew = pick(chews, preferRatio);
-  const bar = pick(byRole("bar"), preferRatio);
+  const jellies = byRole("jelly");
+  const jelly =
+    pick(
+      jellies.filter((product) => product.kind === "jelly"),
+      preferRatio,
+    ) ?? pick(jellies, preferRatio);
+  const bar =
+    input.sportGroup === "cycling" && input.elapsedSec >= BAR_MIN_ELAPSED_SEC
+      ? pick(byRole("bar"), preferRatio)
+      : null;
+  const solids = [jelly, bar].filter((product): product is FuelProduct => product != null);
   const caffeine = pick(
     byRole("caffeine"),
     (product) =>
@@ -698,59 +850,60 @@ export function defaultProposals(input: FuelPlanInput): ProposalSpec[] {
   const ids = (...products: (FuelProduct | null)[]) =>
     products.flatMap((product) => (product ? [product.id] : []));
 
-  const proposals: ProposalSpec[] = [
-    {
-      id: "drink-led",
-      name: "Drink-led",
-      rationale: "Most carbs come from your bottles; gels top up before the climbs.",
-      drinkId: drinkPick?.id ?? null,
-      drinkShare: 0.6,
-      gelIds: ids(gelA),
-      barId: null,
-      barShare: 0,
-      caffeineId: caffeine?.id ?? null,
-    },
-    {
-      id: "gel-led",
-      name: "Gel-led",
-      rationale: "Water in the bottles and gels on a steady clock: simple to carry and to count.",
-      drinkId: null,
-      drinkShare: 0,
-      gelIds: ids(gelB ?? gelA, chew),
-      barId: null,
-      barShare: 0,
-      caffeineId: null,
-    },
-  ];
-  if (input.sportGroup === "cycling" && input.elapsedSec >= BAR_MIN_ELAPSED_SEC && bar) {
-    proposals.push({
-      id: "solids-early",
-      name: "Solids early",
-      rationale: "A bar or two while the stomach is fresh, then drink and gels when it gets hard.",
-      drinkId: drinkPick?.id ?? null,
-      drinkShare: 0.4,
-      gelIds: ids(gelB ?? gelA),
-      barId: bar.id,
-      barShare: 0.15,
-      caffeineId: caffeine?.id ?? null,
-    });
-  } else if (chew) {
-    proposals.push({
-      id: "chews",
-      name: "Chews and sips",
-      rationale: "Chews are easier to take in small bites while moving, with some drink mix.",
-      drinkId: drinkPick?.id ?? null,
-      drinkShare: 0.3,
-      gelIds: ids(chew),
-      barId: null,
-      barShare: 0,
-      caffeineId: caffeine?.id ?? null,
-    });
+  const drinkList = drinks.length > 0 ? drinks : [null];
+  const solidList = solids.length > 0 ? solids : [null];
+  const gelList = [gelA, gelB ?? gelA];
+
+  const proposals: ProposalSpec[] = [];
+  for (const [index, style] of STYLES.entries()) {
+    const drink = drinkList[index % drinkList.length] ?? null;
+    const solid = solidList[index % solidList.length] ?? null;
+    const gel = gelList[index % gelList.length] ?? null;
+    if (!drink && !solid && !gel) break;
+    const drinkShare = drink
+      ? clamp((solid ? (carbsOf(drink) >= 75 ? 0.5 : 0.4) : 0.6) + style.drink, 0.2, 0.8)
+      : 0;
+    const solidShare = solid
+      ? clamp((solid.kind === "bar" ? 0.15 : 0.2) + style.solid, 0.1, 0.5)
+      : 0;
+    const solidName =
+      solid?.kind === "bar" ? "bar" : solid?.kind === "chew" ? "chews" : solid ? "jelly" : null;
+    const drinkLabel = drink?.line || "Water";
+    const base = solidName ? `${drinkLabel} + ${solidName}` : drinkLabel;
+    proposals.push(
+      withGelVariety(
+        {
+          id: `${drink ? slugLine(drink.line) : "water"}-${solidName ?? "gels"}-${index + 1}`,
+          name: style.label ? `${base}, ${style.label}` : base,
+          rationale: [
+            drink ? `${drink.line} in the bottles` : "Water in the bottles",
+            solid ? (solid.kind === "bar" ? "a bar early" : `${solid.line} as the solid`) : null,
+            "gels before the climbs",
+          ]
+            .filter(Boolean)
+            .join("; "),
+          drinkId: drink?.id ?? null,
+          drinkShare,
+          gelIds: ids(gel),
+          solidId: solid?.id ?? null,
+          solidShare,
+          caffeineId: caffeine?.id ?? null,
+        },
+        input.products,
+      ),
+    );
   }
-  // With few products the templates can collapse into the same mix; keep each mix once.
+
   const seen = new Set<string>();
   return proposals.filter((proposal) => {
-    const mix = [proposal.drinkId, proposal.barId, proposal.caffeineId, ...proposal.gelIds].join();
+    const mix = [
+      proposal.drinkId,
+      proposal.solidId,
+      proposal.caffeineId,
+      proposal.drinkShare,
+      proposal.solidShare,
+      ...proposal.gelIds,
+    ].join();
     if (seen.has(mix)) return false;
     seen.add(mix);
     return true;
@@ -768,12 +921,13 @@ export function swapOptions(
 ): FuelProduct[] {
   if (!current) return [];
   const roles = rolesFor(current);
-  return products.filter(
-    (product) =>
-      product.id !== productId &&
-      product.carbsG != null &&
-      rolesFor(product).some((role) => roles.includes(role)),
-  );
+  const solid = roles.includes("bar") || roles.includes("jelly");
+  return products.filter((product) => {
+    if (product.id === productId || product.carbsG == null) return false;
+    const theirs = rolesFor(product);
+    if (theirs.some((role) => roles.includes(role))) return true;
+    return solid && (theirs.includes("bar") || theirs.includes("jelly"));
+  });
 }
 
 /** Replaces a product in its role and re-solves, so the plan keeps the target. */
@@ -792,7 +946,7 @@ export function swapProduct(
   return solveFuelPlan(input, {
     ...spec,
     drinkId: swap(spec.drinkId),
-    barId: swap(spec.barId),
+    solidId: swap(spec.solidId),
     caffeineId: swap(spec.caffeineId),
     gelIds: spec.gelIds.map((id) => swap(id) as string),
   });

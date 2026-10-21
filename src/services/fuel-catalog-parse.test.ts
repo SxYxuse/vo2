@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildFuelProduct, type ShopifyProduct } from "./fuel-catalog-parse.ts";
-import { isPlannable, loadFuelCatalog, ownedProducts, planningProducts } from "./fuel-catalog.ts";
+import {
+  hasPlanningKit,
+  missingKit,
+  isPlannable,
+  loadFuelCatalog,
+  ownedProducts,
+  planningProducts,
+} from "./fuel-catalog.ts";
 
 // Trimmed from the real mnstry.com pages.
 function nutritionTable(serving: string, carbs: string) {
@@ -183,5 +190,36 @@ describe("stored catalog", () => {
 
     expect(owned.map((product) => product.id)).toEqual(["gel-40-mango"]);
     expect(ownedProducts(null)).toEqual([]);
+  });
+
+  it("reads JELLY 40 as the solid, not as another gel", () => {
+    const product = buildFuelProduct(
+      shopify({
+        handle: "jelly-40-neutral-1-0-8",
+        title: "JELLY 40 Neutral 1:0.8",
+        product_type: "JELLY 40",
+        body_html:
+          "<p>fournit 40 grammes de glucides par portion, dans un rapport glucose/fructose de 1:0,8.</p>",
+      }),
+      nutritionTable("58 g", "40,0 g"),
+      url,
+    );
+
+    expect(product.kind).toBe("jelly");
+    expect(loadFuelCatalog().products.find((item) => item.line === "JELLY 40")?.kind).toBe("jelly");
+  });
+
+  it("needs a drink, a solid, and a gel before a route can be planned", () => {
+    const catalog = planningProducts(loadFuelCatalog());
+    const drink = catalog.find((product) => product.kind === "drink");
+    const gel = catalog.find((product) => product.kind === "gel" && !product.caffeineMg);
+    const caffeineGel = catalog.find((product) => product.kind === "gel" && product.caffeineMg);
+    const jelly = catalog.find((product) => product.kind === "jelly");
+
+    expect(drink && gel && caffeineGel && jelly).toBeTruthy();
+    expect(hasPlanningKit([drink!, gel!])).toBe(false);
+    expect(hasPlanningKit([drink!, caffeineGel!, jelly!])).toBe(false);
+    expect(missingKit([drink!, caffeineGel!])).toEqual(["a gel", "a jelly or bar"]);
+    expect(hasPlanningKit([drink!, gel!, jelly!])).toBe(true);
   });
 });

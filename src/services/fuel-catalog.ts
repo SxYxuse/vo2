@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import catalogJson from "@/data/mnstry-catalog.json";
 
-export const FUEL_KINDS = ["gel", "chew", "drink", "bar", "other"] as const;
+export const FUEL_KINDS = ["gel", "jelly", "chew", "drink", "bar", "other"] as const;
 export type FuelKind = (typeof FUEL_KINDS)[number];
 
 const MISSING_FIELDS = ["serving", "carbsG", "glucoseFructose", "caffeineMg"] as const;
@@ -68,6 +68,27 @@ export function isPlannable(product: FuelProduct) {
 
 export function planningProducts(catalog: FuelCatalog = loadFuelCatalog()) {
   return catalog.products.filter(isPlannable);
+}
+
+/** Jelly, a bar, or chews: the one solid a proposal carries alongside gels. */
+export function isSolid(product: FuelProduct) {
+  return product.kind === "jelly" || product.kind === "bar" || product.kind === "chew";
+}
+
+/**
+ * What a route plan still needs from these products: "a drink mix", "a gel", "a jelly or bar".
+ * Each proposal uses one of each; a caffeine gel only stands in for one gel, so it doesn't count.
+ */
+export function missingKit(products: readonly FuelProduct[]): string[] {
+  return [
+    products.some((product) => product.kind === "drink") ? null : "a drink mix",
+    products.some((product) => product.kind === "gel" && !product.caffeineMg) ? null : "a gel",
+    products.some(isSolid) ? null : "a jelly or bar",
+  ].filter((item): item is string => item != null);
+}
+
+export function hasPlanningKit(products: readonly FuelProduct[]) {
+  return missingKit(products).length === 0;
 }
 
 /** The plannable products the athlete has, in catalog order; unknown or retired ids drop out. */

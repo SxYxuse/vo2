@@ -38,8 +38,8 @@ const proposal = {
   drinkId: "fast-carb",
   drinkShare: 0.4,
   gelIds: ["gel-40-peach"],
-  barId: null,
-  barShare: 0,
+  solidId: "jelly-40-neutral-1-0-8",
+  solidShare: 0.2,
   caffeineId: null,
 };
 
@@ -92,19 +92,21 @@ describe("acceptProposals", () => {
 describe("applyPlacementReview", () => {
   it("keeps a small move that breaks nothing", () => {
     const base = input();
-    const plan = solveFuelPlan(base, defaultProposals(base)[1]!);
-    const last = plan.intakes.length - 1;
+    const plan = solveFuelPlan(base, defaultProposals(base)[0]!);
+    const last = plan.intakes.map((intake) => intake.role).lastIndexOf("gel");
+    const original = plan.intakes[last]!;
     const reviewed = applyPlacementReview(base, plan, {
-      shifts: [{ index: last, shiftMin: -5, reason: "before the final flat" }],
+      shifts: [{ index: last, shiftMin: 5, reason: "Before the final flat." }],
     });
+    const moved = reviewed.intakes.find((intake) => intake.reason === "before the final flat");
 
-    expect(reviewed.intakes.at(-1)?.atSec).toBe((plan.intakes[last]?.atSec ?? 0) - 300);
-    expect(reviewed.intakes.at(-1)?.reason).toBe("before the final flat");
+    expect(moved?.productId).toBe(original.productId);
+    expect(moved?.atSec).toBe(original.atSec + 300);
   });
 
   it("keeps the original when a move leaves a climb unfuelled", () => {
     const base = input();
-    const plan = solveFuelPlan(base, defaultProposals(base)[1]!);
+    const plan = solveFuelPlan(base, defaultProposals(base)[0]!);
     const index = plan.intakes.findIndex((intake) =>
       intake.reason.startsWith("ready for the climb"),
     );

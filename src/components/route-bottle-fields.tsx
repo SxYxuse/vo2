@@ -15,19 +15,33 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const MAX_BOTTLES = 6;
 
-/** How many bottles the athlete carries and their size: the drink in a plan never exceeds it. */
+type BottleChange = { bottleCount?: number; bottleMl?: number; mixBottleCount?: number | null };
+
+/**
+ * How many bottles the athlete carries, how many hold drink mix, and their size: the drink in a
+ * plan never exceeds it.
+ */
 export function BottleFields({
   idPrefix,
   count,
   ml,
+  mix,
   onChange,
 }: {
   idPrefix: string;
   count: number;
   ml: number;
-  onChange: (next: { bottleCount?: number; bottleMl?: number }) => void;
+  /** Bottles with drink mix; null lets the plan decide. */
+  mix: number | null;
+  onChange: (next: BottleChange) => void;
 }) {
   const preset = BOTTLE_PRESETS_ML.find((size) => size === ml);
+  // Fewer bottles can't hold more mix bottles than before; none carried means no choice left.
+  const setCount = (next: number) =>
+    onChange({
+      bottleCount: next,
+      ...(mix != null && mix > next ? { mixBottleCount: next > 0 ? next : null } : {}),
+    });
   return (
     <>
       <Field>
@@ -39,7 +53,7 @@ export function BottleFields({
             size="icon"
             aria-label="One bottle fewer"
             disabled={count <= 0}
-            onClick={() => onChange({ bottleCount: Math.max(0, count - 1) })}
+            onClick={() => setCount(Math.max(0, count - 1))}
           >
             <MinusIcon />
           </Button>
@@ -52,15 +66,46 @@ export function BottleFields({
             size="icon"
             aria-label="One bottle more"
             disabled={count >= MAX_BOTTLES}
-            onClick={() => onChange({ bottleCount: Math.min(MAX_BOTTLES, count + 1) })}
+            onClick={() => setCount(Math.min(MAX_BOTTLES, count + 1))}
           >
             <PlusIcon />
           </Button>
         </div>
         <FieldDescription>
-          No refills are planned. Spare bottles are planned as water.
+          Sipped through the session. The plan says when to refill.
         </FieldDescription>
       </Field>
+      {count > 1 ? (
+        <Field>
+          <FieldLabel id={`${idPrefix}-mix-label`}>Bottles with drink mix</FieldLabel>
+          <ToggleGroup
+            size="sm"
+            variant="outline"
+            spacing={0}
+            aria-labelledby={`${idPrefix}-mix-label`}
+            value={[mix == null ? "auto" : String(mix)]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (value === "auto") onChange({ mixBottleCount: null });
+              else if (value) onChange({ mixBottleCount: Number(value) });
+            }}
+          >
+            <ToggleGroupItem value="auto">Auto</ToggleGroupItem>
+            {Array.from({ length: count }, (_, index) => (
+              <ToggleGroupItem key={index + 1} value={String(index + 1)}>
+                {index + 1}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <FieldDescription>
+            {mix == null
+              ? "The plan picks how many bottles get mix; the rest are water."
+              : mix < count
+                ? `${mix} with mix, mixed as strong as the plan needs; ${count - mix} with water for your gels.`
+                : "Every bottle gets mix."}
+          </FieldDescription>
+        </Field>
+      ) : null}
       {count > 0 ? (
         <Field>
           <FieldLabel htmlFor={`${idPrefix}-bottle-ml`}>Bottle size</FieldLabel>

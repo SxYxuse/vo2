@@ -141,6 +141,13 @@
       "when": 1792520941417,
       "tag": "0019_fuel_products",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792568415309,
+      "tag": "0020_mix_bottles",
+      "breakpoints": true
     }
   ]
 }

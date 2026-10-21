@@ -14,8 +14,8 @@ export type ShopifyProduct = {
 const KIND_BY_LINE: Record<string, FuelKind> = {
   GEL40: "gel",
   "ICE-GEL 40": "gel",
-  // The store tags JELLY 40 as a gel: a squeezable pouch, not something chewed.
-  "JELLY 40": "gel",
+  // Squeezable pouch, planned as the solid next to gels, not as another gel.
+  "JELLY 40": "jelly",
   "CHEW 40": "chew",
   "SLOW CARB": "drink",
   "FAST CARB": "drink",

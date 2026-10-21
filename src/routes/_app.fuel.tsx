@@ -36,7 +36,8 @@ function FuelHeader() {
         Fuel
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        Predict a route from your own activities and plan what to eat and drink on it.
+        Choose the products you have, then upload a GPX to see the route and plan what to eat and
+        drink on it.
       </p>
     </div>
   );
@@ -71,17 +72,21 @@ function FuelPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col gap-4">
           <FuelProductsPicker productIds={data.fuelProductIds} />
-          <RouteUploadForm
-            defaults={data.defaults}
-            defaultSportType={data.defaultSportType}
-            hasProducts={(data.fuelProductIds ?? []).length > 0}
-          />
+          {data.canPlan ? (
+            <RouteUploadForm defaults={data.defaults} defaultSportType={data.defaultSportType} />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Choose a drink mix, a jelly or bar, and a gel above, then upload a GPX.
+            </p>
+          )}
         </div>
         <section className="flex flex-col gap-2" aria-label="Your routes">
           <h2 className="text-sm font-medium">Your routes</h2>
           {data.plans.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No routes yet. Upload a GPX to get a prediction and fuel plans.
+              {data.canPlan
+                ? "No routes yet. Upload a GPX to get a prediction and fuel plans."
+                : "No routes yet. Choose your products first, then upload a GPX."}
             </p>
           ) : (
             <ul className="flex flex-col divide-y rounded-xl border">

@@ -178,9 +178,9 @@ _Avoid_: Polar zone, Coggan zone, power zone
 A GPX file the athlete uploads for a session they plan to do, with its predicted time along the way. It is not an activity and does not count toward the week target.
 _Avoid_: Planned session, course, track
 
-**Major climb**:
-A climb on a route big enough to fuel ahead of: 80 m of gain on rides, 40 m on foot. Found with the same detection as climbs in activity analysis.
-_Avoid_: Hard effort, key climb
+**Climb**:
+A sustained uphill on a route, found with the same detection as climbs in activity analysis. Fuel plans treat every climb, not only the biggest ones.
+_Avoid_: Major climb, hard effort, key climb
 
 **Carb target**:
 Grams of carbohydrate per hour the athlete wants on a route. Defaults to 80 g/h for rides, 60 for runs, and 40 for hikes.

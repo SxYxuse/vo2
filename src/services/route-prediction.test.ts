@@ -157,6 +157,24 @@ describe("predictRoute", () => {
     expect((climb?.startSec ?? 0) / 60).toBeLessThan(23);
   });
 
+  it("keeps every sustained climb, not only the biggest", () => {
+    const twoClimbs = (d: number) => {
+      if (d < 5_000) return 200;
+      if (d < 7_000) return 200 + (d - 5_000) * 0.03;
+      if (d < 12_000) return 260;
+      if (d < 14_000) return 260 + (d - 12_000) * 0.03;
+      return 320;
+    };
+    const prediction = predictRoute(
+      input({ history: [ride()], profile: profile(20_000, twoClimbs) }),
+    );
+
+    expect(prediction.climbs.length).toBeGreaterThanOrEqual(2);
+    expect(prediction.climbs.every((climb) => climb.gainM < 80)).toBe(true);
+    expect(prediction.steps[0]?.lat).toBeCloseTo(45, 2);
+    expect(prediction.steps[0]?.lon).toBeCloseTo(6, 2);
+  });
+
   it("slows the end of a route longer than anything comparable", () => {
     const history = [ride({ distanceM: 70_000, movingSec: 7800, elapsedSec: 8000 })];
     const route = profile(90_000, () => 100);

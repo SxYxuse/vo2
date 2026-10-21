@@ -141,6 +141,8 @@ export const routePlans = pgTable(
     carbTarget: real("carb_target").notNull(),
     bottleCount: integer("bottle_count").notNull(),
     bottleMl: integer("bottle_ml").notNull(),
+    /** Bottles filled with drink mix; null lets the plan decide. The rest are water. */
+    mixBottleCount: integer("mix_bottle_count"),
     /** RoutePrediction, steps included: they are the resampled route, not the raw GPX. */
     prediction: jsonb("prediction").notNull(),
     /** ProposalSpec[]: products and shares; servings are solved on read. */

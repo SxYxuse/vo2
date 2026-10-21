@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceArea,
-  ReferenceLine,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { CheckIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 
 import { routePlansQueryOptions } from "@/lib/queries.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
@@ -21,6 +12,7 @@ import { planningProducts, type FuelProduct } from "@/services/fuel-catalog.ts";
 import {
   formatAroundTime,
   MAX_CARBS_PER_HOUR,
+  SIP_EVERY_MIN,
   swapOptions,
   type FuelPlan,
   type Intake,
@@ -29,12 +21,14 @@ import {
   carryList,
   chooseFuelPlan,
   deleteRoutePlan,
+  intakeHours,
   repredictRoutePlan,
   swapFuelProduct,
   updateRoutePlan,
   type RoutePlanView,
 } from "@/services/route-plan.ts";
 import { BottleFields } from "@/components/route-bottle-fields.tsx";
+import { RoutePreview } from "@/components/route-preview.tsx";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -64,14 +58,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-
-const CHART_CONFIG = {
-  altitudeM: { label: "Elevation", color: "var(--color-ds-gray-700)" },
-} satisfies ChartConfig;
 
 const PRODUCTS = planningProducts();
 const nameOf = (id: string) => PRODUCTS.find((product) => product.id === id)?.name ?? id;
@@ -141,90 +131,19 @@ export function RoutePlanDetail({ plan }: { plan: RoutePlanView }) {
         </Alert>
       ) : null}
 
-      <ElevationProfile plan={plan} />
-
-      {prediction.climbs.length > 0 ? (
-        <section aria-label="Major climbs" className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium">Major climbs</h2>
-          <ul className="flex flex-col divide-y rounded-xl border text-sm">
-            {prediction.climbs.map((climb) => (
-              <li
-                key={climb.startSec}
-                className="flex flex-wrap justify-between gap-x-3 px-3 py-2 tabular-nums"
-              >
-                <span>
-                  around {formatAroundTime(climb.startSec)} · km {climb.startKm}–{climb.endKm}
-                </span>
-                <span className="text-muted-foreground">
-                  {climb.gainM} m at {climb.avgGradePct ?? "—"} %, ~
-                  {Math.round(climb.durationSec / 60)} min
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <PlanSettings plan={plan} />
-      <Proposals plan={plan} />
-      {plan.chosen ? <ChosenPlan plan={plan} chosen={plan.chosen} /> : null}
+      {/* Phones read top to bottom; desktop keeps the route beside the plan. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <RoutePreview plan={plan} />
+        </div>
+        <div className="flex flex-col gap-4">
+          {plan.chosen ? <ChosenPlan plan={plan} chosen={plan.chosen} /> : null}
+          <Proposals plan={plan} />
+          <PlanSettings plan={plan} />
+        </div>
+      </div>
       <RouteActions plan={plan} />
     </div>
-  );
-}
-
-function ElevationProfile({ plan }: { plan: RoutePlanView }) {
-  const solids = plan.chosen?.intakes.filter((intake) => intake.role !== "drink") ?? [];
-  if (!plan.prediction.hasElevation) return null;
-  return (
-    <ChartContainer config={CHART_CONFIG} className="aspect-auto h-40 w-full sm:h-56">
-      <AreaChart data={plan.profile} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="km"
-          type="number"
-          domain={["dataMin", "dataMax"]}
-          tickLine={false}
-          axisLine={false}
-          minTickGap={32}
-          tickFormatter={(value) => `${Math.round(Number(value))} km`}
-        />
-        <YAxis
-          dataKey="altitudeM"
-          width={40}
-          tickLine={false}
-          axisLine={false}
-          domain={["dataMin - 20", "dataMax + 20"]}
-          tickFormatter={(value) => `${Math.round(Number(value))}`}
-        />
-        {plan.prediction.climbs.map((climb) => (
-          <ReferenceArea
-            key={climb.startSec}
-            x1={climb.startKm}
-            x2={climb.endKm}
-            fill="var(--color-ds-amber-700)"
-            fillOpacity={0.12}
-          />
-        ))}
-        {solids.map((intake) => (
-          <ReferenceLine
-            key={`${intake.atSec}-${intake.productId}`}
-            x={intake.km}
-            stroke="var(--color-ds-blue-700)"
-            strokeDasharray="2 3"
-          />
-        ))}
-        <Area
-          dataKey="altitudeM"
-          type="monotone"
-          stroke="var(--color-altitudeM)"
-          fill="var(--color-altitudeM)"
-          fillOpacity={0.15}
-          strokeWidth={1.5}
-          isAnimationActive={false}
-        />
-      </AreaChart>
-    </ChartContainer>
   );
 }
 
@@ -233,6 +152,7 @@ function PlanSettings({ plan }: { plan: RoutePlanView }) {
   const [bottles, setBottles] = useState({
     bottleCount: plan.bottleCount,
     bottleMl: plan.bottleMl,
+    mixBottleCount: plan.mixBottleCount,
   });
   const update = useRoutePlanMutation(() =>
     updateRoutePlan({
@@ -249,6 +169,7 @@ function PlanSettings({ plan }: { plan: RoutePlanView }) {
     target !== plan.carbTarget ||
     bottles.bottleCount !== plan.bottleCount ||
     bottles.bottleMl !== plan.bottleMl ||
+    bottles.mixBottleCount !== plan.mixBottleCount ||
     plan.catalogChanged;
 
   return (
@@ -276,9 +197,15 @@ function PlanSettings({ plan }: { plan: RoutePlanView }) {
             idPrefix="plan"
             count={bottles.bottleCount}
             ml={bottles.bottleMl}
+            mix={bottles.mixBottleCount}
             onChange={(next) => setBottles((current) => ({ ...current, ...next }))}
           />
         </FieldGroup>
+        {!plan.chosen && plan.proposals[0]?.fluid.refill ? (
+          <div className="mt-3">
+            <RefillNote fluid={plan.proposals[0].fluid} />
+          </div>
+        ) : null}
       </CardContent>
       {changed ? (
         <CardFooter>
@@ -296,11 +223,13 @@ function summary(plan: FuelPlan) {
   const parts: string[] = [];
   if (plan.drink)
     parts.push(
-      `${plan.drink.quarters / 4} bottle${plan.drink.quarters > 4 ? "s" : ""} ${nameOf(plan.drink.productId)}`,
+      `${plan.drink.bottles} bottle${plan.drink.bottles > 1 ? "s" : ""} ${nameOf(plan.drink.productId)}, ${Math.round(plan.drink.carbsPerBottleG)} g each`,
     );
   for (const item of plan.items) parts.push(`${item.count} × ${nameOf(item.productId)}`);
   return parts;
 }
+
+const CHOSEN_PLAN_ID = "chosen-plan";
 
 function Proposals({ plan }: { plan: RoutePlanView }) {
   const choose = useRoutePlanMutation((proposalId: string) =>
@@ -308,76 +237,136 @@ function Proposals({ plan }: { plan: RoutePlanView }) {
   );
   const chosenId = plan.chosen?.spec.id;
   return (
-    <section aria-label="Fuel plans" className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Fuel plans</h2>
-      {/* One card per screen width on phones, swiped sideways; side by side on desktop. */}
-      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
-        {plan.proposals.map((proposal) => {
-          const isChosen = chosenId === proposal.spec.id;
-          return (
-            <Card
-              key={proposal.spec.id}
-              size="sm"
-              className="w-[85%] shrink-0 snap-center md:w-auto"
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {proposal.spec.name}
-                  {isChosen ? <Badge>Chosen</Badge> : null}
-                </CardTitle>
-                <CardDescription>{proposal.spec.rationale}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2 text-sm">
-                <p className="tabular-nums">
-                  <span className="font-medium">{proposal.achievedGph} g/h</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    of {proposal.carbTarget} · {proposal.totalCarbsG} g
-                  </span>
-                  {proposal.caffeineMg > 0 ? (
+    // Collapsed by default, like the climbs; open until a plan is chosen, since choosing one is
+    // the next step.
+    <Collapsible
+      defaultOpen={!plan.chosen}
+      render={<section aria-label="Fuel plans" />}
+      className="flex flex-col gap-2"
+    >
+      <CollapsibleTrigger className="group/plans hover:bg-muted/50 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+        <span className="font-medium">
+          {plan.chosen ? "Other plans" : "Fuel plans"}
+          <span className="text-muted-foreground font-normal">
+            {" "}
+            · {plan.proposals.length} to choose from
+          </span>
+        </span>
+        <ChevronDownIcon
+          aria-hidden
+          className="text-muted-foreground size-4 transition-transform group-data-panel-open/plans:rotate-180"
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {/* One card per screen width on phones, swiped sideways; side by side on tablets, stacked
+          beside the route on desktop. */}
+        <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-1">
+          {plan.proposals.map((proposal) => {
+            const isChosen = chosenId === proposal.spec.id;
+            return (
+              <Card
+                key={proposal.spec.id}
+                size="sm"
+                className="w-[85%] shrink-0 snap-center md:w-auto"
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {proposal.spec.name}
+                    {isChosen ? <Badge>Chosen</Badge> : null}
+                  </CardTitle>
+                  <CardDescription>{proposal.spec.rationale}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 text-sm">
+                  <p className="tabular-nums">
+                    <span className="font-medium">{proposal.achievedGph} g/h</span>
                     <span className="text-muted-foreground">
                       {" "}
-                      · {proposal.caffeineMg} mg caffeine
+                      of {proposal.carbTarget} · {proposal.totalCarbsG} g
                     </span>
-                  ) : null}
-                </p>
-                <ul className="text-muted-foreground flex flex-col gap-0.5">
-                  {summary(proposal).map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-                {[...proposal.notes, ...proposal.issues].map((note) => (
-                  <p key={note} className="text-xs">
-                    {note}
+                    {proposal.caffeineMg > 0 ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {proposal.caffeineMg} mg caffeine
+                      </span>
+                    ) : null}
                   </p>
-                ))}
-              </CardContent>
-              <CardFooter>
-                <Button
-                  variant={isChosen ? "outline" : "default"}
-                  disabled={choose.isPending}
-                  onClick={() => choose.mutate(proposal.spec.id)}
-                >
-                  {choose.isPending && choose.variables === proposal.spec.id ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : isChosen ? (
-                    <CheckIcon data-icon="inline-start" />
-                  ) : null}
-                  {isChosen ? "Reset to this plan" : "Choose"}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+                  <ul className="text-muted-foreground flex flex-col gap-0.5">
+                    {summary(proposal).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  {[...proposal.notes, ...proposal.issues].map((note) => (
+                    <p key={note} className="text-xs">
+                      {note}
+                    </p>
+                  ))}
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    variant={isChosen ? "outline" : "default"}
+                    disabled={choose.isPending}
+                    onClick={() =>
+                      choose.mutate(proposal.spec.id, {
+                        // The chosen plan renders above the proposals once the route reloads.
+                        onSuccess: () =>
+                          requestAnimationFrame(() =>
+                            document
+                              .getElementById(CHOSEN_PLAN_ID)
+                              ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                          ),
+                      })
+                    }
+                  >
+                    {choose.isPending && choose.variables === proposal.spec.id ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : isChosen ? (
+                      <CheckIcon data-icon="inline-start" />
+                    ) : null}
+                    {isChosen ? "Reset to this plan" : "Choose"}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
+        </div>
+      </CollapsibleContent>
       {choose.error ? <p className="text-destructive text-sm">{choose.error.message}</p> : null}
-    </section>
+    </Collapsible>
+  );
+}
+
+/** Too little fluid for the session: shown once, not on every proposal. */
+function RefillNote({ fluid }: { fluid: FuelPlan["fluid"] }) {
+  if (!fluid.refill) return null;
+  return (
+    <Alert>
+      <AlertDescription>
+        <p className="text-foreground font-medium">
+          Refill around {formatAroundTime(fluid.refill.atSec)}, km {fluid.refill.km}
+        </p>
+        <p>
+          Your bottles give about {fluid.mlPerHour} ml an hour. The plan only counts the mix you
+          start with.
+        </p>
+      </AlertDescription>
+    </Alert>
   );
 }
 
 function intakeAmount(intake: Intake) {
-  if (intake.role === "drink") return "¼ bottle";
   return intake.amount === 1 ? "1" : `${intake.amount}`;
+}
+
+/** A span, not a time of day: "3 h 15", "45 min". */
+function formatHours(sec: number) {
+  const minutes = Math.round(sec / 60 / 5) * 5;
+  const hours = Math.floor(minutes / 60);
+  if (hours === 0) return `${minutes} min`;
+  return `${hours} h${minutes % 60 ? ` ${String(minutes % 60).padStart(2, "0")}` : ""}`;
+}
+
+function hourLabel(hour: number) {
+  return `${hour}:00–${hour + 1}:00`;
 }
 
 function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan }) {
@@ -389,6 +378,8 @@ function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan })
   );
   // Swaps offer only the athlete's products, even when replacing one they no longer have.
   const owned = PRODUCTS.filter((product) => plan.fuelProductIds.includes(product.id));
+  const hours = intakeHours(chosen.intakes);
+  const food = hours.reduce((sum, hour) => sum + hour.intakes.length, 0);
   const options: FuelProduct[] = swapping
     ? swapOptions(
         owned,
@@ -399,8 +390,9 @@ function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan })
 
   return (
     <section
+      id={CHOSEN_PLAN_ID}
       aria-label="Your fuel plan"
-      className="flex flex-col gap-3 pb-[env(safe-area-inset-bottom)]"
+      className="flex scroll-mt-4 flex-col gap-3"
     >
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold">{chosen.spec.name}</h2>
@@ -421,47 +413,103 @@ function ChosenPlan({ plan, chosen }: { plan: RoutePlanView; chosen: FuelPlan })
           </ul>
         </CardContent>
       </Card>
+      {chosen.drink ? (
+        <Alert>
+          <AlertDescription>
+            <button
+              type="button"
+              className="text-foreground text-start font-medium underline-offset-4 hover:underline"
+              onClick={() => setSwapping(chosen.drink?.productId ?? null)}
+            >
+              Sip {nameOf(chosen.drink.productId)} every {SIP_EVERY_MIN[0]}–{SIP_EVERY_MIN[1]} min
+            </button>
+            <p>
+              A little each time, all the way to the finish
+              {chosen.drink.bottles > 1
+                ? `: about one bottle every ${formatHours(plan.prediction.elapsedSec / chosen.drink.bottles)}`
+                : ""}
+              .{" "}
+              {chosen.waterBottles > 0
+                ? "Take your gels with water from the other bottle."
+                : "Take your gels with a sip."}
+            </p>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {chosen.fluid.refill ? <RefillNote fluid={chosen.fluid} /> : null}
       {[...chosen.notes, ...chosen.issues].map((note) => (
         <p key={note} className="text-muted-foreground text-sm">
           {note}
         </p>
       ))}
-      <ol className="flex flex-col divide-y rounded-xl border">
-        {chosen.intakes.map((intake) => (
-          <li
-            key={`${intake.atSec}-${intake.productId}-${intake.role}`}
-            className="flex gap-3 px-3 py-2.5"
-          >
-            <div className="w-16 shrink-0 tabular-nums">
-              <div className="font-medium">~{formatAroundTime(intake.atSec)}</div>
-              <div className="text-muted-foreground text-xs">km {intake.km}</div>
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <button
-                type="button"
-                className="min-h-8 text-start font-medium underline-offset-4 hover:underline"
-                onClick={() => setSwapping(intake.productId)}
-              >
-                {intakeAmount(intake)} {nameOf(intake.productId)}
-              </button>
-              <span className="text-muted-foreground text-xs">
-                {Math.round(intake.carbsG)} g carbs
-                {intake.caffeineMg > 0 ? ` · ${intake.caffeineMg} mg caffeine` : ""}
-                {intake.role !== "drink"
-                  ? intake.withFluid
-                    ? " · with a sip"
-                    : " · on its own"
-                  : ""}{" "}
-                · {intake.reason}
-              </span>
-              <span className="text-muted-foreground text-xs">
-                between {formatAroundTime(intake.earliestSec)} and{" "}
-                {formatAroundTime(intake.latestSec)}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {/* The whole timeline folds, collapsed by default: the carry list says what to pack. */}
+      <Collapsible
+        render={<section aria-label="Timeline" />}
+        className="flex flex-col overflow-hidden rounded-xl border"
+      >
+        <CollapsibleTrigger className="group/timeline hover:bg-muted/50 flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30">
+          <span className="font-medium">
+            Timeline
+            <span className="text-muted-foreground font-normal tabular-nums">
+              {" "}
+              · {hours.length} hour{hours.length > 1 ? "s" : ""} · {food} to take
+            </span>
+          </span>
+          <ChevronDownIcon
+            aria-hidden
+            className="text-muted-foreground size-4 shrink-0 transition-transform group-data-panel-open/timeline:rotate-180"
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="border-t">
+          <ol className="flex flex-col divide-y">
+            {hours.map((hour) => (
+              <li key={hour.hour} className="flex flex-col">
+                <div className="bg-muted/50 flex items-baseline justify-between gap-2 px-3 py-1.5 text-xs tabular-nums">
+                  <span className="font-medium">Hour {hour.hour + 1}</span>
+                  <span className="text-muted-foreground">
+                    {hourLabel(hour.hour)} · {hour.carbsG} g
+                  </span>
+                </div>
+                {hour.intakes.length === 0 ? (
+                  <p className="text-muted-foreground px-3 py-2.5 text-sm">Only sips this hour.</p>
+                ) : (
+                  <ol className="flex flex-col divide-y">
+                    {hour.intakes.map((intake) => (
+                      <li
+                        key={`${intake.atSec}-${intake.productId}-${intake.role}`}
+                        className="flex gap-3 px-3 py-2.5"
+                      >
+                        <div className="w-16 shrink-0 tabular-nums">
+                          <div className="font-medium">~{formatAroundTime(intake.atSec)}</div>
+                          <div className="text-muted-foreground text-xs">km {intake.km}</div>
+                        </div>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <button
+                            type="button"
+                            className="min-h-8 text-start font-medium underline-offset-4 hover:underline"
+                            onClick={() => setSwapping(intake.productId)}
+                          >
+                            {intakeAmount(intake)} {nameOf(intake.productId)}
+                          </button>
+                          <span className="text-muted-foreground text-xs">
+                            {Math.round(intake.carbsG)} g carbs
+                            {intake.caffeineMg > 0 ? ` · ${intake.caffeineMg} mg caffeine` : ""}
+                            {intake.withFluid ? " · with a sip" : " · on its own"} · {intake.reason}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            between {formatAroundTime(intake.earliestSec)} and{" "}
+                            {formatAroundTime(intake.latestSec)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </li>
+            ))}
+          </ol>
+        </CollapsibleContent>
+      </Collapsible>
 
       <ResponsiveDialog
         open={swapping != null}
@@ -521,7 +569,7 @@ function RouteActions({ plan }: { plan: RoutePlanView }) {
   });
 
   return (
-    <div className="flex flex-wrap gap-2 border-t pt-4">
+    <div className="flex flex-wrap gap-2 border-t pt-4 pb-[env(safe-area-inset-bottom)]">
       <Button
         variant="outline"
         disabled={repredict.isPending}

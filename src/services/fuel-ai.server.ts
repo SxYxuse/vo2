@@ -52,7 +52,7 @@ function routeSummary(prediction: RoutePrediction) {
     distanceKm: Math.round(prediction.distanceM / 100) / 10,
     gainM: prediction.gainM,
     predictedMinutes: Math.round(prediction.elapsedSec / 60),
-    majorClimbs: prediction.climbs.map((climb) => ({
+    climbs: prediction.climbs.map((climb) => ({
       startKm: climb.startKm,
       startMinute: Math.round(climb.startSec / 60),
       minutes: Math.round(climb.durationSec / 60),
@@ -102,7 +102,7 @@ export async function proposeFuelPlans(
   const raw = await ask(
     "proposals",
     {
-      task: "Propose 3 fuel plans that differ in products, not just counts. Each names a drink mix (or null for water), up to 3 gels or chews used in turn, an optional bar (rides over 2 h only), an optional caffeine product for the last major climb, and the share of carbs the drink and bar should cover. The planner computes servings and timing.",
+      task: "Propose 3 fuel plans that clearly differ: one balanced, one leaning on the drink (drinkShare 0.5 or more), one leaning on solid food (solidShare 0.3 or more), and use different products where the athlete has them. Each must name a drink mix (SLOW CARB, FAST CARB or POWER CARB when the athlete has them), one solid (a JELLY 40 or a bar — bars only on rides over 2 h), the athlete's plain gels (up to 3, so flavours rotate), an optional caffeine product for the last climb, and the share of carbs the drink and solid should cover. Never omit the drink or the solid. The drink is sipped every 15-20 minutes. The planner computes servings and timing.",
       route: routeSummary(prediction),
       carbTargetPerHour: input.carbTarget,
       bottles: input.bottles,
@@ -139,16 +139,23 @@ export async function reviewPlacement(
     {
       task: "Review this intake timeline. You may move intakes by up to 10 minutes (shiftMin) where the terrain or a climb makes another moment better, with a short reason for the athlete. Return an empty list if it is already good.",
       route: routeSummary(prediction),
-      intakes: plan.intakes.map((intake, index) => ({
-        index,
-        minute: Math.round(intake.atSec / 60),
-        km: intake.km,
-        role: intake.role,
-        productId: intake.productId,
-        carbsG: intake.carbsG,
-        readyAtMinute: Math.round(intake.readyAtSec / 60),
-        reason: intake.reason,
-      })),
+      // Sips are spread evenly and aren't moved; indexes stay those of the full list.
+      intakes: plan.intakes.flatMap((intake, index) =>
+        intake.role === "drink"
+          ? []
+          : [
+              {
+                index,
+                minute: Math.round(intake.atSec / 60),
+                km: intake.km,
+                role: intake.role,
+                productId: intake.productId,
+                carbsG: intake.carbsG,
+                readyAtMinute: Math.round(intake.readyAtSec / 60),
+                reason: intake.reason,
+              },
+            ],
+      ),
     },
     placementReviewSchema,
   );

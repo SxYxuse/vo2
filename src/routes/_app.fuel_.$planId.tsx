@@ -25,7 +25,13 @@ export const Route = createFileRoute("/_app/fuel_/$planId")({
 
 function BackToRoutes() {
   return (
-    <Button variant="ghost" size="sm" className="-ms-2 self-start" render={<Link to="/fuel" />}>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="-ms-2 self-start"
+      nativeButton={false}
+      render={<Link to="/fuel" />}
+    >
       <ChevronLeftIcon data-icon="inline-start" />
       Routes
     </Button>

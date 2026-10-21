@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getProfileSettingsForUser } from "./app-settings.server.ts";
 import {
+  hasPlanningKit,
   loadFuelCatalog,
   ownedProducts,
   planningProducts,
@@ -59,6 +60,9 @@ async function fuelProductIdsFor(userId: string) {
 async function requireProducts(userId: string) {
   const products = ownedProducts(await fuelProductIdsFor(userId));
   if (products.length === 0) throw new Error("Choose the MNSTRY products you have first.");
+  if (!hasPlanningKit(products)) {
+    throw new Error("Choose a drink mix, a jelly or bar, and a gel to plan a route.");
+  }
   return products;
 }
 
@@ -80,7 +84,7 @@ export async function saveFuelProductsImpl(ids: string[]) {
 function proposalsFor(stored: ProposalSpec[], input: FuelPlanInput) {
   const owned = new Set(input.products.map((product) => product.id));
   const usesMissing = stored.some((spec) =>
-    [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds].some(
+    [spec.drinkId, spec.solidId, spec.caffeineId, ...spec.gelIds].some(
       (id) => id != null && !owned.has(id),
     ),
   );
@@ -104,7 +108,12 @@ async function ownedPlan(id: string, userId: string) {
 
 function planInput(
   prediction: RoutePrediction,
-  settings: { carbTarget: number; bottleCount: number; bottleMl: number },
+  settings: {
+    carbTarget: number;
+    bottleCount: number;
+    bottleMl: number;
+    mixBottleCount: number | null;
+  },
   bodyWeightKg: number,
   products: FuelProduct[],
 ): FuelPlanInput {
@@ -114,7 +123,7 @@ function planInput(
     steps: prediction.steps,
     climbs: prediction.climbs,
     carbTarget: settings.carbTarget,
-    bottles: { count: settings.bottleCount, ml: settings.bottleMl },
+    bottles: { count: settings.bottleCount, ml: settings.bottleMl, mix: settings.mixBottleCount },
     bodyWeightKg,
     products,
   };
@@ -128,11 +137,13 @@ function profileFrom(prediction: RoutePrediction, name: string): RouteProfile {
     gainM: prediction.gainM,
     lossM: prediction.lossM,
     hasElevation: prediction.hasElevation,
-    steps: prediction.steps.map(({ distanceM, lengthM, altitudeM, gradePct }) => ({
+    steps: prediction.steps.map(({ distanceM, lengthM, altitudeM, gradePct, lat, lon }) => ({
       distanceM,
       lengthM,
       altitudeM,
       gradePct,
+      lat,
+      lon,
     })),
   };
 }
@@ -153,6 +164,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
     return {
       signedIn: false,
       fuelProductIds: null,
+      canPlan: false,
       plans: [],
       defaults: {},
       defaultSportType: "Ride",
@@ -169,6 +181,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
         carbTarget: routePlans.carbTarget,
         bottleCount: routePlans.bottleCount,
         bottleMl: routePlans.bottleMl,
+        mixBottleCount: routePlans.mixBottleCount,
         distanceM: sql<number>`(${routePlans.prediction}->>'distanceM')::real`,
         gainM: sql<number>`(${routePlans.prediction}->>'gainM')::real`,
         elapsedSec: sql<number>`(${routePlans.prediction}->>'elapsedSec')::real`,
@@ -194,6 +207,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
       carbTarget: row.carbTarget,
       bottleCount: row.bottleCount,
       bottleMl: row.bottleMl,
+      mixBottleCount: row.mixBottleCount,
     };
   }
   // The canonical sport of the group the athlete does most.
@@ -209,6 +223,7 @@ export async function listRoutePlansImpl(): Promise<RoutePlanList> {
   return {
     signedIn: true,
     fuelProductIds,
+    canPlan: hasPlanningKit(ownedProducts(fuelProductIds)),
     plans: rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -239,10 +254,17 @@ export async function getRoutePlanImpl(id: string): Promise<RoutePlanView | null
     carbTarget: row.carbTarget,
     bottleCount: row.bottleCount,
     bottleMl: row.bottleMl,
+    mixBottleCount: row.mixBottleCount,
     prediction,
     profile: profilePoints(steps),
     proposals: row.proposals.map((spec) => solveFuelPlan(input, spec)),
-    chosen: row.chosen?.plan ?? null,
+    // Plans saved before fluid was planned (sips, refills) are re-solved; the review's moves
+    // are lost for those only.
+    chosen: row.chosen
+      ? "fluid" in row.chosen.plan
+        ? row.chosen.plan
+        : solveFuelPlan(input, row.chosen.spec)
+      : null,
     catalogChanged: row.catalogFetchedAt !== loadFuelCatalog().fetchedAt,
     fuelProductIds: products.map((product) => product.id),
   };
@@ -255,6 +277,7 @@ export async function createRoutePlanImpl(data: {
   carbTarget: number;
   bottleCount: number;
   bottleMl: number;
+  mixBottleCount: number | null;
 }): Promise<{ id: string }> {
   const session = await getRequiredSession();
   const userId = session.user.id;
@@ -281,6 +304,7 @@ export async function createRoutePlanImpl(data: {
     carbTarget: data.carbTarget,
     bottleCount: data.bottleCount,
     bottleMl: data.bottleMl,
+    mixBottleCount: data.mixBottleCount,
     prediction,
     proposals,
     chosen: null,
@@ -304,6 +328,7 @@ export async function updateRoutePlanImpl(data: {
   carbTarget: number;
   bottleCount: number;
   bottleMl: number;
+  mixBottleCount: number | null;
 }) {
   const session = await getRequiredSession();
   const row = await ownedPlan(data.id, session.user.id);
@@ -320,6 +345,7 @@ export async function updateRoutePlanImpl(data: {
       proposals: proposalsFor(row.proposals, input),
       bottleCount: data.bottleCount,
       bottleMl: data.bottleMl,
+      mixBottleCount: data.mixBottleCount,
       chosen: resolveChosen(row.chosen, input),
       catalogFetchedAt: loadFuelCatalog().fetchedAt,
       updatedAt: new Date(),

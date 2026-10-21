@@ -19,6 +19,8 @@ export type RouteStep = {
   /** Smoothed; 0 everywhere on a route without elevation. */
   altitudeM: number;
   gradePct: number;
+  lat: number;
+  lon: number;
 };
 
 export type RouteProfile = {
@@ -84,11 +86,16 @@ function median(values: number[]) {
     : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
-/** Elevation at each resampled position, linearly interpolated, with gaps bridged. */
-function elevationAt(points: GpxPoint[], cumulative: number[], positions: number[]) {
-  const known = points.flatMap((point, index) =>
-    point.ele == null ? [] : [{ distance: cumulative[index] ?? 0, ele: point.ele }],
-  );
+function interpolateAt(
+  points: GpxPoint[],
+  cumulative: number[],
+  positions: number[],
+  value: (point: GpxPoint) => number | null,
+) {
+  const known = points.flatMap((point, index) => {
+    const amount = value(point);
+    return amount == null ? [] : [{ distance: cumulative[index] ?? 0, amount }];
+  });
   if (known.length === 0) return null;
   let cursor = 0;
   return positions.map((position) => {
@@ -96,10 +103,28 @@ function elevationAt(points: GpxPoint[], cumulative: number[], positions: number
     const a = known[cursor];
     const b = known[cursor + 1];
     if (!a) return 0;
-    if (!b || position <= a.distance) return a.ele;
+    if (!b || position <= a.distance) return a.amount;
     const span = b.distance - a.distance;
-    return span > 0 ? a.ele + ((b.ele - a.ele) * (position - a.distance)) / span : a.ele;
+    return span > 0
+      ? a.amount + ((b.amount - a.amount) * (position - a.distance)) / span
+      : a.amount;
   });
+}
+
+/** Elevation at each resampled position, linearly interpolated, with gaps bridged. */
+function elevationAt(points: GpxPoint[], cumulative: number[], positions: number[]) {
+  return interpolateAt(points, cumulative, positions, (point) => point.ele);
+}
+
+function coordAt(
+  points: GpxPoint[],
+  cumulative: number[],
+  positions: number[],
+  axis: "lat" | "lon",
+) {
+  return (
+    interpolateAt(points, cumulative, positions, (point) => point[axis]) ?? positions.map(() => 0)
+  );
 }
 
 function gainAndLoss(altitudes: number[]) {
@@ -147,6 +172,8 @@ export function buildRouteProfile(input: {
   const altitudes = raw
     ? raw.map((_, index) => median(raw.slice(Math.max(0, index - half), index + half + 1)))
     : positions.map(() => 0);
+  const lats = coordAt(points, cumulative, positions, "lat");
+  const lons = coordAt(points, cumulative, positions, "lon");
 
   const steps: RouteStep[] = [];
   for (let index = 0; index + 1 < positions.length; index += 1) {
@@ -159,6 +186,8 @@ export function buildRouteProfile(input: {
       lengthM: (positions[index + 1] ?? 0) - (positions[index] ?? 0),
       altitudeM: Math.round((altitudes[index] ?? 0) * 10) / 10,
       gradePct: run > 0 ? Math.round((rise / run) * 1000) / 10 : 0,
+      lat: Math.round((lats[index] ?? 0) * 1e6) / 1e6,
+      lon: Math.round((lons[index] ?? 0) * 1e6) / 1e6,
     });
   }
 

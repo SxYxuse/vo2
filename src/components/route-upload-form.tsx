@@ -29,18 +29,16 @@ function settingsFor(sportType: RouteSportType, defaults: RouteDefaults) {
     carbTarget: String(last?.carbTarget ?? DEFAULT_CARB_TARGET[group]),
     bottleCount: last?.bottleCount ?? DEFAULT_BOTTLES[group].count,
     bottleMl: last?.bottleMl ?? DEFAULT_BOTTLES[group].ml,
+    mixBottleCount: last?.mixBottleCount ?? null,
   };
 }
 
 export function RouteUploadForm({
   defaults,
   defaultSportType,
-  hasProducts,
 }: {
   defaults: RouteDefaults;
   defaultSportType: RouteSportType;
-  /** Plans are made only from the athlete's products, so none means nothing to plan with. */
-  hasProducts: boolean;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -60,6 +58,7 @@ export function RouteUploadForm({
           carbTarget: Number(settings.carbTarget),
           bottleCount: settings.bottleCount,
           bottleMl: settings.bottleMl,
+          mixBottleCount: settings.mixBottleCount,
         },
       });
     },
@@ -78,7 +77,7 @@ export function RouteUploadForm({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!file || !carbValid || !hasProducts) return;
+    if (!file || !carbValid) return;
     create.mutate();
   }
 
@@ -152,6 +151,7 @@ export function RouteUploadForm({
               idPrefix="route"
               count={settings.bottleCount}
               ml={settings.bottleMl}
+              mix={settings.mixBottleCount}
               onChange={(next) => setSettings((current) => ({ ...current, ...next }))}
             />
             {create.error ? (
@@ -161,15 +161,7 @@ export function RouteUploadForm({
                 </AlertDescription>
               </Alert>
             ) : null}
-            {!hasProducts ? (
-              <FieldDescription>
-                Choose your MNSTRY products above to plan a route.
-              </FieldDescription>
-            ) : null}
-            <Button
-              type="submit"
-              disabled={!file || !carbValid || !hasProducts || create.isPending}
-            >
+            <Button type="submit" disabled={!file || !carbValid || create.isPending}>
               {create.isPending ? (
                 <Spinner data-icon="inline-start" />
               ) : (

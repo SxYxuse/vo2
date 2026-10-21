@@ -1,10 +1,10 @@
-import { detectElevationSegments, type ActivitySample } from "./activity-analysis.types.ts";
+import { allElevationClimbs, type ActivitySample } from "./activity-analysis.types.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import type { RideGradeBand } from "./ride-analysis.ts";
 import type { RouteProfile, RouteStep } from "./route-gpx.ts";
 import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 
-export const ROUTE_PREDICTION_VERSION = 1;
+export const ROUTE_PREDICTION_VERSION = 2;
 
 /** Sports a route can be planned for; swimming has no route to upload (ADR 0017). */
 export type RouteSportGroup = Extract<SportGroupId, "cycling" | "running" | "walking">;
@@ -43,7 +43,6 @@ type GroupDefaults = {
   /** On foot, braking keeps descents near flat pace whatever the slope's energy cost says. */
   maxDescentOfFlat: number | null;
   minClimbKmh: number;
-  majorClimbGainM: number;
   splitKm: number;
 };
 
@@ -54,7 +53,6 @@ const DEFAULTS: Record<RouteSportGroup, GroupDefaults> = {
     maxDescentKmh: 50,
     maxDescentOfFlat: null,
     minClimbKmh: 5,
-    majorClimbGainM: 80,
     splitKm: 5,
   },
   running: {
@@ -63,7 +61,6 @@ const DEFAULTS: Record<RouteSportGroup, GroupDefaults> = {
     maxDescentKmh: 16,
     maxDescentOfFlat: 1.2,
     minClimbKmh: 3,
-    majorClimbGainM: 40,
     splitKm: 1,
   },
   walking: {
@@ -72,7 +69,6 @@ const DEFAULTS: Record<RouteSportGroup, GroupDefaults> = {
     maxDescentKmh: 6,
     maxDescentOfFlat: 1.1,
     minClimbKmh: 1.5,
-    majorClimbGainM: 40,
     splitKm: 1,
   },
 };
@@ -147,7 +143,7 @@ export type PredictedStep = RouteStep & {
   speedKmh: number;
 };
 
-export type MajorClimb = {
+export type RouteClimb = {
   startSec: number;
   endSec: number;
   startKm: number;
@@ -180,7 +176,7 @@ export type RoutePrediction = {
   elapsedSec: number;
   steps: PredictedStep[];
   splits: RouteSplit[];
-  climbs: MajorClimb[];
+  climbs: RouteClimb[];
   basis: {
     similar: SimilarActivity[];
     /** Minutes of the athlete's own data per grade band, in GRADE_BANDS order. */
@@ -427,11 +423,7 @@ function splitsFor(steps: PredictedStep[], splitKm: number, endSec: number): Rou
   return splits;
 }
 
-function majorClimbs(
-  steps: PredictedStep[],
-  sportType: string,
-  group: RouteSportGroup,
-): MajorClimb[] {
+function routeClimbs(steps: PredictedStep[], sportType: string): RouteClimb[] {
   const samples: ActivitySample[] = steps.map((step) => ({
     t: step.atSec,
     distanceM: step.distanceM,
@@ -443,21 +435,18 @@ function majorClimbs(
     cadence: null,
   }));
   const kmAt = new Map(steps.map((step) => [step.atSec, step.distanceM / 1000]));
-  return detectElevationSegments(samples, sportType)
-    .climbs.filter((climb) => climb.elevationDeltaM >= DEFAULTS[group].majorClimbGainM)
-    .map((climb) => {
-      const startKm = kmAt.get(climb.startSec) ?? 0;
-      return {
-        startSec: round(climb.startSec),
-        endSec: round(climb.endSec),
-        startKm: round(startKm, 1),
-        endKm: round(startKm + (climb.distanceM ?? 0) / 1000, 1),
-        durationSec: round(climb.durationSec),
-        gainM: round(climb.elevationDeltaM),
-        avgGradePct: climb.avgGradePct,
-      };
-    })
-    .sort((a, b) => a.startSec - b.startSec);
+  return allElevationClimbs(samples, sportType).map((climb) => {
+    const startKm = kmAt.get(climb.startSec) ?? 0;
+    return {
+      startSec: round(climb.startSec),
+      endSec: round(climb.endSec),
+      startKm: round(startKm, 1),
+      endKm: round(startKm + (climb.distanceM ?? 0) / 1000, 1),
+      durationSec: round(climb.durationSec),
+      gainM: round(climb.elevationDeltaM),
+      avgGradePct: climb.avgGradePct,
+    };
+  });
 }
 
 /** Predicts when the athlete reaches each point of the route, from their own history. */
@@ -544,7 +533,9 @@ export function predictRoute(input: PredictionInput): RoutePrediction {
   });
   if (beyondExperience)
     warnings.push(
-      "This route is longer than anything comparable you have done, so the end is predicted slower.",
+      picked.length > 0
+        ? "This route is longer than anything comparable you have done, so the end is predicted slower."
+        : "This route is longer than any of your past activities in this sport, so the end is predicted slower.",
     );
   const elapsedSec = movingSec * stopFactor;
 
@@ -567,7 +558,7 @@ export function predictRoute(input: PredictionInput): RoutePrediction {
     elapsedSec: round(elapsedSec),
     steps,
     splits: splitsFor(steps, defaults.splitKm, elapsedSec),
-    climbs: majorClimbs(steps, sportType, group),
+    climbs: routeClimbs(steps, sportType),
     basis: {
       similar: ranked.filter((item) => picked.some(({ activity }) => activity.id === item.id)),
       bandMinutes: curve.bandSec.map((sec) => round(sec / 60)),

@@ -5,6 +5,8 @@ import {
   checkPlan,
   rolesFor,
   solveFuelPlan,
+  terrainAllows,
+  withGelVariety,
   type FuelPlan,
   type FuelPlanInput,
   type FuelRole,
@@ -38,9 +40,9 @@ export const proposalsSchema = z.object({
         rationale: z.string().min(1).max(240),
         drinkId: z.string().nullable(),
         drinkShare: z.number().min(0).max(1),
-        gelIds: z.array(z.string()).max(3),
-        barId: z.string().nullable(),
-        barShare: z.number().min(0).max(0.5),
+        gelIds: z.array(z.string()).min(1).max(3),
+        solidId: z.string().nullable(),
+        solidShare: z.number().min(0).max(0.5),
         caffeineId: z.string().nullable(),
       }),
     )
@@ -90,14 +92,18 @@ export function acceptProposals(
   const accepted: ProposalSpec[] = [];
   const mixes = new Set<string>();
   for (const [index, proposal] of raw.proposals.entries()) {
+    const solid = proposal.solidId ? byId.get(proposal.solidId) : undefined;
     const valid =
-      (proposal.drinkId == null || fits(byId.get(proposal.drinkId), "drink")) &&
-      (proposal.barId == null || fits(byId.get(proposal.barId), "bar")) &&
+      proposal.drinkId != null &&
+      fits(byId.get(proposal.drinkId), "drink") &&
+      proposal.solidId != null &&
+      (fits(solid, "bar") || fits(solid, "jelly")) &&
       (proposal.caffeineId == null || fits(byId.get(proposal.caffeineId), "caffeine")) &&
+      proposal.gelIds.length > 0 &&
       proposal.gelIds.every((id) => fits(byId.get(id), "gel"));
     if (!valid) continue;
-    const spec: ProposalSpec = { id: `coach-${index + 1}`, ...proposal };
-    const mix = [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds].join(",");
+    const spec = withGelVariety({ id: `coach-${index + 1}`, ...proposal }, input.products);
+    const mix = [spec.drinkId, spec.solidId, spec.caffeineId, ...spec.gelIds].join(",");
     if (mixes.has(mix)) continue;
     if (solveFuelPlan(input, spec).issues.length > 0) continue;
     mixes.add(mix);
@@ -105,7 +111,7 @@ export function acceptProposals(
   }
   for (const spec of fallback) {
     if (accepted.length >= 3) break;
-    const mix = [spec.drinkId, spec.barId, spec.caffeineId, ...spec.gelIds].join(",");
+    const mix = [spec.drinkId, spec.solidId, spec.caffeineId, ...spec.gelIds].join(",");
     if (mixes.has(mix)) continue;
     mixes.add(mix);
     accepted.push(spec);
@@ -113,7 +119,7 @@ export function acceptProposals(
   return accepted;
 }
 
-/** Indexes of the major climbs that have food absorbed in the 20 minutes before they start. */
+/** Indexes of the climbs that have food absorbed in the 20 minutes before they start. */
 function fuelledClimbs(input: FuelPlanInput, intakes: FuelPlan["intakes"]) {
   return input.climbs.flatMap((climb, index) =>
     intakes.some(
@@ -150,13 +156,10 @@ export function applyPlacementReview(
     intake.earliestSec = Math.max(first, intake.earliestSec + delta);
     intake.latestSec = Math.min(last, intake.latestSec + delta);
     intake.readyAtSec += delta;
-    if (shift.reason.trim()) intake.reason = shift.reason.trim();
-    if (
-      intake.role === "bar" &&
-      input.climbs.some((climb) => atSec >= climb.startSec && atSec <= climb.endSec)
-    ) {
-      return plan;
-    }
+    const reason = shift.reason.trim().replace(/\.$/, "");
+    // Reasons read as a clause after the carbs: "40 g carbs · keeps carbs steady".
+    if (reason) intake.reason = reason.charAt(0).toLowerCase() + reason.slice(1);
+    if (!terrainAllows(input, intake.role, atSec)) return plan;
   }
   moved.sort((a, b) => a.atSec - b.atSec);
   const next: FuelPlan = { ...plan, intakes: moved, issues: [] };

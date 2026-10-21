@@ -749,7 +749,7 @@
       "id": "jelly-40-neutral-1-0-8",
       "name": "JELLY 40 Neutral 1:0.8",
       "line": "JELLY 40",
-      "kind": "gel",
+      "kind": "jelly",
       "flavour": "Neutral",
       "url": "https://mnstry.com/fr-eu/products/jelly-40-neutral-1-0-8",
       "serving": {
@@ -768,7 +768,7 @@
       "id": "jelly-40-pomegranate-1-0-8",
       "name": "JELLY 40 Pomegranate 1:0.8",
       "line": "JELLY 40",
-      "kind": "gel",
+      "kind": "jelly",
       "flavour": "Pomegranate",
       "url": "https://mnstry.com/fr-eu/products/jelly-40-pomegranate-1-0-8",
       "serving": {
@@ -787,7 +787,7 @@
       "id": "jelly-40-rhubarb-1-0-8",
       "name": "JELLY 40 Rhubarb 1:0.8",
       "line": "JELLY 40",
-      "kind": "gel",
+      "kind": "jelly",
       "flavour": "Rhubarb",
       "url": "https://mnstry.com/fr-eu/products/jelly-40-rhubarb-1-0-8",
       "serving": {
