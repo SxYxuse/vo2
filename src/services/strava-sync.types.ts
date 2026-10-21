@@ -175,6 +175,17 @@ export function isAbortError(error: unknown) {
   );
 }
 
+/**
+ * Strava no longer accepts VO2's stored tokens: the refresh was refused or the API answered 401,
+ * for example after the athlete deauthorized the app (issue #59). Only signing in again recovers.
+ */
+export const STRAVA_RECONNECT_MESSAGE =
+  "Strava no longer accepts VO2's access. Reconnect Strava to keep syncing.";
+
+export function needsStravaReconnect(error: unknown): error is Error {
+  return error instanceof Error && error.message === STRAVA_RECONNECT_MESSAGE;
+}
+
 export function isTransientSyncError(error: unknown) {
   if (isAbortError(error)) return true;
   if (!(error instanceof Error)) return false;

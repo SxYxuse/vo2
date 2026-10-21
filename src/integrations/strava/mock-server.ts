@@ -24,7 +24,21 @@ const RATE_LIMIT_HEADERS = {
   "X-ReadRateLimit-Usage": "0,0",
 };
 
-export function handleMockStravaRequest(request: Request): Response {
+/**
+ * Strava access tokens last about 6 h; the mock's expire sooner so local syncs go through the
+ * refresh path production depends on.
+ */
+const TOKEN_TTL_SEC = 10 * 60;
+
+/**
+ * Deauthorizing revokes every token Strava issued to the app for the athlete, in every deployment
+ * sharing that app (issue #59). Tokens carry a strictly increasing issue time, so one timestamp
+ * revokes them all.
+ */
+let lastIssuedAt = 0;
+let revokedAt = 0;
+
+export async function handleMockStravaRequest(request: Request): Promise<Response> {
   if (!env.STRAVA_MOCK) return new Response("Not found", { status: 404 });
 
   const url = new URL(request.url);
@@ -32,8 +46,9 @@ export function handleMockStravaRequest(request: Request): Response {
   const query = url.searchParams;
 
   if (path === "/oauth/authorize") return authorize(query);
-  if (path === "/oauth/token" && request.method === "POST") return tokenResponse();
+  if (path === "/oauth/token" && request.method === "POST") return token(await request.formData());
   if (path === "/oauth/deauthorize" && request.method === "POST") return deauthorize(request);
+  if (!isLive(bearerToken(request), "access")) return unauthorized("access_token");
   if (path === "/api/v3/athlete") return json(ATHLETE);
   if (path === "/api/v3/athlete/activities") {
     return json(
@@ -64,22 +79,53 @@ function authorize(query: URLSearchParams) {
   return new Response(null, { status: 302, headers: { location: callback.toString() } });
 }
 
-function tokenResponse() {
-  const expiresIn = 6 * 60 * 60;
+function token(form: FormData) {
+  if (form.get("grant_type") === "refresh_token" && !isLive(form.get("refresh_token"), "refresh")) {
+    return json(
+      {
+        message: "Bad Request",
+        errors: [{ resource: "RefreshToken", field: "refresh_token", code: "invalid" }],
+      },
+      400,
+    );
+  }
+  const issuedAt = Math.max(Date.now(), lastIssuedAt + 1);
+  lastIssuedAt = issuedAt;
   return json({
     token_type: "Bearer",
-    access_token: "mock-access-token",
-    refresh_token: "mock-refresh-token",
-    expires_in: expiresIn,
-    expires_at: Math.floor(Date.now() / 1000) + expiresIn,
+    access_token: `mock-access-${issuedAt}`,
+    refresh_token: `mock-refresh-${issuedAt}`,
+    expires_in: TOKEN_TTL_SEC,
+    expires_at: Math.floor(issuedAt / 1000) + TOKEN_TTL_SEC,
     athlete: ATHLETE,
   });
 }
 
 function deauthorize(request: Request) {
-  const token = request.headers.get("authorization")?.replace(/^Bearer /, "");
-  if (!token) return json({ message: "Authorization Error" }, 401);
+  const token = bearerToken(request);
+  if (!isLive(token, "access")) return unauthorized("access_token");
+  revokedAt = lastIssuedAt;
   return json({ access_token: token });
+}
+
+function bearerToken(request: Request) {
+  return request.headers.get("authorization")?.replace(/^Bearer /, "") ?? null;
+}
+
+/** Refresh tokens never expire on their own; access tokens last TOKEN_TTL_SEC. Both die on deauthorize. */
+function isLive(token: FormDataEntryValue | null, kind: "access" | "refresh") {
+  const match = typeof token === "string" ? new RegExp(`^mock-${kind}-(\\d+)$`).exec(token) : null;
+  if (!match) return false;
+  const issuedAt = Number(match[1]);
+  if (issuedAt <= revokedAt) return false;
+  return kind === "refresh" || Date.now() < issuedAt + TOKEN_TTL_SEC * 1000;
+}
+
+function unauthorized(field: string) {
+  return json(
+    { message: "Authorization Error", errors: [{ resource: "Athlete", field, code: "invalid" }] },
+    401,
+  );
 }
 
 function json(body: unknown, status = 200) {
