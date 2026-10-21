@@ -6,12 +6,12 @@ import {
   type ProfileSave,
   type ProfileSettings,
   profileSaveSchema,
-} from "@/services/app-settings.types.ts";
+} from "@/services/athlete-settings.types.ts";
 import {
   calendarPeriodSchema,
   shownSportTypesSchema,
   type CalendarPeriod,
-} from "@/services/calendar-settings.types.ts";
+} from "@/services/athlete-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   DEFAULT_WEEK_MIX,

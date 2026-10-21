@@ -3,7 +3,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { activities, activityStreams } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
-import { getProfileSettingsForUser } from "./app-settings.server.ts";
+import { getAthleteProfile } from "./athlete-settings.server.ts";
 import { buildRideAnalysis, isRideAnalysis, type RideAnalysis } from "./ride-analysis.ts";
 import { routeSportGroup, type HistoryActivity, type PredictionInput } from "./route-prediction.ts";
 import { SPORT_GROUPS } from "./sport-groups.ts";
@@ -111,7 +111,7 @@ export async function loadPredictionContext(
       })
       .from(activities)
       .where(eq(activities.userId, userId)),
-    getProfileSettingsForUser(userId),
+    getAthleteProfile(userId),
     getTrainingPlanForUser(userId),
   ]);
 

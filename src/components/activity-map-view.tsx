@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
 
-import { formatSportType } from "@/services/calendar-settings.types.ts";
+import { formatSportType, sportTypeColor } from "@/services/athlete-settings.types.ts";
 import {
   ALL_SPORTS,
   focusBoundsOf,
@@ -84,9 +84,8 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
       mapSportOptions(
         decoded.map((track) => track.sportType),
         sportGroupShares,
-        (type) => sportTypes[type]?.visible !== false,
       ),
-    [decoded, sportGroupShares, sportTypes],
+    [decoded, sportGroupShares],
   );
 
   const selectedType = sports.some((sport) => sport.sportType === sportType)
@@ -98,13 +97,8 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
       : (sports.find((sport) => sport.sportType === selectedType)?.members ?? [selectedType]);
 
   const visibleTracks = useMemo(
-    () =>
-      decoded.filter((track) => {
-        if (sportTypes[track.sportType]?.visible === false) return false;
-        if (!selectedMembers) return true;
-        return selectedMembers.includes(track.sportType);
-      }),
-    [decoded, selectedMembers, sportTypes],
+    () => decoded.filter((track) => !selectedMembers || selectedMembers.includes(track.sportType)),
+    [decoded, selectedMembers],
   );
 
   const viewport = useMemo(() => focusBoundsOf(visibleTracks), [visibleTracks]);
@@ -120,7 +114,7 @@ export function ActivityMapView({ tracks, sportTypes, sportGroupShares }: Activi
     };
     const byColor = new Map<string, LngLat[][]>();
     for (const track of visibleTracks) {
-      const color = colorOf(sportTypes[track.sportType]?.color ?? "var(--color-ds-gray-700)");
+      const color = colorOf(sportTypeColor(sportTypes, track.sportType));
       let lines = byColor.get(color);
       if (!lines) {
         lines = [];

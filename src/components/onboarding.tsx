@@ -33,8 +33,8 @@ import {
 } from "@/lib/settings-form.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
-import { saveAppSettings, saveProfile } from "@/services/app-settings.ts";
-import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/calendar-settings.ts";
+import { saveAthleteSettings, saveProfile } from "@/services/athlete-settings.ts";
+import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/athlete-settings.types.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
 import { cn } from "cn";
@@ -168,7 +168,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   });
 
   const save = useMutation({
-    mutationFn: saveAppSettings,
+    mutationFn: saveAthleteSettings,
     onSuccess: (saved) => {
       queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
         current ? { ...current, settings: saved.settings, training: saved.training } : current,

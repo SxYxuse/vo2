@@ -29,7 +29,7 @@ import {
   SETTINGS_SECTIONS,
   type SettingsSection,
 } from "@/lib/settings-sections.ts";
-import { saveAppSettings } from "@/services/app-settings.ts";
+import { saveAthleteSettings } from "@/services/athlete-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   hasRecentWeeklyHours,
@@ -136,7 +136,7 @@ export function SettingsForm({
   }, [data?.profile, data?.training, data?.settings, data?.fitnessLoads, timeZone, form]);
 
   const save = useMutation({
-    mutationFn: saveAppSettings,
+    mutationFn: saveAthleteSettings,
     onSuccess: (saved) => {
       queryClient.setQueryData(homeQueryOptions.queryKey, (current) =>
         current ? { ...current, settings: saved.settings, training: saved.training } : current,

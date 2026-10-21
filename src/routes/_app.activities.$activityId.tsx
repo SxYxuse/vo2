@@ -12,7 +12,7 @@ import {
   loaderQuery,
   settingsSnapshotQueryOptions,
 } from "@/lib/queries.ts";
-import { mergeCalendarSettings } from "@/services/calendar-settings.ts";
+import { sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
@@ -37,9 +37,7 @@ function ActivityPage() {
 
   if (!detail) return <ActivityDetailMissing diary={diary} />;
 
-  const color = mergeCalendarSettings(settingsQuery.data?.settings, [detail.sportType]).sportTypes[
-    detail.sportType
-  ]?.color;
+  const color = sportTypeColor(settingsQuery.data?.settings.sportTypes ?? {}, detail.sportType);
 
   return <ActivityDetailView detail={detail} color={color} diary={diary} />;
 }

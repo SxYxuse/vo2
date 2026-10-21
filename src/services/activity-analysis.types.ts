@@ -1,6 +1,6 @@
 import { formatBpm, formatDuration, formatElevation } from "./activity-detail.types.ts";
 import { formatLocomotion } from "./locomotion.ts";
-import { formatSportType } from "./calendar-settings.types.ts";
+import { formatSportType } from "./athlete-settings.types.ts";
 import {
   emptyHistogram,
   estimateLthrFromMax,

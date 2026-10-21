@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
-import { formatSportType, type CalendarSettings } from "@/services/calendar-settings.types.ts";
+import {
+  formatSportType,
+  sportTypeColor,
+  type AthleteSettings,
+} from "@/services/athlete-settings.types.ts";
 import { maxHrAnchorHint, maxHrAnchorInfo } from "@/services/heart-insights.ts";
 import {
   ALL_SPORTS,
@@ -62,7 +66,7 @@ export function HeartRateZones({
   sportTypes,
 }: {
   data: HeartRateData;
-  sportTypes: CalendarSettings["sportTypes"];
+  sportTypes: AthleteSettings["sportTypes"];
 }) {
   const [sportType, setSportType] = useState(ALL_SPORTS);
   const period = useTrainingPeriod();
@@ -70,14 +74,8 @@ export function HeartRateZones({
   const startMs = period ? periodStartMs(period, timeZone) : null;
   const periodLabel = FITNESS_PERIODS.find((item) => item.id === period)?.label;
   const sports = useMemo(
-    () =>
-      data.sports
-        .filter((sport) => {
-          const types = sport.members.length ? sport.members : [sport.sportType];
-          return types.some((type) => sportTypes[type]?.visible !== false);
-        })
-        .map((sport) => sportForPeriod(sport, startMs)),
-    [data.sports, sportTypes, startMs],
+    () => data.sports.map((sport) => sportForPeriod(sport, startMs)),
+    [data.sports, startMs],
   );
   const overall = useMemo(() => overallFromSports(sports), [sports]);
   const selectedType = sports.some((sport) => sport.sportType === sportType)
@@ -142,7 +140,7 @@ export function HeartRateZones({
               aria-hidden
               className="size-2 rounded-full"
               style={{
-                backgroundColor: sportTypes[sport.sportType]?.color ?? "var(--color-ds-gray-700)",
+                backgroundColor: sportTypeColor(sportTypes, sport.sportType),
               }}
             />
             {sportLabel(sport)}

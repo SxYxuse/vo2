@@ -6,7 +6,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { UploadIcon } from "lucide-react";
 
 import { routePlansQueryOptions } from "@/lib/queries.ts";
-import { formatSportType } from "@/services/calendar-settings.types.ts";
+import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { DEFAULT_BOTTLES, DEFAULT_CARB_TARGET, MAX_CARBS_PER_HOUR } from "@/services/fuel-plan.ts";
 import { MAX_GPX_BYTES } from "@/services/route-gpx.ts";
 import { routeSportGroup } from "@/services/route-prediction.ts";

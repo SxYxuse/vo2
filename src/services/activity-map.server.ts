@@ -4,15 +4,15 @@ import { db } from "@/db/index.ts";
 import { activities } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
-import { DEFAULT_CALENDAR_SETTINGS, mergeCalendarSettings } from "./calendar-settings.types.ts";
+import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
 import type { ActivityMapData } from "./activity-map.types.ts";
 
 const EMPTY_MAP: ActivityMapData = {
   signedIn: false,
   tracks: [],
-  sportTypes: DEFAULT_CALENDAR_SETTINGS.sportTypes,
-  sportGroupShares: DEFAULT_CALENDAR_SETTINGS.sportGroupShares,
+  sportTypes: DEFAULT_ATHLETE_SETTINGS.sportTypes,
+  sportGroupShares: DEFAULT_ATHLETE_SETTINGS.sportGroupShares,
 };
 
 export async function loadActivityMapImpl(): Promise<ActivityMapData> {
@@ -22,7 +22,7 @@ export async function loadActivityMapImpl(): Promise<ActivityMapData> {
     return EMPTY_MAP;
   }
 
-  const [rows, storedSettings] = await Promise.all([
+  const [rows, settings] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -32,16 +32,11 @@ export async function loadActivityMapImpl(): Promise<ActivityMapData> {
       })
       .from(activities)
       .where(and(eq(activities.userId, session.user.id), isNotNull(activities.summaryPolyline))),
-    getCalendarSettingsForUser(session.user.id),
+    getAthleteSettings(session.user.id),
   ]);
 
-  const settings = mergeCalendarSettings(
-    storedSettings,
-    rows.map((row) => row.sportType),
-  );
-
   const tracks = rows.flatMap((row) => {
-    if (!row.polyline) return [];
+    if (!row.polyline || !isSportTypeShown(settings.sportTypes, row.sportType)) return [];
     return [{ id: row.id, title: row.title, sportType: row.sportType, polyline: row.polyline }];
   });
   logger.debug("map.loaded", { trackCount: tracks.length });

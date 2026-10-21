@@ -4,9 +4,8 @@ import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { getCalendarSettingsForUser } from "./calendar-settings.server.ts";
-import { familyCollectors } from "./calendar-settings.types.ts";
-import { ageFromBirthDate } from "./app-settings.types.ts";
+import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { ageFromBirthDate, familyCollectors } from "./athlete-settings.types.ts";
 import { estimateMaxHrAnchor, histogramFromStreams, type HeartPeak } from "./heart-insights.ts";
 import {
   familyLthr,
@@ -102,7 +101,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
       })
       .from(activities)
       .where(eq(activities.userId, userId)),
-    getCalendarSettingsForUser(userId),
+    getAthleteSettings(userId),
     db
       .select({
         ftp: athleteMetrics.ftp,
@@ -222,7 +221,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
       };
     });
 
-  const sportTypes = settings?.sportTypes ?? {};
+  const { sportTypes } = settings;
   logger.debug("week_target.loaded", {
     weekStart,
     activityCount: weekActivities.length,

@@ -105,6 +105,7 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Athlete settings (`athlete-settings.server.ts`); the table keeps its older name. */
 export const calendarSettings = pgTable("calendar_settings", {
   userId: text("user_id")
     .primaryKey()

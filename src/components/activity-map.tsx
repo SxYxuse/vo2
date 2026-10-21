@@ -2,15 +2,15 @@
 
 import { lazy, Suspense } from "react";
 
-import type { CalendarSettings } from "@/services/calendar-settings.types.ts";
+import type { AthleteSettings } from "@/services/athlete-settings.types.ts";
 import type { ActivityMapTrack } from "@/services/activity-map.types.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export type ActivityMapProps = {
   tracks: ActivityMapTrack[];
-  sportTypes: CalendarSettings["sportTypes"];
-  sportGroupShares: CalendarSettings["sportGroupShares"];
+  sportTypes: AthleteSettings["sportTypes"];
+  sportGroupShares: AthleteSettings["sportGroupShares"];
 };
 
 const ActivityMapView = lazy(() =>

@@ -12,6 +12,10 @@ _Avoid_: User, account, client
 Permanently removing an athlete and their whole local copy, training plan, routes and fuel plans, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
 _Avoid_: Account deletion, deactivation, closing an account
 
+**Athlete settings**:
+The athlete's own choices that shape what VO2 shows: per sport type whether it is shown, its colour, and its heart-rate and power sensors; sport-group sharing; and the calendar period. Saved together with the birthday and body weight.
+_Avoid_: Calendar settings, preferences, app settings
+
 **Body weight**:
 The athlete's weight in kilograms, asked during onboarding with the birthday. It caps caffeine in fuel plans.
 _Avoid_: Mass, BMI
@@ -35,7 +39,7 @@ A display grouping of related sport types: cycling, running, swimming, or walkin
 _Avoid_: Sport family (that term is reserved for the week split)
 
 **Hidden sport type**:
-A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form (ADR 0015).
+A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form, the week target, and planning's sensor detection (ADR 0015, ADR 0018).
 _Avoid_: Disabled sport, filtered sport, sport selection
 
 **Pace**:

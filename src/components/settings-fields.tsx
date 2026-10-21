@@ -10,7 +10,11 @@ import {
   type UseFormSetValue,
 } from "react-hook-form";
 
-import { ageFromBirthDate, formatBirthDate, parseBirthDate } from "@/services/app-settings.ts";
+import {
+  ageFromBirthDate,
+  formatBirthDate,
+  parseBirthDate,
+} from "@/services/athlete-settings.types.ts";
 import {
   BUILD_PACES,
   HOURS_INTENTS,
@@ -21,7 +25,7 @@ import {
   suggestedTargetHours,
   type HoursIntent,
 } from "@/services/training-plan.ts";
-import { CALENDAR_PERIODS } from "@/services/calendar-settings.ts";
+import { CALENDAR_PERIODS } from "@/services/athlete-settings.types.ts";
 import type {
   ProfileFormValues,
   SettingsFormInput,
