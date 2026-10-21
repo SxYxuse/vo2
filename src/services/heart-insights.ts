@@ -136,7 +136,7 @@ export function maxHrAnchorInfo(anchor: MaxHrAnchor) {
 /* ---------- Per-activity stream summary (cached next to the chart preview) ---------- */
 
 /** Bump when the stored shape or the math changes, so cached rows are rebuilt on next view. */
-export const HEART_ANALYSIS_VERSION = 1;
+export const HEART_ANALYSIS_VERSION = 2;
 
 const MAX_INTERVAL_SEC = 30;
 const STOPPED_SPEED_MS = 0.5;
@@ -175,6 +175,8 @@ export type HeartAnalysis = {
   /** Sparse `[bpm, seconds]` pairs of time spent at each heart rate. */
   histogram: [number, number][];
   decoupling: DecouplingResult;
+  /** Best sustained average HR per `PEAK_HR_DURATIONS` window; missing when the session is shorter. */
+  peaks: SustainedHeartrate[];
   avgTempC: number | null;
 };
 
@@ -365,6 +367,52 @@ function meanTemp(temp: number[] | null) {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
+/** Windows a sustained heart rate is reported for: a hard minute, a VO2 effort, a threshold test. */
+export const PEAK_HR_DURATIONS = [60, 300, 1200] as const;
+
+export type SustainedHeartrate = { seconds: number; bpm: number };
+
+/**
+ * Highest time-weighted average heart rate over each window, so a single spike does not read
+ * as an effort. Implausible samples and recording gaps (capped like the histogram) count as
+ * missing time rather than as low heart rate.
+ */
+export function peakSustainedHeartrates(
+  heartrate: number[] | null,
+  time: number[] | null,
+  durations: readonly number[] = PEAK_HR_DURATIONS,
+): SustainedHeartrate[] {
+  if (!heartrate?.length) return [];
+  const bpms: number[] = [];
+  const weights: number[] = [];
+  for (let index = 0; index < heartrate.length; index += 1) {
+    const bpm = heartrate[index];
+    const dt = sampleInterval(time, index) || 1;
+    if (!isPlausibleBpm(bpm)) continue;
+    bpms.push(bpm);
+    weights.push(dt);
+  }
+  const results: SustainedHeartrate[] = [];
+  for (const seconds of durations) {
+    let best = 0;
+    let from = 0;
+    let sum = 0;
+    let span = 0;
+    for (let to = 0; to < bpms.length; to += 1) {
+      sum += bpms[to] * weights[to];
+      span += weights[to];
+      while (span - weights[from] >= seconds) {
+        sum -= bpms[from] * weights[from];
+        span -= weights[from];
+        from += 1;
+      }
+      if (span >= seconds) best = Math.max(best, sum / span);
+    }
+    if (best > 0) results.push({ seconds, bpm: Math.round(best) });
+  }
+  return results;
+}
+
 export function buildHeartAnalysis(
   streams: HeartStreams,
   context: DecouplingContext,
@@ -373,6 +421,7 @@ export function buildHeartAnalysis(
     version: HEART_ANALYSIS_VERSION,
     histogram: sparseHistogram(histogramFromStreams(streams.heartrate, streams.time)),
     decoupling: computeDecoupling(streams, context),
+    peaks: peakSustainedHeartrates(streams.heartrate, streams.time),
     avgTempC: meanTemp(streams.temp),
   };
 }
@@ -573,6 +622,7 @@ export type ActivityHeart = {
     deltaPct: number | null;
   } | null;
   usual: { expectedBpm: number; gapBpm: number; count: number } | null;
+  peaks: SustainedHeartrate[];
   avgTempC: number | null;
 };
 

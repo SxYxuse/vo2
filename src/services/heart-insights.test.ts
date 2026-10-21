@@ -9,6 +9,7 @@ import {
   efficiencyTrendSummary,
   estimateMaxHrAnchor,
   explainHeartGap,
+  peakSustainedHeartrates,
   predictedMaxHr,
   toEfficiencyPoint,
   usualHeartrate,
@@ -352,5 +353,28 @@ describe("sportForPeriod", () => {
     expect(recent.maxHeartrate).toBe(185);
     expect(recent.zones.map((zone) => zone.minBpm)).toEqual(sport.zones.map((zone) => zone.minBpm));
     expect(sportForPeriod(sport, null)).toBe(sport);
+  });
+});
+
+describe("peakSustainedHeartrates", () => {
+  test("finds the hardest window instead of the single highest sample", () => {
+    // 10 min at 140, 5 min at 170 with one 200 spike, 10 min at 150.
+    const heartrate = [
+      ...Array.from({ length: 600 }, () => 140),
+      ...Array.from({ length: 300 }, (_, index) => (index === 150 ? 200 : 170)),
+      ...Array.from({ length: 600 }, () => 150),
+    ];
+    const time = heartrate.map((_, index) => index);
+    const peaks = peakSustainedHeartrates(heartrate, time);
+    expect(peaks.find((peak) => peak.seconds === 60)?.bpm).toBe(171);
+    expect(peaks.find((peak) => peak.seconds === 300)?.bpm).toBe(170);
+    expect(peaks.find((peak) => peak.seconds === 1200)?.bpm).toBe(153);
+  });
+
+  test("leaves out windows longer than the session and skips dropouts", () => {
+    const heartrate = Array.from({ length: 400 }, (_, index) => (index % 50 === 0 ? 0 : 160));
+    const peaks = peakSustainedHeartrates(heartrate, null);
+    expect(peaks.map((peak) => peak.seconds)).toEqual([60, 300]);
+    expect(peaks.every((peak) => peak.bpm === 160)).toBe(true);
   });
 });
