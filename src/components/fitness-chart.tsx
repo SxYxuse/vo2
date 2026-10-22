@@ -66,24 +66,25 @@ const SERIES_INFO = {
 } as const;
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
+/** A colour no series uses, so estimated days stand out on any line. */
+const ESTIMATED_DOT_COLOR = "var(--color-ds-pink-700)";
 
 type EstimatedDotProps = {
   cx?: number;
   cy?: number;
-  stroke?: string;
   payload?: { estimatedLoad?: number };
 };
 
 /** Marks a day whose load is partly estimated, on whichever line carries the marks. */
-function EstimatedDot({ cx, cy, stroke, payload }: EstimatedDotProps) {
+function EstimatedDot({ cx, cy, payload }: EstimatedDotProps) {
   if (cx == null || cy == null || !payload?.estimatedLoad) return null;
   return (
     <circle
       cx={cx}
       cy={cy}
-      r={3}
-      fill="var(--color-background)"
-      stroke={stroke}
+      r={3.5}
+      fill={ESTIMATED_DOT_COLOR}
+      stroke="var(--color-background)"
       strokeWidth={1.5}
     />
   );
@@ -422,8 +423,8 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                   <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <span
                       aria-hidden
-                      className="bg-background size-2 rounded-full border-[1.5px]"
-                      style={{ borderColor: CHART_CONFIG[markedLine].color }}
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: ESTIMATED_DOT_COLOR }}
                     />
                     Days with estimated load
                   </p>
