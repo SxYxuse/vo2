@@ -245,11 +245,22 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
               )}
             >
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground text-xs">Right now</span>
-                <InfoTooltip label="About the training phase">{PHASE_INFO}</InfoTooltip>
+                <span
+                  className={cn("text-xs", PHASE_TONE[phase.tone].title || "text-muted-foreground")}
+                >
+                  Right now
+                </span>
+                <InfoTooltip
+                  label="About the training phase"
+                  iconClassName={PHASE_TONE[phase.tone].title || "text-muted-foreground"}
+                >
+                  {PHASE_INFO}
+                </InfoTooltip>
               </div>
               <p className={cn("font-medium", PHASE_TONE[phase.tone].title)}>{phase.title}</p>
-              <p className="text-muted-foreground text-sm">{phase.detail}</p>
+              <p className={cn("text-sm", PHASE_TONE[phase.tone].title || "text-muted-foreground")}>
+                {phase.detail}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <StatCard
