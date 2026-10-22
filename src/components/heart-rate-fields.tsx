@@ -182,100 +182,104 @@ export function HeartRateFields({
           : zonesFromHistogram(emptyHistogram(), SPORT_TYPE[family], resolved);
         const methodId = `${idPrefix}-${family}-method`;
         return (
-          <FieldSet key={family} className="gap-4 rounded-lg border p-3">
-            <FieldLegend className="float-left mb-0">{ZONED_FAMILY_LABELS[family]}</FieldLegend>
-            <Controller
-              name={`${base}.method`}
-              control={control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor={methodId}>Zones</FieldLabel>
-                  <Select
-                    value={field.value}
-                    onValueChange={(next) => {
-                      if (next == null) return;
-                      const method = next as ZoneMethod;
-                      const stored = heartRate.sports[family].customZones;
-                      if (method === "custom" && stored.every((top) => top === "")) {
-                        // Start from the zones in use so the athlete only adjusts them.
-                        const tops = zoneTops(family, resolved);
-                        if (tops.every((top) => top != null)) {
-                          setValue(`${base}.customZones`, tops.map(String), {
-                            shouldDirty: true,
-                          });
+          // The border sits on a wrapper: a bordered fieldset draws its legend into the
+          // line, and iOS Safari ignores the float that would undo it in a flex fieldset.
+          <div key={family} className="rounded-lg border p-3">
+            <FieldSet className="gap-4">
+              <FieldLegend className="mb-0">{ZONED_FAMILY_LABELS[family]}</FieldLegend>
+              <Controller
+                name={`${base}.method`}
+                control={control}
+                render={({ field }) => (
+                  <Field>
+                    <FieldLabel htmlFor={methodId}>Zones</FieldLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(next) => {
+                        if (next == null) return;
+                        const method = next as ZoneMethod;
+                        const stored = heartRate.sports[family].customZones;
+                        if (method === "custom" && stored.every((top) => top === "")) {
+                          // Start from the zones in use so the athlete only adjusts them.
+                          const tops = zoneTops(family, resolved);
+                          if (tops.every((top) => top != null)) {
+                            setValue(`${base}.customZones`, tops.map(String), {
+                              shouldDirty: true,
+                            });
+                          }
                         }
-                      }
-                      field.onChange(method);
-                    }}
-                  >
-                    <SelectTrigger id={methodId} className="w-full sm:w-64">
-                      <SelectValue>
-                        {ZONE_METHODS.find((method) => method.id === field.value)?.label}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {ZONE_METHODS.map((method) => (
-                          <SelectItem key={method.id} value={method.id}>
-                            {method.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>
-                    {ZONE_METHODS.find((method) => method.id === field.value)?.hint}
-                  </FieldDescription>
-                </Field>
-              )}
-            />
-            {resolved.method === "custom" ? (
-              <div className="grid grid-cols-2 gap-3">
-                {([0, 1, 2, 3] as const).map((index) => (
-                  <BpmField
-                    key={index}
-                    id={`${idPrefix}-${family}-zone-${index}`}
-                    name={`${base}.customZones.${index}`}
-                    label={`${HR_ZONES[index].label} top`}
-                    placeholder="bpm"
-                    control={control}
-                  />
-                ))}
-              </div>
-            ) : null}
-            {issueAt(`sports.${family}.customZones`) ? (
-              <FieldError>{issueAt(`sports.${family}.customZones`)}</FieldError>
-            ) : null}
-            <BpmField
-              id={`${idPrefix}-${family}-lthr`}
-              name={`${base}.lthr`}
-              label="LTHR"
-              placeholder={estimateText(lthrEstimate)}
-              description="Lactate-threshold heart rate. Scores heart-rate training load."
-              issue={issueAt(`sports.${family}.lthr`)}
-              control={control}
-            />
-            <BpmField
-              id={`${idPrefix}-${family}-max-hr`}
-              name={`${base}.maxHr`}
-              label="Max heart rate"
-              placeholder={estimateText(estimates.maxHr[family])}
-              description="Replaces your recent peak, with no spike or age check."
-              control={control}
-            />
-            {missing ? (
-              <FieldError>Needs {MISSING_LABEL[missing]}</FieldError>
-            ) : zones ? (
-              <p className="text-sm text-muted-foreground">
-                {zones
-                  .map(
-                    (zone, index) =>
-                      `Z${index + 1} ${formatZoneBpm(zone, index === zones.length - 1)}`,
-                  )
-                  .join(" · ")}
-              </p>
-            ) : null}
-          </FieldSet>
+                        field.onChange(method);
+                      }}
+                    >
+                      <SelectTrigger id={methodId} className="w-full sm:w-64">
+                        <SelectValue>
+                          {ZONE_METHODS.find((method) => method.id === field.value)?.label}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {ZONE_METHODS.map((method) => (
+                            <SelectItem key={method.id} value={method.id}>
+                              {method.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>
+                      {ZONE_METHODS.find((method) => method.id === field.value)?.hint}
+                    </FieldDescription>
+                  </Field>
+                )}
+              />
+              {resolved.method === "custom" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {([0, 1, 2, 3] as const).map((index) => (
+                    <BpmField
+                      key={index}
+                      id={`${idPrefix}-${family}-zone-${index}`}
+                      name={`${base}.customZones.${index}`}
+                      label={`${HR_ZONES[index].label} top`}
+                      placeholder="bpm"
+                      control={control}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {issueAt(`sports.${family}.customZones`) ? (
+                <FieldError>{issueAt(`sports.${family}.customZones`)}</FieldError>
+              ) : null}
+              <BpmField
+                id={`${idPrefix}-${family}-lthr`}
+                name={`${base}.lthr`}
+                label="LTHR"
+                placeholder={estimateText(lthrEstimate)}
+                description="Lactate-threshold heart rate. Scores heart-rate training load."
+                issue={issueAt(`sports.${family}.lthr`)}
+                control={control}
+              />
+              <BpmField
+                id={`${idPrefix}-${family}-max-hr`}
+                name={`${base}.maxHr`}
+                label="Max heart rate"
+                placeholder={estimateText(estimates.maxHr[family])}
+                description="Replaces your recent peak, with no spike or age check."
+                control={control}
+              />
+              {missing ? (
+                <FieldError>Needs {MISSING_LABEL[missing]}</FieldError>
+              ) : zones ? (
+                <p className="text-sm text-muted-foreground">
+                  {zones
+                    .map(
+                      (zone, index) =>
+                        `Z${index + 1} ${formatZoneBpm(zone, index === zones.length - 1)}`,
+                    )
+                    .join(" · ")}
+                </p>
+              ) : null}
+            </FieldSet>
+          </div>
         );
       })}
     </FieldGroup>
