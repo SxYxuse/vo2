@@ -7,7 +7,6 @@ import {
   ctlChange,
   estimateHrIntensity,
   estimateLoadAnchors,
-  heartRateSources,
   formAfterLoad,
   formLabel,
   pmcWithCurrentForm,
@@ -115,24 +114,20 @@ describe("training load", () => {
 });
 
 describe("heart rate from similar activities", () => {
-  const strapless = run({ averageHeartrate: null, maxHeartrate: null, distance: 12_000 });
-  const intensityAt = (bpm: number, lthr: number) => (bpm - 50) / (lthr - 50);
-
-  test("borrows intensity from runs of similar duration and speed before rides", () => {
-    const pool = [
-      strapless,
-      run({ averageHeartrate: 150, distance: 12_000 }),
-      run({ averageHeartrate: 152, distance: 12_100 }),
-      run({ averageHeartrate: 180, movingTime: 1200, distance: 5000 }),
-      ride({ averageHeartrate: 110, deviceWatts: false, distance: 12_000 }),
-    ];
-    const intensity = estimateHrIntensity(strapless, pool, ANCHORS);
-    expect(intensity).toBeGreaterThan(intensityAt(150, 175));
-    expect(intensity).toBeLessThan(intensityAt(160, 175));
+  const day = (offset: number) =>
+    new Date(Date.UTC(2026, 5, 1) + offset * 86_400_000).toISOString();
+  const strapless = run({
+    averageHeartrate: null,
+    maxHeartrate: null,
+    distance: 12_000,
+    startDate: day(0),
   });
+  const runAt = (bpm: number, offset: number, overrides: Partial<LoadInputs> = {}) =>
+    run({ averageHeartrate: bpm, distance: 12_000, startDate: day(offset), ...overrides });
+  const intensityAt = (bpm: number) => (bpm - 50) / (175 - 50);
 
-  test("scores the borrowed intensity like heart rate and flags it as estimated", () => {
-    const pool = [strapless, run({ averageHeartrate: 154, distance: 12_000 })];
+  test("scores the median borrowed intensity like heart rate and flags it as estimated", () => {
+    const pool = [strapless, runAt(150, -3), runAt(154, 4), runAt(158, -10)];
     const result = activityTrainingLoad(strapless, ANCHORS, pool);
     expect(result.source).toBe("similarHeartRate");
     expect(result.estimatedHeartrate).toBe(154);
@@ -140,26 +135,34 @@ describe("heart rate from similar activities", () => {
     expect(toFitnessLoad(new Date(), result.load, result.source).estimatedLoad).toBe(result.load);
   });
 
-  test("every sport gets an estimate, borrowing across sport groups when it has to", () => {
-    const pool = [run({ averageHeartrate: 154 })];
-    for (const sportType of ["Walk", "Swim", "Ride", "Yoga", "WeightTraining", "Kayaking"]) {
-      const activity = run({ sportType, averageHeartrate: null, maxHeartrate: null });
-      expect(activityTrainingLoad(activity, ANCHORS, [activity, ...pool]).source).toBe(
-        "similarHeartRate",
-      );
-    }
+  test("one bad sensor day does not move the median", () => {
+    const pool = [strapless, runAt(150, -3), runAt(154, 4), runAt(196, -1)];
+    expect(estimateHrIntensity(strapless, pool, ANCHORS)).toBeCloseTo(intensityAt(154), 5);
   });
 
-  test("only activities from the reliable heart rate date on lend heart rate", () => {
-    const old = run({ averageHeartrate: 154, startDate: "2025-12-31T23:59:00Z" });
-    const recent = run({ averageHeartrate: 154, startDate: "2026-01-01T00:00:00Z" });
-    expect(heartRateSources([old, recent], "2026-01-01")).toEqual([recent]);
-    expect(heartRateSources([old, recent], null)).toEqual([]);
+  test("needs three matches within two months either side", () => {
+    const tooFew = [strapless, runAt(150, -3), runAt(154, 4)];
+    expect(activityTrainingLoad(strapless, ANCHORS, tooFew).source).toBe("duration");
+    const tooFar = [...tooFew, runAt(158, 61)];
+    expect(activityTrainingLoad(strapless, ANCHORS, tooFar).source).toBe("duration");
+    const inWindow = [...tooFew, runAt(158, 60)];
+    expect(activityTrainingLoad(strapless, ANCHORS, inWindow).source).toBe("similarHeartRate");
   });
 
-  test("falls back to duration when no activity recorded heart rate", () => {
-    const pool = [strapless];
-    expect(activityTrainingLoad(strapless, ANCHORS, pool).source).toBe("duration");
+  test("only borrows from the same sport group", () => {
+    const walk = { ...strapless, sportType: "Walk" };
+    const runs = [runAt(150, -3), runAt(154, 4), runAt(158, -10)];
+    expect(activityTrainingLoad(walk, ANCHORS, [walk, ...runs]).source).toBe("duration");
+    const trail = { ...strapless, sportType: "TrailRun" };
+    expect(activityTrainingLoad(trail, ANCHORS, [trail, ...runs]).source).toBe("similarHeartRate");
+  });
+
+  test("mixed sports only borrow from the same sport type", () => {
+    const yoga = { ...strapless, sportType: "Yoga" };
+    const gym = [130, 132, 134].map((bpm, index) =>
+      runAt(bpm, index, { sportType: "WeightTraining" }),
+    );
+    expect(activityTrainingLoad(yoga, ANCHORS, [yoga, ...gym]).source).toBe("duration");
   });
 });
 

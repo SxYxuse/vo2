@@ -78,7 +78,7 @@ const AVG_WEEK_INFO =
   "Average moving time per week in the selected period, including rest weeks. Check that volume supports a rising fitness line, not only one big week.";
 
 const ESTIMATED_INFO =
-  "Some sessions have no power or heart rate. Their heart rate is borrowed from your most similar sessions of that sport (duration, speed, date), or their load is guessed from duration when there are none. Treat those days as approximate.";
+  "Some sessions have no power or heart rate. Their heart rate is borrowed from your most similar sessions of that sport within two months, or their load is guessed from duration when there are fewer than three. Treat those days as approximate.";
 
 function formatTrainingHmm(seconds: number) {
   const minutes = Math.floor(Math.max(0, seconds) / 60);

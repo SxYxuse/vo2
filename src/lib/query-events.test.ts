@@ -11,11 +11,7 @@ import { afterLocalCopyChanged, afterSettingsSaved, afterSignOut } from "@/lib/q
 import { DEFAULT_ATHLETE_SETTINGS } from "@/services/athlete-settings.types.ts";
 
 const settings = { ...DEFAULT_ATHLETE_SETTINGS, calendarPeriod: "weeks" as const };
-const saved = {
-  profile: { birthDate: "1990-01-01", weightKg: 70, heartRateSince: "2026-01-01" },
-  settings,
-  training: null,
-};
+const saved = { profile: { birthDate: "1990-01-01", weightKg: 70 }, settings, training: null };
 
 function cachedClient() {
   const queryClient = new QueryClient();

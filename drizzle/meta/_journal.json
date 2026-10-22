@@ -155,13 +155,6 @@
       "when": 1792655544265,
       "tag": "0021_estimated_heartrate",
       "breakpoints": true
-    },
-    {
-      "idx": 22,
-      "version": "7",
-      "when": 1792657757993,
-      "tag": "0022_heart_rate_since",
-      "breakpoints": true
     }
   ]
 }

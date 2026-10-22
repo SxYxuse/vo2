@@ -48,7 +48,7 @@ const ActivityStreamCharts = lazy(() =>
 );
 
 const ESTIMATED_HR_INFO =
-  "No heart rate was recorded, so it is estimated from your most similar sessions (same sport first, then duration, speed, and date). Training load, fitness, and form use this estimate.";
+  "No heart rate was recorded, so it is the middle value of your most similar sessions of this sport within two months (duration, speed, and date). Training load, fitness, and form use this estimate.";
 
 function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   return (

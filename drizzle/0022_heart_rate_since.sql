@@ -1,1 +1,0 @@
-ALTER TABLE "athlete_metrics" ADD COLUMN "heart_rate_since" date;

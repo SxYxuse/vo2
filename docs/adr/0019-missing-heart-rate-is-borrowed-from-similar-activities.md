@@ -1,9 +1,15 @@
-# Missing heart rate is borrowed from similar activities before falling back to duration
+# Missing heart rate is borrowed from similar nearby activities before falling back to duration
 
-When an activity has neither usable power nor heart rate, it borrows heart-rate intensity (share of heart-rate reserve up to LTHR or max HR) from the athlete's five most similar activities that recorded heart rate on or after the athlete's reliable-heart-rate date, and is scored like a measured session. Similar means close duration and date, the same sport type first, then the same sport group (where speed also counts), then any sport. Intensity rather than bpm is borrowed so every sport gets an estimate, even one the athlete never wore a strap for: a walk can learn from runs although its heart rate sits lower. The implied average HR is stored and shown on the activity as an estimate. The athlete gives that date, required in onboarding and editable in Settings → Profile, because only they know when their strap or watch became trustworthy; an old optical sensor can be badly off. Heart rate recorded before it is never borrowed, so older strapless sessions also borrow from the date onward. Only when no activity from that date on has heart rate does the flat duration guess from sport type apply.
+When an activity has neither usable power nor heart rate, it borrows heart-rate intensity (share of heart-rate reserve up to LTHR or max HR) from the athlete's most similar activities that recorded heart rate, and is scored like a measured session. The implied average HR is stored and shown on the activity as an estimate.
 
-A forgotten strap on a hard interval run and on an easy jog used to score the same. The athlete's own history at that duration and speed is a much better guess than one intensity per sport, so fitness, fatigue, and form follow what was actually done.
+Three guardrails keep the estimate honest:
 
-Borrowed loads still count as estimated load in the fitness chart, so the athlete sees that those days are approximate. The trade-off is that the estimate moves as new activities arrive, so a past day's load can shift slightly after a sync.
+- **Same sport group, within two months either side.** Walks borrow from walks and rides from rides; mixed sports only from the same sport type. Heart rate at a given effort drifts with fitness, so only sessions near in time count. Among those, the closest in duration, speed, and date win.
+- **At least three matches.** With fewer, one bad sensor day would set the estimate, so the flat duration guess from sport type applies instead.
+- **Median of the five closest.** One session with a wrong reading cannot drag the estimate.
+
+The window replaces asking the athlete since when their heart rate is reliable: few athletes know that date, and sessions near in time already reflect the same sensor and the same fitness. The cost is that a sensor that reads plausibly but wrongly for weeks is lent to its neighbours, exactly as wrong as it already scores those sessions.
+
+Borrowed loads still count as estimated load in the fitness chart, so the athlete sees that those days are approximate. An estimate can shift after a sync, as new nearby activities arrive.
 
 How the duration-only fallback in [0003](0003-training-load-fitness-fatigue-form.md) is reached is superseded here; the power-then-heart-rate order is unchanged.

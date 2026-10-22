@@ -233,14 +233,12 @@ const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
 export const profileSettingsSchema = z.object({
   birthDate: birthDateSchema.nullable(),
   weightKg: weightKgSchema.nullable(),
-  heartRateSince: birthDateSchema.nullable(),
 });
 
-/** Every save carries every profile field, so none can be cleared once set. */
+/** Every save carries a birthday and a weight, so neither can be cleared once set. */
 export const profileSaveSchema = z.object({
   birthDate: birthDateSchema,
   weightKg: weightKgSchema,
-  heartRateSince: birthDateSchema,
 });
 
 export type ProfileSettings = z.infer<typeof profileSettingsSchema>;
@@ -249,12 +247,11 @@ export type ProfileSave = z.infer<typeof profileSaveSchema>;
 export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   birthDate: null,
   weightKg: null,
-  heartRateSince: null,
 };
 
-/** Age, weight, and the reliable-heart-rate date are all required before the app opens. */
+/** Age and weight are both required before the app opens. */
 export function isProfileComplete(profile: ProfileSettings) {
-  return profile.birthDate != null && profile.weightKg != null && profile.heartRateSince != null;
+  return profile.birthDate != null && profile.weightKg != null;
 }
 
 export function parseBirthDate(value: string) {

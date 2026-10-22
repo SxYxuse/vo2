@@ -75,7 +75,6 @@ export function ProfileFields<T extends ProfileFormValues>({
       </Field>
       <BirthDateField idPrefix={idPrefix} control={control} />
       <WeightField idPrefix={idPrefix} control={control} />
-      <HeartRateSinceField idPrefix={idPrefix} control={control} />
     </FieldGroup>
   );
 }
@@ -137,67 +136,6 @@ export function BirthDateField<T extends ProfileFormValues>({
           {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
         </Field>
       )}
-    />
-  );
-}
-
-export function HeartRateSinceField<T extends ProfileFormValues>({
-  idPrefix,
-  control,
-}: {
-  idPrefix: string;
-  control: Control<T>;
-}) {
-  return (
-    <Controller
-      name={"heartRateSince" as FieldPath<T>}
-      control={control}
-      render={({ field, fieldState }) => {
-        const since = field.value ? parseBirthDate(field.value as string) : null;
-        return (
-          <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor={`${idPrefix}-hr-since`}>Reliable heart rate since</FieldLabel>
-            <div className="flex flex-wrap items-center gap-2">
-              <Popover>
-                <PopoverTrigger
-                  render={
-                    <Button
-                      id={`${idPrefix}-hr-since`}
-                      type="button"
-                      variant="outline"
-                      className="min-w-48 justify-start font-normal"
-                      aria-invalid={fieldState.invalid}
-                    />
-                  }
-                >
-                  <CalendarIcon data-icon="inline-start" />
-                  {since ? format(since, "MMM d, yyyy") : "Pick a date"}
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-auto p-2">
-                  <Calendar
-                    mode="single"
-                    captionLayout="dropdown"
-                    selected={since ?? undefined}
-                    defaultMonth={since ?? new Date(new Date().getFullYear(), 0)}
-                    startMonth={new Date(2009, 0)}
-                    endMonth={new Date()}
-                    disabled={{ after: new Date() }}
-                    onSelect={(next) => {
-                      if (next) field.onChange(formatBirthDate(next));
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <FieldDescription>
-              When you started recording heart rate you trust, such as a new strap or watch.
-              Sessions without heart rate borrow it from your similar sessions since then, so they
-              still count toward fitness and form.
-            </FieldDescription>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </Field>
-        );
-      }}
     />
   );
 }

@@ -250,47 +250,25 @@ export function estimateLoadAnchors(
   };
 }
 
-/** LTHR, else the sport's max HR, else the highest max HR seen in any sport. */
 function hrCeiling(sportType: string, anchors: LoadAnchors) {
-  const own = sportLthr(sportType, anchors) ?? sportMaxHr(sportType, anchors);
-  if (own != null) return own;
-  const known = [
-    anchors.cyclingMaxHr,
-    anchors.runMaxHr,
-    anchors.swimMaxHr,
-    anchors.walkingMaxHr,
-    anchors.otherMaxHr,
-  ].filter((bpm): bpm is number => bpm != null);
-  return known.length ? Math.max(...known) : null;
+  return sportLthr(sportType, anchors) ?? sportMaxHr(sportType, anchors);
 }
 
 function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
   const avg = activity.averageHeartrate;
   if (avg == null || avg <= 0) return null;
   const rest = clampRestHr(anchors.restHr);
-  const lthr = sportLthr(activity.sportType, anchors);
-  const ceiling = lthr ?? sportMaxHr(activity.sportType, anchors);
+  const ceiling = hrCeiling(activity.sportType, anchors);
   if (ceiling == null || ceiling <= rest) return null;
   return (avg - rest) / (ceiling - rest);
 }
 
 const SIMILAR_HR_NEIGHBOURS = 5;
+/** Fewer matches than this and one bad sensor day would set the estimate; duration is safer. */
+const SIMILAR_HR_MIN_MATCHES = 3;
+/** Heart rate at a given effort drifts with fitness, so only sessions this close in time count. */
+export const SIMILAR_HR_WINDOW_DAYS = 60;
 const DAY_MS = 86_400_000;
-
-/**
- * Activities that may lend their heart rate: those from the athlete's "reliable heart rate since"
- * date on (a YYYY-MM-DD day, from UTC midnight). Older recordings came from a strap or watch the
- * athlete does not trust, so none are lent before the date is set.
- */
-export function heartRateSources(activities: LoadInputs[], since: string | null) {
-  if (!since) return [];
-  const sinceMs = Date.parse(`${since}T00:00:00Z`);
-  if (!Number.isFinite(sinceMs)) return [];
-  return activities.filter((activity) => {
-    const start = startMs(activity);
-    return start != null && start >= sinceMs;
-  });
-}
 
 function averageSpeed(activity: LoadInputs) {
   if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;
@@ -301,33 +279,45 @@ function startMs(activity: LoadInputs) {
   return activity.startDate ? new Date(activity.startDate).getTime() : null;
 }
 
-/**
- * How unlike two activities are: log ratio of duration and age gap always; speed only within a
- * sport group (a ride's speed says nothing about a run). Other sport types and groups cost extra,
- * so they are only borrowed from when nothing closer recorded heart rate.
- */
-function dissimilarity(activity: LoadInputs, other: LoadInputs) {
-  let score = Math.abs(Math.log(activity.movingTime / other.movingTime));
+function daysApart(activity: LoadInputs, other: LoadInputs) {
   const start = startMs(activity);
   const otherStart = startMs(other);
-  if (start != null && otherStart != null) score += Math.abs(start - otherStart) / DAY_MS / 365;
-  if (activity.sportType === other.sportType) return score + speedGap(activity, other);
-  if (heartRateFamily(activity.sportType) === heartRateFamily(other.sportType)) {
-    return score + 0.5 + speedGap(activity, other);
-  }
-  return score + 2;
+  if (start == null || otherStart == null) return 0;
+  return Math.abs(start - otherStart) / DAY_MS;
 }
 
-function speedGap(activity: LoadInputs, other: LoadInputs) {
+/**
+ * Walks borrow from walks and rides from rides: a run's intensity would score a walk far too
+ * hard. Mixed sports only borrow from the same sport type, since yoga says nothing about a gym session.
+ */
+function canLendHeartRate(activity: LoadInputs, other: LoadInputs) {
+  const family = heartRateFamily(activity.sportType);
+  if (family === "other") return other.sportType === activity.sportType;
+  return heartRateFamily(other.sportType) === family;
+}
+
+/** How unlike two activities of one sport group are: duration, speed, time apart, sport type. */
+function dissimilarity(activity: LoadInputs, other: LoadInputs) {
+  let score = Math.abs(Math.log(activity.movingTime / other.movingTime));
+  score += daysApart(activity, other) / SIMILAR_HR_WINDOW_DAYS / 2;
   const speed = averageSpeed(activity);
   const otherSpeed = averageSpeed(other);
-  return speed && otherSpeed ? 2 * Math.abs(Math.log(speed / otherSpeed)) : 0;
+  if (speed && otherSpeed) score += 2 * Math.abs(Math.log(speed / otherSpeed));
+  if (activity.sportType !== other.sportType) score += 0.5;
+  return score;
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 /**
  * Heart-rate intensity (share of heart-rate reserve up to LTHR or max) borrowed from the
- * athlete's most similar activities that recorded one. Intensity, not bpm, is borrowed so a
- * walk can learn from a run even though their heart rates sit at different levels.
+ * athlete's most similar sessions of the same sport group within two months either side.
+ * The median keeps one bad sensor day from setting the estimate; with fewer than three
+ * matches there is no estimate and duration scores the session.
  */
 export function estimateHrIntensity(
   activity: LoadInputs,
@@ -337,23 +327,22 @@ export function estimateHrIntensity(
   if (activity.movingTime <= 0) return null;
   const neighbours: { intensity: number; score: number }[] = [];
   for (const other of pool) {
-    if (other === activity || other.movingTime <= 0 || !isPlausibleBpm(other.averageHeartrate)) {
+    if (
+      other === activity ||
+      other.movingTime <= 0 ||
+      !isPlausibleBpm(other.averageHeartrate) ||
+      !canLendHeartRate(activity, other) ||
+      daysApart(activity, other) > SIMILAR_HR_WINDOW_DAYS
+    ) {
       continue;
     }
     const intensity = hrIntensity(other, anchors);
     if (intensity == null || intensity <= 0) continue;
     neighbours.push({ intensity, score: dissimilarity(activity, other) });
   }
+  if (neighbours.length < SIMILAR_HR_MIN_MATCHES) return null;
   const nearest = neighbours.sort((a, b) => a.score - b.score).slice(0, SIMILAR_HR_NEIGHBOURS);
-  if (!nearest.length) return null;
-  let total = 0;
-  let weights = 0;
-  for (const { intensity, score } of nearest) {
-    const weight = 1 / (0.1 + score);
-    total += intensity * weight;
-    weights += weight;
-  }
-  return total / weights;
+  return median(nearest.map((neighbour) => neighbour.intensity));
 }
 
 export type ActivityLoad = {

@@ -56,7 +56,7 @@ import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 
-const PROFILE_ERROR_KEYS = ["birthDate", "weightKg", "heartRateSince"] as const;
+const PROFILE_ERROR_KEYS = ["birthDate", "weightKg"] as const;
 
 function sectionForErrors(errors: FieldErrors<SettingsFormInput>): SettingsSection {
   if (PROFILE_ERROR_KEYS.some((key) => errors[key])) return "profile";
