@@ -122,11 +122,11 @@ export function SettingsForm({
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
-        avgHours: recentAverageWeeklyHours(data.fitnessLoads, timeZone),
+        avgHours,
         timeZone,
       }),
     );
-  }, [data?.profile, data?.training, data?.settings, data?.fitnessLoads, timeZone, form]);
+  }, [data?.profile, data?.training, data?.settings, avgHours, timeZone, form]);
 
   const save = useMutation({
     mutationFn: saveAthleteSettings,

@@ -3,12 +3,9 @@ import { addDays, startOfDay } from "date-fns";
 import { z } from "zod";
 
 import { sportGroupFor } from "./sport-groups.ts";
-import {
-  averageWeeklyMovingSeconds,
-  buildPmc,
-  slicePmc,
-  type FitnessLoad,
-} from "./training-load.ts";
+import { buildPmc, dayKey, periodStartMs, type FitnessLoad } from "./training-load.ts";
+
+export { dayKey };
 
 export const BUILD_PACES = [
   {
@@ -338,10 +335,32 @@ export function hasRecentWeeklyHours(avgHours: number) {
   return avgHours > THIN_WEEKLY_HOURS;
 }
 
-export function recentAverageWeeklyHours(loads: FitnessLoad[], timeZone: string) {
-  const pmc = buildPmc(loads, timeZone);
-  const series = slicePmc(pmc, "3m", timeZone);
-  return averageWeeklyMovingSeconds(loads, series, timeZone) / 3600;
+function daysBetweenKeys(from: string, to: string) {
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
+/**
+ * Average weekly hours over the last 3 months, or since the first activity when the history is
+ * shorter. Counts the days directly rather than building the fitness series for the whole
+ * history, which took most of a second on a phone for an athlete with years of activities.
+ */
+export function recentAverageWeeklyHours(loads: FitnessLoad[], timeZone: string, now = new Date()) {
+  if (!loads.length) return 0;
+  let firstMs = Infinity;
+  for (const load of loads) firstMs = Math.min(firstMs, Date.parse(load.start));
+  const firstDayMs = startOfDay(toZoned(new Date(firstMs), timeZone)).getTime();
+  const windowStartMs = Math.max(firstDayMs, periodStartMs("3m", timeZone, now) ?? firstDayMs);
+  const fromKey = dayKey(new Date(windowStartMs), timeZone);
+  const toKey = dayKey(now, timeZone);
+  if (fromKey > toKey) return 0;
+
+  let movingSeconds = 0;
+  for (const load of loads) {
+    const key = dayKey(new Date(load.start), timeZone);
+    if (key >= fromKey && key <= toKey) movingSeconds += load.movingTime;
+  }
+  const days = daysBetweenKeys(fromKey, toKey) + 1;
+  return movingSeconds / (days / 7) / 3600;
 }
 
 export type SessionHistory = { average: number; low: number; high: number };
@@ -389,15 +408,6 @@ export function sportFamilyOf(sportType: string): SportFamily {
 
 function toZoned(date: Date, timeZone: string) {
   return new TZDate(date.getTime(), timeZone);
-}
-
-export function dayKey(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
 }
 
 export function weekStartKey(date: Date, timeZone: string) {

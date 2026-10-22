@@ -101,13 +101,22 @@ function zonedDayStart(date: Date, timeZone: string) {
   return startOfDay(toZoned(date, timeZone));
 }
 
-function dayKey(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+// Building an Intl.DateTimeFormat costs far more than formatting with one, and day keys run
+// once per activity and per day of history, so keep one formatter per time zone.
+const dayKeyFormats = new Map<string, Intl.DateTimeFormat>();
+
+export function dayKey(date: Date, timeZone: string) {
+  let format = dayKeyFormats.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    dayKeyFormats.set(timeZone, format);
+  }
+  return format.format(date);
 }
 
 function percentile(values: number[], p: number) {
@@ -309,11 +318,9 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
     byDay.set(key, current);
   }
 
-  let first = zonedDayStart(new Date(loads[0].start), timeZone);
-  for (let index = 1; index < loads.length; index += 1) {
-    const day = zonedDayStart(new Date(loads[index].start), timeZone);
-    if (day < first) first = day;
-  }
+  let firstMs = Infinity;
+  for (const sample of loads) firstMs = Math.min(firstMs, Date.parse(sample.start));
+  const first = zonedDayStart(new Date(firstMs), timeZone);
   const last = zonedDayStart(new Date(), timeZone);
 
   const points: PmcPoint[] = [];
