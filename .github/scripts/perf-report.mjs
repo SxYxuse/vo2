@@ -8,8 +8,10 @@ import { join } from "node:path";
 
 const MARKER = "<!-- perf-report -->";
 
-// Chunks that moved less than this are noise in a review.
+// Chunks that moved less than this are noise in a review. Rollup renames and splits shared
+// chunks as imports change, so a large refactor lists many; show only the biggest moves.
 const CHUNK_MIN_DELTA = 1_000;
+const CHUNK_ROWS = 10;
 
 function readMetrics(dir) {
   const merged = { metrics: {}, chunks: {} };
@@ -74,10 +76,15 @@ function renderReport(current, baseline, baselineSha) {
         "",
         "| Chunk | main | This PR | Change |",
         "| --- | ---: | ---: | ---: |",
-        ...moved.map(
-          ({ name, before, after }) =>
-            `| \`${name}\` | ${format(before, "bytes")} | ${format(after, "bytes")} | ${after == null ? "removed" : change(before, after, "bytes")} |`,
-        ),
+        ...moved
+          .slice(0, CHUNK_ROWS)
+          .map(
+            ({ name, before, after }) =>
+              `| \`${name}\` | ${format(before, "bytes")} | ${format(after, "bytes")} | ${after == null ? "removed" : change(before, after, "bytes")} |`,
+          ),
+        ...(moved.length > CHUNK_ROWS
+          ? ["", `And ${moved.length - CHUNK_ROWS} smaller changes.`]
+          : []),
         "",
         "</details>",
       );
