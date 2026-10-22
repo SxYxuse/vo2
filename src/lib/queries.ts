@@ -8,6 +8,7 @@ import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
 import { loadHomeData } from "@/services/home-data.ts";
+import { loadProgress } from "@/services/progress.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
@@ -50,6 +51,12 @@ export const activityMapQueryOptions = queryOptions({
 export const fitnessQueryOptions = queryOptions({
   queryKey: ["fitness"],
   queryFn: () => loadFitnessData(),
+  staleTime: 60_000,
+});
+
+export const progressQueryOptions = queryOptions({
+  queryKey: ["progress"],
+  queryFn: () => loadProgress(),
   staleTime: 60_000,
 });
 

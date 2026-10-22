@@ -5,6 +5,7 @@ import {
   useEventCalendarSelector,
   useEventCalendarViewConfig,
 } from "@/components/reui/event-calendar/event-calendar";
+import { EventCalendarMonthView } from "@/components/reui/event-calendar/event-calendar-month-view";
 import type { CalendarView } from "@/components/reui/event-calendar/event-calendar-types";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
@@ -13,11 +14,9 @@ import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_VIEW_COMPONENTS = {
-  month: lazy(() =>
-    import("@/components/reui/event-calendar/event-calendar-month-view").then((mod) => ({
-      default: mod.EventCalendarMonthView,
-    })),
-  ),
+  // Static: the activity calendar imports the month view directly, so lazy loading it here
+  // could never move it into its own chunk.
+  month: EventCalendarMonthView,
   week: lazy(() =>
     import("@/components/reui/event-calendar/event-calendar-time-grid").then((mod) => ({
       default: mod.EventCalendarWeekView,

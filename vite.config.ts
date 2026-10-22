@@ -9,6 +9,18 @@ import tailwindcss from "@tailwindcss/vite";
 
 const isTest = process.env.VITEST === "true";
 
+/**
+ * Nitro's own ignored codes, which this `onwarn` replaces, plus the `"use client"` directives
+ * React libraries ship: the server bundle has no client boundary for them to mark.
+ */
+const IGNORED_SERVER_WARNINGS = new Set([
+  "EVAL",
+  "CIRCULAR_DEPENDENCY",
+  "THIS_IS_UNDEFINED",
+  "EMPTY_BUNDLE",
+  "MODULE_LEVEL_DIRECTIVE",
+]);
+
 const config = defineConfig({
   ssr: {
     external: ["winston", "winston-loki"],
@@ -37,6 +49,11 @@ const config = defineConfig({
     "*": "vp check --fix",
   },
   resolve: { tsconfigPaths: true },
+  build: {
+    // MapLibre alone is about 1 MB minified and loads only with the map page; every other
+    // chunk stays well under the 500 kB default.
+    chunkSizeWarningLimit: 1100,
+  },
   test: {
     include: ["src/**/*.test.ts"],
   },
@@ -46,7 +63,14 @@ const config = defineConfig({
         devtools(),
         tailwindcss(),
         tanstackStart(),
-        nitro({ preset: "bun" }),
+        nitro({
+          preset: "bun",
+          rolldownConfig: {
+            onwarn(warning, warn) {
+              if (!IGNORED_SERVER_WARNINGS.has(warning.code ?? "")) warn(warning);
+            },
+          },
+        }),
         viteReact(),
       ]),
 });

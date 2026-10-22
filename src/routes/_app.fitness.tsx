@@ -1,11 +1,12 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { noop, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrendingUpIcon } from "lucide-react";
 
 import { FitnessChart } from "@/components/fitness-chart.tsx";
+import { ProgressCards } from "@/components/progress-cards.tsx";
 import { SignInPanel } from "@/components/sync-panel.tsx";
-import { fitnessQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { fitnessQueryOptions, loaderQuery, progressQueryOptions } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -16,7 +17,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/fitness")({
-  loader: ({ context }) => context.queryClient.query(loaderQuery(fitnessQueryOptions)),
+  loader: ({ context }) => {
+    // Progress reads streams and may build best efforts, so it streams in below the graph.
+    void context.queryClient.query(loaderQuery(progressQueryOptions)).catch(noop);
+    return context.queryClient.query(loaderQuery(fitnessQueryOptions));
+  },
   pendingMs: 200,
   pendingComponent: FitnessPending,
   errorComponent: FitnessError,
@@ -35,11 +40,14 @@ function FitnessPage() {
           Fitness and form
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Track fitness, fatigue, and form so you can keep building without overreaching.
+          Dose your training with fitness, fatigue, and form, and see whether it makes you better.
         </p>
       </div>
       {signedIn ? (
-        <FitnessChart loads={fitnessLoads} />
+        <>
+          <FitnessChart loads={fitnessLoads} />
+          <ProgressCards />
+        </>
       ) : (
         <>
           <Empty className="min-h-64 border">
@@ -69,7 +77,7 @@ function FitnessPending() {
           Fitness and form
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Track fitness, fatigue, and form so you can keep building without overreaching.
+          Dose your training with fitness, fatigue, and form, and see whether it makes you better.
         </p>
       </div>
       <Skeleton className="h-80 w-full rounded-xl" />

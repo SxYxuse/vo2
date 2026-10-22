@@ -528,6 +528,112 @@ export function formLabel(tsb: number) {
   return "Very fatigued";
 }
 
+export type TrainingPhaseId =
+  | "starting"
+  | "deep-fatigue"
+  | "ramping-fast"
+  | "building"
+  | "holding"
+  | "fresh"
+  | "recovering"
+  | "break";
+
+export type TrainingPhase = {
+  id: TrainingPhaseId;
+  title: string;
+  detail: string;
+  tone: "positive" | "neutral" | "warning";
+};
+
+/** A ramp below this, either way, reads as steady load. */
+const STEADY_RAMP = 2;
+const FAST_RAMP = 8;
+const DEEP_FATIGUE_TSB = -30;
+const FRESH_TSB = 10;
+/** A four-week drop of a fifth of fitness (and at least 5) is a break, not a recovery week. */
+const BREAK_SHARE = 0.2;
+const MIN_HISTORY_DAYS = 28;
+
+/**
+ * Where the athlete is in the build, rest, and freshen cycle, from the last week's ramp, the
+ * last four weeks' trend, and form. Fitness is meant to rise in blocks and dip in recovery,
+ * so a falling line is a phase to read, not a loss to avoid.
+ */
+export function trainingPhase(points: PmcPoint[]): TrainingPhase {
+  const latest = points.at(-1);
+  if (!latest || points.length < MIN_HISTORY_DAYS || latest.ctl < 3) {
+    return {
+      id: "starting",
+      title: "Building history",
+      detail:
+        "Fitness needs about six weeks of training to settle. Read the trend once there is more history.",
+      tone: "neutral",
+    };
+  }
+  const ramp = ctlChange(points, 7);
+  const monthAgo = points[points.length - 1 - MIN_HISTORY_DAYS].ctl;
+  const monthDrop = monthAgo - latest.ctl;
+  const tsb = formAfterLoad(latest);
+  const rampText = `${ramp >= 0 ? "+" : ""}${roundLoad(ramp).toFixed(1)}`;
+
+  if (tsb < DEEP_FATIGUE_TSB) {
+    return {
+      id: "deep-fatigue",
+      title: "Deep fatigue",
+      detail: `Form is ${Math.round(tsb)}: recent load is far above what you are used to. Plan easy days soon so it turns into fitness instead of a hole.`,
+      tone: "warning",
+    };
+  }
+  if (ramp > FAST_RAMP) {
+    return {
+      id: "ramping-fast",
+      title: "Ramping fast",
+      detail: `Fitness rose ${rampText} this week. Fine for a week or a camp; hold it longer and fatigue tends to outrun the gains.`,
+      tone: "warning",
+    };
+  }
+  if (ramp >= STEADY_RAMP) {
+    return {
+      id: "building",
+      title: "Building",
+      detail: `Fitness rose ${rampText} this week and fatigue rises with it, so negative form is expected. Keep it up while sessions still feel good, then ease off for a few days.`,
+      tone: "positive",
+    };
+  }
+  if (monthDrop >= Math.max(5, monthAgo * BREAK_SHARE) && ramp < 0) {
+    return {
+      id: "break",
+      title: "Taking a break",
+      detail: `Fitness is ${Math.round(monthDrop)} lower than four weeks ago. It comes back quickly: ramp up again gently, a few points a week.`,
+      tone: "neutral",
+    };
+  }
+  if (ramp <= -STEADY_RAMP) {
+    return tsb >= FRESH_TSB
+      ? {
+          id: "fresh",
+          title: "Fresh",
+          detail:
+            "You eased off and fatigue has cleared. A good time for a race, a hard session, or a best effort.",
+          tone: "positive",
+        }
+      : {
+          id: "recovering",
+          title: "Recovering",
+          detail:
+            "You eased off: fitness dips a little while fatigue clears. That is how the load you did turns into progress.",
+          tone: "neutral",
+        };
+  }
+  return {
+    id: "holding",
+    title: "Consolidating",
+    detail:
+      "Load is steady. You keep progressing as your body absorbs it; add load again once the same sessions feel easier.",
+    tone: "neutral",
+  };
+}
+
 export function roundLoad(value: number) {
   return Math.round(value * 10) / 10;
 }
