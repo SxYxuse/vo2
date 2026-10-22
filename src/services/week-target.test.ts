@@ -29,14 +29,13 @@ import {
   type WeekActivity,
   type WeekTargetData,
 } from "./week-target.ts";
+import { seasonPhase, type SeasonPhase } from "./season-phase.ts";
 
 const WEEK_START = "2026-10-19";
 const WEDNESDAY = "2026-10-21";
 
 const PLAN: TrainingPlan = {
-  buildPace: "steady",
   targetMode: "manual",
-  hoursIntent: "keep",
   // 60% of 5 sessions: 3 key sessions. At fitness 50 in the week of Oct 19 that is
   // 3 × 10 min Z4 (1h 05), 2 × 20 min Z3 (1h 10), and a 2h long Z2: 4h 15, then 2 easy sessions.
   weekMix: { minSessions: 5, maxSessions: 5, keyShare: 60, doubleDays: 0 },
@@ -44,6 +43,14 @@ const PLAN: TrainingPlan = {
   targetWeeklyHours: 8,
   preferredRestWeekday: 0,
   timeZone: "UTC",
+};
+
+/** A build week at the old "steady" build pace: +5 fitness a week, threshold first. */
+const STEADY: SeasonPhase = {
+  ...seasonPhase([], WEEK_START),
+  kind: "build",
+  ramp: 5,
+  rotation: "steady",
 };
 
 /** Today with no preference: VO2 picks. */
@@ -96,6 +103,7 @@ function week(
     weekStartFitness: { ctl: 50, atl: 50 },
     fitness: { ctl: 50, atl: 50 },
     collectors: { running: COLLECTORS, cycling: COLLECTORS },
+    season: STEADY,
     anchors: {
       ftpWatts: null,
       heartRate: {
@@ -108,9 +116,10 @@ function week(
 }
 
 describe("weeklyTarget", () => {
-  it("sets hours from fitness and build pace in auto mode", () => {
+  it("sets hours from fitness and the phase's ramp in auto mode", () => {
     const target = weeklyTarget({
       plan: { ...PLAN, targetMode: "auto" },
+      season: STEADY,
       weekStartFitness: { ctl: 50, atl: 50 },
       loadPerHour: 56,
     });
@@ -120,7 +129,8 @@ describe("weeklyTarget", () => {
 
   it("holds fitness when the week starts very fatigued", () => {
     const target = weeklyTarget({
-      plan: { ...PLAN, targetMode: "auto", buildPace: "overreach" },
+      plan: { ...PLAN, targetMode: "auto" },
+      season: { ramp: 12, loadFactor: null },
       weekStartFitness: { ctl: 50, atl: 85 },
       loadPerHour: 50,
     });
@@ -130,6 +140,7 @@ describe("weeklyTarget", () => {
   it("falls back to fixed hours without fitness history", () => {
     const target = weeklyTarget({
       plan: { ...PLAN, targetMode: "auto" },
+      season: STEADY,
       weekStartFitness: { ctl: 2, atl: 4 },
       loadPerHour: 42,
     });
@@ -381,9 +392,7 @@ describe("parseTrainingPlan", () => {
       timeZone: "Europe/Brussels",
     });
     expect(plan).toEqual({
-      buildPace: "slow",
       targetMode: "auto",
-      hoursIntent: "keep",
       weekMix: { minSessions: 4, maxSessions: 6, keyShare: 0, doubleDays: 0 },
       keySessionSports: {},
       targetWeeklyHours: 6,
@@ -395,10 +404,8 @@ describe("parseTrainingPlan", () => {
 
 describe("assignKeySports", () => {
   const sessions = generateKeySessions({
-    plan: {
-      buildPace: "overreach",
-      weekMix: { minSessions: 4, maxSessions: 4, keyShare: 100, doubleDays: 0 },
-    },
+    weekMix: { minSessions: 4, maxSessions: 4, keyShare: 100, doubleDays: 0 },
+    season: { rotation: "overreach", maxKeySessions: null },
     weekStart: WEEK_START,
     ctl: 50,
     targetMinutes: 1200,
@@ -513,10 +520,8 @@ describe("generateKeySessions", () => {
       generateKeySessions({
         ...base,
         targetMinutes: 1200,
-        plan: {
-          buildPace: "steady",
-          weekMix: { minSessions: sessions, maxSessions: sessions, keyShare, doubleDays: 0 },
-        },
+        weekMix: { minSessions: sessions, maxSessions: sessions, keyShare, doubleDays: 0 },
+        season: { rotation: "steady", maxKeySessions: null },
       }).length;
     expect(count(5, 20)).toBe(1);
     expect(count(6, 50)).toBe(3);
@@ -525,13 +530,13 @@ describe("generateKeySessions", () => {
     expect(count(12, 50)).toBe(4);
   });
 
-  it("always leads with the build pace's main session and rotates the rest weekly", () => {
+  it("always leads with the phase's main session and rotates the rest weekly", () => {
     const plan = {
-      buildPace: "fast" as const,
+      season: { rotation: "fast" as const, maxKeySessions: null },
       weekMix: { minSessions: 4, maxSessions: 4, keyShare: 50, doubleDays: 0 },
     };
     const names = (weekStart: string) =>
-      generateKeySessions({ ...base, plan, weekStart }).map((session) =>
+      generateKeySessions({ ...base, ...plan, weekStart }).map((session) =>
         session.id.split("-").at(-1),
       );
     expect(names("2026-10-19")).toEqual(["vo2", "long"]);
@@ -540,11 +545,11 @@ describe("generateKeySessions", () => {
 
   it("sizes sessions by fitness", () => {
     const plan = {
-      buildPace: "steady" as const,
+      season: { rotation: "steady" as const, maxKeySessions: null },
       weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20, doubleDays: 0 },
     };
-    const [low] = generateKeySessions({ ...base, plan, ctl: 20 });
-    const [high] = generateKeySessions({ ...base, plan, ctl: 80 });
+    const [low] = generateKeySessions({ ...base, ...plan, ctl: 20 });
+    const [high] = generateKeySessions({ ...base, ...plan, ctl: 80 });
     expect(keySessionName(low)).toBe("3 × 8 min Z4");
     expect(keySessionName(high)).toBe("4 × 10 min Z4");
   });
@@ -553,10 +558,8 @@ describe("generateKeySessions", () => {
     const sessions = generateKeySessions({
       ...base,
       targetMinutes: 180,
-      plan: {
-        buildPace: "steady",
-        weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100, doubleDays: 0 },
-      },
+      weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100, doubleDays: 0 },
+      season: { rotation: "steady", maxKeySessions: null },
     });
     expect(sessions.map((session) => session.kind)).not.toContain("long");
     expect(sessions.length).toBe(1);

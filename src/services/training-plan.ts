@@ -9,7 +9,6 @@ import {
 
 export type {
   BuildPace,
-  HoursIntent,
   TargetMode,
   TrainingPlan,
   KeySession,
@@ -20,8 +19,6 @@ export type {
   TargetZone,
 } from "./training-plan.types.ts";
 export {
-  BUILD_PACES,
-  HOURS_INTENTS,
   TARGET_MODES,
   WEEKDAYS,
   HR_TARGET_ZONES,

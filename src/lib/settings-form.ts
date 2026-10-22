@@ -30,8 +30,6 @@ import {
   type TrainingPlan,
 } from "@/services/training-plan.types.ts";
 
-const BUILD_PACES = ["hold", "slow", "steady", "fast", "overreach"] as const;
-
 // Age checks the max-HR anchor against spikes, and weight caps caffeine in fuel plans,
 // so every athlete gives both.
 export const profileFormSchema = z.object({
@@ -58,9 +56,6 @@ export const profileFormSchema = z.object({
 });
 
 const trainingFormFields = trainingPlanSchema.extend({
-  buildPace: z
-    .union([z.literal(""), z.enum(BUILD_PACES)])
-    .pipe(z.enum(BUILD_PACES, { error: "Choose how hard you want to build fitness." })),
   targetMode: z.enum(["auto", "manual"]),
   weekMix: weekMixSchema,
 });
@@ -145,15 +140,11 @@ export type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][
 export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
 >;
-export const TRAINING_PACE_FIELDS = ["buildPace"] as const satisfies ReadonlyArray<
-  keyof TrainingFormInput
->;
 export const SPORTS_FIELDS = ["sportTypes", "sportGroupShares"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
 >;
 export const TRAINING_WEEK_FIELDS = [
   "targetMode",
-  "hoursIntent",
   "targetWeeklyHours",
   "preferredRestWeekday",
 ] as const satisfies ReadonlyArray<keyof TrainingFormInput>;
@@ -178,9 +169,7 @@ export function trainingFormDefaults(
 ): TrainingFormInput {
   if (plan) {
     return {
-      buildPace: plan.buildPace,
       targetMode: plan.targetMode,
-      hoursIntent: plan.hoursIntent,
       weekMix: plan.weekMix,
       keySessionSports: plan.keySessionSports,
       targetWeeklyHours: plan.targetWeeklyHours,
@@ -189,12 +178,10 @@ export function trainingFormDefaults(
     };
   }
   return {
-    buildPace: "",
     targetMode: "auto",
-    hoursIntent: "keep",
     weekMix: DEFAULT_WEEK_MIX,
     keySessionSports: {},
-    targetWeeklyHours: suggestedTargetHours(avgHours, "keep"),
+    targetWeeklyHours: suggestedTargetHours(avgHours),
     preferredRestWeekday: 0,
     timeZone,
   };

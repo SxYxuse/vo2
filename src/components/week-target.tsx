@@ -17,8 +17,8 @@ import {
 import { cn } from "cn";
 
 import { settingsSnapshotQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
+import { PHASES, type SeasonPhase } from "@/services/season-phase.ts";
 import {
-  BUILD_PACES,
   addDayKey,
   formatHours,
   keySessionName,
@@ -101,13 +101,13 @@ function minutesLabel(minutes: number) {
   return formatHours(minutes / 60);
 }
 
-function targetSourceLabel(summary: WeekSummary, plan: TrainingPlan) {
-  const pace = BUILD_PACES.find((item) => item.id === plan.buildPace)?.label ?? plan.buildPace;
-  if (summary.target.source === "auto") return `Set from your fitness and ${pace.toLowerCase()}.`;
+function targetSourceLabel(summary: WeekSummary, season: SeasonPhase) {
+  const phase = PHASES[season.kind].label.toLowerCase();
+  if (summary.target.source === "auto") return `Set from your fitness and the ${phase} phase.`;
   if (summary.target.source === "no-history") {
-    return "Fixed hours until VO2 has enough history to set it from your build pace.";
+    return "Starting hours until VO2 has enough history to set it from your fitness.";
   }
-  return "Fixed hours from Settings.";
+  return `Capped at the hours you have; the ${phase} phase asks for more.`;
 }
 
 function Stat({
@@ -142,7 +142,7 @@ function TargetCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary
           <Badge variant="outline">{weekRangeLabel(data.weekStart)}</Badge>
           <Badge variant={status.variant}>{status.label}</Badge>
         </CardTitle>
-        <CardDescription>{targetSourceLabel(summary, data.plan)}</CardDescription>
+        <CardDescription>{targetSourceLabel(summary, data.season)}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
