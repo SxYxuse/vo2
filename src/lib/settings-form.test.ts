@@ -7,6 +7,7 @@ import {
   profileFromForm,
   settingsFormDefaults,
   settingsFormSchema,
+  settingsSaveFromForm,
 } from "./settings-form.ts";
 
 const plan = {
@@ -167,5 +168,53 @@ describe("onboardingFormSchema", () => {
     );
 
     expect(issuePaths(result)).toEqual(["birthDate", "weightKg"]);
+  });
+});
+
+describe("settingsSaveFromForm", () => {
+  const saved = {
+    profile,
+    training: plan,
+    settings: { sportTypes: { Run: sport(true) }, sportGroupShares: {}, calendarPeriod: "month" },
+  } as never;
+
+  function form(overrides: Record<string, unknown>) {
+    return {
+      ...settingsFormDefaults({
+        profile,
+        training: plan,
+        sportTypes: { Run: sport(true) },
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+      ...overrides,
+    };
+  }
+
+  it("saves the training edit while a half-typed weight keeps its saved value", () => {
+    const result = settingsSaveFromForm(form({ weightKg: "", targetWeeklyHours: 9 }), saved);
+
+    expect(result?.profile).toEqual(profile);
+    expect(result?.training?.targetWeeklyHours).toBe(9);
+  });
+
+  it("keeps the saved sport types when every type is hidden", () => {
+    const result = settingsSaveFromForm(
+      form({ sportTypes: { Run: sport(false) }, weightKg: "70,5" }),
+      saved,
+    );
+
+    expect(result?.sportTypes).toEqual({ Run: sport(true) });
+    expect(result?.profile.weightKg).toBe(70.5);
+  });
+
+  it("saves nothing when the profile has never been valid", () => {
+    const result = settingsSaveFromForm(form({ weightKg: "" }), {
+      ...(saved as object),
+      profile: { birthDate: "1990-05-14", weightKg: null },
+    } as never);
+
+    expect(result).toBeNull();
   });
 });
