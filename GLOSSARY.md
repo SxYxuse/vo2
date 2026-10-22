@@ -152,6 +152,8 @@ _Avoid_: PR, record, power curve, mean-max
 
 ## Anchors
 
+An anchor is either estimated by VO2 or set by the athlete. A set anchor wins over the estimate.
+
 **FTP**:
 Estimated ~60-minute maximal cycling power, used as the cycling power anchor.
 _Avoid_: Threshold watts, FTP watts as a second term
@@ -181,8 +183,12 @@ The average heart rate the athlete's recent aerobic sessions needed for a given 
 _Avoid_: Expected HR, baseline HR, resting heart rate
 
 **Heart-rate zone**:
-One of five effort bands from recovery through VO2 max. Cycling, running, and swimming cut zones from that sport's LTHR; walking and other sports cut from max heart rate.
+One of five effort bands from recovery through VO2 max, cut by the sport's zone method.
 _Avoid_: Polar zone, Coggan zone, power zone
+
+**Zone method**:
+How a sport's five heart-rate zones are cut from its anchors: % of LTHR, % of max heart rate, heart-rate reserve, or custom boundaries. Cycling, running, and swimming each have their own, chosen by the athlete; walking and other sports always use % of max heart rate.
+_Avoid_: Zone model, zone system, zone preset
 
 ## Fuelling
 

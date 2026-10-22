@@ -1,0 +1,7 @@
+# Athletes can set heart-rate anchors and pick a zone method per sport
+
+Cycling, running, and swimming each have a zone method the athlete chooses: % of LTHR (the default, with the cuts from 0006), % of max heart rate, heart-rate reserve, or four custom boundaries in bpm. Walking and other sports keep % of max heart rate. Resting heart rate, and LTHR and max heart rate per sport, are each either estimated or set by the athlete. A set value wins over the estimate. A set max heart rate skips the spike filter and age check from 0012, and the LTHR estimate builds on it. Changing either recalculates all history.
+
+Estimates are a guess: running LTHR at a fixed 88 % of max is off by several bpm for many athletes, and Friel's narrow running bands move with every bpm. Athletes who know their threshold or train with someone else's zones had no way to use them. This supersedes [0011](0011-field-tests-removed.md): set anchors are stored, but there are still no test protocols or flagged test activities. Zones stay per sport, as in [0006](0006-sport-specific-heart-rate-zones.md).
+
+Training load reads only the anchors, never the zone method, so heart-rate reserve or custom zones change time in zone and hard minutes but not fitness, fatigue, or form. Taking the threshold from custom zones would make load depend on how the athlete drew them. When a method needs an anchor that has no value, the sport shows no zone bounds instead of quietly falling back to another method.
