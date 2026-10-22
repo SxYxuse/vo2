@@ -32,4 +32,68 @@ jobs:
         env:
           STRAVA_MOCK: "1"
       - run: vp test
+        env:
+          PERF_METRICS_DIR: ${{ runner.temp }}/perf-metrics
       - run: vp build
+      - name: Check bundle size
+        run: node .github/scripts/bundle-size.mjs "$RUNNER_TEMP/perf-metrics"
+
+      # Main's upload is the baseline each PR report compares against.
+      - name: Upload perf metrics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-metrics
+          path: ${{ runner.temp }}/perf-metrics
+          if-no-files-found: ignore
+          retention-days: 90
+
+  # A report, not a gate: the budgets above fail CI; this comments the drift against main.
+  perf-report:
+    if: ${{ github.event_name == 'pull_request' && !cancelled() }}
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+
+      - id: current
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: perf-metrics
+          path: ${{ runner.temp }}/perf/current
+
+      - name: Download main baseline
+        id: baseline
+        if: steps.current.outcome == 'success'
+        run: |
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --branch main --event push \
+            --status success --limit 1 --json databaseId,headSha --jq '.[0] // empty')
+          if [ -n "$run" ]; then
+            echo "sha=$(jq -r .headSha <<< "$run")" >> "$GITHUB_OUTPUT"
+            gh run download "$(jq -r .databaseId <<< "$run")" --repo "$GITHUB_REPOSITORY" \
+              --name perf-metrics --dir "$RUNNER_TEMP/perf/baseline" || true
+          fi
+
+      - name: Comment the report
+        if: steps.current.outcome == 'success'
+        run: |
+          node .github/scripts/perf-report.mjs "$RUNNER_TEMP/perf/current" \
+            "$RUNNER_TEMP/perf/baseline" "${{ steps.baseline.outputs.sha }}" > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          comments="repos/$GITHUB_REPOSITORY/issues/${{ github.event.pull_request.number }}/comments"
+          existing=$(gh api "$comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- perf-report -->"))][0].id // empty' | head -n 1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F body=@report.md
+          else
+            gh api -X POST "$comments" -F body=@report.md
+          fi

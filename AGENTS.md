@@ -41,6 +41,7 @@ Regenerate these, rather than editing them by hand:
 - Prove the change with the smallest check: `vp test run <files>` for the tests you touched or added.
 - Test pure logic and observable behavior, not rendered markup or callback wiring.
 - Open the app in a browser to verify only when the developer asks for it.
+- **Perf budgets** fail CI: work counts on full-history paths in `src/services/perf-budgets.test.ts`, and bundle sizes in `.github/scripts/bundle-size.mjs` after `vp build`. Each PR also gets a comment comparing them with `main`. Raise a budget only on purpose, and say why in the PR.
 - **Before pushing,** run `vp check` (format, lint, types); CI fails on it before tests run. The pre-commit hook runs `vp check --fix` on staged files once `bun install` has installed it.
 
 ## Pull requests and commits
