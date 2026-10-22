@@ -47,6 +47,9 @@ function quietToast(onOnboarding: () => boolean): SyncToast {
   };
 }
 
+/** A check for new activities shows only the header spinner; status shows pauses and errors. */
+const silentToast: SyncToast = { add: () => "", update: () => {} };
+
 function finishSyncToast(
   notify: SyncToast,
   toastId: string,
@@ -95,7 +98,7 @@ export function useStravaSyncPending() {
 
 export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
   const router = useRouter();
-  const notify: SyncToast = quiet
+  const defaultNotify: SyncToast = quiet
     ? quietToast(() => router.state.location.pathname.startsWith("/onboarding"))
     : toast;
   const queryClient = useQueryClient();
@@ -103,7 +106,8 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
 
   const sync = useMutation({
     mutationKey: stravaSyncMutationKey,
-    mutationFn: async () => {
+    mutationFn: async (options: { silent?: boolean } | void) => {
+      const notify = options?.silent ? silentToast : defaultNotify;
       const toastId = notify.add({
         type: "loading",
         title: "Syncing from Strava",

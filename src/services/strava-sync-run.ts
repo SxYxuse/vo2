@@ -8,6 +8,7 @@ import { errorFields, logger } from "@/lib/logger.server.ts";
 import type { SyncKind, SyncResult } from "./strava-sync.types.ts";
 import {
   isAbortError,
+  historyCompleteFromRun,
   isOverSyncBudget,
   remainingSyncBudgetMs,
   SYNC_POSTPROCESS_MIN_MS,
@@ -104,7 +105,9 @@ export async function syncAthlete({
 
   try {
     let newerCaughtUp = false;
-    let olderCaughtUp = false;
+    // Once history is walked, nothing older appears: skip that read so a sync of a complete
+    // copy costs one read plus streams for new activities (#41, ADR 0020).
+    let olderCaughtUp = historyCompleteFromRun(run?.status ?? null, pendingAtStart);
     const firstCopy = (await store.oldestStartDate()) == null;
     let newestOnly = false;
     if (!overBudget()) {
@@ -113,7 +116,7 @@ export async function syncAthlete({
       newerCaughtUp = newer.caughtUp;
       newestOnly = stopsAfterNewestPage({ firstCopy, newestUpserted: newer.upserted });
     }
-    if (!newestOnly && !overBudget()) {
+    if (!olderCaughtUp && !newestOnly && !overBudget()) {
       const older = await upsertOlderActivities(strava, store);
       activitiesUpserted += older.upserted;
       olderCaughtUp = older.caughtUp;

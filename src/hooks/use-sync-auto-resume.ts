@@ -14,6 +14,7 @@ const PAUSE_SLACK_MS = 5_000;
  * Finishes an incomplete local copy while the app is open and in the foreground: on open, on
  * return from the background, and when a rate-limit pause ends (ADR 0012). It only reacts to
  * those moments, never to every status change, so a copy that keeps dropping does not loop.
+ * The same moments check a complete copy for new activities (ADR 0020).
  */
 export function useSyncAutoResume() {
   const queryClient = useQueryClient();
@@ -30,7 +31,10 @@ export function useSyncAutoResume() {
       if (cancelled || document.visibilityState !== "visible" || syncRef.current.isPending) return;
       const latest = await queryClient.fetchQuery({ ...syncStatusQueryOptions, staleTime: 0 });
       if (cancelled || syncRef.current.isPending) return;
-      if (autoResumePlan(latest).kind === "sync") syncRef.current.mutate();
+      const plan = autoResumePlan(latest);
+      if (plan.kind === "sync") syncRef.current.mutate();
+      // Every check re-reads a few activities, so a finish toast would say "Copied 3" each time.
+      if (plan.kind === "check") syncRef.current.mutate({ silent: true });
     };
 
     const onVisibility = () => {
@@ -47,7 +51,7 @@ export function useSyncAutoResume() {
   const pausedUntil = status?.status === "paused" ? status.pausedUntil : null;
   useEffect(() => {
     if (!pausedUntil) return;
-    const plan = autoResumePlan({ status: "paused", pausedUntil });
+    const plan = autoResumePlan({ status: "paused", pausedUntil, lastAttemptAt: null });
     if (plan.kind !== "wait") return;
     const timer = setTimeout(
       () => void checkRef.current(),

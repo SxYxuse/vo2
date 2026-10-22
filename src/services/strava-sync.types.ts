@@ -45,17 +45,30 @@ export function stopsAfterNewestPage(input: { firstCopy: boolean; newestUpserted
   return input.firstCopy && input.newestUpserted > 0;
 }
 
-export type AutoResumePlan = { kind: "sync" } | { kind: "wait"; until: number } | { kind: "idle" };
+/** Each check costs at least one Strava read; this gap keeps quota for history and streams. */
+export const NEW_ACTIVITY_CHECK_GAP_MS = 15 * 60_000;
+
+export type AutoResumePlan =
+  | { kind: "sync" }
+  | { kind: "check" }
+  | { kind: "wait"; until: number }
+  | { kind: "idle" };
 
 /**
  * While the app is open, an incomplete local copy resumes on its own and an active pause is
- * waited out. The first copy and failed copies still wait for the athlete (ADR 0012).
+ * waited out. The first copy and failed copies still wait for the athlete (ADR 0012). A
+ * complete copy checks for new activities at most every 15 minutes since the last sync of any
+ * kind (ADR 0020).
  */
 export function autoResumePlan(
-  status: Pick<SyncStatus, "status" | "pausedUntil">,
+  status: Pick<SyncStatus, "status" | "pausedUntil" | "lastAttemptAt">,
   now = Date.now(),
 ): AutoResumePlan {
   if (status.status === "incomplete") return { kind: "sync" };
+  if (status.status === "complete") {
+    const last = status.lastAttemptAt ? new Date(status.lastAttemptAt).getTime() : 0;
+    return now - last >= NEW_ACTIVITY_CHECK_GAP_MS ? { kind: "check" } : { kind: "idle" };
+  }
   if (status.status === "paused" && status.pausedUntil) {
     const until = new Date(status.pausedUntil).getTime();
     if (until > now) return { kind: "wait", until };
