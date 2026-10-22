@@ -589,7 +589,7 @@ function GoalFormBody({
                 const id = `goal-objective-${objective.id}`;
                 return (
                   <FieldLabel key={objective.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start rounded-lg border p-3">
+                    <Field orientation="horizontal" className="items-start p-3">
                       <RadioGroupItem value={objective.id} id={id} />
                       <FieldContent>
                         <FieldTitle>{objective.label}</FieldTitle>
