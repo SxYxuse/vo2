@@ -55,7 +55,7 @@ How the week target splits time: running, cycling, or other. Recommended session
 _Avoid_: Sport group, sport type
 
 **Sync**:
-Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out. While the app is open, it resumes on its own after the pause to finish an incomplete local copy; the athlete can also sync again by hand.
+Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out. While the app is open, it resumes on its own after the pause to finish an incomplete local copy, and checks for new activities when the app opens or returns to the foreground, at most every 15 minutes. The athlete can also sync again by hand.
 _Avoid_: Import, fetch, refresh
 
 **Local copy**:

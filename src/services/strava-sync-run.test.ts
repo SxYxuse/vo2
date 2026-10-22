@@ -191,6 +191,26 @@ describe("syncAthlete", () => {
     expect(local.recorded.at(-1)?.status).toBe("complete");
   });
 
+  it("skips the older-history read once history is complete", async () => {
+    const local = fakeStore({
+      run: {
+        status: "complete",
+        pausedUntil: null,
+        lastError: null,
+        shortLimitRemaining: 90,
+        dailyLimitRemaining: 900,
+      },
+    });
+    await local.store.upsertActivities([activity(2, 2), activity(3, 3)]);
+    for (const row of local.activities.values()) row.streams = true;
+    const strava = fakeStrava([activity(1, 1), activity(2, 2), activity(3, 3)]);
+
+    const result = await sync(local.store, strava);
+
+    expect(strava.calls).toEqual([expect.stringMatching(/^list after=\d+ before=-$/), "streams 1"]);
+    expect(result).toMatchObject({ historyComplete: true, done: true });
+  });
+
   it("re-reads the three newest stored activities so late Strava edits land", async () => {
     const local = fakeStore();
     const history = [1, 2, 3, 4].map((id) => activity(id, id));

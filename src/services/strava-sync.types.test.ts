@@ -127,25 +127,40 @@ describe("autoResumePlan", () => {
   const now = Date.parse("2026-10-20T10:00:00Z");
 
   it("resumes an incomplete local copy", () => {
-    expect(autoResumePlan({ status: "incomplete", pausedUntil: null }, now)).toEqual({
+    expect(
+      autoResumePlan({ status: "incomplete", pausedUntil: null, lastAttemptAt: null }, now),
+    ).toEqual({
       kind: "sync",
     });
   });
 
   it("waits for an active pause to end", () => {
-    expect(autoResumePlan({ status: "paused", pausedUntil: "2026-10-20T10:15:00Z" }, now)).toEqual({
+    expect(
+      autoResumePlan(
+        { status: "paused", pausedUntil: "2026-10-20T10:15:00Z", lastAttemptAt: null },
+        now,
+      ),
+    ).toEqual({
       kind: "wait",
       until: Date.parse("2026-10-20T10:15:00Z"),
     });
   });
 
   it("never starts the first copy or retries a failed one on its own", () => {
-    expect(autoResumePlan({ status: "never", pausedUntil: null }, now)).toEqual({ kind: "idle" });
-    expect(autoResumePlan({ status: "failed", pausedUntil: null }, now)).toEqual({ kind: "idle" });
+    expect(
+      autoResumePlan({ status: "never", pausedUntil: null, lastAttemptAt: null }, now),
+    ).toEqual({ kind: "idle" });
+    expect(
+      autoResumePlan({ status: "failed", pausedUntil: null, lastAttemptAt: null }, now),
+    ).toEqual({ kind: "idle" });
   });
 
-  it("leaves a complete local copy alone", () => {
-    expect(autoResumePlan({ status: "complete", pausedUntil: null }, now)).toEqual({
+  it("checks a complete local copy for new activities once 15 minutes have passed", () => {
+    const complete = { status: "complete", pausedUntil: null } as const;
+    expect(autoResumePlan({ ...complete, lastAttemptAt: "2026-10-20T09:45:00Z" }, now)).toEqual({
+      kind: "check",
+    });
+    expect(autoResumePlan({ ...complete, lastAttemptAt: "2026-10-20T09:46:00Z" }, now)).toEqual({
       kind: "idle",
     });
   });
