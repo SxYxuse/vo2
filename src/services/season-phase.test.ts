@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { blendShares, seasonPhase } from "./season-phase.ts";
+import { blendShares, expectedGoalMinutes, goalSessions, seasonPhase } from "./season-phase.ts";
 import { addDayKey } from "./training-plan.types.ts";
 import type { Goal } from "./season.types.ts";
 
@@ -115,5 +115,79 @@ describe("seasonPhase", () => {
     expect(phase.kind).toBe("base");
     expect(phase.goalShares).toEqual({ running: 0.5, cycling: 0.5, other: 0 });
     expect(phase.goalWeight).toBe(0.5);
+  });
+});
+
+describe("goalSessions", () => {
+  const paces = {
+    running: { kmh: 10, climbPerKm: 10 },
+    cycling: { kmh: 30, climbPerKm: 8 },
+    swimming: { kmh: 3, climbPerKm: 0 },
+  };
+
+  test("expected time comes from the athlete's pace, plus climbing beyond their usual", () => {
+    // 30 km at 10 km/h is 3 h; 1,800 m less the usual 300 m is 1,500 m at 10 min per 100 m.
+    const trail = goal("trail", WEEK, {
+      sportType: "TrailRun",
+      distanceM: 30_000,
+      elevationGainM: 1_800,
+    });
+    expect(expectedGoalMinutes(trail, paces.running)).toBe(180 + 150);
+    expect(expectedGoalMinutes(trail, undefined)).toBeNull();
+  });
+
+  test("the long session grows toward the goal and is capped per sport", () => {
+    const marathon = (weeks: number) =>
+      goalSessions(seasonPhase([goal("m", inWeeks(weeks), { distanceM: 42_195 })], WEEK), paces)
+        ?.longMinutes;
+    // 42.2 km at 10 km/h is about 4h 15: 40 % in base, three quarters by the end of build, then
+    // the 3 h cap on runs at peak.
+    expect([marathon(20), marathon(12), marathon(4), marathon(2)]).toEqual([105, 120, 180, 180]);
+  });
+
+  test("no long session target in race week, recovery, or without a goal", () => {
+    expect(goalSessions(seasonPhase([goal("a", inWeeks(0))], WEEK), paces)?.longMinutes).toBeNull();
+    expect(goalSessions(seasonPhase([], WEEK), paces)).toBeNull();
+  });
+
+  test("the longest part of a multisport goal sets the key sport", () => {
+    const phase = seasonPhase(
+      [
+        goal("swim", inWeeks(6), { sportType: "Swim", distanceM: 1_900 }),
+        goal("ride", inWeeks(6), { sportType: "Ride", distanceM: 90_000 }),
+        goal("run", inWeeks(6), { distanceM: 21_100 }),
+      ],
+      WEEK,
+    );
+    expect(goalSessions(phase, paces)?.keySport).toBe("cycling");
+  });
+
+  test("a swim goal puts key sessions in the pool", () => {
+    const phase = seasonPhase(
+      [goal("swim", inWeeks(6), { sportType: "Swim", distanceM: 3_800 })],
+      WEEK,
+    );
+    expect(goalSessions(phase, paces)).toMatchObject({ keySport: "swimming", hilly: false });
+  });
+
+  test("a hilly goal puts intervals on a climb and climbing into the long session", () => {
+    const phase = seasonPhase(
+      [
+        goal("trail", inWeeks(6), {
+          sportType: "TrailRun",
+          distanceM: 30_000,
+          elevationGainM: 1_800,
+        }),
+      ],
+      WEEK,
+    );
+    const sessions = goalSessions(phase, paces);
+    expect(sessions?.hilly).toBe(true);
+    expect(sessions?.longClimbM).toBeGreaterThan(0);
+  });
+
+  test("other sport types set no key sport", () => {
+    const phase = seasonPhase([goal("ski", inWeeks(6), { sportType: "NordicSki" })], WEEK);
+    expect(goalSessions(phase, paces)).toBeNull();
   });
 });
