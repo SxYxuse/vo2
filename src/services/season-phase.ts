@@ -1,4 +1,11 @@
-import { sportFamilyOf, type BuildPace, type SportFamily } from "./training-plan.types.ts";
+import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
+import {
+  isKeySport,
+  sportFamilyOf,
+  type BuildPace,
+  type KeySport,
+  type SportFamily,
+} from "./training-plan.types.ts";
 import {
   daysBetween,
   roughGoalHours,
@@ -52,7 +59,25 @@ export type SeasonPhase = {
   goalShares: Record<SportFamily, number> | null;
   /** How much goalShares weighs against the athlete's own split (0–1). */
   goalWeight: number;
+  /** Shaped by the goal's sport, distance, and climbing; null without a goal to shape toward. */
+  sessions: GoalSessions | null;
 };
+
+export type GoalSessions = {
+  /** The sport the main key session and the long session go on. */
+  keySport: KeySport;
+  /** The goal's expected duration at the athlete's own pace. */
+  expectedMinutes: number | null;
+  /** This week's long session, a growing share of the goal's expected time. */
+  longMinutes: number | null;
+  /** Climbing to put into the long session, in proportion to the goal's. */
+  longClimbM: number | null;
+  /** The goal climbs enough that intervals belong on a hill. */
+  hilly: boolean;
+};
+
+/** The athlete's usual speed and climbing per sport group, from recent activities. */
+export type GroupPace = { kmh: number; climbPerKm: number };
 
 const RAMP: Record<"base" | "build" | "peak", Record<GoalObjective, number>> = {
   base: { finish: 3, finishWell: 3, perform: 5 },
@@ -79,6 +104,7 @@ const HOLD: SeasonPhase = {
   maxKeySessions: null,
   goalShares: null,
   goalWeight: 0,
+  sessions: null,
 };
 
 /** Share of time per sport family across goals, weighted by their rough duration. */
@@ -225,4 +251,91 @@ export function blendShares(
   const mix = (family: SportFamily) =>
     history[family] * (1 - weight) + phase.goalShares![family] * weight;
   return { running: mix("running"), cycling: mix("cycling"), other: mix("other") };
+}
+
+/** Minutes per 100 m of climbing beyond what the athlete's usual sessions climb. */
+const CLIMB_MINUTES_PER_100M: Record<SportGroupId, number> = {
+  cycling: 6,
+  running: 10,
+  walking: 15,
+  swimming: 0,
+};
+/** Longest long session per sport, whatever the goal: beyond it recovery costs too much. */
+const LONG_CAP_MINUTES: Record<KeySport, number> = {
+  cycling: 360,
+  running: 180,
+  walking: 360,
+  swimming: 90,
+};
+const LONG_MIN_MINUTES = 45;
+/** Metres of climbing per kilometre from which intervals go on a hill. */
+export const HILLY_M_PER_KM = 15;
+
+/** The goal's duration at the athlete's own pace, or null without a usable pace. */
+export function expectedGoalMinutes(
+  goal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM">,
+  pace: GroupPace | undefined,
+) {
+  const group = sportGroupFor(goal.sportType)?.id;
+  if (!group || goal.distanceM == null || !pace || pace.kmh <= 0) return null;
+  const km = goal.distanceM / 1000;
+  const extraClimb = Math.max(0, (goal.elevationGainM ?? 0) - pace.climbPerKm * km);
+  return Math.round((km / pace.kmh) * 60 + (extraClimb / 100) * CLIMB_MINUTES_PER_100M[group]);
+}
+
+/** Share of the goal's expected time the long session reaches, by phase. */
+function longShare(phase: Pick<SeasonPhase, "kind" | "daysToAnchor">) {
+  const weeksLeft = Math.floor((phase.daysToAnchor ?? 0) / 7);
+  switch (phase.kind) {
+    case "base":
+      return 0.4;
+    case "build": {
+      // From half the goal 12 weeks out to three quarters 4 weeks out.
+      const progress = (BASE_WEEKS - weeksLeft) / (BASE_WEEKS - PEAK_WEEKS - 1);
+      return 0.5 + 0.25 * Math.min(1, Math.max(0, progress));
+    }
+    case "maintain":
+      return 0.6;
+    case "peak":
+      return 0.8;
+    case "taper":
+      return 0.4;
+    default:
+      return null;
+  }
+}
+
+/** Where the goal puts the week's key sessions: its sport, the long session, and hills. */
+export function goalSessions(
+  phase: SeasonPhase,
+  paces: Partial<Record<SportGroupId, GroupPace>>,
+): GoalSessions | null {
+  // The longest part of the event leads: the ride of a triathlon, the run of a duathlon.
+  const lead = [...phase.anchor]
+    .filter((goal) => isKeySport(sportGroupFor(goal.sportType)?.id ?? ""))
+    .sort((a, b) => roughGoalHours(b) - roughGoalHours(a))[0];
+  const keySport = lead ? (sportGroupFor(lead.sportType)!.id as KeySport) : null;
+  if (!lead || !keySport || phase.kind === "recovery" || phase.kind === "hold") return null;
+  const expectedMinutes = expectedGoalMinutes(lead, paces[keySport]);
+  const share = longShare(phase);
+  const longMinutes =
+    expectedMinutes != null && share != null
+      ? Math.min(
+          LONG_CAP_MINUTES[keySport],
+          Math.max(LONG_MIN_MINUTES, Math.round((expectedMinutes * share) / 15) * 15),
+        )
+      : null;
+  const climbPerKm =
+    lead.distanceM && lead.elevationGainM ? lead.elevationGainM / (lead.distanceM / 1000) : 0;
+  const longClimbM =
+    longMinutes != null && expectedMinutes && lead.elevationGainM
+      ? Math.round((lead.elevationGainM * Math.min(1, longMinutes / expectedMinutes)) / 50) * 50
+      : null;
+  return {
+    keySport,
+    expectedMinutes,
+    longMinutes,
+    longClimbM: longClimbM || null,
+    hilly: keySport !== "swimming" && climbPerKm >= HILLY_M_PER_KM,
+  };
 }

@@ -102,13 +102,20 @@ function week(
     history: [],
     weekStartFitness: { ctl: 50, atl: 50 },
     fitness: { ctl: 50, atl: 50 },
-    collectors: { running: COLLECTORS, cycling: COLLECTORS },
+    collectors: {
+      running: COLLECTORS,
+      cycling: COLLECTORS,
+      swimming: COLLECTORS,
+      walking: COLLECTORS,
+    },
     season: STEADY,
     anchors: {
       ftpWatts: null,
       heartRate: {
         cycling: { maxHr: 190, lthr: 160 },
         running: { maxHr: 195, lthr: 170 },
+        swimming: { maxHr: 180, lthr: 150 },
+        walking: { maxHr: 185, lthr: null },
       },
     },
     ...overrides,
@@ -442,6 +449,39 @@ describe("assignKeySports", () => {
     );
     expect(first).toMatchObject({ sport: "running", suggestedSport: "cycling", sportPinned: true });
   });
+  it("puts the main and long sessions on the goal's sport", () => {
+    const planned = assignKeySports(
+      sessions,
+      { cycling: 0.8, running: 0.2, other: 0 },
+      {},
+      { keySport: "running" },
+    );
+    expect(planned.map((session) => [session.kind, session.sport])).toEqual([
+      ["intervals", "running"],
+      ["zone", "cycling"],
+      ["intervals", "running"],
+      ["long", "running"],
+    ]);
+  });
+
+  it("gives a swimmer who also rides the rest of the key sessions on the bike", () => {
+    const sport = (shares: { cycling: number; running: number }) =>
+      assignKeySports(sessions, { ...shares, other: 0.5 }, {}, { keySport: "swimming" }).map(
+        (session) => session.sport,
+      );
+    expect(sport({ cycling: 0.5, running: 0 })).toEqual([
+      "swimming",
+      "cycling",
+      "cycling",
+      "swimming",
+    ]);
+    expect(sport({ cycling: 0, running: 0 })).toEqual([
+      "swimming",
+      "swimming",
+      "swimming",
+      "swimming",
+    ]);
+  });
 });
 
 describe("withKeySessionSport", () => {
@@ -671,7 +711,7 @@ describe("today's choice", () => {
     );
   });
 
-  it("keeps a strength-only day easy, and says hard needs a ride or a run", () => {
+  it("keeps a strength-only day easy, and says hard needs an endurance sport", () => {
     const data = week();
     const pick = recommendToday(data, summarizeWeek(data), {
       available: 60,
@@ -679,7 +719,9 @@ describe("today's choice", () => {
       feel: "hard",
     });
     expect(pick).toMatchObject({ kind: "easy", family: "strength", title: "Strength session" });
-    expect(pick.warnings).toContain("Key sessions are rides or runs. Add one to today to go hard.");
+    expect(pick.warnings).toContain(
+      "Strength has no key sessions. Add a ride, run, swim, or walk to go hard.",
+    );
   });
 });
 

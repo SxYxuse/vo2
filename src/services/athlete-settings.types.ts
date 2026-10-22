@@ -6,6 +6,7 @@ import {
   mergeSportGroupShares,
   sportGroupFor,
   SPORT_GROUPS,
+  type SportGroupId,
 } from "./sport-groups.ts";
 
 const GEIST_HUES = ["blue", "red", "amber", "green", "teal", "purple", "pink", "gray"] as const;
@@ -127,7 +128,7 @@ export function heartRateCollectorLabel(sportType: string) {
 /** Sensors are still worn when a sport type is hidden, so hidden types count (ADR 0018). */
 export function familyCollectors(
   sportTypes: SportTypeSettings,
-  family: "running" | "cycling",
+  family: SportGroupId,
 ): SportCollectors {
   const members = SPORT_GROUPS.find((group) => group.id === family)?.members ?? [];
   const pool = members

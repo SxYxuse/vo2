@@ -24,7 +24,11 @@ import {
   keySessionName,
   saveKeySessionSport,
 } from "@/services/training-plan.ts";
-import { withKeySessionSport, type TrainingPlan } from "@/services/training-plan.types.ts";
+import {
+  withKeySessionSport,
+  type KeySport,
+  type TrainingPlan,
+} from "@/services/training-plan.types.ts";
 import {
   AVAILABLE_WINDOWS,
   HISTORY_WEEKS,
@@ -250,14 +254,25 @@ function SplitBar({
   );
 }
 
-const KEY_SPORTS = [
-  { id: "cycling", label: "Ride" },
-  { id: "running", label: "Run" },
-] as const;
+const KEY_SPORT_OPTIONS: { id: KeySport; label: string; noun: string }[] = [
+  { id: "cycling", label: "Ride", noun: "ride" },
+  { id: "running", label: "Run", noun: "run" },
+  { id: "swimming", label: "Swim", noun: "swim" },
+  { id: "walking", label: "Walk", noun: "walk" },
+];
 
-type KeySport = (typeof KEY_SPORTS)[number]["id"];
+/** Rides and runs always; a swim or walk only when it is suggested or already picked. */
+function keySportOptions(status: KeySessionStatus) {
+  return KEY_SPORT_OPTIONS.filter(
+    (option) =>
+      option.id === "cycling" ||
+      option.id === "running" ||
+      option.id === status.suggestedSport ||
+      option.id === status.session.sport,
+  );
+}
 
-/** Ride or run for one key session. Picking VO2's suggestion clears the athlete's own pick. */
+/** The sport for one key session. Picking VO2's suggestion clears the athlete's own pick. */
 function KeySportPicker({ status }: { status: KeySessionStatus }) {
   const queryClient = useQueryClient();
   const id = status.session.id;
@@ -288,7 +303,8 @@ function KeySportPicker({ status }: { status: KeySessionStatus }) {
       void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryOptions.queryKey });
     },
   });
-  const sport = status.session.sport === "running" ? "running" : "cycling";
+  const sport = status.session.sport === "any" ? status.suggestedSport : status.session.sport;
+  const options = keySportOptions(status);
 
   return (
     <ToggleGroup
@@ -298,12 +314,12 @@ function KeySportPicker({ status }: { status: KeySessionStatus }) {
       aria-label={`Sport for ${keySessionName(status.session)}`}
       value={[sport]}
       onValueChange={(next) => {
-        const picked = KEY_SPORTS.find((option) => option.id === next[0])?.id;
+        const picked = options.find((option) => option.id === next[0])?.id;
         if (!picked || picked === sport) return;
         save.mutate(picked === status.suggestedSport ? null : picked);
       }}
     >
-      {KEY_SPORTS.map((option) => (
+      {options.map((option) => (
         <ToggleGroupItem key={option.id} value={option.id}>
           {option.label}
         </ToggleGroupItem>
@@ -313,7 +329,7 @@ function KeySportPicker({ status }: { status: KeySessionStatus }) {
 }
 
 function keySportHint(status: KeySessionStatus) {
-  const suggested = status.suggestedSport === "running" ? "run" : "ride";
+  const suggested = KEY_SPORT_OPTIONS.find((option) => option.id === status.suggestedSport)?.noun;
   return status.sportPinned ? `Your pick · VO2 suggests a ${suggested}` : "VO2’s pick";
 }
 

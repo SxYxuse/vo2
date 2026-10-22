@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { emptyHistogram, zonesFromHistogram } from "./heart-rate.ts";
 import { ATL_DAYS, CTL_DAYS, formLabel } from "./training-load.ts";
-import { blendShares, type SeasonPhase } from "./season-phase.ts";
+import { blendShares, type GoalSessions, type SeasonPhase } from "./season-phase.ts";
+import { sportGroupFor } from "./sport-groups.ts";
 import {
   DEFAULT_LOAD_PER_HOUR,
   KEY_SESSION_PRESETS,
@@ -11,6 +12,7 @@ import {
   addDayKey,
   formatHours,
   easySessionRange,
+  isKeySport,
   keySessionCount,
   keySessionFromPreset,
   keySessionMinutes,
@@ -21,6 +23,7 @@ import {
   type FamilyCollectors,
   type KeySession,
   type KeySessionPresetId,
+  type KeySport,
   type PlanningAnchors,
   type SportFamily,
   type TargetZone,
@@ -81,7 +84,7 @@ export type WeekTargetData = {
   weekStartFitness: FitnessPoint;
   /** Fitness and fatigue at the end of today, after today's copied activities. */
   fitness: FitnessPoint;
-  collectors: { running: FamilyCollectors; cycling: FamilyCollectors };
+  collectors: Record<KeySport, FamilyCollectors>;
   anchors: PlanningAnchors;
   /** Where the season puts this week; read at the start of the week like the target. */
   season: SeasonPhase;
@@ -139,7 +142,7 @@ export type KeySessionStatus = {
   /** Dropped for this week: more open key sessions than training days left. */
   skipped: boolean;
   /** The sport VO2 suggests for this session, and whether the athlete picked another. */
-  suggestedSport: "cycling" | "running";
+  suggestedSport: KeySport;
   sportPinned: boolean;
 };
 
@@ -323,9 +326,9 @@ export type StepZone = "z1" | TargetZone;
 
 const ZONE_INDEX: Record<StepZone, number> = { z1: 0, z2: 1, z3: 2, z4: 3, z5: 4 };
 
-/** Any ride or run can tick off a key session: the stimulus counts, not the sport it was planned on. */
+/** Any ride, run, swim, or walk can tick off a key session: the stimulus counts, not the sport. */
 function sportFits(activity: WeekActivity) {
-  return activity.family !== "other";
+  return sportGroupFor(activity.sportType) != null;
 }
 
 /** Minutes an activity spent at or above the session's zone. */
@@ -393,7 +396,9 @@ function weekNumber(weekStart: string) {
 /** This week's key sessions, built from the week mix, the season phase, fitness, and target. */
 export function generateKeySessions(input: {
   weekMix: TrainingPlan["weekMix"];
-  season: Pick<SeasonPhase, "rotation" | "maxKeySessions">;
+  season: Pick<SeasonPhase, "rotation" | "maxKeySessions"> & {
+    sessions?: Pick<GoalSessions, "longMinutes"> | null;
+  };
   weekStart: string;
   ctl: number;
   targetMinutes: number;
@@ -408,7 +413,10 @@ export function generateKeySessions(input: {
   const rotated = [...rest.slice(shift), ...rest.slice(0, shift)];
   const order = [first, ...rotated];
   const level = input.ctl < 35 ? 0 : input.ctl < 65 ? 1 : 2;
-  const longMinutes = clamp(Math.round((input.targetMinutes * 0.25) / 15) * 15, 75, 240);
+  // Toward a goal the long session grows with it; otherwise it is a quarter of the week.
+  const longMinutes =
+    input.season.sessions?.longMinutes ??
+    clamp(Math.round((input.targetMinutes * 0.25) / 15) * 15, 75, 240);
 
   const sessions: KeySession[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -430,33 +438,52 @@ export function generateKeySessions(input: {
 }
 
 export type PlannedKeySession = KeySession & {
-  sport: "cycling" | "running";
-  suggestedSport: "cycling" | "running";
+  sport: KeySport;
+  suggestedSport: KeySport;
   sportPinned: boolean;
 };
 
+/** Time on rides and runs below this share leaves no room to move key sessions onto them. */
+const RIDE_RUN_MIN_SHARE = 0.15;
+
 /**
- * A sport for each key session: the main one on the sport the athlete does most, the others
- * spread by their ride / run balance, a long Z2 on the bike when they ride. Their own pick wins.
+ * A sport for each key session. Toward a goal, the main one and the long one go on the goal's
+ * sport; otherwise on the sport the athlete does most, with a long Z2 on the bike when they ride.
+ * The rest spread by the ride / run balance. Their own pick wins.
  */
 export function assignKeySports(
   sessions: KeySession[],
   shares: Record<SportFamily, number>,
-  pinned: Record<string, "cycling" | "running">,
+  pinned: Record<string, KeySport>,
+  goal: Pick<GoalSessions, "keySport"> | null = null,
 ): PlannedKeySession[] {
   const both = shares.cycling + shares.running;
   const runShare = both > 0 ? shares.running / both : 0.5;
   const rides = runShare <= 0.9;
   const runs = runShare >= 0.1;
-  const dominant: "cycling" | "running" = runShare > 0.5 && runs ? "running" : "cycling";
-  const other = dominant === "cycling" ? "running" : "cycling";
+  const historyLead: KeySport = runShare > 0.5 && runs ? "running" : "cycling";
+  const dominant: KeySport = goal?.keySport ?? historyLead;
+  const rideOrRunLead = dominant === "cycling" || dominant === "running";
+  const other: KeySport = !rideOrRunLead
+    ? historyLead
+    : dominant === "cycling"
+      ? "running"
+      : "cycling";
+  const longSport: KeySport = goal?.keySport ?? (rides ? "cycling" : "running");
   const intervals = sessions.filter((session) => session.kind !== "long").length;
-  // How many interval sessions go on the less-done sport, rounded to whole sessions.
-  let otherQuota = rides && runs ? Math.round(intervals * Math.min(runShare, 1 - runShare)) : 0;
+  // How many interval sessions go on the other sport, rounded to whole sessions. A swim or walk
+  // goal keeps the main one and gives the rest to rides or runs when the athlete does them.
+  let otherQuota = rideOrRunLead
+    ? rides && runs
+      ? Math.round(intervals * Math.min(runShare, 1 - runShare))
+      : 0
+    : both >= RIDE_RUN_MIN_SHARE
+      ? intervals - 1
+      : 0;
   let placedDominant = false;
   return sessions.map((session) => {
-    let suggested: "cycling" | "running";
-    if (session.kind === "long") suggested = rides ? "cycling" : "running";
+    let suggested: KeySport;
+    if (session.kind === "long") suggested = longSport;
     else if (!placedDominant || otherQuota <= 0) {
       suggested = dominant;
       placedDominant = true;
@@ -558,7 +585,7 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
     (activity) => activity.date === today && activity.hardMinutes >= HARD_DAY_MINUTES,
   );
   let keyDays = Math.max(0, trainingDaysLeft - (hardToday ? 1 : 0));
-  const planned = assignKeySports(generated, shares, plan.keySessionSports);
+  const planned = assignKeySports(generated, shares, plan.keySessionSports, data.season.sessions);
   const keySessions = matchKeySessions(planned, activities).map((status) => {
     if (status.done) return status;
     if (keyDays > 0) {
@@ -672,13 +699,18 @@ const ZONE_RPE: Record<StepZone, string> = {
   z5: "RPE 9, still controlled",
 };
 
+const KEY_SPORT_TYPE: Record<KeySport, string> = {
+  cycling: "Ride",
+  running: "Run",
+  swimming: "Swim",
+  walking: "Walk",
+};
+
 /** Heart-rate bounds of a zone, cut by the same sport model as the heart rate page. */
-function zoneBpm(zone: StepZone, family: "running" | "cycling", anchors: PlanningAnchors) {
-  const zones = zonesFromHistogram(
-    emptyHistogram(),
-    family === "cycling" ? "Ride" : "Run",
-    anchors.heartRate[family],
-  );
+function zoneBpm(zone: StepZone, family: KeySport, anchors: PlanningAnchors) {
+  const sportAnchors = anchors.heartRate[family];
+  if (!sportAnchors.maxHr && !sportAnchors.lthr) return null;
+  const zones = zonesFromHistogram(emptyHistogram(), KEY_SPORT_TYPE[family], sportAnchors);
   const stat = zones[ZONE_INDEX[zone]];
   if (!stat || stat.minBpm == null || stat.maxBpm == null) return null;
   return { min: stat.minBpm, max: stat.maxBpm, top: zone === "z5" };
@@ -687,7 +719,7 @@ function zoneBpm(zone: StepZone, family: "running" | "cycling", anchors: Plannin
 /** How to hold a zone: watts on bikes with a meter, heart rate with a belt or watch, else RPE. */
 export function zoneCue(
   zone: StepZone,
-  family: "running" | "cycling",
+  family: KeySport,
   collectors: FamilyCollectors,
   anchors: PlanningAnchors,
 ) {
@@ -705,11 +737,7 @@ export function zoneCue(
 }
 
 /** Upper edge of zone 2, when the athlete has a usable anchor for that sport. */
-function easyCap(
-  family: "running" | "cycling",
-  collectors: FamilyCollectors,
-  anchors: PlanningAnchors,
-) {
+function easyCap(family: KeySport, collectors: FamilyCollectors, anchors: PlanningAnchors) {
   if (family === "cycling" && collectors.power && anchors.ftpWatts) {
     return `Hold under ${Math.round(anchors.ftpWatts * POWER_BANDS.z2[1])} W.`;
   }
@@ -728,21 +756,28 @@ function keySessionIntensity(session: KeySession) {
 
 export function keySessionDescription(
   session: KeySession,
-  family: "running" | "cycling",
-  data: Pick<WeekTargetData, "collectors" | "anchors">,
+  family: KeySport,
+  data: Pick<WeekTargetData, "collectors" | "anchors"> & {
+    season?: Pick<SeasonPhase, "sessions">;
+  },
 ) {
   const cue = zoneCue(session.zone, family, data.collectors[family], data.anchors);
   const zone = zoneLabel(session.zone);
+  const goal = data.season?.sessions;
+  const onGoalSport = goal?.keySport === family;
   if (session.kind === "long") {
-    return `${formatHours(session.workMinutes / 60)} in ${zone} (${cue}). Eat and drink from the first hour.`;
+    const climb =
+      onGoalSport && goal.longClimbM ? ` Take in about ${goal.longClimbM} m of climbing.` : "";
+    return `${formatHours(session.workMinutes / 60)} in ${zone} (${cue}).${climb} Eat and drink from the first hour.`;
   }
+  const hill = onGoalSport && goal.hilly ? " on a climb" : "";
   const work =
     session.reps === 1
       ? `${session.workMinutes} min`
       : `${session.reps} × ${session.workMinutes} min`;
   const between =
     session.reps > 1 && session.restMinutes > 0 ? `, ${session.restMinutes} min easy between` : "";
-  return `${WARM_UP_LABEL}. ${work} in ${zone} (${cue})${between}. ${COOL_DOWN_LABEL}.`;
+  return `${WARM_UP_LABEL}. ${work} in ${zone}${hill} (${cue})${between}. ${COOL_DOWN_LABEL}.`;
 }
 
 const WARM_UP_LABEL = "15 min easy";
@@ -780,7 +815,7 @@ export function pickFamily(
   summary: WeekSummary,
   available: number,
   sport: KeySession["sport"] = "any",
-): "running" | "cycling" {
+): KeySport {
   if (sport !== "any") return sport;
   const rides = summary.shares.cycling >= 0.15;
   const { running, cycling } = summary.bySport;
@@ -887,12 +922,12 @@ function isRideOrRun(sport: PartSport): sport is "running" | "cycling" {
   return sport === "running" || sport === "cycling";
 }
 
-/** Key sessions are rides or runs: that is where zones and watts mean something. */
+/** Key sessions go on sports with heart-rate zones: not strength. */
 function hostsKey(sport: DaySport) {
-  return sport === "any" || sport === "cycling" || sport === "running";
+  return sport !== "strength";
 }
 
-/** Sessions planned on today's sport come first; the others still fit, as any ride or run counts. */
+/** Sessions planned on today's sport come first; the others still fit, as any key sport counts. */
 function plannedFirst(sport: DaySport) {
   const rank = (status: KeySessionStatus) =>
     sport === "any" || status.session.sport === sport ? 0 : 1;
@@ -901,9 +936,15 @@ function plannedFirst(sport: DaySport) {
 
 /** How to hold an easy part in a sport without zones or watts in VO2. */
 function partHint(sport: PartSport, data: Pick<WeekTargetData, "collectors" | "anchors">) {
+  if (sport === "swimming" || sport === "walking") {
+    const feel =
+      sport === "swimming"
+        ? "Long, relaxed strokes; you could keep going."
+        : "Brisk, breathing through your nose.";
+    const bpm = data.collectors[sport].heartRate ? zoneBpm("z2", sport, data.anchors) : null;
+    return bpm ? `${feel} Keep heart rate under ${bpm.max} bpm.` : feel;
+  }
   if (isRideOrRun(sport)) return easyCap(sport, data.collectors[sport], data.anchors);
-  if (sport === "swimming") return "Long, relaxed strokes; you could keep going.";
-  if (sport === "walking") return "Brisk, breathing through your nose.";
   return "Controlled reps, full rest between sets; no intervals.";
 }
 
@@ -912,7 +953,7 @@ function partCue(
   zone: StepZone,
   data: Pick<WeekTargetData, "collectors" | "anchors">,
 ) {
-  if (isRideOrRun(sport)) return zoneCue(zone, sport, data.collectors[sport], data.anchors);
+  if (isKeySport(sport)) return zoneCue(zone, sport, data.collectors[sport], data.anchors);
   if (sport === "strength") return "Controlled, no intervals";
   return ZONE_RPE[zone];
 }
@@ -980,8 +1021,11 @@ export function recommendToday(
   );
   const todayMinutes = todaySessions.reduce((sum, activity) => sum + activity.minutes, 0);
 
-  // The first ride or run part is the only one that can carry a key session.
-  const keyIndex = sports.findIndex(hostsKey);
+  // A ride or run part takes it first; a swim or walk day carries it when that is all there is.
+  const rideOrRunIndex = sports.findIndex(
+    (sport) => sport === "any" || sport === "cycling" || sport === "running",
+  );
+  const keyIndex = rideOrRunIndex >= 0 ? rideOrRunIndex : sports.findIndex(hostsKey);
   const keySport = keyIndex >= 0 ? sports[keyIndex] : null;
   const open = keySport
     ? summary.keySessions.filter((status) => !status.done).sort(plannedFirst(keySport))
@@ -1012,7 +1056,7 @@ export function recommendToday(
     }
   } else if (feel === "hard" && !keySport) {
     kind = "easy";
-    warnings.push("Key sessions are rides or runs. Add one to today to go hard.");
+    warnings.push("Strength has no key sessions. Add a ride, run, swim, or walk to go hard.");
   } else if (feel === "hard") {
     kind = "key";
     const hard = (status: KeySessionStatus) => isHard(status.session);
@@ -1075,7 +1119,7 @@ export function recommendToday(
     if (sport !== "any") return sport;
     return mainSport === "cycling" ? "running" : "cycling";
   });
-  if (keySession && isRideOrRun(mainSport)) keySession = { ...keySession, sport: mainSport };
+  if (keySession && isKeySport(mainSport)) keySession = { ...keySession, sport: mainSport };
 
   // Minutes per part.
   let minutesByPart: number[];
@@ -1198,17 +1242,17 @@ export function buildRecommendation(
       return `${formatHours(part.minutes / 60)} easy ${noun}: ${partHint(part.sport, data)}`;
     if (kind === "rest") return "Take the day off. The week’s target is already met.";
     if (kind === "recovery") {
-      return isRideOrRun(part.sport)
+      return isKeySport(part.sport)
         ? `Zone 1 only, no surges. ${partHint(part.sport, data)}`
         : `Very easy ${noun}. ${partHint(part.sport, data)}`;
     }
-    if (keySession && isRideOrRun(part.sport)) {
+    if (keySession && isKeySport(part.sport)) {
       const extra = round5(part.minutes - keySessionMinutes(keySession));
       const steady =
         extra >= 5 ? ` Add ${formatHours(extra / 60)} steady Z2 before the cool-down.` : "";
       return `${keySessionDescription(keySession, part.sport, data)}${steady}`;
     }
-    return isRideOrRun(part.sport)
+    return isKeySport(part.sport)
       ? `Zone 2 the whole way. ${partHint(part.sport, data)}`
       : `Easy ${noun}. ${partHint(part.sport, data)}`;
   };
