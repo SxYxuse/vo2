@@ -21,11 +21,15 @@ import {
 } from "@/services/heart-rate.ts";
 import {
   heartRateSettingsIssues,
+  ZONE_METHOD_ANCHORS,
   ZONE_METHODS,
   ZONED_FAMILY_LABELS,
+  zoneMethodHint,
   type HeartRateEstimates,
   type HeartRateSettings,
 } from "@/services/heart-rate-settings.ts";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
@@ -69,8 +73,12 @@ const MISSING_LABEL = {
   zones: "all four zone tops",
 } as const;
 
-function estimateText(value: number | null) {
-  return value == null ? "No estimate yet" : `Estimated ${value}`;
+function reserveZonesLabel(families: ZonedFamily[]) {
+  if (families.length === 0) return undefined;
+  const names = families.map((family) => ZONED_FAMILY_LABELS[family].toLowerCase());
+  const list =
+    names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+  return `Sets ${list} zones`;
 }
 
 function zoneTops(family: ZonedFamily, resolved: ResolvedHeartRate) {
@@ -78,22 +86,61 @@ function zoneTops(family: ZonedFamily, resolved: ResolvedHeartRate) {
   return zones.slice(0, 4).map((zone) => zone.maxBpm);
 }
 
+type Estimate = { bpm: number | null; source?: string };
+
+/** Says whether a field uses VO2's estimate or the athlete's value, and offers the way back. */
+function EstimateStatus({
+  value,
+  estimate,
+  onReset,
+}: {
+  value: string;
+  estimate: Estimate;
+  onReset: () => void;
+}) {
+  if (value.trim() === "") {
+    return (
+      <FieldDescription>
+        {estimate.bpm == null
+          ? "No estimate yet. Enter a value, or sync activities with heart rate."
+          : `Using VO2's estimate: ${estimate.bpm} bpm${estimate.source ? `, ${estimate.source}` : ""}.`}
+      </FieldDescription>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs/relaxed text-muted-foreground">
+      <span>Your value.</span>
+      <Button type="button" variant="outline" size="sm" onClick={onReset}>
+        {estimate.bpm == null ? "Clear" : `Use estimate (${estimate.bpm} bpm)`}
+      </Button>
+    </div>
+  );
+}
+
 function BpmField({
   id,
   name,
   label,
   placeholder,
+  estimate,
+  setsZones,
   description,
   issue,
   control,
+  onReset,
 }: {
   id: string;
   name: BpmPath;
   label: string;
-  placeholder: string;
+  placeholder?: string;
+  /** Omitted for fields with no estimate to fall back on, such as custom zone tops. */
+  estimate?: Estimate;
+  /** Badge text naming the zones this field sets, when the zone method reads it. */
+  setsZones?: string;
   description?: string;
   issue?: string;
   control: Control<SettingsFormInput>;
+  onReset?: () => void;
 }) {
   return (
     <Controller
@@ -103,14 +150,17 @@ function BpmField({
         const message = fieldState.error?.message ?? issue;
         return (
           <Field data-invalid={Boolean(message)}>
-            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            <div className="flex items-center gap-2">
+              <FieldLabel htmlFor={id}>{label}</FieldLabel>
+              {setsZones ? <Badge variant="secondary">{setsZones}</Badge> : null}
+            </div>
             <InputGroup className="max-w-48">
               <InputGroupInput
                 id={id}
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder={placeholder}
+                placeholder={placeholder ?? (estimate?.bpm != null ? "Auto" : undefined)}
                 name={field.name}
                 value={field.value as string}
                 aria-invalid={Boolean(message)}
@@ -122,6 +172,16 @@ function BpmField({
                 <InputGroupText>bpm</InputGroupText>
               </InputGroupAddon>
             </InputGroup>
+            {estimate ? (
+              <EstimateStatus
+                value={field.value as string}
+                estimate={estimate}
+                onReset={() => {
+                  field.onChange("");
+                  onReset?.();
+                }}
+              />
+            ) : null}
             {description ? <FieldDescription>{description}</FieldDescription> : null}
             {message ? <FieldError>{message}</FieldError> : null}
           </Field>
@@ -136,11 +196,14 @@ export function HeartRateFields({
   control,
   setValue,
   estimates,
+  onReset,
 }: {
   idPrefix: string;
   control: Control<SettingsFormInput>;
   setValue: UseFormSetValue<SettingsFormInput>;
   estimates: HeartRateEstimates;
+  /** Typed fields save on blur, so going back to an estimate asks for its own save. */
+  onReset: () => void;
 }) {
   const heartRate = useWatch({ control, name: "heartRate" }) as HeartRateFormInput["heartRate"];
   // A half-typed value reads as blank, so the rest of the card keeps up while typing.
@@ -157,21 +220,25 @@ export function HeartRateFields({
   return (
     <FieldGroup>
       <FieldDescription>
-        Leave a field blank to use VO2's estimate. Changes rescore every past activity.
+        Blank fields use VO2's estimate. Changes rescore every past activity.
       </FieldDescription>
       <BpmField
         id={`${idPrefix}-rest-hr`}
         name="heartRate.restHr"
         label="Resting heart rate"
-        placeholder={estimateText(estimates.restHr)}
-        description="The floor of heart-rate reserve, for zones and training load."
+        estimate={{ bpm: estimates.restHr }}
+        setsZones={reserveZonesLabel(
+          ZONED_FAMILIES.filter((family) => settings.sports[family].method === "reserve"),
+        )}
+        onReset={onReset}
+        description="Scores training load, for every sport."
         issue={issueAt("restHr")}
         control={control}
       />
       {ZONED_FAMILIES.map((family) => {
         const base = `heartRate.sports.${family}` as const;
         const resolved = resolve(family);
-        // Placeholders show what each blank field would resolve to.
+        // What a blank LTHR would resolve to, given the max heart rate in use.
         const lthrEstimate = resolve(family, {
           ...settings,
           sports: { ...settings.sports, [family]: { ...settings.sports[family], lthr: null } },
@@ -181,12 +248,33 @@ export function HeartRateFields({
           ? null
           : zonesFromHistogram(emptyHistogram(), SPORT_TYPE[family], resolved);
         const methodId = `${idPrefix}-${family}-method`;
+        const anchors = ZONE_METHOD_ANCHORS[resolved.method];
         return (
           // The border sits on a wrapper: a bordered fieldset draws its legend into the
           // line, and iOS Safari ignores the float that would undo it in a flex fieldset.
           <div key={family} className="rounded-lg border p-3">
             <FieldSet className="gap-4">
-              <FieldLegend className="mb-0">{ZONED_FAMILY_LABELS[family]}</FieldLegend>
+              <FieldLegend className="mb-3">{ZONED_FAMILY_LABELS[family]}</FieldLegend>
+              {missing ? (
+                <FieldError>Needs {MISSING_LABEL[missing]} to set these zones.</FieldError>
+              ) : zones ? (
+                <ul className="grid max-w-sm gap-1 text-sm">
+                  {zones.map((zone, index) => (
+                    <li key={zone.id} className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="size-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: HR_ZONES[index].color }}
+                      />
+                      <span className="font-medium">Z{index + 1}</span>
+                      <span className="text-muted-foreground">{HR_ZONES[index].name}</span>
+                      <span className="ms-auto tabular-nums">
+                        {formatZoneBpm(zone, index === zones.length - 1)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <Controller
                 name={`${base}.method`}
                 control={control}
@@ -226,9 +314,7 @@ export function HeartRateFields({
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                    <FieldDescription>
-                      {ZONE_METHODS.find((method) => method.id === field.value)?.hint}
-                    </FieldDescription>
+                    <FieldDescription>{zoneMethodHint(field.value, family)}</FieldDescription>
                   </Field>
                 )}
               />
@@ -253,8 +339,10 @@ export function HeartRateFields({
                 id={`${idPrefix}-${family}-lthr`}
                 name={`${base}.lthr`}
                 label="LTHR"
-                placeholder={estimateText(lthrEstimate)}
-                description="Lactate-threshold heart rate. Scores heart-rate training load."
+                estimate={{ bpm: lthrEstimate, source: "from your max heart rate" }}
+                setsZones={anchors.includes("lthr") ? "Sets these zones" : undefined}
+                onReset={onReset}
+                description="Lactate threshold: about the highest heart rate you can hold for an hour. Scores training load."
                 issue={issueAt(`sports.${family}.lthr`)}
                 control={control}
               />
@@ -262,22 +350,12 @@ export function HeartRateFields({
                 id={`${idPrefix}-${family}-max-hr`}
                 name={`${base}.maxHr`}
                 label="Max heart rate"
-                placeholder={estimateText(estimates.maxHr[family])}
-                description="Replaces your recent peak, with no spike or age check."
+                estimate={{ bpm: estimates.maxHr[family], source: "from your recent peaks" }}
+                setsZones={anchors.includes("max") ? "Sets these zones" : undefined}
+                onReset={onReset}
+                description="The highest heart rate you reach in this sport."
                 control={control}
               />
-              {missing ? (
-                <FieldError>Needs {MISSING_LABEL[missing]}</FieldError>
-              ) : zones ? (
-                <p className="text-sm text-muted-foreground">
-                  {zones
-                    .map(
-                      (zone, index) =>
-                        `Z${index + 1} ${formatZoneBpm(zone, index === zones.length - 1)}`,
-                    )
-                    .join(" · ")}
-                </p>
-              ) : null}
             </FieldSet>
           </div>
         );

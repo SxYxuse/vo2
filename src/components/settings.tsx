@@ -287,6 +287,7 @@ export function SettingsForm({
                 control={form.control}
                 setValue={form.setValue}
                 estimates={data.heartRateEstimates}
+                onReset={requestSave}
               />
             ) : (
               <SportTypesFields idPrefix="settings" control={form.control} />

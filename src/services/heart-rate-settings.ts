@@ -16,20 +16,35 @@ export const ZONED_FAMILY_LABELS: Record<ZonedFamily, string> = {
   swimming: "Swimming",
 };
 
-export const ZONE_METHODS: { id: ZoneMethod; label: string; hint: string }[] = [
-  {
-    id: "lthr",
-    label: "% of LTHR",
-    hint: "Friel for running, Coggan for cycling, CSS-style for swimming.",
-  },
-  { id: "max", label: "% of max heart rate", hint: "60, 70, 80, and 90 % of max." },
-  {
-    id: "reserve",
-    label: "Heart-rate reserve",
-    hint: "Karvonen: 60, 70, 80, and 90 % of the range from resting to max.",
-  },
-  { id: "custom", label: "Custom", hint: "Your own zones, in bpm." },
+export const ZONE_METHODS: { id: ZoneMethod; label: string }[] = [
+  { id: "lthr", label: "% of LTHR" },
+  { id: "max", label: "% of max heart rate" },
+  { id: "reserve", label: "Heart-rate reserve" },
+  { id: "custom", label: "Custom" },
 ];
+
+const LTHR_MODEL_HINTS: Record<ZonedFamily, string> = {
+  cycling: "Coggan's cycling zones, as a share of your LTHR.",
+  running: "Friel's running zones, as a share of your LTHR.",
+  swimming: "CSS-style swimming zones, as a share of your LTHR.",
+};
+
+export function zoneMethodHint(method: ZoneMethod, family: ZonedFamily) {
+  if (method === "lthr") return LTHR_MODEL_HINTS[family];
+  if (method === "max") return "60, 70, 80, and 90 % of your max heart rate.";
+  if (method === "reserve") {
+    return "Karvonen: 60, 70, 80, and 90 % of the way from resting to max heart rate.";
+  }
+  return "Your own zone tops, in bpm.";
+}
+
+/** The anchors a zone method reads. Training load reads resting HR and LTHR whatever the method. */
+export const ZONE_METHOD_ANCHORS: Record<ZoneMethod, ("rest" | "lthr" | "max")[]> = {
+  lthr: ["lthr"],
+  max: ["max"],
+  reserve: ["rest", "max"],
+  custom: [],
+};
 
 export const REST_HR_MIN = 30;
 export const REST_HR_MAX = 100;

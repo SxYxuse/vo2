@@ -4,10 +4,16 @@ import {
   DEFAULT_HEART_RATE_SETTINGS,
   heartRateSettingsIssues,
   parseHeartRateSettings,
+  ZONE_METHOD_ANCHORS,
   type HeartRateEstimates,
   type HeartRateSettings,
 } from "./heart-rate-settings.ts";
-import { resolveHeartRate } from "./heart-rate.ts";
+import {
+  emptyHistogram,
+  resolveHeartRate,
+  zonesFromHistogram,
+  type ZoneMethod,
+} from "./heart-rate.ts";
 
 const ESTIMATES: HeartRateEstimates = {
   restHr: 52,
@@ -108,4 +114,31 @@ describe("heartRateSettingsIssues", () => {
     );
     expect(issues.map((issue) => issue.path)).toEqual(["sports.running.customZones"]);
   });
+});
+
+describe("ZONE_METHOD_ANCHORS", () => {
+  const BASE = { rest: 52, lthr: 170, max: 196 };
+
+  function zoneTops(method: ZoneMethod, values: typeof BASE) {
+    const settings = withRunning({ method, lthr: values.lthr, maxHr: values.max }, values.rest);
+    const resolved = resolveHeartRate("running", settings, RUNNING);
+    // The tops of zones 1 to 4; zone 5 has no top.
+    return zonesFromHistogram(emptyHistogram(), "Run", resolved)
+      .slice(0, 4)
+      .map((zone) => zone.maxBpm);
+  }
+
+  test.each(["lthr", "max", "reserve"] satisfies ZoneMethod[])(
+    "%s zones move with exactly the anchors the settings page marks",
+    (method) => {
+      for (const anchor of ["rest", "lthr", "max"] as const) {
+        const moved = zoneTops(method, { ...BASE, [anchor]: BASE[anchor] - 6 });
+        const changed = JSON.stringify(moved) !== JSON.stringify(zoneTops(method, BASE));
+        expect({ anchor, changed }).toEqual({
+          anchor,
+          changed: ZONE_METHOD_ANCHORS[method].includes(anchor),
+        });
+      }
+    },
+  );
 });
