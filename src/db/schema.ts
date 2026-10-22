@@ -162,3 +162,25 @@ export const routePlans = pgTable(
   },
   (table) => [index("route_plans_user_created_idx").on(table.userId, table.createdAt)],
 );
+
+/** A race or event on the athlete's season; goals drive the week target (ADR 0021). */
+export const goals = pgTable(
+  "goals",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sportType: text("sport_type").notNull(),
+    date: date("date", { mode: "string" }).notNull(),
+    distanceM: real("distance_m"),
+    elevationGainM: real("elevation_gain_m"),
+    objective: text("objective").$type<"finish" | "finishWell" | "perform">().notNull(),
+    /** The goal the athlete peaks for among goals less than 4 weeks apart. */
+    main: boolean("main").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("goals_user_date_idx").on(table.userId, table.date)],
+);

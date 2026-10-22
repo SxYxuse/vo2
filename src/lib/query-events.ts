@@ -4,7 +4,9 @@ import {
   activityDetailQueryOptions,
   appShellQueryOptions,
   homeQueryOptions,
+  seasonQueryOptions,
   settingsSnapshotQueryOptions,
+  weekTargetQueryOptions,
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
 
@@ -42,6 +44,14 @@ export function afterProfileSaved(queryClient: QueryClient) {
     current ? { ...current, hasProfile: true } : current,
   );
   return queryClient.invalidateQueries();
+}
+
+/** Goals set the week's plan, so the season and the week go stale together. */
+export function afterGoalsChanged(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
+  ]);
 }
 
 /** A sync call copied activities or streams, so every view of the local copy goes stale. */
