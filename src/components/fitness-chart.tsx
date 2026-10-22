@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { cn } from "cn";
 import {
   Area,
   AreaChart,
@@ -24,6 +25,7 @@ import {
   buildPmc,
   ctlChange,
   formLabel,
+  trainingPhase,
   pmcWithCurrentForm,
   roundLoad,
   slicePmc,
@@ -60,9 +62,9 @@ const SERIES_SHORT_LABEL = {
 } as const;
 
 const SERIES_INFO = {
-  ctl: "42-day training load. This is fitness: it climbs with consistent work and fades slowly if you rest. A steady rise over months is the goal.",
-  atl: "7-day training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
-  tsb: "Fitness minus fatigue after that day's known training (today: as of now). Positive means you are fresh. Negative means you are carrying fatigue.",
+  ctl: "About six weeks of training load: how much training your body is used to. It is not a score of how good you are. It rises in build blocks and dips in recovery weeks, even while you get faster, so it does not need a record every week.",
+  atl: "About one week of training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
+  tsb: "Fitness minus fatigue after that day's known training (today: as of now). Around −10 to −30 is normal while building; positive means fresh, which is what you want before a race or a hard test. It is not a performance score.",
 } as const;
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
@@ -92,13 +94,12 @@ function EstimatedDot({ cx, cy, payload }: EstimatedDotProps) {
 const LOAD_Y_DOMAIN = [0, "auto"] as const;
 
 const GRAPH_GOAL_INFO =
-  "Use this to keep progressing without digging a hole: raise fitness over weeks, let fatigue come down after hard blocks, and keep quality work in the productive form band (about −10 to +15). Progress looks like a slowly rising fitness line, not a single huge week.";
+  "This graph shows training load, not ability. Use it to dose your training: build fitness in blocks while you recover well, ease off so fatigue clears, and arrive fresh when it matters. Whether you are actually getting better shows in Progress below: your best efforts and your output at the same heart rate.";
 
 const RAMP_INFO =
-  "How much fitness changed in the last 7 days. A small plus (about +2 to +8) is a productive build. A large plus often means you ramped too fast.";
+  "How much fitness changed in the last 7 days. A small plus (about +2 to +8) is a productive build, a large plus often means you ramped too fast, and a minus is a recovery week or a break.";
 
-const AVG_WEEK_INFO =
-  "Average moving time per week in the selected period, including rest weeks. Check that volume supports a rising fitness line, not only one big week.";
+const AVG_WEEK_INFO = "Average moving time per week in the selected period, including rest weeks.";
 
 const ESTIMATED_INFO =
   "Some sessions have no power or heart rate. Their heart rate is borrowed from your most similar sessions of that sport within two months, or their load is guessed from duration when there are fewer than three. Dots on the graph mark those days; treat them as approximate.";
@@ -113,12 +114,22 @@ const DATE_TICK = new Intl.DateTimeFormat("en-US", { month: "short", day: "numer
 const DATE_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
 const DATE_FULL = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
+// Form between −10 and −30 is ordinary training, not a warning.
 function formTone(tsb: number) {
   if (tsb >= 5) return "text-success";
-  if (tsb >= -10) return "text-muted-foreground";
-  if (tsb >= -30) return "text-warning";
+  if (tsb >= -30) return "text-muted-foreground";
   return "text-destructive";
 }
+
+// Same tints as the success and warning badges.
+const PHASE_TONE = {
+  positive: { box: "border-success/25 bg-success/10", title: "text-success" },
+  neutral: { box: "border-border bg-muted/40", title: "" },
+  warning: { box: "border-warning/25 bg-warning/10", title: "text-warning" },
+} as const;
+
+const PHASE_INFO =
+  "Read from the last week's change in fitness, the trend over four weeks, and form. Training moves through phases: build while you absorb the load, consolidate, recover, then freshen up before a goal. A dipping fitness line in a recovery week is part of the plan.";
 
 function rampTone(ramp: number) {
   if (ramp > 8) return "text-warning";
@@ -176,6 +187,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   );
   const latest = series.at(-1);
   const ramp = ctlChange(pmc);
+  const phase = useMemo(() => trainingPhase(pmc), [pmc]);
   const estimatedShare =
     series.reduce((sum, point) => sum + point.estimatedLoad, 0) /
     Math.max(
@@ -207,7 +219,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
             <InfoTooltip label="About this graph">{GRAPH_GOAL_INFO}</InfoTooltip>
           </div>
           <CardDescription>
-            Track fitness, fatigue, and form so you can keep building without overreaching.
+            How much training you are absorbing, and whether you are fresh. Load, not ability.
           </CardDescription>
         </div>
         <PeriodToggle period={sharedPeriod} />
@@ -226,6 +238,19 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
           <Skeleton className="h-80 w-full rounded-lg" />
         ) : (
           <>
+            <div
+              className={cn(
+                "flex flex-col gap-1 rounded-lg border p-3",
+                PHASE_TONE[phase.tone].box,
+              )}
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground text-xs">Right now</span>
+                <InfoTooltip label="About the training phase">{PHASE_INFO}</InfoTooltip>
+              </div>
+              <p className={cn("font-medium", PHASE_TONE[phase.tone].title)}>{phase.title}</p>
+              <p className="text-muted-foreground text-sm">{phase.detail}</p>
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <StatCard
                 label="Fitness (CTL)"

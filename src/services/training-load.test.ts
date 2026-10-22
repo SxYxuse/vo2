@@ -11,8 +11,10 @@ import {
   formLabel,
   pmcWithCurrentForm,
   toFitnessLoad,
+  trainingPhase,
   type LoadAnchors,
   type LoadInputs,
+  type PmcPoint,
 } from "./training-load.ts";
 
 const ANCHORS: LoadAnchors = {
@@ -238,5 +240,59 @@ describe("labels and NP", () => {
         watts.map((_, index) => index),
       ),
     ).toBeCloseTo(200, 0);
+  });
+});
+
+/** Days of fitness moving linearly from `from` to `to`, ending with this fatigue. */
+function pmcLine(from: number, to: number, atl: number, days = 40): PmcPoint[] {
+  return Array.from({ length: days }, (_, index) => {
+    const ctl = from + ((to - from) * index) / (days - 1);
+    return {
+      date: `d${index}`,
+      t: index,
+      load: 0,
+      measuredLoad: 0,
+      estimatedLoad: 0,
+      ctl,
+      atl: index === days - 1 ? atl : ctl,
+      tsb: 0,
+    };
+  });
+}
+
+describe("training phase", () => {
+  test("too little history reads as building history", () => {
+    expect(trainingPhase(pmcLine(10, 20, 20, 10)).id).toBe("starting");
+  });
+
+  test("a steady rise of a few points a week is building", () => {
+    // 40 days from 30 to 47: about +3 a week.
+    expect(trainingPhase(pmcLine(30, 47, 60)).id).toBe("building");
+  });
+
+  test("more than 8 a week is ramping fast", () => {
+    expect(trainingPhase(pmcLine(20, 80, 85)).id).toBe("ramping-fast");
+  });
+
+  test("deep negative form wins over the ramp", () => {
+    expect(trainingPhase(pmcLine(30, 47, 90)).id).toBe("deep-fatigue");
+  });
+
+  test("flat fitness is consolidating", () => {
+    expect(trainingPhase(pmcLine(50, 51, 55)).id).toBe("holding");
+  });
+
+  test("an easy week after a build is recovering", () => {
+    const points = [...pmcLine(40, 55, 55, 33), ...pmcLine(54, 51, 48, 7)];
+    expect(trainingPhase(points).id).toBe("recovering");
+  });
+
+  test("an easy week with fatigue gone is fresh", () => {
+    const points = [...pmcLine(40, 55, 55, 33), ...pmcLine(54, 51, 38, 7)];
+    expect(trainingPhase(points).id).toBe("fresh");
+  });
+
+  test("weeks of falling fitness are a break", () => {
+    expect(trainingPhase(pmcLine(60, 40, 30)).id).toBe("break");
   });
 });

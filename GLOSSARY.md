@@ -131,7 +131,7 @@ A single score of how costly an activity was. Power first, then heart rate, then
 _Avoid_: TSS, relative effort, stress score
 
 **Fitness**:
-The slow picture of training load: about six weeks of exponentially weighted load. It rises with consistent work and fades slowly at rest.
+The slow picture of training load: about six weeks of exponentially weighted load. It rises with consistent work and fades slowly at rest. It measures load absorbed, not ability (ADR 0020).
 _Avoid_: CTL used alone
 
 **Fatigue**:
@@ -141,6 +141,14 @@ _Avoid_: ATL used alone
 **Form**:
 Fitness minus fatigue at the start of the day, before today's training. Positive means fresh; negative means carrying fatigue.
 _Avoid_: TSB used alone, freshness, TSB score
+
+**Training phase**:
+Where the athlete is in the cycle of building, consolidating, recovering, and freshening up, read from the last week's change in fitness, the four-week trend, and form.
+_Avoid_: Block, periodization, status
+
+**Best effort**:
+The best average power over a fixed duration on a ride with a power meter, or the fastest time over a fixed distance inside a run. Progress compares the last six weeks with the six before and the best of the year.
+_Avoid_: PR, record, power curve, mean-max
 
 ## Anchors
 

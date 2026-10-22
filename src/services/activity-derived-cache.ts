@@ -1,13 +1,15 @@
 /**
- * The per-activity summaries the detail view builds lazily from `activity_streams` and caches
- * back on that row. Clear them together whenever their inputs change; the next detail view
- * rebuilds them. An algorithm change bumps the version each one carries instead
- * (`isRideAnalysis`, `isHeartAnalysis`). The chart preview is not listed: the sync rewrites it
- * with every stream copy, and it reads only the streams.
+ * The per-activity summaries built lazily from `activity_streams` and cached back on that row:
+ * the detail view builds the ride and heart analyses, the fitness page the best efforts. Clear
+ * them together whenever their inputs change; the next read rebuilds them. An algorithm change
+ * bumps the version each one carries instead (`isRideAnalysis`, `isHeartAnalysis`,
+ * `isBestEfforts`). The chart preview is not listed: the sync rewrites it with every stream
+ * copy, and it reads only the streams.
  */
 export const CLEARED_DERIVED_CACHES = {
   rideAnalysis: null,
   heartAnalysis: null,
+  bestEfforts: null,
 } as const;
 
 /** The activity fields the derived caches are built from, besides the streams. */
