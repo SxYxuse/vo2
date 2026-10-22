@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { format, parseISO } from "date-fns";
-import { ChevronRightIcon, FlagIcon, PlusIcon } from "lucide-react";
+import { addYears, format, parseISO } from "date-fns";
+import { CalendarIcon, ChevronRightIcon, FlagIcon, PlusIcon } from "lucide-react";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
@@ -60,7 +60,16 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -291,6 +300,63 @@ function PastGoals({ goals, today }: { goals: PastGoal[]; today: string }) {
   );
 }
 
+function GoalDatePicker({
+  id,
+  value,
+  fromDate,
+  invalid,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  fromDate?: string;
+  invalid: boolean;
+  onChange: (date: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = value ? parseISO(value) : undefined;
+  const from = fromDate ? parseISO(fromDate) : undefined;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            aria-invalid={invalid}
+            className="h-10 w-full justify-start font-normal sm:h-7"
+          />
+        }
+      >
+        <CalendarIcon data-icon="inline-start" />
+        {selected ? (
+          format(selected, "d MMM yyyy")
+        ) : (
+          <span className="text-muted-foreground">Pick a date</span>
+        )}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2">
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          weekStartsOn={1}
+          selected={selected}
+          defaultMonth={selected ?? from}
+          startMonth={from}
+          endMonth={addYears(new Date(), 5)}
+          disabled={from ? { before: from } : undefined}
+          onSelect={(next) => {
+            if (!next) return;
+            onChange(format(next, "yyyy-MM-dd"));
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 type GoalForm = {
   name: string;
   sportType: string;
@@ -435,28 +501,38 @@ function GoalFormBody({
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="goal-sport">Sport</FieldLabel>
-              <NativeSelect
-                id="goal-sport"
-                className="w-full [&_select]:h-10 sm:[&_select]:h-7"
+              <Select
                 value={form.sportType}
-                onChange={(event) => set({ sportType: event.target.value })}
+                onValueChange={(next) => {
+                  if (next != null) set({ sportType: String(next) });
+                }}
               >
-                {sportOptions.map((type) => (
-                  <NativeSelectOption key={type} value={type}>
-                    {formatSportType(type)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger
+                  id="goal-sport"
+                  className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
+                >
+                  <SelectValue>{formatSportType(form.sportType)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {sportOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {formatSportType(type)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field data-invalid={errorFor("date") != null}>
               <FieldLabel htmlFor="goal-date">Date</FieldLabel>
-              <Input
+              <GoalDatePicker
                 id="goal-date"
-                type="date"
-                min={goal ? undefined : today}
-                className="h-10 sm:h-7"
                 value={form.date}
-                onChange={(event) => set({ date: event.target.value })}
+                // A new goal is ahead; an existing one may be moved to any date.
+                fromDate={goal ? undefined : today}
+                invalid={errorFor("date") != null}
+                onChange={(date) => set({ date })}
               />
               <FieldError>{errorFor("date")}</FieldError>
             </Field>
