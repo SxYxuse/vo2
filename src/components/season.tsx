@@ -13,7 +13,6 @@ import { createGoal, deleteGoal, pickMainGoal, updateGoal } from "@/services/sea
 import {
   CLUSTER_GAP_DAYS,
   GOAL_OBJECTIVES,
-  GOAL_SPORT_TYPES,
   daysBetween,
   formatDaysLeft,
   goalInputSchema,
@@ -129,7 +128,12 @@ export function SeasonView({ data }: { data: SeasonData }) {
 
       {data.past.length > 0 ? <PastGoals goals={data.past} today={data.today} /> : null}
 
-      <GoalDialog editing={editing} today={data.today} onClose={() => setEditing(null)} />
+      <GoalDialog
+        editing={editing}
+        today={data.today}
+        sportTypes={data.sportTypes}
+        onClose={() => setEditing(null)}
+      />
     </>
   );
 }
@@ -296,10 +300,10 @@ type GoalForm = {
   objective: Goal["objective"];
 };
 
-function formFor(goal: Goal | null): GoalForm {
+function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
   return {
     name: goal?.name ?? "",
-    sportType: goal?.sportType ?? "Run",
+    sportType: goal?.sportType ?? defaultSportType,
     date: goal?.date ?? "",
     distanceKm: goal?.distanceM != null ? String(goal.distanceM / 1000) : "",
     elevationGainM: goal?.elevationGainM != null ? String(goal.elevationGainM) : "",
@@ -330,20 +334,23 @@ function toInput(form: GoalForm) {
 function GoalDialog({
   editing,
   today,
+  sportTypes,
   onClose,
 }: {
   editing: Editing;
   today: string;
+  sportTypes: string[];
   onClose: () => void;
 }) {
   return (
     <ResponsiveDialog open={editing != null} onOpenChange={(open) => (open ? null : onClose())}>
-      <ResponsiveDialogContent>
+      <ResponsiveDialogContent className="sm:max-w-md">
         {editing ? (
           <GoalFormBody
             key={editing.goal?.id ?? "new"}
             goal={editing.goal}
             today={today}
+            sportTypes={sportTypes}
             onDone={onClose}
           />
         ) : null}
@@ -355,14 +362,19 @@ function GoalDialog({
 function GoalFormBody({
   goal,
   today,
+  sportTypes,
   onDone,
 }: {
   goal: Goal | null;
   today: string;
+  sportTypes: string[];
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState(() => formFor(goal));
+  // A goal keeps its sport even after the athlete hides it in Settings.
+  const sportOptions =
+    goal && !sportTypes.includes(goal.sportType) ? [goal.sportType, ...sportTypes] : sportTypes;
+  const [form, setForm] = useState(() => formFor(goal, sportOptions[0] ?? "Run"));
   const [submitted, setSubmitted] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const parsed = toInput(form);
@@ -399,14 +411,14 @@ function GoalFormBody({
   }
 
   return (
-    <form noValidate onSubmit={submit} className="flex min-h-0 flex-col">
+    <form noValidate onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
       <ResponsiveDialogHeader>
         <ResponsiveDialogTitle>{goal ? "Edit goal" : "Add a goal"}</ResponsiveDialogTitle>
         <ResponsiveDialogDescription>
           A race or event on your season. The plan works toward your goals in date order.
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
-      <div className="max-h-[60vh] overflow-y-auto px-4 sm:max-h-none sm:px-0">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
         <FieldGroup>
           <Field data-invalid={errorFor("name") != null}>
             <FieldLabel htmlFor="goal-name">Name</FieldLabel>
@@ -414,6 +426,7 @@ function GoalFormBody({
               id="goal-name"
               autoComplete="off"
               placeholder="Trail des Fagnes"
+              className="h-10 sm:h-7"
               value={form.name}
               onChange={(event) => set({ name: event.target.value })}
             />
@@ -424,10 +437,11 @@ function GoalFormBody({
               <FieldLabel htmlFor="goal-sport">Sport</FieldLabel>
               <NativeSelect
                 id="goal-sport"
+                className="w-full [&_select]:h-10 sm:[&_select]:h-7"
                 value={form.sportType}
                 onChange={(event) => set({ sportType: event.target.value })}
               >
-                {GOAL_SPORT_TYPES.map((type) => (
+                {sportOptions.map((type) => (
                   <NativeSelectOption key={type} value={type}>
                     {formatSportType(type)}
                   </NativeSelectOption>
@@ -440,6 +454,7 @@ function GoalFormBody({
                 id="goal-date"
                 type="date"
                 min={goal ? undefined : today}
+                className="h-10 sm:h-7"
                 value={form.date}
                 onChange={(event) => set({ date: event.target.value })}
               />
@@ -449,7 +464,7 @@ function GoalFormBody({
           <div className="grid grid-cols-2 gap-3">
             <Field data-invalid={errorFor("distanceM") != null}>
               <FieldLabel htmlFor="goal-distance">Distance</FieldLabel>
-              <InputGroup>
+              <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
                 <InputGroupInput
                   id="goal-distance"
                   type="text"
@@ -467,7 +482,7 @@ function GoalFormBody({
             </Field>
             <Field data-invalid={errorFor("elevationGainM") != null}>
               <FieldLabel htmlFor="goal-elevation">Elevation gain</FieldLabel>
-              <InputGroup>
+              <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
                 <InputGroupInput
                   id="goal-elevation"
                   type="text"
@@ -518,6 +533,10 @@ function GoalFormBody({
         </FieldGroup>
       </div>
       <ResponsiveDialogFooter>
+        <Button type="submit" disabled={save.isPending} className="h-10 sm:h-7">
+          {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+          {goal ? "Save" : "Add goal"}
+        </Button>
         {goal ? (
           confirmingDelete ? (
             <Button
@@ -525,7 +544,7 @@ function GoalFormBody({
               variant="destructive"
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
-              className="sm:mr-auto"
+              className="h-10 sm:order-first sm:mr-auto sm:h-7"
             >
               {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
               Delete for good
@@ -535,16 +554,12 @@ function GoalFormBody({
               type="button"
               variant="ghost"
               onClick={() => setConfirmingDelete(true)}
-              className="text-destructive sm:mr-auto"
+              className="text-destructive h-10 sm:order-first sm:mr-auto sm:h-7"
             >
               Delete
             </Button>
           )
         ) : null}
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-          {goal ? "Save" : "Add goal"}
-        </Button>
       </ResponsiveDialogFooter>
     </form>
   );

@@ -106,11 +106,19 @@ export type PastGoal = Goal & { activityId: string | null };
 
 export type SeasonData = {
   signedIn: boolean;
+  /** Sport types the athlete shows in Settings, in picker order; every type when none is set. */
+  sportTypes: string[];
   /** Today in the athlete's timezone, so days left match the week target. */
   today: string;
   upcoming: SeasonCluster[];
   past: PastGoal[];
 };
+
+/** The sport types a goal can pick: those the athlete shows in Settings. */
+export function goalSportTypes(shown: Record<string, { visible: boolean }>) {
+  const enabled = GOAL_SPORT_TYPES.filter((type) => shown[type]?.visible);
+  return enabled.length ? enabled : [...GOAL_SPORT_TYPES];
+}
 
 export function daysBetween(fromKey: string, toKey: string) {
   return differenceInCalendarDays(parseISO(toKey), parseISO(fromKey));
