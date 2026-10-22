@@ -45,9 +45,6 @@ const config = defineConfig({
       "src/integrations/strava/openapi.json",
     ],
   },
-  staged: {
-    "*": "vp check --fix",
-  },
   resolve: { tsconfigPaths: true },
   build: {
     // MapLibre alone is about 1 MB minified and loads only with the map page; every other
