@@ -1,5 +1,7 @@
 # A week target replaces the bucket of planned sessions
 
+Build pace and hours intent superseded by [0023](0023-season-goals-drive-the-week-target.md).
+
 VO2 no longer stores planned sessions or matches activities to them. The training plan sets a week target in hours (with training load as the second number), derived from fitness and build pace unless the athlete fixes the hours. The athlete sets a week mix (sessions per week and the share that are key sessions); VO2 generates the key sessions (intervals, time in zone, or a long Z2) from build pace and fitness, and spreads the rest of the target over easy sessions. The Week target page shows time left, ticks key sessions off, picks one session for the time the athlete has today, and projects fitness and form if they finish the week. Everything is worked out from copied activities each time the page loads.
 
 The bucket was mostly filler ("Easy ride 1h 15"), matching by duration failed whenever a ride ran long, and the session counts and double days in Settings existed only to fill that list. Time left was the one part athletes used. A target plus one recommendation keeps that, uses the fitness model and heart-rate zones VO2 already has, and drops the stored state that had to be rebuilt after every sync.

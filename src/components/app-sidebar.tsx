@@ -5,6 +5,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   CalendarDaysIcon,
+  FlagIcon,
   TargetIcon,
   HeartPulseIcon,
   LogOutIcon,
@@ -49,6 +50,7 @@ import {
 const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
   { title: "Week target", to: "/week", icon: TargetIcon },
+  { title: "Season", to: "/season", icon: FlagIcon },
   { title: "Fuel", to: "/fuel", icon: RouteIcon },
 ] as const;
 
