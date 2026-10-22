@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -40,7 +40,6 @@ import {
   TrainingWeekFields,
   WeightField,
 } from "@/components/settings-fields.tsx";
-import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -88,21 +87,6 @@ const STEPS = [
     description: "Open the calendar to see your week.",
   },
 ] as const;
-
-export function OnboardingShell({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-dvh flex-col bg-background">
-      <header className="flex h-12 shrink-0 items-center px-4 pt-[max(0px,env(safe-area-inset-top))] sm:px-6">
-        <div className="flex items-center text-lg font-semibold">
-          <Vo2Wordmark />
-        </div>
-      </header>
-      <main className="flex flex-1 justify-center overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-10">
-        <div className="my-auto w-full max-w-lg">{children}</div>
-      </main>
-    </div>
-  );
-}
 
 export function OnboardingForm({ userName }: { userName: string }) {
   const queryClient = useQueryClient();
