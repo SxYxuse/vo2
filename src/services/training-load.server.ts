@@ -30,6 +30,7 @@ async function loadActivityRows(userId: string): Promise<StoredLoadRow[]> {
       startDate: activities.startDate,
       sportType: activities.sportType,
       movingTime: activities.movingTime,
+      distance: activities.distance,
       averageHeartrate: activities.averageHeartrate,
       maxHeartrate: activities.maxHeartrate,
       averageWatts: activities.averageWatts,
@@ -93,20 +94,23 @@ function persistableAnchors(anchors: LoadAnchors) {
   };
 }
 
-async function writeLoads(updates: { id: string; load: number; source: LoadSource }[]) {
+async function writeLoads(
+  updates: { id: string; load: number; source: LoadSource; estimatedHeartrate: number | null }[],
+) {
   if (!updates.length) return;
   const values = sql.join(
     updates.map(
       (update) =>
-        sql`(${update.id}::text, ${update.load}::double precision, ${update.source}::text)`,
+        sql`(${update.id}::text, ${update.load}::double precision, ${update.source}::text, ${update.estimatedHeartrate}::real)`,
     ),
     sql`, `,
   );
   await db.execute(sql`
     UPDATE activities AS a
     SET training_load = v.load,
-        load_source = v.source
-    FROM (VALUES ${values}) AS v(id, load, source)
+        load_source = v.source,
+        estimated_heartrate = v.estimated_heartrate
+    FROM (VALUES ${values}) AS v(id, load, source, estimated_heartrate)
     WHERE a.id = v.id
   `);
 }
@@ -134,8 +138,7 @@ async function refreshTrainingLoads(userId: string) {
     });
 
   const updates = withStreams.map((row) => {
-    const { load, source } = activityTrainingLoad(row, anchors);
-    return { id: row.id, load, source };
+    return { id: row.id, ...activityTrainingLoad(row, anchors, withStreams) };
   });
   await writeLoads(updates);
   logger.info("training_load.refreshed", {

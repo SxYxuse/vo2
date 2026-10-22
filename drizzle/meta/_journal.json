@@ -148,6 +148,13 @@
       "when": 1792568415309,
       "tag": "0020_mix_bottles",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792655544265,
+      "tag": "0021_estimated_heartrate",
+      "breakpoints": true
     }
   ]
 }

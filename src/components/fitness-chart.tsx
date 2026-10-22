@@ -66,6 +66,29 @@ const SERIES_INFO = {
 } as const;
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
+/** A colour no series uses, so estimated days stand out on any line. */
+const ESTIMATED_DOT_COLOR = "var(--color-ds-pink-700)";
+
+type EstimatedDotProps = {
+  cx?: number;
+  cy?: number;
+  payload?: { estimatedLoad?: number };
+};
+
+/** Marks a day whose load is partly estimated, on whichever line carries the marks. */
+function EstimatedDot({ cx, cy, payload }: EstimatedDotProps) {
+  if (cx == null || cy == null || !payload?.estimatedLoad) return null;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={3.5}
+      fill={ESTIMATED_DOT_COLOR}
+      stroke="var(--color-background)"
+      strokeWidth={1.5}
+    />
+  );
+}
 const LOAD_Y_DOMAIN = [0, "auto"] as const;
 
 const GRAPH_GOAL_INFO =
@@ -78,7 +101,7 @@ const AVG_WEEK_INFO =
   "Average moving time per week in the selected period, including rest weeks. Check that volume supports a rising fitness line, not only one big week.";
 
 const ESTIMATED_INFO =
-  "Some sessions have no power or heart rate, so their load is guessed from duration. Treat those days as approximate.";
+  "Some sessions have no power or heart rate. Their heart rate is borrowed from your most similar sessions of that sport within two months, or their load is guessed from duration when there are fewer than three. Dots on the graph mark those days; treat them as approximate.";
 
 function formatTrainingHmm(seconds: number) {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
@@ -171,6 +194,9 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
   const showAtl = visible.includes("atl");
   const showTsb = visible.includes("tsb");
   const showPmc = showCtl || showAtl || showTsb;
+  // One line carries the estimate marks, so they never stack: fitness first.
+  const markedLine = showCtl ? "ctl" : showAtl ? "atl" : showTsb ? "tsb" : null;
+  const hasEstimatedDays = series.some((point) => point.estimatedLoad > 0);
 
   return (
     <Card>
@@ -246,7 +272,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
             </div>
             {estimatedShare > 0.05 ? (
               <Badge variant="info" className="w-fit gap-1">
-                {Math.round(estimatedShare * 100)}% of load in this period is duration-estimated
+                {Math.round(estimatedShare * 100)}% of load in this period is estimated
                 <InfoTooltip label="About estimated load">{ESTIMATED_INFO}</InfoTooltip>
               </Badge>
             ) : null}
@@ -272,126 +298,138 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
               ))}
             </ToggleGroup>
             {showLoad || showPmc ? (
-              <ChartContainer
-                config={CHART_CONFIG}
-                className="aspect-auto h-44 w-full sm:h-72 lg:h-80"
-              >
-                <ComposedChart data={series} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="t"
-                    tickLine={false}
-                    axisLine={false}
-                    minTickGap={isDesktop === true ? 48 : 24}
-                    tickFormatter={(value) => tickFormatter.format(new Date(Number(value)))}
-                  />
-                  {showPmc ? (
-                    <YAxis
-                      yAxisId="pmc"
-                      type="number"
-                      domain={PMC_Y_DOMAIN}
-                      hide={isDesktop !== true}
+              <div className="flex flex-col gap-2">
+                <ChartContainer
+                  config={CHART_CONFIG}
+                  className="aspect-auto h-44 w-full sm:h-72 lg:h-80"
+                >
+                  <ComposedChart data={series} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis
+                      dataKey="t"
                       tickLine={false}
                       axisLine={false}
-                      width={isDesktop === true ? 40 : 0}
-                      tickFormatter={(value) => String(Math.round(Number(value)))}
+                      minTickGap={isDesktop === true ? 48 : 24}
+                      tickFormatter={(value) => tickFormatter.format(new Date(Number(value)))}
                     />
-                  ) : null}
-                  {showLoad ? (
-                    <YAxis
-                      yAxisId="load"
-                      type="number"
-                      domain={LOAD_Y_DOMAIN}
-                      hide={isDesktop !== true}
-                      orientation="right"
-                      tickLine={false}
-                      axisLine={false}
-                      width={isDesktop === true ? 36 : 0}
-                      tickFormatter={(value) => String(Math.round(Number(value)))}
-                    />
-                  ) : null}
-                  {showPmc ? (
-                    <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" />
-                  ) : null}
-                  <ChartTooltip
-                    cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
-                    content={
-                      <ChartTooltipContent
-                        indicator="line"
-                        labelFormatter={(_value, payload) => {
-                          const stamp = Number(payload?.[0]?.payload?.t);
-                          return Number.isFinite(stamp) ? DATE_FULL.format(new Date(stamp)) : "";
-                        }}
-                        formatter={(value, name, item) => {
-                          const key = String(item.dataKey ?? name);
-                          const meta = CHART_CONFIG[key as keyof typeof CHART_CONFIG];
-                          if (!meta || typeof value !== "number") return null;
-                          const extra =
-                            key === "load" && item.payload?.estimatedLoad
-                              ? ` (${Math.round((Number(item.payload.estimatedLoad) / Math.max(value, 0.1)) * 100)}% est.)`
-                              : "";
-                          return (
-                            <div className="flex w-full items-center justify-between gap-4">
-                              <span className="text-muted-foreground">{meta.label}</span>
-                              <span className="font-mono font-medium tabular-nums">
-                                {roundLoad(value).toFixed(1)}
-                                {extra}
-                              </span>
-                            </div>
-                          );
-                        }}
+                    {showPmc ? (
+                      <YAxis
+                        yAxisId="pmc"
+                        type="number"
+                        domain={PMC_Y_DOMAIN}
+                        hide={isDesktop !== true}
+                        tickLine={false}
+                        axisLine={false}
+                        width={isDesktop === true ? 40 : 0}
+                        tickFormatter={(value) => String(Math.round(Number(value)))}
                       />
-                    }
-                  />
-                  {showLoad ? (
-                    <Bar
-                      yAxisId="load"
-                      dataKey="load"
-                      name={CHART_CONFIG.load.label}
-                      fill="var(--color-load)"
-                      fillOpacity={0.28}
-                      radius={1}
-                      isAnimationActive={false}
+                    ) : null}
+                    {showLoad ? (
+                      <YAxis
+                        yAxisId="load"
+                        type="number"
+                        domain={LOAD_Y_DOMAIN}
+                        hide={isDesktop !== true}
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={false}
+                        width={isDesktop === true ? 36 : 0}
+                        tickFormatter={(value) => String(Math.round(Number(value)))}
+                      />
+                    ) : null}
+                    {showPmc ? (
+                      <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" />
+                    ) : null}
+                    <ChartTooltip
+                      cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
+                      content={
+                        <ChartTooltipContent
+                          indicator="line"
+                          labelFormatter={(_value, payload) => {
+                            const stamp = Number(payload?.[0]?.payload?.t);
+                            return Number.isFinite(stamp) ? DATE_FULL.format(new Date(stamp)) : "";
+                          }}
+                          formatter={(value, name, item) => {
+                            const key = String(item.dataKey ?? name);
+                            const meta = CHART_CONFIG[key as keyof typeof CHART_CONFIG];
+                            if (!meta || typeof value !== "number") return null;
+                            const extra =
+                              key === "load" && item.payload?.estimatedLoad
+                                ? ` (${Math.round((Number(item.payload.estimatedLoad) / Math.max(value, 0.1)) * 100)}% est.)`
+                                : "";
+                            return (
+                              <div className="flex w-full items-center justify-between gap-4">
+                                <span className="text-muted-foreground">{meta.label}</span>
+                                <span className="font-mono font-medium tabular-nums">
+                                  {roundLoad(value).toFixed(1)}
+                                  {extra}
+                                </span>
+                              </div>
+                            );
+                          }}
+                        />
+                      }
                     />
-                  ) : null}
-                  {showCtl ? (
-                    <Line
-                      yAxisId="pmc"
-                      dataKey="ctl"
-                      type="monotone"
-                      name={CHART_CONFIG.ctl.label}
-                      stroke="var(--color-ctl)"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
+                    {showLoad ? (
+                      <Bar
+                        yAxisId="load"
+                        dataKey="load"
+                        name={CHART_CONFIG.load.label}
+                        fill="var(--color-load)"
+                        fillOpacity={0.28}
+                        radius={1}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showCtl ? (
+                      <Line
+                        yAxisId="pmc"
+                        dataKey="ctl"
+                        type="monotone"
+                        name={CHART_CONFIG.ctl.label}
+                        stroke="var(--color-ctl)"
+                        strokeWidth={2}
+                        dot={markedLine === "ctl" ? EstimatedDot : false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showAtl ? (
+                      <Line
+                        yAxisId="pmc"
+                        dataKey="atl"
+                        type="monotone"
+                        name={CHART_CONFIG.atl.label}
+                        stroke="var(--color-atl)"
+                        strokeWidth={2}
+                        dot={markedLine === "atl" ? EstimatedDot : false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showTsb ? (
+                      <Line
+                        yAxisId="pmc"
+                        dataKey="tsb"
+                        type="monotone"
+                        name={CHART_CONFIG.tsb.label}
+                        stroke="var(--color-tsb)"
+                        strokeWidth={2}
+                        dot={markedLine === "tsb" ? EstimatedDot : false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                  </ComposedChart>
+                </ChartContainer>
+                {markedLine && hasEstimatedDays ? (
+                  <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                    <span
+                      aria-hidden
+                      className="size-2 rounded-full"
+                      style={{ backgroundColor: ESTIMATED_DOT_COLOR }}
                     />
-                  ) : null}
-                  {showAtl ? (
-                    <Line
-                      yAxisId="pmc"
-                      dataKey="atl"
-                      type="monotone"
-                      name={CHART_CONFIG.atl.label}
-                      stroke="var(--color-atl)"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  ) : null}
-                  {showTsb ? (
-                    <Line
-                      yAxisId="pmc"
-                      dataKey="tsb"
-                      type="monotone"
-                      name={CHART_CONFIG.tsb.label}
-                      stroke="var(--color-tsb)"
-                      strokeWidth={2}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  ) : null}
-                </ComposedChart>
-              </ChartContainer>
+                    Days with estimated load
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <Empty className="min-h-48 border">
                 <EmptyHeader>

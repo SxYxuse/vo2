@@ -127,7 +127,7 @@ _Avoid_: Missed, failed
 ## Load and form
 
 **Training load**:
-A single score of how costly an activity was. Power first, then heart rate, then duration.
+A single score of how costly an activity was. Power first, then heart rate, then heart rate borrowed from similar activities, then duration (ADR 0019).
 _Avoid_: TSS, relative effort, stress score
 
 **Fitness**:

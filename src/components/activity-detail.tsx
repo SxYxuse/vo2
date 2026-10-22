@@ -47,6 +47,9 @@ const ActivityStreamCharts = lazy(() =>
   })),
 );
 
+const ESTIMATED_HR_INFO =
+  "No heart rate was recorded, so it is the middle value of your most similar sessions of this sport within two months (duration, speed, and date). Training load, fitness, and form use this estimate.";
+
 function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   return (
     <div className="flex flex-col gap-4">
@@ -66,11 +69,21 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
           value={formatElevation(detail.totalElevationGain)}
           color={SERIES_META.altitude.color}
         />
-        <StatCard
-          label="Avg HR"
-          value={formatBpm(detail.kpis.avgHeartrate)}
-          color={SERIES_META.heartrate.color}
-        />
+        {detail.kpis.avgHeartrate == null && detail.estimatedHeartrate != null ? (
+          <StatCard
+            label="Avg HR"
+            value={`~${formatBpm(detail.estimatedHeartrate)}`}
+            hint="Estimated"
+            info={ESTIMATED_HR_INFO}
+            color={SERIES_META.heartrate.color}
+          />
+        ) : (
+          <StatCard
+            label="Avg HR"
+            value={formatBpm(detail.kpis.avgHeartrate)}
+            color={SERIES_META.heartrate.color}
+          />
+        )}
         <StatCard
           label={isCyclingSport(detail.sportType) ? "Avg / NP" : "Avg power"}
           value={
