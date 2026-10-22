@@ -86,11 +86,13 @@ export function InfoTooltip({
   label,
   children,
   className,
+  iconClassName,
 }: {
   /** Accessible name, such as "About TSS". */
   label: string;
   children: React.ReactNode;
   className?: string;
+  iconClassName?: string;
 }) {
   return (
     <TapTooltip>
@@ -106,7 +108,7 @@ export function InfoTooltip({
           />
         }
       >
-        <InfoIcon />
+        <InfoIcon className={iconClassName} />
       </TapTooltipTrigger>
       <TooltipContent className={cn("max-w-72", className)}>{children}</TooltipContent>
     </TapTooltip>
