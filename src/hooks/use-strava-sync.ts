@@ -70,7 +70,10 @@ function finishSyncToast(
     notify.update(toastId, {
       type: "success",
       title: "Strava sync finished",
-      description: syncCopiedDescription(activitiesUpserted, streamsFetched),
+      description:
+        activitiesUpserted === 0 && streamsFetched === 0
+          ? "Already up to date."
+          : syncCopiedDescription(activitiesUpserted, streamsFetched),
       timeout: 8000,
     });
     return;

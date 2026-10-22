@@ -274,7 +274,7 @@ async function insertActivityRows(userId: string, pageItems: SummaryActivity[]) 
       .set(CLEARED_DERIVED_CACHES)
       .where(inArray(activityStreams.activityId, stale));
   }
-  return rows.length;
+  return rows.length - stored.length;
 }
 
 function activityInsertRow(userId: string, activity: SummaryActivity) {

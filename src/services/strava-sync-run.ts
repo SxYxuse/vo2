@@ -62,6 +62,7 @@ export type SyncStore = {
   /** Start dates of the newest stored activities, newest first. */
   newestStartDates(limit: number): Promise<Date[]>;
   oldestStartDate(): Promise<Date | null>;
+  /** Returns how many were not stored before, so re-read activities don't count as copied. */
   upsertActivities(activities: SummaryActivity[]): Promise<number>;
   /** Activities still waiting for streams, newest first. */
   activitiesWithoutStreams(limit: number): Promise<{ id: string; manual: boolean }[]>;
