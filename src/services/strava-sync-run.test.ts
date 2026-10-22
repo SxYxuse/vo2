@@ -100,15 +100,17 @@ function fakeStore(options: { run?: StoredSyncRun; deleted?: boolean } = {}) {
       return dates.length ? new Date(Math.min(...dates)) : null;
     },
     async upsertActivities(items) {
+      let added = 0;
       for (const item of items) {
         const id = String(item.id);
+        if (!activities.has(id)) added += 1;
         activities.set(id, {
           startDate: new Date(item.start_date!),
           manual: item.manual === true,
           streams: activities.get(id)?.streams ?? item.manual === true,
         });
       }
-      return items.length;
+      return added;
     },
     async activitiesWithoutStreams(limit) {
       return [...activities.entries()]
@@ -222,6 +224,20 @@ describe("syncAthlete", () => {
 
     const thirdNewest = Date.parse(history[2]!.start_date!) / 1000;
     expect(strava.calls[0]).toBe(`list after=${thirdNewest - 1} before=-`);
+  });
+
+  it("counts only new activities as copied, not the re-read ones (#81)", async () => {
+    const local = fakeStore();
+    const history = [2, 3, 4, 5].map((id) => activity(id, id));
+    const strava = fakeStrava(history);
+    while (!(await sync(local.store, strava)).done);
+
+    const unchanged = await sync(local.store, strava);
+    history.push(activity(1, 1));
+    const withNew = await sync(local.store, strava);
+
+    expect(unchanged).toMatchObject({ done: true, activitiesUpserted: 0 });
+    expect(withNew).toMatchObject({ done: true, activitiesUpserted: 1 });
   });
 
   it("pauses until the next window when Strava answers with the short limit", async () => {

@@ -33,7 +33,7 @@ export function useSyncAutoResume() {
       if (cancelled || syncRef.current.isPending) return;
       const plan = autoResumePlan(latest);
       if (plan.kind === "sync") syncRef.current.mutate();
-      // Every check re-reads a few activities, so a finish toast would say "Copied 3" each time.
+      // A check runs on every app open; a finish toast each time would be noise.
       if (plan.kind === "check") syncRef.current.mutate({ silent: true });
     };
 
