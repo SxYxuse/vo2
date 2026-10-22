@@ -31,8 +31,11 @@ export type HeartPeak = {
 
 export type MaxHrAnchor = {
   bpm: number | null;
-  /** `recent`: a peak inside the window. `older`: no recent peak, oldest data used. `age`: no peaks. */
-  source: "recent" | "older" | "age" | null;
+  /**
+   * `recent`: a peak inside the window. `older`: no recent peak, oldest data used. `age`: no peaks.
+   * `athlete`: set in settings, trusted as given.
+   */
+  source: "recent" | "older" | "age" | "athlete" | null;
   predictedBpm: number | null;
   ageCheck: "matches" | "above" | "below" | null;
   peak: HeartPeak | null;
@@ -52,9 +55,20 @@ function checksAgainstAge(family: HeartRateFamily) {
 
 export function estimateMaxHrAnchor(
   peaks: HeartPeak[],
-  options: { family: HeartRateFamily; age?: number | null; now?: Date },
+  options: { family: HeartRateFamily; age?: number | null; now?: Date; athleteBpm?: number | null },
 ): MaxHrAnchor {
   const predictedBpm = predictedMaxHr(options.age);
+  // A max the athlete set skips the spike filter and the age check (ADR 0021).
+  if (options.athleteBpm != null) {
+    return {
+      bpm: options.athleteBpm,
+      source: "athlete",
+      predictedBpm,
+      ageCheck: null,
+      peak: null,
+      excluded: [],
+    };
+  }
   const plausible = peaks.filter((peak) => isPlausibleBpm(peak.bpm));
   const cutoff = subMonths(options.now ?? new Date(), MAX_HR_WINDOW_MONTHS).getTime();
   const recent = plausible.filter((peak) => new Date(peak.start).getTime() >= cutoff);
@@ -97,6 +111,7 @@ export function estimateMaxHrAnchor(
 }
 
 export function maxHrAnchorHint(anchor: MaxHrAnchor) {
+  if (anchor.source === "athlete") return "Set by you";
   if (anchor.source === "age") return "From your age, no recorded peak";
   if (anchor.ageCheck === "below" && anchor.predictedBpm) {
     return `Age suggests ~${anchor.predictedBpm} bpm`;
@@ -109,6 +124,9 @@ export function maxHrAnchorHint(anchor: MaxHrAnchor) {
 }
 
 export function maxHrAnchorInfo(anchor: MaxHrAnchor) {
+  if (anchor.source === "athlete") {
+    return "Max heart rate you set in settings. It replaces your recent peak, with no spike filter or age check. Clear it in settings to go back to the estimate.";
+  }
   const parts = [
     `Highest heart rate from the last ${MAX_HR_WINDOW_MONTHS} months: max HR drops about 0.7 bpm per year, so older peaks would set zones too high.`,
   ];

@@ -5,6 +5,7 @@ import { activities, athleteMetrics, athleteSettings } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import {
+  ageFromBirthDate,
   DEFAULT_ATHLETE_SETTINGS,
   DEFAULT_PROFILE_SETTINGS,
   mergeAthleteSettings,
@@ -18,6 +19,15 @@ import type {
   SavedAthleteSettings,
   SettingsSnapshot,
 } from "./athlete-settings.ts";
+import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
+import { heartRateFamily, isPlausibleBpm, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
+import {
+  DEFAULT_HEART_RATE_SETTINGS,
+  heartRateSettingsIssues,
+  parseHeartRateSettings,
+  type HeartRateEstimates,
+  type HeartRateSettings,
+} from "./heart-rate-settings.ts";
 import { toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
@@ -48,6 +58,59 @@ export async function getAthleteSettings(userId: string): Promise<AthleteSetting
   return mergeAthleteSettings(stored, sportTypes);
 }
 
+const NO_ESTIMATES: HeartRateEstimates = {
+  restHr: null,
+  maxHr: { cycling: null, running: null, swimming: null },
+};
+
+async function getHeartRateSettings(userId: string): Promise<HeartRateSettings> {
+  const [row] = await db
+    .select({ heartRate: athleteMetrics.heartRate })
+    .from(athleteMetrics)
+    .where(eq(athleteMetrics.userId, userId))
+    .limit(1);
+  return parseHeartRateSettings(row?.heartRate);
+}
+
+/** What VO2 would use with nothing set: the same max-HR rule as every view, without overrides. */
+async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
+  const [rows, [metrics]] = await Promise.all([
+    db
+      .select({
+        sportType: activities.sportType,
+        startDate: activities.startDate,
+        maxHeartrate: activities.maxHeartrate,
+        averageHeartrate: activities.averageHeartrate,
+      })
+      .from(activities)
+      .where(eq(activities.userId, userId)),
+    db
+      .select({ restHr: athleteMetrics.restHr, birthDate: athleteMetrics.birthDate })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, userId))
+      .limit(1),
+  ]);
+  const peaks: Record<ZonedFamily, HeartPeak[]> = { cycling: [], running: [], swimming: [] };
+  for (const row of rows) {
+    const family = heartRateFamily(row.sportType);
+    if (!isZonedFamily(family) || !isPlausibleBpm(row.maxHeartrate)) continue;
+    peaks[family].push({
+      bpm: row.maxHeartrate!,
+      start: row.startDate.toISOString(),
+      avgBpm: row.averageHeartrate,
+    });
+  }
+  const age = ageFromBirthDate(metrics?.birthDate ?? null);
+  const maxHr = (family: ZonedFamily) => {
+    const anchor = estimateMaxHrAnchor(peaks[family], { family, age });
+    return anchor.peak ? anchor.bpm : null;
+  };
+  return {
+    restHr: metrics?.restHr ?? null,
+    maxHr: { cycling: maxHr("cycling"), running: maxHr("running"), swimming: maxHr("swimming") },
+  };
+}
+
 export async function getAthleteProfile(userId: string): Promise<ProfileSettings> {
   const [row] = await db
     .select({
@@ -70,12 +133,16 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
       profile: DEFAULT_PROFILE_SETTINGS,
       settings: DEFAULT_ATHLETE_SETTINGS,
       training: null,
+      heartRate: DEFAULT_HEART_RATE_SETTINGS,
+      heartRateEstimates: NO_ESTIMATES,
     };
   }
-  const [profile, settings, training, loadRows] = await Promise.all([
+  const [profile, settings, training, heartRate, estimates, loadRows] = await Promise.all([
     getAthleteProfile(session.user.id),
     getAthleteSettings(session.user.id),
     getTrainingPlanForUser(session.user.id),
+    getHeartRateSettings(session.user.id),
+    heartRateEstimates(session.user.id),
     db
       .select({
         startDate: activities.startDate,
@@ -91,6 +158,8 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
     profile,
     settings,
     training,
+    heartRate,
+    heartRateEstimates: estimates,
     fitnessLoads: loadRows.map((row) =>
       toFitnessLoad(
         row.startDate,
@@ -107,11 +176,18 @@ export async function saveAthleteSettingsImpl(
 ): Promise<SavedAthleteSettings> {
   const session = await getRequiredSession();
   const userId = session.user.id;
-  const [stored, sportTypes, previousProfile] = await Promise.all([
+  const [stored, sportTypes, previousProfile, previousHeartRate] = await Promise.all([
     storedAthleteSettings(userId),
     copiedSportTypes(userId),
     getAthleteProfile(userId),
+    getHeartRateSettings(userId),
   ]);
+  const heartRate = value.heartRate ?? previousHeartRate;
+  const heartRateChanged = JSON.stringify(heartRate) !== JSON.stringify(previousHeartRate);
+  if (heartRateChanged) {
+    const [issue] = heartRateSettingsIssues(heartRate, await heartRateEstimates(userId));
+    if (issue) throw new Error(issue.message);
+  }
   const parsed = parseAthleteSettings({
     ...(stored ?? DEFAULT_ATHLETE_SETTINGS),
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
@@ -130,6 +206,7 @@ export async function saveAthleteSettingsImpl(
         birthDate: value.profile.birthDate,
         weightKg: value.profile.weightKg,
         training: value.training,
+        heartRate,
         updatedAt,
       })
       .onConflictDoUpdate({
@@ -138,6 +215,7 @@ export async function saveAthleteSettingsImpl(
           birthDate: value.profile.birthDate,
           weightKg: value.profile.weightKg,
           ...(value.training ? { training: value.training } : {}),
+          heartRate,
           updatedAt,
         },
       });
@@ -150,14 +228,15 @@ export async function saveAthleteSettingsImpl(
       });
   });
 
-  // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load.
-  if (previousProfile.birthDate !== value.profile.birthDate) {
+  // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load; set anchors
+  // score it directly. Either way every past activity is rescored (ADR 0021).
+  if (previousProfile.birthDate !== value.profile.birthDate || heartRateChanged) {
     await refreshTrainingLoadsForUser(userId);
   }
 
   const training = value.training ?? (await getTrainingPlanForUser(userId));
   logger.info("settings.saved", { hasTraining: Boolean(training) });
-  return { profile: value.profile, settings, training };
+  return { profile: value.profile, settings, training, heartRate };
 }
 
 export async function saveProfileImpl(value: ProfileSave): Promise<void> {

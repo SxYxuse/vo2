@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
+import { DEFAULT_HEART_RATE_SETTINGS, type HeartRateSettings } from "./heart-rate-settings.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import {
   activityTrainingLoad,
@@ -15,6 +16,7 @@ import {
   type LoadAnchors,
   type LoadInputs,
   type PmcPoint,
+  withAthleteAnchors,
 } from "./training-load.ts";
 
 const ANCHORS: LoadAnchors = {
@@ -221,7 +223,39 @@ describe("anchors", () => {
     expect(estimated.cyclingLthr).toBe(Math.round(180 * 0.83));
     expect(estimated.runLthr).toBe(Math.round(200 * 0.88));
   });
+
+  test("a set max heart rate replaces the peak and sets the LTHR estimate", () => {
+    const estimated = estimateLoadAnchors([run({ maxHeartrate: 200 })], {
+      heartRate: runningSettings({ maxHr: 190 }),
+    });
+    expect(estimated.runMaxHr).toBe(190);
+    expect(estimated.runLthr).toBe(167);
+  });
+
+  test("set LTHR and resting heart rate score heart-rate load; the zone method does not", () => {
+    const set = withAthleteAnchors(ANCHORS, runningSettings({ lthr: 165 }, 45));
+    const intensity = (154 - 45) / (165 - 45);
+    expect(activityTrainingLoad(run(), set).load).toBeCloseTo(100 * intensity * intensity, 5);
+
+    const methodOnly = withAthleteAnchors(ANCHORS, runningSettings({ method: "reserve" }));
+    expect(activityTrainingLoad(run(), methodOnly).load).toBe(
+      activityTrainingLoad(run(), ANCHORS).load,
+    );
+  });
 });
+
+function runningSettings(
+  running: Partial<HeartRateSettings["sports"]["running"]>,
+  restHr: number | null = null,
+): HeartRateSettings {
+  return {
+    restHr,
+    sports: {
+      ...DEFAULT_HEART_RATE_SETTINGS.sports,
+      running: { ...DEFAULT_HEART_RATE_SETTINGS.sports.running, ...running },
+    },
+  };
+}
 
 describe("labels and NP", () => {
   test("form bands follow Coggan-style race and caution lines", () => {

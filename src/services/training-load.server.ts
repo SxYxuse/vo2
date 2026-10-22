@@ -4,6 +4,7 @@ import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { ageFromBirthDate } from "./athlete-settings.types.ts";
+import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import {
   activityTrainingLoad,
@@ -14,6 +15,7 @@ import {
   type LoadAnchors,
   type LoadInputs,
   type LoadSource,
+  withAthleteAnchors,
 } from "./training-load.ts";
 
 type StoredLoadRow = LoadInputs & {
@@ -121,14 +123,18 @@ async function refreshTrainingLoads(userId: string) {
 
   const withStreams = await attachPowerStreams(rows);
   const [profile] = await db
-    .select({ birthDate: athleteMetrics.birthDate })
+    .select({ birthDate: athleteMetrics.birthDate, heartRate: athleteMetrics.heartRate })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
-  const anchors = estimateLoadAnchors(withStreams, {
+  const heartRate = parseHeartRateSettings(profile?.heartRate);
+  const estimated = estimateLoadAnchors(withStreams, {
     age: ageFromBirthDate(profile?.birthDate ?? null),
+    heartRate,
   });
-  const stored = persistableAnchors(anchors);
+  // The columns keep estimates so clearing a setting falls back to them; load uses set values.
+  const stored = persistableAnchors(estimated);
+  const anchors = withAthleteAnchors(estimated, heartRate);
   await db
     .insert(athleteMetrics)
     .values({ userId, ...stored })

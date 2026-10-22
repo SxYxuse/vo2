@@ -8,13 +8,16 @@ import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { ageFromBirthDate, familyCollectors } from "./athlete-settings.types.ts";
 import { estimateMaxHrAnchor, histogramFromStreams, type HeartPeak } from "./heart-insights.ts";
 import {
-  familyLthr,
+  athleteMaxHr,
   heartRateFamily,
   isPlausibleBpm,
+  sportHeartRate,
   zonesFromHistogram,
   type HeartRateFamily,
-  type SportLthrAnchors,
+  type ZoneAnchors,
 } from "./heart-rate.ts";
+import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
+import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
@@ -28,12 +31,10 @@ import {
 } from "./week-target.ts";
 
 const NO_COLLECTORS = { heartRate: false, power: false, powerPartial: false };
+const NO_ZONES: ZoneAnchors = { maxHr: null, lthr: null };
 const NO_ANCHORS = {
   ftpWatts: null,
-  cyclingLthr: null,
-  cyclingMaxHr: null,
-  runLthr: null,
-  runMaxHr: null,
+  heartRate: { cycling: NO_ZONES, running: NO_ZONES },
 };
 
 function emptyWeek(signedIn: boolean, timeZone: string): WeekTargetData {
@@ -57,12 +58,11 @@ function zoneMinutesFromStream(
   heartrate: number[] | null,
   time: number[] | null,
   sportType: string,
-  maxHeartrate: number | null,
-  lthr: number | null,
+  anchors: ZoneAnchors,
 ) {
   if (!heartrate?.length) return null;
   const histogram = histogramFromStreams(heartrate, time);
-  const zones = zonesFromHistogram(histogram, sportType, maxHeartrate, lthr);
+  const zones = zonesFromHistogram(histogram, sportType, anchors);
   if (!zones.length || zones.every((zone) => zone.minBpm == null)) return null;
   return zones.map((zone) => Math.round(zone.seconds / 60));
 }
@@ -104,11 +104,8 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
     getAthleteSettings(userId),
     db
       .select({
+        ...HEART_RATE_METRICS,
         ftp: athleteMetrics.ftp,
-        cyclingLthr: athleteMetrics.cyclingLthr,
-        runLthr: athleteMetrics.runLthr,
-        swimLthr: athleteMetrics.swimLthr,
-        lthr: athleteMetrics.lthr,
         birthDate: athleteMetrics.birthDate,
       })
       .from(athleteMetrics)
@@ -160,17 +157,17 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
 
   const metrics = metricsRows[0];
   const age = ageFromBirthDate(metrics?.birthDate ?? null);
-  const stored: SportLthrAnchors = {};
-  const cyclingLthr = metrics?.cyclingLthr ?? metrics?.lthr ?? null;
-  if (cyclingLthr) stored.cycling = { bpm: cyclingLthr, source: "estimated-from-max" };
-  if (metrics?.runLthr) stored.running = { bpm: metrics.runLthr, source: "estimated-from-max" };
-  if (metrics?.swimLthr) stored.swimming = { bpm: metrics.swimLthr, source: "estimated-from-max" };
-  const zoneAnchors = new Map<HeartRateFamily, { maxHr: number | null; lthr: number | null }>();
+  const athlete = athleteHeartRateFrom(metrics);
+  const zoneAnchors = new Map<HeartRateFamily, ZoneAnchors>();
   const anchorsFor = (family: HeartRateFamily) => {
     const cached = zoneAnchors.get(family);
     if (cached) return cached;
-    const maxHr = estimateMaxHrAnchor(peaks.get(family) ?? [], { family, age }).bpm;
-    const anchors = { maxHr, lthr: familyLthr(family, maxHr, stored).lthr };
+    const maxHr = estimateMaxHrAnchor(peaks.get(family) ?? [], {
+      family,
+      age,
+      athleteBpm: athleteMaxHr(family, athlete),
+    }).bpm;
+    const anchors = sportHeartRate(family, maxHr, athlete);
     zoneAnchors.set(family, anchors);
     return anchors;
   };
@@ -200,8 +197,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
             stream.heartrate ?? null,
             stream.time ?? null,
             row.sportType,
-            anchorsFor(family).maxHr,
-            anchorsFor(family).lthr,
+            anchorsFor(family),
           )
         : null;
       return {
@@ -245,10 +241,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
     },
     anchors: {
       ftpWatts: metrics?.ftp ?? null,
-      cyclingLthr: anchorsFor("cycling").lthr,
-      cyclingMaxHr: anchorsFor("cycling").maxHr,
-      runLthr: anchorsFor("running").lthr,
-      runMaxHr: anchorsFor("running").maxHr,
+      heartRate: { cycling: anchorsFor("cycling"), running: anchorsFor("running") },
     },
   };
 }

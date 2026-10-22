@@ -98,10 +98,10 @@ function week(
     collectors: { running: COLLECTORS, cycling: COLLECTORS },
     anchors: {
       ftpWatts: null,
-      cyclingLthr: 160,
-      cyclingMaxHr: 190,
-      runLthr: 170,
-      runMaxHr: 195,
+      heartRate: {
+        cycling: { maxHr: 190, lthr: 160 },
+        running: { maxHr: 195, lthr: 170 },
+      },
     },
     ...overrides,
   };
