@@ -4,9 +4,11 @@ import { db } from "@/db/index.ts";
 import { activities, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
+import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { addDayKey, dayKey } from "./training-plan.types.ts";
 import {
+  goalSportTypes,
   mainFlagsAfterPick,
   normalizedMainFlags,
   seasonClusters,
@@ -88,10 +90,20 @@ async function matchPastActivities(
 export async function loadSeasonImpl(): Promise<SeasonData> {
   const session = await getOptionalSession();
   if (!session) {
-    return { signedIn: false, today: dayKey(new Date(), "UTC"), upcoming: [], past: [] };
+    return {
+      signedIn: false,
+      sportTypes: goalSportTypes({}),
+      today: dayKey(new Date(), "UTC"),
+      upcoming: [],
+      past: [],
+    };
   }
   const userId = session.user.id;
-  const [all, plan] = await Promise.all([goalsFor(userId), getTrainingPlanForUser(userId)]);
+  const [all, plan, settings] = await Promise.all([
+    goalsFor(userId),
+    getTrainingPlanForUser(userId),
+    getAthleteSettings(userId),
+  ]);
   const timeZone = plan?.timeZone ?? "UTC";
   const today = dayKey(new Date(), timeZone);
   const past = all
@@ -100,6 +112,7 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
   const matched = await matchPastActivities(userId, past, timeZone);
   return {
     signedIn: true,
+    sportTypes: goalSportTypes(settings.sportTypes),
     today,
     upcoming: seasonClusters(all.filter((goal) => goal.date >= today)),
     past: matched.reverse(),

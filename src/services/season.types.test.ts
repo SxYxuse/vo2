@@ -2,6 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import {
   formatDaysLeft,
+  goalSportTypes,
   mainFlagsAfterPick,
   normalizedMainFlags,
   seasonClusters,
@@ -121,4 +122,10 @@ test("formatDaysLeft", () => {
     "Yesterday",
     "3 days ago",
   ]);
+});
+
+test("goal sports are the ones shown in Settings, in picker order", () => {
+  const shown = { Hike: { visible: true }, Run: { visible: true }, Ride: { visible: false } };
+  expect(goalSportTypes(shown)).toEqual(["Run", "Hike"]);
+  expect(goalSportTypes({}).length).toBeGreaterThan(40);
 });
