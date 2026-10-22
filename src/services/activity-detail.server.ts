@@ -67,6 +67,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
       totalElevationGain: activities.totalElevationGain,
       streamsSyncedAt: activities.streamsSyncedAt,
       averageHeartrate: activities.averageHeartrate,
+      estimatedHeartrate: activities.estimatedHeartrate,
       averageWatts: activities.averageWatts,
       weightedAverageWatts: activities.weightedAverageWatts,
       deviceWatts: activities.deviceWatts,
@@ -139,6 +140,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
         ? (row.weightedAverageWatts ?? preview.kpis.normalizedWatts ?? null)
         : null,
     },
+    estimatedHeartrate: isPlausibleBpm(row.averageHeartrate) ? null : row.estimatedHeartrate,
     series: preview.series,
     chart: preview.chart,
     ride:

@@ -145,7 +145,15 @@ const ID_BASE = 900_000_000;
 
 type SportType = NonNullable<SummaryActivity["sport_type"]>;
 type MockKind = "ride" | "ftpRide" | "virtualRide" | "run" | "trailRun" | "walk" | "swim";
-type MockSpec = { id: number; kind: MockKind; name: string; start: Date; minutes: number };
+type MockSpec = {
+  id: number;
+  kind: MockKind;
+  name: string;
+  start: Date;
+  minutes: number;
+  /** No strap or power meter, so training load has to borrow heart rate from similar sessions. */
+  noSensors?: boolean;
+};
 
 const KIND_SPORT: Record<MockKind, SportType> = {
   ride: "Ride",
@@ -177,19 +185,19 @@ function buildCatalog(now: Date): MockSpec[] {
   const monday = startOfUtcMonday(now);
   let seq = 1;
 
-  const push = (kind: MockKind, name: string, start: Date, minutes: number) => {
+  const push = (kind: MockKind, name: string, start: Date, minutes: number, noSensors = false) => {
     if (start.getTime() > now.getTime()) return;
-    items.push({ id: ID_BASE + seq, kind, name, start, minutes });
+    items.push({ id: ID_BASE + seq, kind, name, start, minutes, noSensors });
     seq += 1;
   };
 
   for (let week = 7; week >= 0; week -= 1) {
     const weekMonday = addUtcDays(monday, -week * 7);
-    push("ride", "Morning ride", atUtcHour(addUtcDays(weekMonday, 1), 7), 60);
+    push("ride", "Morning ride", atUtcHour(addUtcDays(weekMonday, 1), 7), 60, week === 6);
     if (week === 2) {
       push("trailRun", "Trail run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55);
     } else {
-      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45);
+      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45, week === 6);
     }
     if (week === 1) {
       push("ftpRide", "Threshold ride", atUtcHour(addUtcDays(weekMonday, 3), 7), 50);
@@ -201,7 +209,7 @@ function buildCatalog(now: Date): MockSpec[] {
     } else {
       push("run", "Long run", atUtcHour(addUtcDays(weekMonday, 5), 8), 80);
     }
-    if (week === 3) push("walk", "Park walk", atUtcHour(addUtcDays(weekMonday, 4), 12), 40);
+    if (week === 3) push("walk", "Park walk", atUtcHour(addUtcDays(weekMonday, 4), 12), 40, true);
     if (week === 4) {
       push("virtualRide", "Indoor ride", atUtcHour(addUtcDays(weekMonday, 4), 18), 45);
     }
@@ -211,8 +219,11 @@ function buildCatalog(now: Date): MockSpec[] {
   return items.sort((left, right) => right.start.getTime() - left.start.getTime());
 }
 
-function hasPower(kind: MockKind) {
-  return kind === "ride" || kind === "ftpRide" || kind === "virtualRide";
+function hasPower(spec: MockSpec) {
+  return (
+    !spec.noSensors &&
+    (spec.kind === "ride" || spec.kind === "ftpRide" || spec.kind === "virtualRide")
+  );
 }
 
 function hasGps(kind: MockKind) {
@@ -279,7 +290,8 @@ function toSummary(spec: MockSpec): SummaryActivity {
   const distance = terrain.distance.at(-1) ?? 0;
   const speed = movingTime > 0 ? distance / movingTime : 0;
   const points = hasGps(spec.kind) ? loopPoints(24) : [];
-  const power = hasPower(spec.kind);
+  const power = hasPower(spec);
+  const heart = !spec.noSensors;
   const avgWatts = power ? (spec.kind === "ftpRide" ? 198 : 190) : undefined;
   const avgHr = spec.kind === "swim" ? 128 : spec.kind === "walk" ? 110 : 148;
   const iso = spec.start.toISOString();
@@ -304,9 +316,9 @@ function toSummary(spec: MockSpec): SummaryActivity {
     manual: false,
     private: false,
     average_speed: speed,
-    has_heartrate: true,
-    average_heartrate: avgHr,
-    max_heartrate: avgHr + 28,
+    has_heartrate: heart,
+    average_heartrate: heart ? avgHr : undefined,
+    max_heartrate: heart ? avgHr + 28 : undefined,
     average_watts: avgWatts,
     device_watts: power,
     weighted_average_watts: avgWatts ? Math.round(avgWatts * 1.05) : undefined,
@@ -316,7 +328,7 @@ function toSummary(spec: MockSpec): SummaryActivity {
 function streamsFor(spec: MockSpec): StreamSet {
   const samples = Math.max(2, Math.round((spec.minutes * 60) / STREAM_STEP_SEC) + 1);
   const gpsOn = hasGps(spec.kind);
-  const power = hasPower(spec.kind);
+  const power = hasPower(spec);
   const terrain = terrainFor(spec, samples);
   const gps = gpsOn ? loopPoints(samples) : [];
   const indexes = Array.from({ length: samples }, (_, i) => i);
@@ -334,7 +346,9 @@ function streamsFor(spec: MockSpec): StreamSet {
     latlng: gpsOn ? stream(gps) : undefined,
     altitude: stream(terrain.altitude),
     velocity_smooth: stream(terrain.speed),
-    heartrate: stream(indexes.map((i) => heartAt(spec.kind, progress(i)))),
+    heartrate: spec.noSensors
+      ? undefined
+      : stream(indexes.map((i) => heartAt(spec.kind, progress(i)))),
     cadence: stream(indexes.map(() => (power ? 88 : spec.kind === "swim" ? 0 : 164))),
     watts: power ? stream(indexes.map((i) => wattsAt(spec.kind, progress(i)))) : undefined,
     temp: stream(indexes.map(() => 16)),

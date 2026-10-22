@@ -36,6 +36,8 @@ export type ActivityDetail = {
   totalElevationGain: number | null;
   hasStreams: boolean;
   kpis: ActivityKpis;
+  /** Average HR borrowed from similar activities when none was recorded (ADR 0019). */
+  estimatedHeartrate: number | null;
   series: StreamSeriesKey[];
   chart: ActivityChartPoint[];
   /** Cycling only: terrain breakdown and ride-quality numbers. Null without power or cadence. */

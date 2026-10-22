@@ -5,10 +5,12 @@ import {
   activityTrainingLoad,
   buildPmc,
   ctlChange,
+  estimateHrIntensity,
   estimateLoadAnchors,
   formAfterLoad,
   formLabel,
   pmcWithCurrentForm,
+  toFitnessLoad,
   type LoadAnchors,
   type LoadInputs,
 } from "./training-load.ts";
@@ -108,6 +110,56 @@ describe("training load", () => {
   test("zero moving time is training load 0", () => {
     const { load } = activityTrainingLoad(ride({ movingTime: 0 }), ANCHORS);
     expect(load).toBe(0);
+  });
+});
+
+describe("heart rate from similar activities", () => {
+  const strapless = run({ averageHeartrate: null, maxHeartrate: null, distance: 12_000 });
+  const intensityAt = (bpm: number, lthr: number) => (bpm - 50) / (lthr - 50);
+
+  test("borrows intensity from runs of similar duration and speed before rides", () => {
+    const pool = [
+      strapless,
+      run({ averageHeartrate: 150, distance: 12_000 }),
+      run({ averageHeartrate: 152, distance: 12_100 }),
+      run({ averageHeartrate: 180, movingTime: 1200, distance: 5000 }),
+      ride({ averageHeartrate: 110, deviceWatts: false, distance: 12_000 }),
+    ];
+    const intensity = estimateHrIntensity(strapless, pool, ANCHORS);
+    expect(intensity).toBeGreaterThan(intensityAt(150, 175));
+    expect(intensity).toBeLessThan(intensityAt(160, 175));
+  });
+
+  test("scores the borrowed intensity like heart rate and flags it as estimated", () => {
+    const pool = [strapless, run({ averageHeartrate: 154, distance: 12_000 })];
+    const result = activityTrainingLoad(strapless, ANCHORS, pool);
+    expect(result.source).toBe("similarHeartRate");
+    expect(result.estimatedHeartrate).toBe(154);
+    expect(result.load).toBeCloseTo(activityTrainingLoad(run(), ANCHORS).load, 5);
+    expect(toFitnessLoad(new Date(), result.load, result.source).estimatedLoad).toBe(result.load);
+  });
+
+  test("every sport gets an estimate, borrowing across sport groups when it has to", () => {
+    const pool = [run({ averageHeartrate: 154 })];
+    for (const sportType of ["Walk", "Swim", "Ride", "Yoga", "WeightTraining", "Kayaking"]) {
+      const activity = run({ sportType, averageHeartrate: null, maxHeartrate: null });
+      expect(activityTrainingLoad(activity, ANCHORS, [activity, ...pool]).source).toBe(
+        "similarHeartRate",
+      );
+    }
+  });
+
+  test("only borrows heart rate recorded from 2026 on", () => {
+    const old = run({ averageHeartrate: 154, startDate: "2025-12-31T08:00:00Z" });
+    const recent = run({ averageHeartrate: 154, startDate: "2026-01-01T08:00:00Z" });
+    const target = { ...strapless, startDate: "2024-06-01T08:00:00Z" };
+    expect(activityTrainingLoad(target, ANCHORS, [target, old]).source).toBe("duration");
+    expect(activityTrainingLoad(target, ANCHORS, [target, recent]).source).toBe("similarHeartRate");
+  });
+
+  test("falls back to duration when no activity recorded heart rate", () => {
+    const pool = [strapless];
+    expect(activityTrainingLoad(strapless, ANCHORS, pool).source).toBe("duration");
   });
 });
 

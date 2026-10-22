@@ -40,7 +40,11 @@ export const activities = pgTable(
     weightedAverageWatts: real("weighted_average_watts"),
     deviceWatts: boolean("device_watts").notNull().default(false),
     trainingLoad: real("training_load"),
-    loadSource: text("load_source").$type<"power" | "heartRate" | "duration">(),
+    /** Average HR borrowed from similar activities when this one recorded none (ADR 0019). */
+    estimatedHeartrate: real("estimated_heartrate"),
+    loadSource: text("load_source").$type<
+      "power" | "heartRate" | "similarHeartRate" | "duration"
+    >(),
     manual: boolean("manual").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

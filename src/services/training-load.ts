@@ -15,7 +15,7 @@ export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
 export const DEFAULT_REST_HR = 60;
 
-export type LoadSource = "power" | "heartRate" | "duration";
+export type LoadSource = "power" | "heartRate" | "similarHeartRate" | "duration";
 
 export type FitnessPeriod = "7d" | "1m" | "3m" | "6m" | "1y" | "all";
 
@@ -33,6 +33,8 @@ export type LoadInputs = {
   /** Peaks older than the max-HR window stop setting zones; missing counts as recent. */
   startDate?: Date | string;
   movingTime: number;
+  /** Metres; lets HR estimates match activities of similar speed. */
+  distance?: number | null;
   averageHeartrate: number | null;
   maxHeartrate: number | null;
   averageWatts: number | null;
@@ -248,6 +250,20 @@ export function estimateLoadAnchors(
   };
 }
 
+/** LTHR, else the sport's max HR, else the highest max HR seen in any sport. */
+function hrCeiling(sportType: string, anchors: LoadAnchors) {
+  const own = sportLthr(sportType, anchors) ?? sportMaxHr(sportType, anchors);
+  if (own != null) return own;
+  const known = [
+    anchors.cyclingMaxHr,
+    anchors.runMaxHr,
+    anchors.swimMaxHr,
+    anchors.walkingMaxHr,
+    anchors.otherMaxHr,
+  ].filter((bpm): bpm is number => bpm != null);
+  return known.length ? Math.max(...known) : null;
+}
+
 function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
   const avg = activity.averageHeartrate;
   if (avg == null || avg <= 0) return null;
@@ -258,28 +274,134 @@ function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
   return (avg - rest) / (ceiling - rest);
 }
 
+const SIMILAR_HR_NEIGHBOURS = 5;
+const DAY_MS = 86_400_000;
+/** Only heart rate recorded from 2026 on is borrowed; older recordings are not trusted to match the athlete now. */
+export const SIMILAR_HR_SINCE = Date.UTC(2026, 0, 1);
+
+function averageSpeed(activity: LoadInputs) {
+  if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;
+  return activity.distance / activity.movingTime;
+}
+
+function startMs(activity: LoadInputs) {
+  return activity.startDate ? new Date(activity.startDate).getTime() : null;
+}
+
+/**
+ * How unlike two activities are: log ratio of duration and age gap always; speed only within a
+ * sport group (a ride's speed says nothing about a run). Other sport types and groups cost extra,
+ * so they are only borrowed from when nothing closer recorded heart rate.
+ */
+function dissimilarity(activity: LoadInputs, other: LoadInputs) {
+  let score = Math.abs(Math.log(activity.movingTime / other.movingTime));
+  const start = startMs(activity);
+  const otherStart = startMs(other);
+  if (start != null && otherStart != null) score += Math.abs(start - otherStart) / DAY_MS / 365;
+  if (activity.sportType === other.sportType) return score + speedGap(activity, other);
+  if (heartRateFamily(activity.sportType) === heartRateFamily(other.sportType)) {
+    return score + 0.5 + speedGap(activity, other);
+  }
+  return score + 2;
+}
+
+function speedGap(activity: LoadInputs, other: LoadInputs) {
+  const speed = averageSpeed(activity);
+  const otherSpeed = averageSpeed(other);
+  return speed && otherSpeed ? 2 * Math.abs(Math.log(speed / otherSpeed)) : 0;
+}
+
+/**
+ * Heart-rate intensity (share of heart-rate reserve up to LTHR or max) borrowed from the
+ * athlete's most similar activities that recorded one. Intensity, not bpm, is borrowed so a
+ * walk can learn from a run even though their heart rates sit at different levels.
+ */
+export function estimateHrIntensity(
+  activity: LoadInputs,
+  pool: LoadInputs[],
+  anchors: LoadAnchors,
+) {
+  if (activity.movingTime <= 0) return null;
+  const neighbours: { intensity: number; score: number }[] = [];
+  for (const other of pool) {
+    if (other === activity || other.movingTime <= 0 || !isPlausibleBpm(other.averageHeartrate)) {
+      continue;
+    }
+    const otherStart = startMs(other);
+    if (otherStart != null && otherStart < SIMILAR_HR_SINCE) continue;
+    const intensity = hrIntensity(other, anchors);
+    if (intensity == null || intensity <= 0) continue;
+    neighbours.push({ intensity, score: dissimilarity(activity, other) });
+  }
+  const nearest = neighbours.sort((a, b) => a.score - b.score).slice(0, SIMILAR_HR_NEIGHBOURS);
+  if (!nearest.length) return null;
+  let total = 0;
+  let weights = 0;
+  for (const { intensity, score } of nearest) {
+    const weight = 1 / (0.1 + score);
+    total += intensity * weight;
+    weights += weight;
+  }
+  return total / weights;
+}
+
+export type ActivityLoad = {
+  load: number;
+  source: LoadSource;
+  /** Average HR implied by the borrowed intensity; only set when source is "similarHeartRate". */
+  estimatedHeartrate: number | null;
+};
+
 export function activityTrainingLoad(
   activity: LoadInputs,
   anchors: LoadAnchors,
-): { load: number; source: LoadSource } {
+  /** Activities to borrow heart-rate intensity from when this one has none. */
+  pool: LoadInputs[] = [],
+): ActivityLoad {
   const hours = hoursFromMoving(activity.movingTime);
-  if (hours <= 0) return { load: 0, source: "duration" };
+  if (hours <= 0) return { load: 0, source: "duration", estimatedHeartrate: null };
 
   if (anchors.ftp && isPowerCyclingSport(activity.sportType) && activity.deviceWatts) {
     const normalized =
       activity.weightedAverageWatts ??
       normalizedPowerFromWatts(activity.wattsStream, activity.timeStream);
     if (normalized && normalized > 0) {
-      return { load: trainingStress(hours, normalized / anchors.ftp), source: "power" };
+      return {
+        load: trainingStress(hours, normalized / anchors.ftp),
+        source: "power",
+        estimatedHeartrate: null,
+      };
     }
   }
 
   const intensity = hrIntensity(activity, anchors);
   if (intensity != null) {
-    return { load: trainingStress(hours, intensity), source: "heartRate" };
+    return {
+      load: trainingStress(hours, intensity),
+      source: "heartRate",
+      estimatedHeartrate: null,
+    };
   }
 
-  return { load: trainingStress(hours, durationIntensity(activity.sportType)), source: "duration" };
+  if (!isPlausibleBpm(activity.averageHeartrate)) {
+    const borrowed = estimateHrIntensity(activity, pool, anchors);
+    if (borrowed != null) {
+      const rest = clampRestHr(anchors.restHr);
+      const ceiling = hrCeiling(activity.sportType, anchors);
+      return {
+        load: trainingStress(hours, borrowed),
+        source: "similarHeartRate",
+        estimatedHeartrate:
+          ceiling != null && ceiling > rest ? Math.round(rest + borrowed * (ceiling - rest)) : null,
+      };
+    }
+  }
+
+  return {
+    load: trainingStress(hours, durationIntensity(activity.sportType)),
+    source: "duration",
+    estimatedHeartrate: null,
+  };
 }
 
 export function toFitnessLoad(
@@ -291,7 +413,7 @@ export function toFitnessLoad(
   return {
     start: typeof start === "string" ? start : start.toISOString(),
     load,
-    estimatedLoad: source === "duration" ? load : 0,
+    estimatedLoad: source === "duration" || source === "similarHeartRate" ? load : 0,
     movingTime,
   };
 }
