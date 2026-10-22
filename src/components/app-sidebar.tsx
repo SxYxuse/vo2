@@ -222,11 +222,13 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
+      {/* On phones the buttons sit low, beside the home indicator, and the wide side padding
+          keeps them inside the rounded screen corner instead of lifting them above it. */}
       <SidebarFooter
         className={cn(
           "flex-row items-center group-data-[collapsible=icon]:flex-col",
           isMobile
-            ? "px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"
+            ? "px-[1.5rem] pb-[max(0.5rem,calc(env(safe-area-inset-bottom)-1.25rem))]"
             : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
