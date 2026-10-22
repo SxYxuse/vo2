@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker, useNavigate } from "@tanstack/react-router";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { CheckIcon } from "lucide-react";
+import { useForm } from "react-hook-form";
 
 import { settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { afterSettingsSaved } from "@/lib/query-events.ts";
 import {
-  profileFromForm,
   settingsFormDefaults,
-  SPORTS_FIELDS,
   settingsFormSchema,
-  trainingFromForm,
+  settingsSaveFromForm,
   type SettingsFormInput,
   type SettingsFormValues,
 } from "@/lib/settings-form.ts";
@@ -29,7 +28,7 @@ import {
   recentAverageWeeklyHours,
   recentSessionHistory,
 } from "@/services/training-plan.ts";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,15 +53,13 @@ import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import { toast } from "@/components/ui/toast";
 
-const PROFILE_ERROR_KEYS = ["birthDate", "weightKg"] as const;
+// Sliders report every step; waiting this long after the last one saves once the thumb settles.
+const SAVE_DELAY_MS = 400;
+// Typed fields save on blur, so a weight is not saved one keystroke at a time.
+const TYPED_FIELDS = new Set<string>(["weightKg"]);
 
-function sectionForErrors(errors: FieldErrors<SettingsFormInput>): SettingsSection {
-  if (PROFILE_ERROR_KEYS.some((key) => errors[key])) return "profile";
-  if (SPORTS_FIELDS.some((key) => errors[key])) return "sports";
-  return "training";
-}
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function SettingsForm({
   section,
@@ -80,6 +77,10 @@ export function SettingsForm({
     [data?.fitnessLoads, timeZone],
   );
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saving = useRef(false);
+  const changedSinceSave = useRef(false);
   const emptyDefaults = useMemo(
     () =>
       settingsFormDefaults({
@@ -95,14 +96,12 @@ export function SettingsForm({
   const form = useForm<SettingsFormInput, unknown, SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
     defaultValues: emptyDefaults,
-    mode: "onSubmit",
-    reValidateMode: "onChange",
+    mode: "onTouched",
   });
-  const { isDirty } = form.formState;
-  // Switching sections keeps the form mounted; only leaving settings drops unsaved edits.
+  // A save in flight finishes after leaving settings; only a failed one would be lost silently.
   const blocker = useBlocker({
-    shouldBlockFn: ({ next }) => isDirty && !isSettingsPath(next.pathname),
-    enableBeforeUnload: () => isDirty,
+    shouldBlockFn: ({ next }) => status === "error" && !isSettingsPath(next.pathname),
+    enableBeforeUnload: () => status === "error" || saving.current || timer.current != null,
     withResolver: true,
   });
   const sectionLabel =
@@ -114,7 +113,7 @@ export function SettingsForm({
 
   useEffect(() => {
     if (!data) return;
-    setSaveError(null);
+    // Saved values come back while the athlete may still be editing; keep what they changed.
     form.reset(
       settingsFormDefaults({
         profile: data.profile,
@@ -125,64 +124,118 @@ export function SettingsForm({
         avgHours,
         timeZone,
       }),
+      { keepDirtyValues: true, keepErrors: true },
     );
   }, [data?.profile, data?.training, data?.settings, avgHours, timeZone, form]);
 
-  const save = useMutation({
-    mutationFn: saveAthleteSettings,
-    onSuccess: (saved) => {
-      void afterSettingsSaved(queryClient, saved);
-      setSaveError(null);
-      toast.add({ type: "success", title: "Settings saved" });
-    },
-    onError: (caught) => {
-      setSaveError(caught instanceof Error ? caught.message : "Could not save settings");
-    },
-  });
+  // One save at a time, each sending the form as it is when it starts, so the latest edit wins.
+  // A plain promise rather than a mutation keeps saving after the form unmounts.
+  async function saveChanges() {
+    while (changedSinceSave.current) {
+      changedSinceSave.current = false;
+      const saved = queryClient.getQueryData(settingsSnapshotQueryOptions.queryKey);
+      const payload = saved ? settingsSaveFromForm(form.getValues(), saved) : null;
+      if (!payload) continue;
+      void afterSettingsSaved(queryClient, await saveAthleteSettings({ data: payload }));
+    }
+  }
 
-  function onSubmit(values: SettingsFormValues) {
-    save.mutate({
-      data: {
-        profile: profileFromForm(values),
-        sportTypes: values.sportTypes,
-        sportGroupShares: values.sportGroupShares,
-        calendarPeriod: values.calendarPeriod,
-        training: trainingFromForm(values),
-      },
+  function requestSave() {
+    clearTimeout(timer.current);
+    timer.current = undefined;
+    changedSinceSave.current = true;
+    void form.trigger();
+    if (saving.current) return;
+    saving.current = true;
+    setStatus("saving");
+    setSaveError(null);
+    saveChanges()
+      .then(
+        () => setStatus("saved"),
+        (caught: unknown) => {
+          setSaveError(caught instanceof Error ? caught.message : "Could not save settings");
+          setStatus("error");
+        },
+      )
+      .finally(() => {
+        saving.current = false;
+      });
+  }
+
+  useEffect(() => {
+    const subscription = form.watch((_values, { name, type }) => {
+      if (type !== "change" || !name || TYPED_FIELDS.has(name)) return;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(requestSave, SAVE_DELAY_MS);
     });
-  }
+    // Backgrounding the PWA or leaving settings must not drop a change still waiting to save.
+    const flush = () => {
+      if (timer.current != null) requestSave();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisibility);
+      flush();
+    };
+  }, [form]);
 
-  function onInvalid(errors: FieldErrors<SettingsFormInput>) {
-    setSection(sectionForErrors(errors));
-  }
+  useEffect(() => {
+    if (status !== "saved") return;
+    const fade = setTimeout(() => setStatus("idle"), 2000);
+    return () => clearTimeout(fade);
+  }, [status]);
 
   return (
     <>
       <form
         noValidate
         className="flex flex-col gap-4"
-        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          requestSave();
+        }}
+        onBlur={(event) => {
+          const name = event.target.getAttribute("name");
+          if (name && TYPED_FIELDS.has(name) && form.getFieldState(name as "weightKg").isDirty) {
+            requestSave();
+          }
+        }}
       >
         <div className="flex flex-col gap-2">
           <div className="flex min-h-7 items-center justify-between gap-3">
             <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight sm:text-2xl">
               {sectionLabel}
             </h1>
-            {section === "sync" ? null : (
-              <Button
-                type="submit"
-                className="shrink-0"
-                disabled={!data || !isDirty || save.isPending}
-              >
-                {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-                Save
-              </Button>
-            )}
+            <p
+              aria-live="polite"
+              className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"
+            >
+              {status === "saving" ? (
+                <>
+                  <Spinner />
+                  Saving…
+                </>
+              ) : status === "saved" ? (
+                <>
+                  <CheckIcon className="size-4" />
+                  Saved
+                </>
+              ) : null}
+            </p>
           </div>
           {saveError ? (
             <Alert variant="destructive">
               <AlertTitle>Could not save</AlertTitle>
               <AlertDescription>{saveError}</AlertDescription>
+              <AlertAction>
+                <Button type="button" size="sm" variant="outline" onClick={requestSave}>
+                  Retry
+                </Button>
+              </AlertAction>
             </Alert>
           ) : null}
         </div>
@@ -238,13 +291,13 @@ export function SettingsForm({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
             <AlertDialogDescription>
-              Your settings edits have not been saved. Leaving settings drops them.
+              Your last change hasn't saved yet. Leaving settings drops it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => blocker.proceed?.()}>
               Discard
             </AlertDialogAction>

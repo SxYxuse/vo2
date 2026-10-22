@@ -10,6 +10,7 @@ import {
   type ProfileSave,
   type ProfileSettings,
 } from "@/services/athlete-settings.types.ts";
+import type { AthleteSettingsSave, SavedAthleteSettings } from "@/services/athlete-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   DEFAULT_WEEK_MIX,
@@ -60,6 +61,8 @@ const sportsFormFields = {
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
 };
+
+const sportsFormSchema = z.object(sportsFormFields);
 
 export const settingsFormSchema = profileFormSchema
   .extend(trainingFormFields.shape)
@@ -139,6 +142,35 @@ export function trainingFormDefaults(
 
 export function trainingFromForm(values: TrainingFormValues): TrainingPlan {
   return trainingPlanSchema.parse(values);
+}
+
+/**
+ * Settings save as the athlete edits, so one half-typed field must not hold back the rest:
+ * each part that fails validation keeps its last saved value. Null when nothing valid is known.
+ */
+export function settingsSaveFromForm(
+  values: SettingsFormInput,
+  saved: SavedAthleteSettings,
+): AthleteSettingsSave | null {
+  const profile = profileFormSchema.safeParse(values);
+  const training = trainingFormSchema.safeParse(values);
+  const sports = sportsFormSchema.safeParse(values);
+  const savedProfile = profileSaveSchema.safeParse(saved.profile);
+  const profileSave = profile.success
+    ? profileFromForm(profile.data)
+    : savedProfile.success
+      ? savedProfile.data
+      : null;
+  if (!profileSave) return null;
+  return {
+    profile: profileSave,
+    sportTypes: sports.success ? sports.data.sportTypes : saved.settings.sportTypes,
+    sportGroupShares: sports.success
+      ? sports.data.sportGroupShares
+      : (saved.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES),
+    calendarPeriod: values.calendarPeriod,
+    training: training.success ? trainingFromForm(training.data) : (saved.training ?? undefined),
+  };
 }
 
 function sportsFormDefaults(
