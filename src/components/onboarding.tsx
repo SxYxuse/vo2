@@ -12,7 +12,6 @@ import { afterProfileSaved, afterSettingsSaved } from "@/lib/query-events.ts";
 import {
   PROFILE_FIELDS,
   SPORTS_FIELDS,
-  TRAINING_PACE_FIELDS,
   TRAINING_WEEK_FIELDS,
   onboardingFormDefaults,
   onboardingFormSchema,
@@ -34,12 +33,7 @@ import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
-import {
-  BirthDateField,
-  TrainingPaceFields,
-  TrainingWeekFields,
-  WeightField,
-} from "@/components/settings-fields.tsx";
+import { BirthDateField, TrainingWeekFields, WeightField } from "@/components/settings-fields.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -70,11 +64,6 @@ const STEPS = [
     title: "Your sports",
     description:
       "Choose what shows in your calendar, map, and heart rate, and the gear you train with.",
-  },
-  {
-    id: "pace",
-    title: "Fitness goal",
-    description: "How hard you want to build — this drives weekly load.",
   },
   {
     id: "week",
@@ -183,19 +172,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
       setStepIndex((current) => current + 1);
       return;
     }
-    if (step.id === "pace") {
-      const ok = await form.trigger([...TRAINING_PACE_FIELDS]);
-      if (!ok) return;
-      setStepIndex((current) => current + 1);
-      return;
-    }
     if (step.id !== "week") return;
-    const ok = await form.trigger([
-      ...PROFILE_FIELDS,
-      ...SPORTS_FIELDS,
-      ...TRAINING_PACE_FIELDS,
-      ...TRAINING_WEEK_FIELDS,
-    ]);
+    const ok = await form.trigger([...PROFILE_FIELDS, ...SPORTS_FIELDS, ...TRAINING_WEEK_FIELDS]);
     if (!ok) return;
     await form.handleSubmit((values) => {
       save.mutate({
@@ -255,11 +233,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
           <p className="text-muted-foreground text-sm">
             {step.id === "sync"
               ? "Start by copying your activities from Strava."
-              : step.id === "pace" && !hasActivityHistory
-                ? "How hard you want this block to push — fitness and form come after activities are copied."
-                : step.id === "week" && !hasActivityHistory
-                  ? "How many hours you want to train each week."
-                  : step.description}
+              : step.id === "week" && !hasActivityHistory
+                ? "How many hours you want to train each week."
+                : step.description}
           </p>
         </CardHeader>
         <CardContent>
@@ -297,19 +273,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   </FieldDescription>
                 ) : null}
               </>
-            ) : step.id === "pace" ? (
-              <TrainingPaceFields
-                idPrefix="onboard"
-                control={form.control}
-                hasActivityHistory={hasActivityHistory}
-              />
             ) : step.id === "week" ? (
-              <TrainingWeekFields
-                idPrefix="onboard"
-                control={form.control}
-                setValue={form.setValue}
-                avgHours={avgHours}
-              />
+              <TrainingWeekFields idPrefix="onboard" control={form.control} avgHours={avgHours} />
             ) : (
               <Empty className="min-h-48 border-0">
                 <EmptyHeader>
@@ -321,8 +286,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   <EmptyTitle>Ready to train</EmptyTitle>
                   <EmptyDescription>
                     {copyUnfinished
-                      ? "Your goal is saved. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
-                      : "Your goal is saved. Open the calendar to see your week, or change anything later from Settings."}
+                      ? "Your week is set. Add your races on the Season page so the plan builds toward them. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
+                      : "Your week is set. Add your races on the Season page so the plan builds toward them, or change anything later from Settings."}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>

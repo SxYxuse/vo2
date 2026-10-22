@@ -29,7 +29,7 @@ const goalColumns = {
   main: goals.main,
 };
 
-async function goalsFor(userId: string): Promise<Goal[]> {
+export async function goalsFor(userId: string): Promise<Goal[]> {
   const rows = await db.select(goalColumns).from(goals).where(eq(goals.userId, userId));
   return rows as Goal[];
 }

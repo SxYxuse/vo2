@@ -2,8 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { emptyHistogram, zonesFromHistogram } from "./heart-rate.ts";
 import { ATL_DAYS, CTL_DAYS, formLabel } from "./training-load.ts";
+import { blendShares, type SeasonPhase } from "./season-phase.ts";
 import {
-  BUILD_PACES,
   DEFAULT_LOAD_PER_HOUR,
   KEY_SESSION_PRESETS,
   COOL_DOWN_MINUTES,
@@ -83,6 +83,8 @@ export type WeekTargetData = {
   fitness: FitnessPoint;
   collectors: { running: FamilyCollectors; cycling: FamilyCollectors };
   anchors: PlanningAnchors;
+  /** Where the season puts this week; read at the start of the week like the target. */
+  season: SeasonPhase;
 };
 
 export type WeekTarget = {
@@ -197,12 +199,12 @@ function stress(minutes: number, intensity: number) {
   return (minutes / 60) * 100 * intensity * intensity;
 }
 
-export function rampFor(buildPace: BuildPace, form: number) {
-  let pace = buildPace;
-  if (form < -30) pace = "hold";
-  else if (form < -10 && pace === "overreach") pace = "fast";
-  else if (form < -18 && (pace === "fast" || pace === "overreach")) pace = "steady";
-  return BUILD_PACES.find((item) => item.id === pace)?.ramp ?? 0;
+/** The phase's ramp, eased off when form is already low. */
+export function rampFor(ramp: number, form: number) {
+  if (form < -30) return Math.min(ramp, 0);
+  if (form < -18) return Math.min(ramp, 5);
+  if (form < -10) return Math.min(ramp, 8);
+  return ramp;
 }
 
 /** Hard minutes when an activity has no heart-rate stream: from its load per hour. */
@@ -223,24 +225,37 @@ export function recentLoadPerHour(history: DayTotal[]) {
   return clamp(load / (minutes / 60), 25, 90);
 }
 
+/**
+ * The week's hours from the season phase and fitness at the start of Monday. Fixed hours are
+ * the time the athlete has: a cap on the phase's target, and the target itself without history.
+ */
 export function weeklyTarget(input: {
   plan: TrainingPlan;
+  season: Pick<SeasonPhase, "ramp" | "loadFactor">;
   weekStartFitness: FitnessPoint;
   loadPerHour: number;
 }): WeekTarget {
-  const { plan, loadPerHour } = input;
+  const { plan, season, loadPerHour } = input;
   const { ctl, atl } = input.weekStartFitness;
-  if (plan.targetMode === "manual" || ctl <= 5) {
-    const minutes = Math.round(plan.targetWeeklyHours * 60);
-    return {
-      minutes,
-      load: Math.round((minutes / 60) * loadPerHour),
-      source: plan.targetMode === "manual" ? "manual" : "no-history",
-    };
+  const fixedMinutes = Math.round(plan.targetWeeklyHours * 60);
+  const fromMinutes = (minutes: number, source: WeekTarget["source"]): WeekTarget => ({
+    minutes,
+    load: Math.round((minutes / 60) * loadPerHour),
+    source,
+  });
+  if (ctl <= 5) {
+    return fromMinutes(round5(fixedMinutes * (season.loadFactor ?? 1)), "no-history");
   }
-  const load = Math.max(0, 7 * ctl + CTL_DAYS * rampFor(plan.buildPace, ctl - atl));
+  const load =
+    season.loadFactor != null
+      ? 7 * ctl * season.loadFactor
+      : Math.max(0, 7 * ctl + CTL_DAYS * rampFor(season.ramp, ctl - atl));
   const hours = clamp(Math.round((load / loadPerHour) * 4) / 4, 0.5, 30);
-  return { minutes: Math.round(hours * 60), load: Math.round(load), source: "auto" };
+  const minutes = Math.round(hours * 60);
+  if (plan.targetMode === "manual" && fixedMinutes < minutes) {
+    return fromMinutes(fixedMinutes, "manual");
+  }
+  return { minutes, load: Math.round(load), source: "auto" };
 }
 
 function weekMinutesByDay(history: DayTotal[], weekStart: string) {
@@ -364,9 +379,9 @@ const KEY_SIZES: Record<Exclude<KeySessionPresetId, "long">, [number, number][]>
   ],
 };
 
-/** Key session types a build pace leads with, for the settings preview. */
-export function keySessionTypes(buildPace: BuildPace) {
-  return KEY_ROTATION[buildPace].map(
+/** Key session types a phase leads with. */
+export function keySessionTypes(rotation: BuildPace) {
+  return KEY_ROTATION[rotation].map(
     (preset) => KEY_SESSION_PRESETS.find((item) => item.id === preset)?.label ?? preset,
   );
 }
@@ -375,16 +390,20 @@ function weekNumber(weekStart: string) {
   return Math.floor(Date.parse(`${weekStart}T12:00:00Z`) / (7 * 86_400_000));
 }
 
-/** This week's key sessions, built from the week mix, build pace, fitness, and target. */
+/** This week's key sessions, built from the week mix, the season phase, fitness, and target. */
 export function generateKeySessions(input: {
-  plan: Pick<TrainingPlan, "buildPace" | "weekMix">;
+  weekMix: TrainingPlan["weekMix"];
+  season: Pick<SeasonPhase, "rotation" | "maxKeySessions">;
   weekStart: string;
   ctl: number;
   targetMinutes: number;
 }): KeySession[] {
-  const count = keySessionCount(input.plan.weekMix);
+  const count = Math.min(
+    keySessionCount(input.weekMix),
+    input.season.maxKeySessions ?? Number.POSITIVE_INFINITY,
+  );
   if (count <= 0) return [];
-  const [first, ...rest] = KEY_ROTATION[input.plan.buildPace];
+  const [first, ...rest] = KEY_ROTATION[input.season.rotation];
   const shift = rest.length ? weekNumber(input.weekStart) % rest.length : 0;
   const rotated = [...rest.slice(shift), ...rest.slice(0, shift)];
   const order = [first, ...rotated];
@@ -492,6 +511,7 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
   const loadPerHour = recentLoadPerHour(data.history);
   const target = weeklyTarget({
     plan,
+    season: data.season,
     weekStartFitness: data.weekStartFitness,
     loadPerHour,
   });
@@ -522,11 +542,12 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
   const status: PaceStatus =
     remainingMinutes <= 0 ? "done" : gap >= 30 ? "ahead" : gap >= -20 ? "on-track" : "behind";
 
-  const shares = sportShares(data.history);
+  const shares = blendShares(sportShares(data.history), data.season);
   const left = splitRemaining(target.minutes, remainingMinutes, shares, done);
 
   const generated = generateKeySessions({
-    plan,
+    weekMix: plan.weekMix,
+    season: data.season,
     weekStart,
     ctl: data.weekStartFitness.ctl,
     targetMinutes: target.minutes,
@@ -926,10 +947,9 @@ export function fitKeySession(session: KeySession, available: number): KeySessio
 /** A key session beyond the week mix, for a day the athlete wants to go hard anyway. */
 function extraKeySession(data: WeekTargetData & { plan: TrainingPlan }) {
   const [first] = generateKeySessions({
-    plan: {
-      buildPace: data.plan.buildPace,
-      weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100, doubleDays: 0 },
-    },
+    weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100, doubleDays: 0 },
+    // The athlete asked to go hard, so the phase's cap on key sessions does not apply.
+    season: { rotation: data.season.rotation, maxKeySessions: null },
     weekStart: data.weekStart,
     ctl: data.weekStartFitness.ctl,
     targetMinutes: Number.MAX_SAFE_INTEGER,

@@ -1,14 +1,9 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarIcon, WeightIcon } from "lucide-react";
-import {
-  Controller,
-  useWatch,
-  type Control,
-  type FieldPath,
-  type UseFormSetValue,
-} from "react-hook-form";
+import { Link } from "@tanstack/react-router";
+import { CalendarIcon, FlagIcon, WeightIcon } from "lucide-react";
+import { Controller, useWatch, type Control, type FieldPath } from "react-hook-form";
 
 import {
   ageFromBirthDate,
@@ -17,14 +12,10 @@ import {
   parseBirthDate,
 } from "@/services/athlete-settings.types.ts";
 import {
-  BUILD_PACES,
-  HOURS_INTENTS,
   TARGET_MODES,
   WEEKDAYS,
   formatHours,
   hasRecentWeeklyHours,
-  suggestedTargetHours,
-  type HoursIntent,
 } from "@/services/training-plan.ts";
 import type {
   ProfileFormValues,
@@ -184,74 +175,35 @@ export function WeightField<T extends ProfileFormValues>({
   );
 }
 
-export function TrainingPaceFields<T extends TrainingFormInput>({
-  idPrefix,
-  control,
-  hasActivityHistory = true,
-}: {
-  idPrefix: string;
-  control: Control<T>;
-  hasActivityHistory?: boolean;
-}) {
+/** Goals replaced build pace: the Season page sets how fast the plan builds (ADR 0021). */
+export function SeasonGoalsNote() {
   return (
-    <Controller
-      name={"buildPace" as FieldPath<T>}
-      control={control}
-      render={({ field, fieldState }) => (
-        <FieldSet data-invalid={fieldState.invalid}>
-          <FieldLegend>Fitness and form</FieldLegend>
-          <FieldDescription>
-            {hasActivityHistory
-              ? "Keep building, or hold where you are. Faster ramps raise fitness quicker and sit you in more fatigue."
-              : "How hard this block should push. After activities are copied, faster ramps raise fitness quicker and sit you in more fatigue."}
-          </FieldDescription>
-          <RadioGroup
-            name={field.name}
-            value={(field.value as string) || null}
-            onValueChange={(next) => {
-              if (!next) return;
-              field.onChange(next);
-            }}
-            className="gap-2"
-          >
-            {BUILD_PACES.map((pace) => {
-              const id = `${idPrefix}-pace-${pace.id}`;
-              return (
-                <FieldLabel key={pace.id} htmlFor={id} className="w-full">
-                  <Field
-                    orientation="horizontal"
-                    className="items-start rounded-lg border p-3"
-                    data-invalid={fieldState.invalid}
-                  >
-                    <RadioGroupItem value={pace.id} id={id} aria-invalid={fieldState.invalid} />
-                    <FieldContent>
-                      <FieldTitle>{pace.label}</FieldTitle>
-                      <FieldDescription>{pace.hint}</FieldDescription>
-                    </FieldContent>
-                    <Badge variant={pace.id === "overreach" ? "destructive" : "outline"}>
-                      {pace.risk}
-                    </Badge>
-                  </Field>
-                </FieldLabel>
-              );
-            })}
-          </RadioGroup>
-          {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-        </FieldSet>
-      )}
-    />
+    <FieldSet>
+      <FieldLegend>Goals</FieldLegend>
+      <FieldDescription>
+        Your races and events set how fast the plan builds: base work when the next goal is far,
+        then build, peak, and taper toward it. Without a goal, the plan holds your fitness.
+      </FieldDescription>
+      <Button
+        variant="outline"
+        className="self-start"
+        nativeButton={false}
+        render={<Link to="/season" />}
+      >
+        <FlagIcon data-icon="inline-start" />
+        Open Season
+      </Button>
+    </FieldSet>
   );
 }
 
 export function TrainingWeekFields<T extends TrainingFormInput>({
   idPrefix,
   control,
-  setValue,
   avgHours,
 }: {
   idPrefix: string;
   control: Control<T>;
-  setValue: UseFormSetValue<T>;
   avgHours: number;
 }) {
   const targetMode = useWatch({ control, name: "targetMode" as FieldPath<T> }) as string;
@@ -267,10 +219,7 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
         render={({ field, fieldState }) => (
           <FieldSet data-invalid={fieldState.invalid}>
             <FieldLegend>Weekly target</FieldLegend>
-            <FieldDescription>
-              Hours are the headline on the Week target page. Training load follows your build pace
-              either way.
-            </FieldDescription>
+            <FieldDescription>Hours are the headline on the Week target page.</FieldDescription>
             <RadioGroup
               name={field.name}
               value={field.value as string}
@@ -301,57 +250,24 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
       />
       {showHours ? (
         <FieldSet>
-          <FieldLegend>{targetMode === "manual" ? "Weekly hours" : "Starting hours"}</FieldLegend>
+          <FieldLegend>
+            {targetMode === "manual" ? "Hours you have each week" : "Starting hours"}
+          </FieldLegend>
           <FieldDescription>
             {targetMode !== "manual"
               ? "No recent history yet. VO2 uses these hours until it can set the target from your fitness."
               : hasHistory
-                ? `Your last 3 months average ${formatHours(avgHours)}. Choose whether to cut back, keep that volume, or add hours.`
-                : "No activities copied from Strava yet, so there is no recent-weeks baseline. Choose how many hours you want to train each week."}
+                ? `Your last 3 months average ${formatHours(avgHours)}. The week target never goes above the hours you set.`
+                : "No activities copied from Strava yet. VO2 uses these hours until it can set the target from your fitness, and never goes above them."}
           </FieldDescription>
-          {hasHistory ? (
-            <Controller
-              name={"hoursIntent" as FieldPath<T>}
-              control={control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <RadioGroup
-                    name={field.name}
-                    value={field.value as string}
-                    onValueChange={(next) => {
-                      if (!next) return;
-                      field.onChange(next);
-                      setValue(
-                        "targetWeeklyHours" as FieldPath<T>,
-                        suggestedTargetHours(avgHours, next as HoursIntent) as never,
-                        { shouldValidate: true },
-                      );
-                    }}
-                  >
-                    {HOURS_INTENTS.map((intent) => {
-                      const id = `${idPrefix}-hours-${intent.id}`;
-                      return (
-                        <Field key={intent.id} orientation="horizontal">
-                          <RadioGroupItem value={intent.id} id={id} />
-                          <FieldLabel htmlFor={id} className="font-normal">
-                            {intent.label}
-                          </FieldLabel>
-                        </Field>
-                      );
-                    })}
-                  </RadioGroup>
-                  {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-                </Field>
-              )}
-            />
-          ) : null}
           <Controller
             name={"targetWeeklyHours" as FieldPath<T>}
             control={control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor={`${idPrefix}-hours-slider`}>
-                  Target {formatHours(field.value as number)} a week
+                  {targetMode === "manual" ? "Up to" : "Start with"}{" "}
+                  {formatHours(field.value as number)} a week
                 </FieldLabel>
                 <Slider
                   id={`${idPrefix}-hours-slider`}

@@ -23,11 +23,7 @@ import {
 } from "@/lib/settings-sections.ts";
 import { saveAthleteSettings } from "@/services/athlete-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import {
-  hasRecentWeeklyHours,
-  recentAverageWeeklyHours,
-  recentSessionHistory,
-} from "@/services/training-plan.ts";
+import { recentAverageWeeklyHours, recentSessionHistory } from "@/services/training-plan.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -44,7 +40,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
   ProfileFields,
-  TrainingPaceFields,
+  SeasonGoalsNote,
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
@@ -253,16 +249,11 @@ export function SettingsForm({
               </>
             ) : section === "training" ? (
               <FieldGroup>
-                <TrainingPaceFields
-                  idPrefix="settings"
-                  control={form.control}
-                  hasActivityHistory={hasRecentWeeklyHours(avgHours)}
-                />
+                <SeasonGoalsNote />
                 <FieldSeparator />
                 <TrainingWeekFields
                   idPrefix="settings"
                   control={form.control}
-                  setValue={form.setValue}
                   avgHours={avgHours}
                 />
                 <FieldSeparator />
