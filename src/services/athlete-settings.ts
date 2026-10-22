@@ -8,6 +8,11 @@ import {
   type AthleteSettings,
   type ProfileSettings,
 } from "./athlete-settings.types.ts";
+import {
+  heartRateSettingsSchema,
+  type HeartRateEstimates,
+  type HeartRateSettings,
+} from "./heart-rate-settings.ts";
 import type { FitnessLoad } from "./training-load.ts";
 import { trainingPlanSchema, type TrainingPlan } from "./training-plan.types.ts";
 
@@ -17,6 +22,7 @@ export const athleteSettingsSaveSchema = z.object({
   sportGroupShares: z.record(z.string(), z.boolean()),
   calendarPeriod: calendarPeriodSchema.optional(),
   training: trainingPlanSchema.optional(),
+  heartRate: heartRateSettingsSchema.optional(),
 });
 
 export type AthleteSettingsSave = z.infer<typeof athleteSettingsSaveSchema>;
@@ -25,11 +31,14 @@ export type SavedAthleteSettings = {
   profile: ProfileSettings;
   settings: AthleteSettings;
   training: TrainingPlan | null;
+  heartRate: HeartRateSettings;
 };
 
 export type SettingsSnapshot = SavedAthleteSettings & {
   signedIn: boolean;
   fitnessLoads: FitnessLoad[];
+  /** Shown as placeholders and checked against the athlete's own values. */
+  heartRateEstimates: HeartRateEstimates;
 };
 
 export const loadSettingsSnapshot = createServerFn({ method: "GET" }).handler(

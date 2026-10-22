@@ -2,12 +2,15 @@ import { formatBpm, formatDuration, formatElevation } from "./activity-detail.ty
 import { formatLocomotion } from "./locomotion.ts";
 import { formatSportType } from "./athlete-settings.types.ts";
 import {
+  athleteMaxHr,
   emptyHistogram,
-  estimateLthrFromMax,
   heartRateFamily,
   HR_ZONES,
+  sportHeartRate,
   zonesFromHistogram,
+  type AthleteHeartRate,
   type HeartRateFamily,
+  type ZoneAnchors,
 } from "./heart-rate.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
@@ -114,7 +117,7 @@ export type ActivityOverview = {
   hasStreams: boolean;
   powerRole: "meter" | "estimated" | "none";
   lthr: number | null;
-  lthrSource: "athlete" | "estimated-from-session-max" | null;
+  lthrSource: "athlete" | "estimated" | "estimated-from-session-max" | null;
   ftp: number | null;
   timeInZones: ZoneShare[];
   aboveThresholdSec: number;
@@ -862,8 +865,7 @@ function powerRoleFor(sportType: string, hasWatts: boolean): ActivityOverview["p
 function zoneSharesFromSamples(
   samples: ActivitySample[],
   sportType: string,
-  maxHeartrate: number | null,
-  lthr: number | null,
+  anchors: ZoneAnchors,
 ): ZoneShare[] {
   const histogram = emptyHistogram();
   const time = samples.map((sample) => sample.t);
@@ -876,7 +878,7 @@ function zoneSharesFromSamples(
       current != null && previous != null ? Math.max(0, Math.min(30, current - previous)) : 1;
     histogram[bpm] += delta > 0 ? delta : 1;
   }
-  const zones = zonesFromHistogram(histogram, sportType, maxHeartrate, lthr);
+  const zones = zonesFromHistogram(histogram, sportType, anchors);
   const total = zones.reduce((sum, zone) => sum + zone.seconds, 0);
   if (total <= 0) return [];
   return zones
@@ -894,6 +896,12 @@ function zoneSharesFromSamples(
     });
 }
 
+const LTHR_SOURCE_NOTES = {
+  athlete: "set by the athlete",
+  estimated: "estimated from the athlete's history",
+  "estimated-from-session-max": "estimated from this session's max",
+} as const;
+
 export function buildOverview(input: {
   title: string;
   sportType: string;
@@ -903,9 +911,7 @@ export function buildOverview(input: {
   samples: ActivitySample[];
   athlete?: {
     ftp: number | null;
-    cyclingLthr: number | null;
-    runLthr: number | null;
-    swimLthr: number | null;
+    heartRate: AthleteHeartRate;
   };
 }): ActivityOverview {
   const samples = input.samples;
@@ -920,18 +926,24 @@ export function buildOverview(input: {
     .map((sample) => sample.speedKmh)
     .filter((value): value is number => value != null);
   const maxHeartrate = hrs.length ? Math.max(...hrs) : null;
-  const estimatedLthr = estimateLthrFromMax(maxHeartrate, family);
+  const heartRate = input.athlete?.heartRate;
+  // Without a max the athlete set, the session's own peak caps the zones.
+  const zoneMax = athleteMaxHr(family, heartRate) ?? maxHeartrate;
+  const resolved = sportHeartRate(family, zoneMax, heartRate);
+  const lthr = resolved.lthr;
   const storedLthr =
-    family === "cycling"
-      ? (input.athlete?.cyclingLthr ?? null)
-      : family === "running"
-        ? (input.athlete?.runLthr ?? null)
-        : family === "swimming"
-          ? (input.athlete?.swimLthr ?? null)
-          : null;
-  const lthr = storedLthr ?? estimatedLthr;
-  const lthrSource = storedLthr ? "athlete" : estimatedLthr ? "estimated-from-session-max" : null;
-  const timeInZones = zoneSharesFromSamples(samples, input.sportType, maxHeartrate, lthr);
+    family === "cycling" || family === "running" || family === "swimming"
+      ? (heartRate?.lthr[family] ?? null)
+      : null;
+  const lthrSource =
+    resolved.lthrSource === "athlete"
+      ? "athlete"
+      : lthr == null
+        ? null
+        : storedLthr != null && athleteMaxHr(family, heartRate) == null
+          ? "estimated"
+          : "estimated-from-session-max";
+  const timeInZones = zoneSharesFromSamples(samples, input.sportType, resolved);
   const aboveThresholdSec = timeInZones
     .filter((zone) => zone.id === "z4" || zone.id === "z5")
     .reduce((sum, zone) => sum + zone.seconds, 0);
@@ -946,7 +958,7 @@ export function buildOverview(input: {
   }
   if (lthr) {
     notes.push(
-      `Coach against ${lthr} bpm LTHR (${lthrSource === "athlete" ? "athlete profile" : "estimated from this session's max"}).`,
+      `Coach against ${lthr} bpm LTHR (${LTHR_SOURCE_NOTES[lthrSource ?? "estimated-from-session-max"]}).`,
     );
   }
   return {

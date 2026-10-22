@@ -102,6 +102,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   runLthr: real("run_lthr"),
   swimLthr: real("swim_lthr"),
   restHr: real("rest_hr"),
+  /** Anchors the athlete set and each sport's zone method; the columns above stay estimates. */
+  heartRate: jsonb("heart_rate"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
   /** MNSTRY product ids the athlete has; fuel plans use only these. Null until chosen. */

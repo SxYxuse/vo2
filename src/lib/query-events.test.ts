@@ -9,9 +9,15 @@ import {
 } from "@/lib/queries.ts";
 import { afterLocalCopyChanged, afterSettingsSaved, afterSignOut } from "@/lib/query-events.ts";
 import { DEFAULT_ATHLETE_SETTINGS } from "@/services/athlete-settings.types.ts";
+import { DEFAULT_HEART_RATE_SETTINGS } from "@/services/heart-rate-settings.ts";
 
 const settings = { ...DEFAULT_ATHLETE_SETTINGS, calendarPeriod: "weeks" as const };
-const saved = { profile: { birthDate: "1990-01-01", weightKg: 70 }, settings, training: null };
+const saved = {
+  profile: { birthDate: "1990-01-01", weightKg: 70 },
+  settings,
+  training: null,
+  heartRate: DEFAULT_HEART_RATE_SETTINGS,
+};
 
 function cachedClient() {
   const queryClient = new QueryClient();

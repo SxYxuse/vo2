@@ -2,6 +2,7 @@ import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay } from "date-fns";
 import { z } from "zod";
 
+import type { ZoneAnchors } from "./heart-rate.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { buildPmc, dayKey, periodStartMs, type FitnessLoad } from "./training-load.ts";
 
@@ -236,10 +237,8 @@ export type FamilyCollectors = {
 
 export type PlanningAnchors = {
   ftpWatts: number | null;
-  cyclingLthr: number | null;
-  cyclingMaxHr: number | null;
-  runLthr: number | null;
-  runMaxHr: number | null;
+  /** Each sport's zone anchors and method, so session cues match the athlete's zones. */
+  heartRate: Record<"cycling" | "running", ZoneAnchors>;
 };
 
 export const WEEKDAYS = [

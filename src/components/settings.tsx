@@ -47,6 +47,7 @@ import {
   TrainingPaceFields,
   TrainingWeekFields,
 } from "@/components/settings-fields.tsx";
+import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
 import { WeekMixFields } from "@/components/week-mix-fields.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
@@ -57,7 +58,9 @@ import { Spinner } from "@/components/ui/spinner";
 // Sliders report every step; waiting this long after the last one saves once the thumb settles.
 const SAVE_DELAY_MS = 400;
 // Typed fields save on blur, so a weight is not saved one keystroke at a time.
-const TYPED_FIELDS = new Set<string>(["weightKg"]);
+function isTypedField(name: string) {
+  return name === "weightKg" || (name.startsWith("heartRate.") && !name.endsWith(".method"));
+}
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -118,6 +121,7 @@ export function SettingsForm({
       settingsFormDefaults({
         profile: data.profile,
         training: data.training,
+        heartRate: data.heartRate,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
@@ -126,7 +130,7 @@ export function SettingsForm({
       }),
       { keepDirtyValues: true, keepErrors: true },
     );
-  }, [data?.profile, data?.training, data?.settings, avgHours, timeZone, form]);
+  }, [data?.profile, data?.training, data?.settings, data?.heartRate, avgHours, timeZone, form]);
 
   // One save at a time, each sending the form as it is when it starts, so the latest edit wins.
   // A plain promise rather than a mutation keeps saving after the form unmounts.
@@ -164,7 +168,7 @@ export function SettingsForm({
 
   useEffect(() => {
     const subscription = form.watch((_values, { name, type }) => {
-      if (type !== "change" || !name || TYPED_FIELDS.has(name)) return;
+      if (type !== "change" || !name || isTypedField(name)) return;
       clearTimeout(timer.current);
       timer.current = setTimeout(requestSave, SAVE_DELAY_MS);
     });
@@ -200,7 +204,7 @@ export function SettingsForm({
         }}
         onBlur={(event) => {
           const name = event.target.getAttribute("name");
-          if (name && TYPED_FIELDS.has(name) && form.getFieldState(name as "weightKg").isDirty) {
+          if (name && isTypedField(name) && form.getFieldState(name as "weightKg").isDirty) {
             requestSave();
           }
         }}
@@ -277,6 +281,13 @@ export function SettingsForm({
               <CalendarPeriodField idPrefix="settings" control={form.control} />
             ) : section === "sync" ? (
               <SettingsSyncSection enabled />
+            ) : section === "heart-rate" ? (
+              <HeartRateFields
+                idPrefix="settings"
+                control={form.control}
+                setValue={form.setValue}
+                estimates={data.heartRateEstimates}
+              />
             ) : (
               <SportTypesFields idPrefix="settings" control={form.control} />
             )}

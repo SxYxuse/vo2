@@ -25,14 +25,16 @@ import {
   type HeartPeak,
 } from "./heart-insights.ts";
 import {
-  familyLthr,
+  athleteMaxHr,
   heartRateFamily,
   histogramSeconds,
   isPlausibleBpm,
-  zoneModelFor,
+  sportHeartRate,
+  zoneMethodLabel,
   zonesFromHistogram,
-  type SportLthrAnchors,
 } from "./heart-rate.ts";
+import { athleteHeartRateFrom, type HeartRateMetricsRow } from "./heart-rate-settings.ts";
+import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import {
   buildRideAnalysis,
   isRideAnalysis,
@@ -75,10 +77,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
       rideAnalysis: activityStreams.rideAnalysis,
       heartAnalysis: activityStreams.heartAnalysis,
       ftp: athleteMetrics.ftp,
-      cyclingLthr: athleteMetrics.cyclingLthr,
-      runLthr: athleteMetrics.runLthr,
-      swimLthr: athleteMetrics.swimLthr,
-      lthr: athleteMetrics.lthr,
+      ...HEART_RATE_METRICS,
       birthDate: athleteMetrics.birthDate,
     })
     .from(activities)
@@ -158,7 +157,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
   };
 }
 
-type DetailRow = {
+type DetailRow = HeartRateMetricsRow & {
   id: string;
   sportType: string;
   startDate: Date;
@@ -169,10 +168,6 @@ type DetailRow = {
   averageWatts: number | null;
   weightedAverageWatts: number | null;
   deviceWatts: boolean;
-  cyclingLthr: number | null;
-  runLthr: number | null;
-  swimLthr: number | null;
-  lthr: number | null;
   birthDate: string | null;
 };
 
@@ -210,18 +205,17 @@ async function buildActivityHeart(
       avgBpm: item.averageHeartrate,
     });
   }
-  const maxAnchor = estimateMaxHrAnchor(peaks, { family, age: ageFromBirthDate(row.birthDate) });
-  const stored: SportLthrAnchors = {};
-  const cyclingLthr = row.cyclingLthr ?? row.lthr;
-  if (cyclingLthr) stored.cycling = { bpm: cyclingLthr, source: "estimated-from-max" };
-  if (row.runLthr) stored.running = { bpm: row.runLthr, source: "estimated-from-max" };
-  if (row.swimLthr) stored.swimming = { bpm: row.swimLthr, source: "estimated-from-max" };
-  const { lthr } = familyLthr(family, maxAnchor.bpm, stored);
+  const athlete = athleteHeartRateFrom(row);
+  const maxAnchor = estimateMaxHrAnchor(peaks, {
+    family,
+    age: ageFromBirthDate(row.birthDate),
+    athleteBpm: athleteMaxHr(family, athlete),
+  });
+  const resolved = sportHeartRate(family, maxAnchor.bpm, athlete);
+  const lthr = resolved.lthr;
 
   const histogram = analysis?.histogram.length ? denseHistogram(analysis.histogram) : null;
-  const zones = histogram
-    ? zonesFromHistogram(histogram, row.sportType, maxAnchor.bpm, lthr)
-    : null;
+  const zones = histogram ? zonesFromHistogram(histogram, row.sportType, resolved) : null;
 
   const start = row.startDate.toISOString();
   const current = toEfficiencyPoint({ ...row, start }, lthr);
@@ -254,7 +248,7 @@ async function buildActivityHeart(
 
   return {
     family,
-    zoneModel: zoneModelFor(row.sportType).label,
+    zoneModel: zoneMethodLabel(family, resolved.method),
     maxHeartrate: maxAnchor.bpm,
     lthr,
     zones,

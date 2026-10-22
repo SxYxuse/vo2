@@ -25,7 +25,13 @@ export function afterSettingsSaved(
   );
   queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
     current
-      ? { ...current, profile: saved.profile, settings: saved.settings, training: saved.training }
+      ? {
+          ...current,
+          profile: saved.profile,
+          settings: saved.settings,
+          training: saved.training,
+          heartRate: saved.heartRate,
+        }
       : current,
   );
   queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
