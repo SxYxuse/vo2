@@ -183,7 +183,7 @@ export function HeartRateFields({
         const methodId = `${idPrefix}-${family}-method`;
         return (
           <FieldSet key={family} className="gap-4 rounded-lg border p-3">
-            <FieldLegend>{ZONED_FAMILY_LABELS[family]}</FieldLegend>
+            <FieldLegend className="float-left mb-0">{ZONED_FAMILY_LABELS[family]}</FieldLegend>
             <Controller
               name={`${base}.method`}
               control={control}
