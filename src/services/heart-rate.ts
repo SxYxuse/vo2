@@ -287,7 +287,10 @@ export function resolveHeartRate(
 }
 
 /** The anchor a sport's method needs but has no value for, if any. */
-export function missingAnchor(resolved: ResolvedHeartRate): "max" | "lthr" | "rest" | null {
+export function missingAnchor(
+  resolved: ResolvedHeartRate,
+): "max" | "lthr" | "rest" | "zones" | null {
+  if (resolved.method === "custom" && resolved.customZones?.length !== 4) return "zones";
   if (resolved.method === "lthr" && resolved.lthr == null) return "lthr";
   if ((resolved.method === "max" || resolved.method === "reserve") && resolved.maxHr == null) {
     return "max";

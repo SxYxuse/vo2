@@ -66,6 +66,7 @@ const MISSING_LABEL = {
   max: "max heart rate",
   lthr: "LTHR",
   rest: "resting heart rate",
+  zones: "all four zone tops",
 } as const;
 
 function estimateText(value: number | null) {

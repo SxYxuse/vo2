@@ -6,10 +6,12 @@ import {
   emptyHistogram,
   heartRateFamily,
   HR_ZONES,
+  isZonedFamily,
   sportHeartRate,
   zonesFromHistogram,
   type AthleteHeartRate,
   type HeartRateFamily,
+  type ResolvedHeartRate,
   type ZoneAnchors,
 } from "./heart-rate.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
@@ -896,9 +898,23 @@ function zoneSharesFromSamples(
     });
 }
 
+/** Set, estimated from the athlete's max (recorded or set), or from this session's own peak. */
+function overviewLthrSource(
+  family: HeartRateFamily,
+  resolved: ResolvedHeartRate,
+  heartRate: AthleteHeartRate | undefined,
+): ActivityOverview["lthrSource"] {
+  if (resolved.lthr == null) return null;
+  if (resolved.lthrSource === "athlete") return "athlete";
+  const fromAthleteMax =
+    isZonedFamily(family) &&
+    (heartRate?.lthr[family] != null || athleteMaxHr(family, heartRate) != null);
+  return fromAthleteMax ? "estimated" : "estimated-from-session-max";
+}
+
 const LTHR_SOURCE_NOTES = {
   athlete: "set by the athlete",
-  estimated: "estimated from the athlete's history",
+  estimated: "estimated from the athlete's max heart rate",
   "estimated-from-session-max": "estimated from this session's max",
 } as const;
 
@@ -931,18 +947,7 @@ export function buildOverview(input: {
   const zoneMax = athleteMaxHr(family, heartRate) ?? maxHeartrate;
   const resolved = sportHeartRate(family, zoneMax, heartRate);
   const lthr = resolved.lthr;
-  const storedLthr =
-    family === "cycling" || family === "running" || family === "swimming"
-      ? (heartRate?.lthr[family] ?? null)
-      : null;
-  const lthrSource =
-    resolved.lthrSource === "athlete"
-      ? "athlete"
-      : lthr == null
-        ? null
-        : storedLthr != null && athleteMaxHr(family, heartRate) == null
-          ? "estimated"
-          : "estimated-from-session-max";
+  const lthrSource = overviewLthrSource(family, resolved, heartRate);
   const timeInZones = zoneSharesFromSamples(samples, input.sportType, resolved);
   const aboveThresholdSec = timeInZones
     .filter((zone) => zone.id === "z4" || zone.id === "z5")

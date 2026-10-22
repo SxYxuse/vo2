@@ -8,6 +8,7 @@ import {
   estimateLthrFromMax,
   heartRateFamily,
   isPlausibleBpm,
+  isZonedFamily,
   type HeartRateFamily,
 } from "./heart-rate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
@@ -183,10 +184,7 @@ function sportLthr(sportType: string, anchors: LoadAnchors) {
 export type AnchorOptions = { age?: number | null; now?: Date; heartRate?: HeartRateSettings };
 
 function athleteMaxHr(family: HeartRateFamily, settings: HeartRateSettings | undefined) {
-  if (family === "cycling" || family === "running" || family === "swimming") {
-    return settings?.sports[family].maxHr ?? null;
-  }
-  return null;
+  return isZonedFamily(family) ? (settings?.sports[family].maxHr ?? null) : null;
 }
 
 /** Recent max HR per family, with sensor spikes dropped (same rules as the heart rate page). */
