@@ -233,7 +233,7 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
                 const id = `${idPrefix}-target-${mode.id}`;
                 return (
                   <FieldLabel key={mode.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start rounded-lg border p-3">
+                    <Field orientation="horizontal" className="items-start p-3">
                       <RadioGroupItem value={mode.id} id={id} />
                       <FieldContent>
                         <FieldTitle>{mode.label}</FieldTitle>
@@ -354,7 +354,7 @@ export function CalendarPeriodField({
               const id = `${idPrefix}-calendar-period-${period.id}`;
               return (
                 <FieldLabel key={period.id} htmlFor={id} className="w-full">
-                  <Field orientation="horizontal" className="items-start rounded-lg border p-3">
+                  <Field orientation="horizontal" className="items-start p-3">
                     <RadioGroupItem value={period.id} id={id} />
                     <FieldContent>
                       <FieldTitle>{period.label}</FieldTitle>
