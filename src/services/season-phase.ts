@@ -1,5 +1,7 @@
 import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
+import { ATL_DAYS, CTL_DAYS } from "./training-load.ts";
 import {
+  addDayKey,
   isKeySport,
   sportFamilyOf,
   type BuildPace,
@@ -46,12 +48,12 @@ export type SeasonPhase = {
   /** A goal that is not the main one falls this week: a short taper and fewer key sessions. */
   tuneUp: Goal[];
   /**
-   * How the week target moves: a ramp in fitness per week (as build pace did), or a share of
+   * How the week target moves: a ramp in fitness per week, or a share of
    * the week's usual load when volume drops.
    */
   ramp: number;
   loadFactor: number | null;
-  /** Which key session types lead (the build pace rotations). */
+  /** Which key session types lead (see KEY_ROTATION in week-target.ts). */
   rotation: BuildPace;
   /** At most this many key sessions this week, whatever the week mix says. */
   maxKeySessions: number | null;
@@ -338,4 +340,50 @@ export function goalSessions(
     longClimbM: longClimbM || null,
     hilly: keySport !== "swimming" && climbPerKm >= HILLY_M_PER_KM,
   };
+}
+
+/** The phase's ramp, eased off when form is already low. */
+export function rampFor(ramp: number, form: number) {
+  if (form < -30) return Math.min(ramp, 0);
+  if (form < -18) return Math.min(ramp, 5);
+  if (form < -10) return Math.min(ramp, 8);
+  return ramp;
+}
+
+/** A week's training load from fitness and fatigue at its start, as the week target sets it. */
+export function phaseWeekLoad(
+  phase: Pick<SeasonPhase, "ramp" | "loadFactor">,
+  fitness: { ctl: number; atl: number },
+) {
+  const { ctl, atl } = fitness;
+  if (phase.loadFactor != null) return 7 * ctl * phase.loadFactor;
+  return Math.max(0, 7 * ctl + CTL_DAYS * rampFor(phase.ramp, ctl - atl));
+}
+
+function mondayOf(key: string) {
+  const weekday = new Date(`${key}T12:00:00Z`).getUTCDay();
+  return addDayKey(key, -((weekday + 6) % 7));
+}
+
+/**
+ * Fitness, fatigue, and form on the morning of `goalDate` if every week from tomorrow hits its
+ * week target, load spread evenly over the days. A guide to the taper, not a prediction.
+ */
+export function projectRaceDay(
+  fitness: { ctl: number; atl: number },
+  goals: Goal[],
+  today: string,
+  goalDate: string,
+) {
+  let { ctl, atl } = fitness;
+  let dailyLoad = 0;
+  for (let day = addDayKey(today, 1); day < goalDate; day = addDayKey(day, 1)) {
+    const weekStart = mondayOf(day);
+    if (day === weekStart || day === addDayKey(today, 1)) {
+      dailyLoad = phaseWeekLoad(seasonPhase(goals, weekStart), { ctl, atl }) / 7;
+    }
+    ctl += (dailyLoad - ctl) / CTL_DAYS;
+    atl += (dailyLoad - atl) / ATL_DAYS;
+  }
+  return { ctl, atl, form: ctl - atl };
 }

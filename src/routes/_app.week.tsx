@@ -28,7 +28,7 @@ function WeekTargetHeading() {
     <div className="flex flex-col gap-2">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
         <TargetIcon aria-hidden className="size-5" />
-        Week target
+        This week
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         Time left to reach this training week’s target, and the best use of the time you have today.
@@ -69,7 +69,7 @@ function WeekTargetPage() {
             </EmptyMedia>
             <EmptyTitle>Finish your training plan</EmptyTitle>
             <EmptyDescription>
-              Set a build pace and weekly hours in Settings → Training to get a week target.
+              Set your weekly hours and week mix in Settings → Training to get a week target.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -92,7 +92,7 @@ function WeekTargetError({ error }: ErrorComponentProps) {
   return (
     <Empty className="min-h-64 border">
       <EmptyHeader>
-        <EmptyTitle>Could not load the week target</EmptyTitle>
+        <EmptyTitle>Could not load this week</EmptyTitle>
         <EmptyDescription>{message}</EmptyDescription>
       </EmptyHeader>
     </Empty>
