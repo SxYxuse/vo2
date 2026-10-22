@@ -90,7 +90,7 @@ export function SeasonView({ data }: { data: SeasonData }) {
   return (
     <>
       <div className="flex justify-end">
-        <Button size="sm" onClick={() => open(null)}>
+        <Button onClick={() => open(null)}>
           <PlusIcon data-icon="inline-start" />
           Add a goal
         </Button>
