@@ -7,7 +7,13 @@ import { TZDate } from "@date-fns/tz";
 import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { cn } from "cn";
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FlagIcon,
+  HeartOffIcon,
+} from "lucide-react";
 
 import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
@@ -23,7 +29,11 @@ import {
   formatDistanceKm,
   formatDuration,
 } from "@/services/activity-detail.ts";
-import { isMissingHeartrate, type CalendarActivity } from "@/services/home-data.types.ts";
+import {
+  isMissingHeartrate,
+  type CalendarActivity,
+  type CalendarGoal,
+} from "@/services/home-data.types.ts";
 import {
   diaryTotals,
   diaryWindow,
@@ -86,17 +96,39 @@ function MissingHeartrateMark() {
   );
 }
 
+/** Goals share the calendar with activities; their event ids carry this prefix. */
+const GOAL_ID_PREFIX = "goal:";
+
+type CalendarItem = CalendarActivity | CalendarGoal;
+
+function isGoal(item: CalendarItem | undefined): item is CalendarGoal {
+  return item != null && "date" in item;
+}
+
 function warmActivity(queryClient: ReturnType<typeof useQueryClient>, id: string) {
+  if (id.startsWith(GOAL_ID_PREFIX)) return;
   prefetchActivityDetail(queryClient, id);
+}
+
+function GoalMark() {
+  return <FlagIcon aria-hidden className="size-3 shrink-0 text-(--ec-event-color)" />;
 }
 
 function CalendarEventChip({
   occurrence,
 }: {
-  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+  occurrence: EventCalendarRenderEventProps<CalendarItem>["occurrence"];
 }) {
   const queryClient = useQueryClient();
   const activity = occurrence.event.data;
+  if (isGoal(activity)) {
+    return (
+      <span className="contents">
+        <GoalMark />
+        <span className="hidden truncate font-semibold sm:inline">{activity.name}</span>
+      </span>
+    );
+  }
   return (
     <span
       className="contents"
@@ -115,17 +147,18 @@ function CalendarEventChip({
   );
 }
 
-function renderCalendarEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+function renderCalendarEvent({ occurrence }: EventCalendarRenderEventProps<CalendarItem>) {
   return <CalendarEventChip occurrence={occurrence} />;
 }
 
 function renderCalendarEventTooltip({
   occurrence,
 }: {
-  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+  occurrence: EventCalendarRenderEventProps<CalendarItem>["occurrence"];
 }) {
   const activity = occurrence.event.data;
   if (!activity) return occurrence.event.title;
+  if (isGoal(activity)) return `Goal · ${activity.name} · ${formatSportType(activity.sportType)}`;
   const when = formatActivityClockRange(activity.start, activity.end);
   return (
     <span className="flex flex-col gap-0.5">
@@ -142,10 +175,24 @@ function renderCalendarEventTooltip({
 function AgendaEventRow({
   occurrence,
 }: {
-  occurrence: EventCalendarRenderEventProps<CalendarActivity>["occurrence"];
+  occurrence: EventCalendarRenderEventProps<CalendarItem>["occurrence"];
 }) {
   const queryClient = useQueryClient();
-  const activity = occurrence.event.data;
+  const item = occurrence.event.data;
+  if (isGoal(item)) {
+    return (
+      <span className="contents">
+        <GoalMark />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate text-sm font-semibold">{item.name}</span>
+          <span className="text-muted-foreground truncate text-xs">
+            Goal · {formatSportType(item.sportType)}
+          </span>
+        </span>
+      </span>
+    );
+  }
+  const activity = item;
   const when = activity ? formatActivityClockRange(activity.start, activity.end) : "";
   const meta = activity
     ? [
@@ -180,7 +227,7 @@ function AgendaEventRow({
   );
 }
 
-function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<CalendarActivity>) {
+function renderAgendaEvent({ occurrence }: EventCalendarRenderEventProps<CalendarItem>) {
   return <AgendaEventRow occurrence={occurrence} />;
 }
 
@@ -368,11 +415,17 @@ function DiaryNav({
 
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
+  goals: CalendarGoal[];
   initialSettings: AthleteSettings;
   diary: DiarySearch;
 };
 
-export function ActivityCalendar({ activities, initialSettings, diary }: ActivityCalendarProps) {
+export function ActivityCalendar({
+  activities,
+  goals,
+  initialSettings,
+  diary,
+}: ActivityCalendarProps) {
   const sportTypes = initialSettings.sportTypes;
   const isDesktopMedia = useDesktopMedia();
   const layoutReady = isDesktopMedia !== null;
@@ -427,8 +480,25 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
   const weekSwipe = useWeekSwipe({ onStep: stepWeek, canStepForward: cursorWeek < currentWeek });
 
   // The month view still lays bars across its padded weeks, even with outside days hidden.
-  const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
-    return activities
+  const events = useMemo<CalendarEvent<CalendarItem>[]>(() => {
+    const goalEvents = goals
+      .filter((goal) => !byMonth || goal.date.startsWith(cursorMonth))
+      .map((goal) => {
+        const dayStart = dayKeyDate(goal.date, timeZone);
+        return {
+          id: `${GOAL_ID_PREFIX}${goal.id}`,
+          title: goal.name,
+          start: dayStart,
+          end: addDays(dayStart, 1),
+          allDay: true,
+          color: sportTypeColor(sportTypes, goal.sportType),
+          readOnly: true,
+          draggable: false,
+          resizable: false,
+          data: goal,
+        };
+      });
+    const activityEvents = activities
       .filter(
         (activity) => !byMonth || monthKey(new Date(activity.start), timeZone) === cursorMonth,
       )
@@ -447,7 +517,9 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
           data: activity,
         };
       });
-  }, [activities, sportTypes, timeZone, byMonth, cursorMonth]);
+    // Goals first, so a race day leads with the goal and then what was done.
+    return [...goalEvents, ...activityEvents];
+  }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
   return (
     <Card className="flex h-[calc(100dvh-7.5rem)] min-h-80 flex-none flex-col py-0 md:h-[720px]">
@@ -475,6 +547,10 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
             interactions={DISABLED_INTERACTIONS}
             onEventClick={(occurrence, event) => {
               event.preventDefault();
+              if (isGoal(occurrence.event.data)) {
+                void navigate({ to: "/season" });
+                return;
+              }
               warmActivity(queryClient, occurrence.event.id);
               const activityId = occurrence.event.id;
               void router.preloadRoute({

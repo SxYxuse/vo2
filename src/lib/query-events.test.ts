@@ -29,10 +29,15 @@ function cachedClient() {
   queryClient.setQueryData(homeQueryOptions.queryKey, {
     signedIn: true,
     activities: [],
+    goals: [],
     settings: DEFAULT_ATHLETE_SETTINGS,
     training: null,
   });
-  queryClient.setQueryData(fitnessQueryOptions.queryKey, { signedIn: true, fitnessLoads: [] });
+  queryClient.setQueryData(fitnessQueryOptions.queryKey, {
+    signedIn: true,
+    fitnessLoads: [],
+    goals: [],
+  });
   queryClient.setQueryData(activityDetailQueryOptions("42").queryKey, {} as never);
   return queryClient;
 }

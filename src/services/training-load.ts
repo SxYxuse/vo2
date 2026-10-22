@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
 import type { HeartRateSettings } from "./heart-rate-settings.ts";
+import type { Goal } from "./season.types.ts";
 import {
   estimateLthrFromMax,
   heartRateFamily,
@@ -667,6 +668,8 @@ export function roundLoad(value: number) {
 export type FitnessPageData = {
   signedIn: boolean;
   fitnessLoads: FitnessLoad[];
+  /** Season goals, marked on the chart; the next one gets a race-day projection. */
+  goals: Goal[];
 };
 
 export const loadFitnessData = createServerFn({ method: "GET" }).handler(

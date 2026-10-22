@@ -6,12 +6,13 @@ import { logger } from "@/lib/logger.server.ts";
 import { ageFromBirthDate } from "./athlete-settings.types.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
+import { goalsFor } from "./season.server.ts";
 import {
   activityTrainingLoad,
   estimateLoadAnchors,
   isPowerCyclingSport,
   toFitnessLoad,
-  type FitnessLoad,
+  type FitnessPageData,
   type LoadAnchors,
   type LoadInputs,
   type LoadSource,
@@ -161,32 +162,33 @@ export async function refreshTrainingLoadsForUser(userId: string) {
   await refreshTrainingLoads(userId);
 }
 
-export async function loadFitnessDataImpl(): Promise<{
-  signedIn: boolean;
-  fitnessLoads: FitnessLoad[];
-}> {
+export async function loadFitnessDataImpl(): Promise<FitnessPageData> {
   const session = await getOptionalSession();
   if (!session) {
     logger.debug("fitness.anonymous");
-    return { signedIn: false, fitnessLoads: [] };
+    return { signedIn: false, fitnessLoads: [], goals: [] };
   }
 
   await refreshTrainingLoadsIfNeeded(session.user.id);
 
-  const rows = await db
-    .select({
-      startDate: activities.startDate,
-      movingTime: activities.movingTime,
-      trainingLoad: activities.trainingLoad,
-      loadSource: activities.loadSource,
-    })
-    .from(activities)
-    .where(eq(activities.userId, session.user.id))
-    .orderBy(activities.startDate);
+  const [rows, goals] = await Promise.all([
+    db
+      .select({
+        startDate: activities.startDate,
+        movingTime: activities.movingTime,
+        trainingLoad: activities.trainingLoad,
+        loadSource: activities.loadSource,
+      })
+      .from(activities)
+      .where(eq(activities.userId, session.user.id))
+      .orderBy(activities.startDate),
+    goalsFor(session.user.id),
+  ]);
 
   logger.debug("fitness.loaded", { activityCount: rows.length });
   return {
     signedIn: true,
+    goals,
     fitnessLoads: rows.map((row) =>
       toFitnessLoad(
         row.startDate,

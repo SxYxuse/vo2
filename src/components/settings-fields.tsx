@@ -219,7 +219,7 @@ export function TrainingWeekFields<T extends TrainingFormInput>({
         render={({ field, fieldState }) => (
           <FieldSet data-invalid={fieldState.invalid}>
             <FieldLegend>Weekly target</FieldLegend>
-            <FieldDescription>Hours are the headline on the Week target page.</FieldDescription>
+            <FieldDescription>Hours are the headline on the This week page.</FieldDescription>
             <RadioGroup
               name={field.name}
               value={field.value as string}

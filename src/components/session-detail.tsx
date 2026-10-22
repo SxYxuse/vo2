@@ -302,7 +302,7 @@ export function SessionDetail({
           nativeButton={false}
         >
           <ArrowLeftIcon data-icon="inline-start" />
-          Week target
+          This week
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
           <SportIcon aria-hidden className={cn("size-5", SPORT_STYLE[pick.family].text)} />

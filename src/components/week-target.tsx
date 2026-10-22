@@ -6,8 +6,10 @@ import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import {
   ChevronDownIcon,
+  ChevronRightIcon,
   CircleCheckIcon,
   CircleIcon,
+  FlagIcon,
   MoonIcon,
   PauseIcon,
   PlusIcon,
@@ -18,6 +20,7 @@ import { cn } from "cn";
 
 import { settingsSnapshotQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
 import { PHASES, type SeasonPhase } from "@/services/season-phase.ts";
+import { daysBetween, formatDaysLeft } from "@/services/season.types.ts";
 import {
   addDayKey,
   formatHours,
@@ -470,7 +473,7 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
   );
 }
 
-function SplitCard({ summary }: { summary: WeekSummary }) {
+function SplitCard({ summary, season }: { summary: WeekSummary; season: SeasonPhase }) {
   const families = (["cycling", "running", "other"] as const).filter(
     (family) => summary.bySport[family].done + summary.bySport[family].left > 0,
   );
@@ -483,7 +486,11 @@ function SplitCard({ summary }: { summary: WeekSummary }) {
     <Card>
       <CardHeader>
         <CardTitle>What’s left by sport</CardTitle>
-        <CardDescription>Split from your last {HISTORY_WEEKS} weeks.</CardDescription>
+        <CardDescription>
+          {season.goalWeight > 0
+            ? `Split from your last ${HISTORY_WEEKS} weeks, leaning toward your goals’ sports.`
+            : `Split from your last ${HISTORY_WEEKS} weeks.`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {families.length ? (
@@ -946,8 +953,8 @@ function ProjectionCard({ data, summary }: { data: PlannedWeek; summary: WeekSum
             <AlertTitle>Big jump in load</AlertTitle>
             <AlertDescription>
               This week would be {rampPct}% above your last 4-week average of{" "}
-              {projection.recentAverageLoad}. Jumps over 30% raise injury risk. Consider a slower
-              build pace or fixed hours.
+              {projection.recentAverageLoad}. Jumps over 30% raise injury risk. Consider capping
+              your hours in Settings, or a less demanding objective on your next goal.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -1001,14 +1008,58 @@ function DoneCard({ data }: { data: PlannedWeek }) {
   );
 }
 
+/** Where the season puts this week, and how far the goal is. Opens the Season page. */
+function SeasonCard({ data }: { data: PlannedWeek }) {
+  const { season, today } = data;
+  const phase = PHASES[season.kind];
+  const anchorDate = season.anchor[0]?.date;
+  const names = season.anchor.map((goal) => goal.name).join(" + ");
+  const headline =
+    season.kind === "hold"
+      ? "No goal ahead"
+      : season.kind === "recovery" && anchorDate && anchorDate < today
+        ? `After ${names}`
+        : anchorDate
+          ? `${formatDaysLeft(daysBetween(today, anchorDate))} · ${names}`
+          : phase.label;
+  const tuneUp = season.tuneUp.length
+    ? `Tune-up this week: ${season.tuneUp.map((goal) => goal.name).join(" + ")}, with a short taper.`
+    : null;
+
+  return (
+    <Card className="py-0 md:col-span-2">
+      <Link
+        to="/season"
+        preload="intent"
+        className="hover:bg-muted/50 flex min-h-14 items-center gap-3 px-4 py-3"
+      >
+        <FlagIcon aria-hidden className="text-muted-foreground size-5 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex flex-wrap items-center gap-2">
+            <Badge variant={season.kind === "hold" ? "outline" : "secondary"}>{phase.label}</Badge>
+            <span className="truncate text-sm font-medium">{headline}</span>
+          </span>
+          <span className="text-muted-foreground text-xs">
+            {season.kind === "hold"
+              ? "The plan holds your fitness. Add a race or event to build toward it."
+              : (tuneUp ?? phase.hint)}
+          </span>
+        </div>
+        <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+      </Link>
+    </Card>
+  );
+}
+
 export function WeekTargetView({ data }: { data: PlannedWeek }) {
   const summary = useMemo(() => summarizeWeek(data), [data]);
   return (
     <div className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-2">
+      <SeasonCard data={data} />
       <TargetCard data={data} summary={summary} />
       <TodayCard data={data} summary={summary} />
       <WeekMixCard summary={summary} />
-      <SplitCard summary={summary} />
+      <SplitCard summary={summary} season={data.season} />
       <ProjectionCard data={data} summary={summary} />
       <DoneCard data={data} />
     </div>

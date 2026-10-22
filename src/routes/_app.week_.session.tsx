@@ -84,12 +84,12 @@ function SessionPage() {
         <EmptyHeader>
           <EmptyTitle>Session not found</EmptyTitle>
           <EmptyDescription>
-            This key session is no longer in your week mix. Pick one from the Week target page.
+            This key session is no longer in your week mix. Pick one from the This week page.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to="/week" />} nativeButton={false}>
-            Week target
+            This week
           </Button>
         </EmptyContent>
       </Empty>

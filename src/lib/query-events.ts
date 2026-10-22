@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
   activityDetailQueryOptions,
   appShellQueryOptions,
+  fitnessQueryOptions,
   homeQueryOptions,
   seasonQueryOptions,
   settingsSnapshotQueryOptions,
@@ -52,11 +53,13 @@ export function afterProfileSaved(queryClient: QueryClient) {
   return queryClient.invalidateQueries();
 }
 
-/** Goals set the week's plan, so the season and the week go stale together. */
+/** Goals set the week's plan and show on the calendar and fitness chart. */
 export function afterGoalsChanged(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
   ]);
 }
 
