@@ -20,7 +20,7 @@ const plan = {
   timeZone: "Europe/Paris",
 } as const;
 
-const profile = { birthDate: "1990-05-14", weightKg: 72 };
+const profile = { birthDate: "1990-05-14", weightKg: 72, heartRateSince: "2026-01-01" };
 
 function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
@@ -65,7 +65,7 @@ describe("settingsFormSchema", () => {
   it("flags the profile section when the birthday is missing", () => {
     const result = settingsFormSchema.safeParse(
       settingsFormDefaults({
-        profile: { birthDate: null, weightKg: 72 },
+        profile: { ...profile, birthDate: null },
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
@@ -80,7 +80,7 @@ describe("settingsFormSchema", () => {
   it("flags the profile section when the weight is missing", () => {
     const result = settingsFormSchema.safeParse(
       settingsFormDefaults({
-        profile: { birthDate: "1990-05-14", weightKg: null },
+        profile: { ...profile, weightKg: null },
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
@@ -91,19 +91,34 @@ describe("settingsFormSchema", () => {
 
     expect(issuePaths(result)).toEqual(["weightKg"]);
   });
+
+  it("flags the profile section when the reliable heart rate date is missing", () => {
+    const result = settingsFormSchema.safeParse(
+      settingsFormDefaults({
+        profile: { ...profile, heartRateSince: null },
+        training: plan,
+        sportTypes: {},
+        sportGroupShares: undefined,
+        avgHours: 5,
+        timeZone: "Europe/Paris",
+      }),
+    );
+
+    expect(issuePaths(result)).toEqual(["heartRateSince"]);
+  });
 });
 
 describe("profileFormSchema", () => {
   it.each(["29.9", "200.1", "abc"])("rejects a weight of %s", (weightKg) => {
-    const result = profileFormSchema.safeParse({ birthDate: "1990-05-14", weightKg });
+    const result = profileFormSchema.safeParse({ ...profile, weightKg });
 
     expect(issuePaths(result)).toEqual(["weightKg"]);
   });
 
   it("reads a comma decimal and keeps one decimal", () => {
-    const values = profileFormSchema.parse({ birthDate: "1990-05-14", weightKg: " 72,46 " });
+    const values = profileFormSchema.parse({ ...profile, weightKg: " 72,46 " });
 
-    expect(profileFromForm(values)).toEqual({ birthDate: "1990-05-14", weightKg: 72.5 });
+    expect(profileFromForm(values)).toEqual({ ...profile, weightKg: 72.5 });
   });
 });
 
@@ -166,6 +181,6 @@ describe("onboardingFormSchema", () => {
       }),
     );
 
-    expect(issuePaths(result)).toEqual(["birthDate", "weightKg"]);
+    expect(issuePaths(result)).toEqual(["birthDate", "heartRateSince", "weightKg"]);
   });
 });

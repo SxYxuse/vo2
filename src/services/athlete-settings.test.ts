@@ -2,7 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { athleteSettingsSaveSchema } from "./athlete-settings.ts";
 
-const profile = { birthDate: "1990-05-14", weightKg: 72 };
+const profile = { birthDate: "1990-05-14", weightKg: 72, heartRateSince: "2026-01-01" };
 
 function sport(visible: boolean) {
   return { visible, color: "var(--color-ds-blue-700)", heartRate: true, power: false };
@@ -42,6 +42,16 @@ describe("athleteSettingsSaveSchema", () => {
   it("rejects a save that clears the birthday", () => {
     const result = athleteSettingsSaveSchema.safeParse({
       profile: { ...profile, birthDate: null },
+      sportTypes: {},
+      sportGroupShares: {},
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a save that clears the reliable heart rate date", () => {
+    const result = athleteSettingsSaveSchema.safeParse({
+      profile: { ...profile, heartRateSince: null },
       sportTypes: {},
       sportGroupShares: {},
     });

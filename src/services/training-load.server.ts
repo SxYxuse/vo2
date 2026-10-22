@@ -8,6 +8,7 @@ import { getOptionalSession } from "@/lib/session.server.ts";
 import {
   activityTrainingLoad,
   estimateLoadAnchors,
+  heartRateSources,
   isPowerCyclingSport,
   toFitnessLoad,
   type FitnessLoad,
@@ -121,7 +122,7 @@ async function refreshTrainingLoads(userId: string) {
 
   const withStreams = await attachPowerStreams(rows);
   const [profile] = await db
-    .select({ birthDate: athleteMetrics.birthDate })
+    .select({ birthDate: athleteMetrics.birthDate, heartRateSince: athleteMetrics.heartRateSince })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
@@ -137,8 +138,9 @@ async function refreshTrainingLoads(userId: string) {
       set: stored,
     });
 
+  const sources = heartRateSources(withStreams, profile?.heartRateSince ?? null);
   const updates = withStreams.map((row) => {
-    return { id: row.id, ...activityTrainingLoad(row, anchors, withStreams) };
+    return { id: row.id, ...activityTrainingLoad(row, anchors, sources) };
   });
   await writeLoads(updates);
   logger.info("training_load.refreshed", {

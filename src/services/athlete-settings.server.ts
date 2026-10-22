@@ -53,12 +53,17 @@ export async function getAthleteProfile(userId: string): Promise<ProfileSettings
     .select({
       birthDate: athleteMetrics.birthDate,
       weightKg: athleteMetrics.weightKg,
+      heartRateSince: athleteMetrics.heartRateSince,
     })
     .from(athleteMetrics)
     .where(eq(athleteMetrics.userId, userId))
     .limit(1);
   if (!row) return DEFAULT_PROFILE_SETTINGS;
-  return { birthDate: row.birthDate ?? null, weightKg: row.weightKg ?? null };
+  return {
+    birthDate: row.birthDate ?? null,
+    weightKg: row.weightKg ?? null,
+    heartRateSince: row.heartRateSince ?? null,
+  };
 }
 
 export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
@@ -102,6 +107,14 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
   };
 }
 
+/**
+ * Age caps the max-HR anchor, which sets LTHR and so heart-rate training load; the
+ * reliable-heart-rate date picks which sessions lend heart rate to those without it.
+ */
+function loadInputsChanged(previous: ProfileSettings, next: ProfileSave) {
+  return previous.birthDate !== next.birthDate || previous.heartRateSince !== next.heartRateSince;
+}
+
 export async function saveAthleteSettingsImpl(
   value: AthleteSettingsSave,
 ): Promise<SavedAthleteSettings> {
@@ -129,6 +142,7 @@ export async function saveAthleteSettingsImpl(
         userId,
         birthDate: value.profile.birthDate,
         weightKg: value.profile.weightKg,
+        heartRateSince: value.profile.heartRateSince,
         training: value.training,
         updatedAt,
       })
@@ -137,6 +151,7 @@ export async function saveAthleteSettingsImpl(
         set: {
           birthDate: value.profile.birthDate,
           weightKg: value.profile.weightKg,
+          heartRateSince: value.profile.heartRateSince,
           ...(value.training ? { training: value.training } : {}),
           updatedAt,
         },
@@ -150,8 +165,7 @@ export async function saveAthleteSettingsImpl(
       });
   });
 
-  // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load.
-  if (previousProfile.birthDate !== value.profile.birthDate) {
+  if (loadInputsChanged(previousProfile, value.profile)) {
     await refreshTrainingLoadsForUser(userId);
   }
 
@@ -163,12 +177,17 @@ export async function saveAthleteSettingsImpl(
 export async function saveProfileImpl(value: ProfileSave): Promise<void> {
   const session = await getRequiredSession();
   const previousProfile = await getAthleteProfile(session.user.id);
-  const fields = { birthDate: value.birthDate, weightKg: value.weightKg, updatedAt: new Date() };
+  const fields = {
+    birthDate: value.birthDate,
+    weightKg: value.weightKg,
+    heartRateSince: value.heartRateSince,
+    updatedAt: new Date(),
+  };
   await db
     .insert(athleteMetrics)
     .values({ userId: session.user.id, ...fields })
     .onConflictDoUpdate({ target: athleteMetrics.userId, set: fields });
-  if (previousProfile.birthDate !== value.birthDate) {
+  if (loadInputsChanged(previousProfile, value)) {
     await refreshTrainingLoadsForUser(session.user.id);
   }
   logger.info("profile.saved");

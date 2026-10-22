@@ -276,8 +276,21 @@ function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
 
 const SIMILAR_HR_NEIGHBOURS = 5;
 const DAY_MS = 86_400_000;
-/** Only heart rate recorded from 2026 on is borrowed; older recordings are not trusted to match the athlete now. */
-export const SIMILAR_HR_SINCE = Date.UTC(2026, 0, 1);
+
+/**
+ * Activities that may lend their heart rate: those from the athlete's "reliable heart rate since"
+ * date on (a YYYY-MM-DD day, from UTC midnight). Older recordings came from a strap or watch the
+ * athlete does not trust, so none are lent before the date is set.
+ */
+export function heartRateSources(activities: LoadInputs[], since: string | null) {
+  if (!since) return [];
+  const sinceMs = Date.parse(`${since}T00:00:00Z`);
+  if (!Number.isFinite(sinceMs)) return [];
+  return activities.filter((activity) => {
+    const start = startMs(activity);
+    return start != null && start >= sinceMs;
+  });
+}
 
 function averageSpeed(activity: LoadInputs) {
   if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;
@@ -327,8 +340,6 @@ export function estimateHrIntensity(
     if (other === activity || other.movingTime <= 0 || !isPlausibleBpm(other.averageHeartrate)) {
       continue;
     }
-    const otherStart = startMs(other);
-    if (otherStart != null && otherStart < SIMILAR_HR_SINCE) continue;
     const intensity = hrIntensity(other, anchors);
     if (intensity == null || intensity <= 0) continue;
     neighbours.push({ intensity, score: dissimilarity(activity, other) });

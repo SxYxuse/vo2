@@ -21,14 +21,19 @@ import {
 
 const BUILD_PACES = ["hold", "slow", "steady", "fast", "overreach"] as const;
 
-// Age checks the max-HR anchor against spikes, and weight caps caffeine in fuel plans,
-// so every athlete gives both.
+// Age checks the max-HR anchor against spikes, weight caps caffeine in fuel plans, and the
+// reliable-heart-rate date picks which sessions lend heart rate to those without it.
 export const profileFormSchema = z.object({
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .refine((value) => value != null, { error: "Pick your birthday." }),
+  heartRateSince: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .refine((value) => value != null, { error: "Pick when your heart rate became reliable." }),
   weightKg: z
     .string()
     .trim()
@@ -79,9 +84,11 @@ export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 
-export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
-  keyof OnboardingFormInput
->;
+export const PROFILE_FIELDS = [
+  "birthDate",
+  "weightKg",
+  "heartRateSince",
+] as const satisfies ReadonlyArray<keyof OnboardingFormInput>;
 export const TRAINING_PACE_FIELDS = ["buildPace"] as const satisfies ReadonlyArray<
   keyof TrainingFormInput
 >;
@@ -99,13 +106,18 @@ export function profileFormDefaults(profile: ProfileSettings | null): ProfileFor
   return {
     birthDate: profile?.birthDate ?? null,
     weightKg: profile?.weightKg != null ? String(profile.weightKg) : "",
+    heartRateSince: profile?.heartRateSince ?? null,
   };
 }
 
 export function profileFromForm(values: ProfileFormValues): ProfileSave {
   // Phones in comma-decimal locales type "72,5".
   const weightKg = Math.round(Number(values.weightKg.replace(",", ".")) * 10) / 10;
-  return profileSaveSchema.parse({ birthDate: values.birthDate, weightKg });
+  return profileSaveSchema.parse({
+    birthDate: values.birthDate,
+    weightKg,
+    heartRateSince: values.heartRateSince,
+  });
 }
 
 export function trainingFormDefaults(

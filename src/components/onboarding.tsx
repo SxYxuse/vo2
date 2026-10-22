@@ -36,6 +36,7 @@ import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import {
   BirthDateField,
+  HeartRateSinceField,
   TrainingPaceFields,
   TrainingWeekFields,
   WeightField,
@@ -64,7 +65,7 @@ const STEPS = [
     id: "about",
     title: "About you",
     description:
-      "Your birthday, to check heart-rate peaks against your age, and your weight, to cap caffeine in fuel plans.",
+      "Your birthday, to check heart-rate peaks against your age, your weight, to cap caffeine in fuel plans, and since when your heart rate is reliable.",
   },
   {
     id: "sports",
@@ -139,6 +140,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
   const birthDate = useWatch({ control: form.control, name: "birthDate" });
   const weightKg = useWatch({ control: form.control, name: "weightKg" });
+  const heartRateSince = useWatch({ control: form.control, name: "heartRateSince" });
   // Steps validate with trigger, not submit, so react-hook-form never revalidates on change.
   useEffect(() => {
     if (birthDate) form.clearErrors("birthDate");
@@ -146,6 +148,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
   useEffect(() => {
     if (weightKg) form.clearErrors("weightKg");
   }, [weightKg, form]);
+  useEffect(() => {
+    if (heartRateSince) form.clearErrors("heartRateSince");
+  }, [heartRateSince, form]);
   const hasSportTypes = Object.keys(sportTypes).length > 0;
   const hidesEverySport = hidesEverySportType(sportTypes);
   const { data: syncStatus = null, isPending: syncStatusPending } =
@@ -300,6 +305,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
               <>
                 <BirthDateField idPrefix="onboard" control={form.control} />
                 <WeightField idPrefix="onboard" control={form.control} />
+                <HeartRateSinceField idPrefix="onboard" control={form.control} />
               </>
             ) : step.id === "sports" ? (
               <>
@@ -395,7 +401,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   );
 }
 
-/** One-step setup for athletes who finished onboarding before the birthday and weight were required. */
+/** One-step setup for athletes who finished onboarding before every profile field was required. */
 export function ProfilePrompt() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -421,13 +427,15 @@ export function ProfilePrompt() {
       <div className="flex flex-col gap-2 border-b px-4 pt-4 pb-3 text-center">
         <h1 className="text-xl font-semibold tracking-tight">About you</h1>
         <p className="text-muted-foreground text-sm">
-          VO2 checks heart-rate peaks against your age and caps caffeine in fuel plans by your
-          weight. Add both to continue.
+          VO2 checks heart-rate peaks against your age, caps caffeine in fuel plans by your weight,
+          and fills in heart rate for sessions without it from the date you trust. Add all three to
+          continue.
         </p>
       </div>
       <div className="flex flex-col gap-4 p-4 pb-6">
         <BirthDateField idPrefix="profile-prompt" control={form.control} />
         <WeightField idPrefix="profile-prompt" control={form.control} />
+        <HeartRateSinceField idPrefix="profile-prompt" control={form.control} />
       </div>
       <div className="flex flex-row flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
         {save.error ? (

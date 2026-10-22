@@ -16,6 +16,10 @@ _Avoid_: Account deletion, deactivation, closing an account
 The athlete's own choices that shape what VO2 shows: per sport type whether it is shown, its colour, and its heart-rate and power sensors; sport-group sharing; and the calendar period. Saved together with the birthday and body weight.
 _Avoid_: Calendar settings, preferences, app settings
 
+**Reliable heart rate since**:
+The day from which the athlete trusts their recorded heart rate, asked during onboarding with the birthday. Activities without heart rate borrow it only from activities on or after this day (ADR 0019).
+_Avoid_: HR start date, strap date
+
 **Body weight**:
 The athlete's weight in kilograms, asked during onboarding with the birthday. It caps caffeine in fuel plans.
 _Avoid_: Mass, BMI

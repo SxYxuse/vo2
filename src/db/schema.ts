@@ -103,6 +103,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   restHr: real("rest_hr"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
+  /** Activities from this day on lend heart rate to ones without it (ADR 0019). */
+  heartRateSince: date("heart_rate_since", { mode: "string" }),
   /** MNSTRY product ids the athlete has; fuel plans use only these. Null until chosen. */
   fuelProductIds: jsonb("fuel_product_ids").$type<string[]>(),
   training: jsonb("training"),

@@ -7,6 +7,7 @@ import {
   ctlChange,
   estimateHrIntensity,
   estimateLoadAnchors,
+  heartRateSources,
   formAfterLoad,
   formLabel,
   pmcWithCurrentForm,
@@ -149,12 +150,11 @@ describe("heart rate from similar activities", () => {
     }
   });
 
-  test("only borrows heart rate recorded from 2026 on", () => {
-    const old = run({ averageHeartrate: 154, startDate: "2025-12-31T08:00:00Z" });
-    const recent = run({ averageHeartrate: 154, startDate: "2026-01-01T08:00:00Z" });
-    const target = { ...strapless, startDate: "2024-06-01T08:00:00Z" };
-    expect(activityTrainingLoad(target, ANCHORS, [target, old]).source).toBe("duration");
-    expect(activityTrainingLoad(target, ANCHORS, [target, recent]).source).toBe("similarHeartRate");
+  test("only activities from the reliable heart rate date on lend heart rate", () => {
+    const old = run({ averageHeartrate: 154, startDate: "2025-12-31T23:59:00Z" });
+    const recent = run({ averageHeartrate: 154, startDate: "2026-01-01T00:00:00Z" });
+    expect(heartRateSources([old, recent], "2026-01-01")).toEqual([recent]);
+    expect(heartRateSources([old, recent], null)).toEqual([]);
   });
 
   test("falls back to duration when no activity recorded heart rate", () => {
