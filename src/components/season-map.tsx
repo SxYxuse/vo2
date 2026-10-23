@@ -109,7 +109,7 @@ export function SeasonMap({
             className={cn(
               "min-w-0 flex-1 rounded-t-[2px]",
               week.lighter && "opacity-50",
-              index === 0 && "outline-foreground outline-1 outline-offset-1",
+              index === 0 && "ring-foreground ring-1 ring-inset",
             )}
             style={{
               height: `${Math.max(8, (week.hours / maxHours) * 100)}%`,
