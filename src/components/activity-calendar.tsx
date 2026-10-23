@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type TouchEvent, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
@@ -12,6 +12,7 @@ import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from
 import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import { DiaryJumpPicker } from "@/components/diary-jump-picker.tsx";
+import { useWeekSwipe } from "@/hooks/use-week-swipe.ts";
 import {
   formatSportType,
   sportTypeColor,
@@ -74,7 +75,6 @@ const DIARY_VIEWS: CalendarView[] = ["month", "days"];
 const MONDAY = 1;
 const DESKTOP_WEEKS = 4;
 const MOBILE_WEEKS = 1;
-const SWIPE_DISTANCE = 60;
 
 function MissingHeartrateMark() {
   return (
@@ -399,8 +399,6 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
   const [jumping, setJumping] = useState(false);
   const [jumpKey, setJumpKey] = useState(0);
   const totals = useMemo(() => diaryTotals(activities, timeZone), [activities, timeZone]);
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
-  const swiped = useRef(false);
   const anchor = useMemo(
     () => dayKeyDate(byMonth ? `${cursorMonth}-01` : weekRange.start, timeZone),
     [byMonth, cursorMonth, weekRange.start, timeZone],
@@ -408,7 +406,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
   const cursor: DiarySearch = byMonth ? { month: cursorMonth } : { week: cursorWeek };
   // The present stays out of the URL so a bare "/" keeps following today.
   const show = (next: DiarySearch) =>
-    void navigate({
+    navigate({
       to: "/",
       search: (previous) => ({
         ...previous,
@@ -426,39 +424,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
     : undefined;
   const stepWeek = (direction: 1 | -1) =>
     show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) });
-  // A sideways swipe on the phone's day list pages a week. Touch events, not pointer events:
-  // the browser sends pointercancel once it claims the touch for scrolling the list, but
-  // touchend still arrives (as pull-to-refresh relies on).
-  const swipeHandlers = {
-    onTouchStart: (event: TouchEvent) => {
-      const touch = event.touches[0];
-      swipeStart.current =
-        event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
-      swiped.current = false;
-    },
-    onTouchEnd: (event: TouchEvent) => {
-      const start = swipeStart.current;
-      swipeStart.current = null;
-      const touch = event.changedTouches[0];
-      if (!start || !touch) return;
-      const dx = touch.clientX - start.x;
-      const dy = touch.clientY - start.y;
-      if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      swiped.current = true;
-      if (dx > 0) stepWeek(-1);
-      else if (cursorWeek < currentWeek) stepWeek(1);
-    },
-    onTouchCancel: () => {
-      swipeStart.current = null;
-    },
-    // A swipe can end on the activity it started on; that is not a tap.
-    onClickCapture: (event: SyntheticEvent) => {
-      if (!swiped.current) return;
-      swiped.current = false;
-      event.preventDefault();
-      event.stopPropagation();
-    },
-  };
+  const weekSwipe = useWeekSwipe({ onStep: stepWeek, canStepForward: cursorWeek < currentWeek });
 
   // The month view still lays bars across its padded weeks, even with outside days hidden.
   const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
@@ -544,9 +510,9 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                 unit="month"
                 atPresent={cursorMonth >= currentMonth}
                 onStep={(direction) =>
-                  show({ month: stepDiaryMonth(cursorMonth, direction, currentMonth) })
+                  void show({ month: stepDiaryMonth(cursorMonth, direction, currentMonth) })
                 }
-                onToday={() => show({})}
+                onToday={() => void show({})}
                 onJump={openJump}
               />
             ) : (
@@ -554,8 +520,10 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                 label={formatDiaryRange(weekRange.start, weekRange.end)}
                 unit={weeks === 1 ? "week" : `${weeks} weeks`}
                 atPresent={cursorWeek >= currentWeek}
-                onStep={stepWeek}
-                onToday={() => show({})}
+                onStep={(direction) =>
+                  void (isDesktop ? stepWeek(direction) : weekSwipe.slide(direction))
+                }
+                onToday={() => void show({})}
                 onJump={openJump}
               />
             )}
@@ -572,24 +540,28 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                 pickWeek={!isDesktop}
                 onPickMonth={(month) => {
                   setJumping(false);
-                  show(byMonth ? { month } : { week: monthLandingWeek(month, weeks, currentWeek) });
+                  void show(
+                    byMonth ? { month } : { week: monthLandingWeek(month, weeks, currentWeek) },
+                  );
                 }}
                 onPickWeek={(week) => {
                   setJumping(false);
-                  show({ week });
+                  void show({ week });
                 }}
               />
             ) : null}
             <div
-              className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !isDesktop && "touch-pan-y")}
-              {...(isDesktop ? {} : swipeHandlers)}
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              {...(isDesktop ? {} : weekSwipe.handlers)}
             >
-              <EventCalendarContent
-                components={{
-                  month: EventCalendarMonthView,
-                  days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
-                }}
-              />
+              <div ref={weekSwipe.ref} className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <EventCalendarContent
+                  components={{
+                    month: EventCalendarMonthView,
+                    days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
+                  }}
+                />
+              </div>
             </div>
           </EventCalendar>
         ) : (
