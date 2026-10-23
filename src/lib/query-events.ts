@@ -5,12 +5,16 @@ import {
   appShellQueryOptions,
   fitnessQueryOptions,
   homeQueryOptions,
+  seasonChangeQueryOptions,
   seasonQueryOptions,
   settingsSnapshotQueryOptions,
   weekCoachQueryOptions,
   weekTargetQueryOptions,
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
+import { checkSeason } from "@/services/plan-builder.ts";
+import type { SeasonCheck } from "@/services/plan-builder.types.ts";
+import type { TrainingPlan } from "@/services/training-plan.types.ts";
 
 /*
  * Callers name what happened; this module decides what goes stale. Settings, the profile, and
@@ -54,15 +58,36 @@ export function afterProfileSaved(queryClient: QueryClient) {
   return queryClient.invalidateQueries();
 }
 
-/** Goals set the week's plan and show on the calendar and fitness chart. */
-export function afterGoalsChanged(queryClient: QueryClient) {
-  return Promise.all([
+/**
+ * Goals set the week's plan and show on the calendar and fitness chart. The plan reads its own
+ * copy of them (ADR 0026): a change it can take quietly goes in, one that reshapes the current
+ * block waits for the athlete, shown by SeasonChangePrompt.
+ */
+export async function afterGoalsChanged(queryClient: QueryClient): Promise<SeasonCheck | null> {
+  const check = await checkSeason().catch(() => null);
+  queryClient.setQueryData(seasonChangeQueryOptions.queryKey, check?.impact ?? null);
+  await Promise.all([
     queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekCoachQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: ["plan-builder"] }),
   ]);
+  return check;
+}
+
+/** A plan built, rebuilt, or adapted: the shell, settings, and every planned view go stale. */
+export function afterPlanChanged(queryClient: QueryClient, plan?: TrainingPlan | null) {
+  if (plan !== undefined) {
+    queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
+      current ? { ...current, training: plan } : current,
+    );
+    queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
+      current ? { ...current, training: plan } : current,
+    );
+  }
+  return queryClient.invalidateQueries();
 }
 
 /** A sync call copied activities or streams, so every view of the local copy goes stale. */

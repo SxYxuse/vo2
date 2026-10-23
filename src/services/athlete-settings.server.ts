@@ -197,6 +197,21 @@ export async function saveAthleteSettingsImpl(
   if (!parsed) throw new Error("Invalid athlete settings");
   const settings = mergeAthleteSettings(parsed, [...sportTypes, ...Object.keys(value.sportTypes)]);
 
+  // Settings edit the week's shape only: the plan goals and starting point stay as the plan
+  // builder or the last adapt left them (ADR 0026).
+  const storedTraining = value.training ? await getTrainingPlanForUser(userId) : null;
+  const training =
+    value.training && storedTraining
+      ? {
+          ...storedTraining,
+          restWeekdays: value.training.restWeekdays,
+          longWeekday: value.training.longWeekday,
+          doubleDays: value.training.doubleDays,
+          sports: value.training.sports,
+          keySessionSports: value.training.keySessionSports,
+        }
+      : value.training;
+
   const updatedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
@@ -205,7 +220,7 @@ export async function saveAthleteSettingsImpl(
         userId,
         birthDate: value.profile.birthDate,
         weightKg: value.profile.weightKg,
-        training: value.training,
+        training,
         heartRate,
         updatedAt,
       })
@@ -214,7 +229,7 @@ export async function saveAthleteSettingsImpl(
         set: {
           birthDate: value.profile.birthDate,
           weightKg: value.profile.weightKg,
-          ...(value.training ? { training: value.training } : {}),
+          ...(training ? { training } : {}),
           heartRate,
           updatedAt,
         },
@@ -234,9 +249,9 @@ export async function saveAthleteSettingsImpl(
     await refreshTrainingLoadsForUser(userId);
   }
 
-  const training = value.training ?? (await getTrainingPlanForUser(userId));
-  logger.info("settings.saved", { hasTraining: Boolean(training) });
-  return { profile: value.profile, settings, training, heartRate };
+  const saved = training ?? (await getTrainingPlanForUser(userId));
+  logger.info("settings.saved", { hasTraining: Boolean(saved) });
+  return { profile: value.profile, settings, training: saved, heartRate };
 }
 
 export async function saveProfileImpl(value: ProfileSave): Promise<void> {

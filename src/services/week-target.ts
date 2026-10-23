@@ -15,12 +15,10 @@ import {
   DEFAULT_LOAD_PER_HOUR,
   KEY_SESSION_PRESETS,
   COOL_DOWN_MINUTES,
+  NO_HISTORY_MINUTES_PER_DAY,
   WARM_UP_MINUTES,
-  addDayKey,
   formatHours,
-  easySessionRange,
-  isKeySport,
-  keySessionCount,
+  keySessionCountFor,
   keySessionFromPreset,
   keySessionMinutes,
   keySessionName,
@@ -35,21 +33,14 @@ import {
   type SportFamily,
   type TargetZone,
   type TrainingPlan,
+  trainingDayCount,
 } from "./training-plan.types.ts";
+import type { Goal } from "./season.types.ts";
 
 /** Complete weeks before this one used for the usual pace, sport split, and ramp check. */
 export const HISTORY_WEEKS = 8;
 /** A finished week above this many times the last-4-week load is flagged. */
 export const RAMP_WARNING_RATIO = 1.3;
-
-export const AVAILABLE_WINDOWS = [
-  { minutes: 30, label: "30 min" },
-  { minutes: 45, label: "45 min" },
-  { minutes: 60, label: "1h" },
-  { minutes: 90, label: "1h 30" },
-  { minutes: 120, label: "2h" },
-  { minutes: 180, label: "3h" },
-] as const;
 
 /** A key session counts as done once this share of its target-zone time is reached. */
 export const KEY_SESSION_DONE_SHARE = 0.8;
@@ -95,6 +86,8 @@ export type WeekTargetData = {
   anchors: PlanningAnchors;
   /** Where the season puts this week; read at the start of the week like the target. */
   season: SeasonPhase;
+  /** Goals of the plan from a few days before the week to a few after: their days shape it. */
+  nearbyGoals: Goal[];
 };
 
 export type WeekTarget = {
@@ -102,13 +95,11 @@ export type WeekTarget = {
   load: number;
   /**
    * auto: fitness and the phase; ramp-cap / form: a guardrail held the phase back (ADR 0024);
-   * manual: capped at the hours the athlete has; no-history: their hours until VO2 has history.
+   * baseline: growing from the athlete's starting point after a break; no-history: 45 minutes
+   * per training day until VO2 has history (ADR 0026).
    */
-  source: "auto" | "ramp-cap" | "form" | "manual" | "no-history";
+  source: "auto" | "ramp-cap" | "form" | "baseline" | "no-history";
 };
-
-/** "over" is past a taper or race-week target by enough to cost freshness. */
-export type PaceStatus = "done" | "over" | "ahead" | "on-track" | "behind";
 
 export type WeekSummary = {
   target: WeekTarget;
@@ -116,45 +107,22 @@ export type WeekSummary = {
   doneLoad: number;
   remainingMinutes: number;
   remainingLoad: number;
-  daysLeft: number;
-  trainingDaysLeft: number;
-  restDayAhead: boolean;
-  perDayMinutes: number;
-  pace: { expectedMinutes: number; status: PaceStatus; fromHistory: boolean };
   shares: Record<SportFamily, number>;
   /** Running time was held to the athlete's recent running plus 15 % (ADR 0024). */
   runCapped: boolean;
   bySport: Record<SportFamily, { done: number; left: number }>;
   keySessions: KeySessionStatus[];
-  /** Planned minutes of key sessions still to do (0 while paused). */
-  keyLeftMinutes: number;
   /** Key sessions are paused when form is very low. */
   paused: boolean;
-  easy: {
-    target: number;
-    left: number;
-    /** The easy-session range from the week mix, how many are planned now, and how many are done. */
-    min: number;
-    max: number;
-    planned: number;
-    done: number;
-    /** Suggested length of each easy session still to do. */
-    perSession: number;
-    /** Days left that can take one more session without doubling up. */
-    singleDaySlots: number;
-  };
-  /** Days with two or more sessions: allowed by the week mix, used, and left. */
-  doubles: { allowed: number; used: number; left: number };
   loadPerHour: number;
   form: number;
+  trainingDays: number;
 };
 
 export type KeySessionStatus = {
   session: KeySession;
   minutes: number;
   done: WeekActivity | null;
-  /** Dropped for this week: more open key sessions than training days left. */
-  skipped: boolean;
   /** The sport VO2 suggests for this session, and whether the athlete picked another. */
   suggestedSport: KeySport;
   sportPinned: boolean;
@@ -190,10 +158,6 @@ export type WeekProjection = {
   fitnessSunday: number;
   formMonday: number;
   formMondayLabel: string;
-  weekLoad: number;
-  recentAverageLoad: number | null;
-  rampRatio: number | null;
-  warn: boolean;
 };
 
 function clamp(value: number, low: number, high: number) {
@@ -202,10 +166,6 @@ function clamp(value: number, low: number, high: number) {
 
 function round5(minutes: number) {
   return Math.max(0, Math.round(minutes / 5) * 5);
-}
-
-function weekdayOf(key: string) {
-  return new Date(`${key}T12:00:00Z`).getUTCDay();
 }
 
 function daysBetween(from: string, to: string) {
@@ -234,67 +194,43 @@ export function recentLoadPerHour(history: DayTotal[]) {
   return clamp(load / (minutes / 60), 25, 90);
 }
 
+/** Weekly growth from the athlete's starting point after a break. */
+export const BASELINE_GROWTH = 1.1;
+
 /**
- * The week's hours from the season phase and fitness at the start of Monday. Fixed hours are
- * the time the athlete has: a cap on the phase's target, and the target itself without history.
+ * The week's hours from the season phase and fitness at the start of Monday. Without history,
+ * 45 minutes per training day (or the athlete's starting point); after a break, the starting
+ * point grows by at most 10 % a week until fitness asks for less (ADR 0026).
  */
 export function weeklyTarget(input: {
-  plan: TrainingPlan;
+  plan: Pick<TrainingPlan, "restWeekdays" | "baselineMinutes" | "startWeek">;
   season: Pick<SeasonPhase, "ramp" | "loadFactor">;
   weekStartFitness: FitnessPoint;
   loadPerHour: number;
+  weekStart: string;
   /** Recent weekly load the ramp cap grows from (rampBaseLoad); null without history. */
   recentAverageLoad?: number | null;
 }): WeekTarget {
   const { plan, season, loadPerHour } = input;
   const { ctl, atl } = input.weekStartFitness;
-  const fixedMinutes = Math.round(plan.targetWeeklyHours * 60);
   const fromMinutes = (minutes: number, source: WeekTarget["source"]): WeekTarget => ({
     minutes,
     load: Math.round((minutes / 60) * loadPerHour),
     source,
   });
   if (ctl <= 5) {
-    return fromMinutes(round5(fixedMinutes * (season.loadFactor ?? 1)), "no-history");
+    const start = plan.baselineMinutes ?? trainingDayCount(plan) * NO_HISTORY_MINUTES_PER_DAY;
+    return fromMinutes(round5(start * (season.loadFactor ?? 1)), "no-history");
   }
   const { load, limitedBy } = phaseWeekLoad(season, { ctl, atl }, input.recentAverageLoad ?? null);
   const hours = clamp(Math.round((load / loadPerHour) * 4) / 4, 0.5, 30);
   const minutes = Math.round(hours * 60);
-  if (plan.targetMode === "manual" && fixedMinutes < minutes) {
-    return fromMinutes(fixedMinutes, "manual");
+  if (plan.baselineMinutes != null && plan.startWeek) {
+    const weeks = Math.max(0, Math.round(daysBetween(plan.startWeek, input.weekStart) / 7));
+    const cap = round5(plan.baselineMinutes * BASELINE_GROWTH ** weeks * (season.loadFactor ?? 1));
+    if (cap < minutes) return fromMinutes(cap, "baseline");
   }
   return { minutes, load: Math.round(load), source: limitedBy ?? "auto" };
-}
-
-function weekMinutesByDay(history: DayTotal[], weekStart: string) {
-  const days = [0, 0, 0, 0, 0, 0, 0];
-  for (const day of history) {
-    const index = daysBetween(weekStart, day.date);
-    if (index >= 0 && index < 7) days[index] += day.minutes;
-  }
-  return days;
-}
-
-/** Average share of the week done by the end of each weekday, Monday first. */
-export function usualWeekCurve(history: DayTotal[], weekStart: string): number[] | null {
-  const curves: number[][] = [];
-  for (let week = 1; week <= HISTORY_WEEKS; week += 1) {
-    const days = weekMinutesByDay(history, addDayKey(weekStart, -7 * week));
-    const total = days.reduce((sum, minutes) => sum + minutes, 0);
-    if (total < 60) continue;
-    let running = 0;
-    curves.push(
-      days.map((minutes) => {
-        running += minutes;
-        return running / total;
-      }),
-    );
-  }
-  if (curves.length < 3) return null;
-  return Array.from(
-    { length: 7 },
-    (_, index) => curves.reduce((sum, curve) => sum + curve[index], 0) / curves.length,
-  );
 }
 
 export function sportShares(history: DayTotal[]): Record<SportFamily, number> {
@@ -309,8 +245,6 @@ export function sportShares(history: DayTotal[]): Record<SportFamily, number> {
   };
 }
 
-/** Done this far past a taper or race-week target, the week is over, not done. */
-const OVER_SHARE = 1.15;
 /** Shortest easy session worth planning, by the sport most of the week is on. */
 export const EASY_MIN_RIDE = 45;
 export const EASY_MIN_RUN = 30;
@@ -400,7 +334,7 @@ function keySessionDoneBy(
 }
 
 /** Hard minutes in one activity that make it a hard day. */
-const HARD_DAY_MINUTES = 15;
+export const HARD_DAY_MINUTES = 15;
 
 /** An activity this long counts as one of the week's easy sessions. */
 export const EASY_SESSION_MIN_MINUTES = 20;
@@ -448,12 +382,12 @@ function weekNumber(weekStart: string) {
 const LONG_MIN_MINUTES = 45;
 
 /**
- * This week's key sessions, built from the week mix, the season phase, fitness, and target.
+ * This week's key sessions, built from their count, the season phase, fitness, and target.
  * Toward a goal the long session leads in base and comes second from build on (ADR 0024).
  */
 export function generateKeySessions(input: {
-  weekMix: TrainingPlan["weekMix"];
-  season: Pick<SeasonPhase, "rotation" | "maxKeySessions"> & {
+  count: number;
+  season: Pick<SeasonPhase, "rotation"> & {
     kind?: SeasonPhase["kind"];
     sessions?: Pick<GoalSessions, "longMinutes"> | null;
   };
@@ -461,26 +395,19 @@ export function generateKeySessions(input: {
   ctl: number;
   targetMinutes: number;
 }): KeySession[] {
-  const count = Math.min(
-    keySessionCount(input.weekMix),
-    input.season.maxKeySessions ?? Number.POSITIVE_INFINITY,
-  );
+  const { count } = input;
   if (count <= 0) return [];
   const [first, ...rest] = KEY_ROTATION[input.season.rotation];
   const shift = rest.length ? weekNumber(input.weekStart) % rest.length : 0;
   const rotated = [...rest.slice(shift), ...rest.slice(0, shift)];
   let order: KeySessionPresetId[] = [first, ...rotated];
-  const goalLong = input.season.sessions?.longMinutes != null;
-  const building =
-    input.season.kind === "base" ||
-    input.season.kind === "build" ||
-    input.season.kind === "peak" ||
-    input.season.kind === "maintain";
-  if (goalLong && building) {
-    const others = order.filter((preset) => preset !== "long");
-    order =
-      input.season.kind === "base" ? ["long", ...others] : [others[0]!, "long", ...others.slice(1)];
-  }
+  // The week has a long session day (ADR 0026): the long session leads in base and comes
+  // second otherwise, so any week with two key sessions has one.
+  const others = order.filter((preset) => preset !== "long");
+  order =
+    input.season.kind === "base" || others.length === 0
+      ? ["long", ...others]
+      : [others[0]!, "long", ...others.slice(1)];
   const level = input.ctl < 35 ? 0 : input.ctl < 65 ? 1 : 2;
   // Toward a goal the long session grows with it; otherwise it is a quarter of the week.
   const longMinutes =
@@ -535,12 +462,15 @@ export function assignKeySports(
   shares: Record<SportFamily, number>,
   pinned: Record<string, KeySport>,
   goal: Pick<GoalSessions, "keySport"> | null = null,
+  sports: readonly KeySport[] = ["cycling", "running"],
 ): PlannedKeySession[] {
   const both = shares.cycling + shares.running;
   const runShare = both > 0 ? shares.running / both : 0.5;
-  const rides = runShare <= 0.9;
-  const runs = runShare >= 0.1;
-  const historyLead: KeySport = runShare > 0.5 && runs ? "running" : "cycling";
+  const rides = runShare <= 0.9 && sports.includes("cycling");
+  const runs = runShare >= 0.1 && sports.includes("running");
+  // Without rides or runs to plan, the athlete's other sport leads.
+  const historyLead: KeySport =
+    runShare > 0.5 && runs ? "running" : rides ? "cycling" : runs ? "running" : sports[0]!;
   const dominant: KeySport = goal?.keySport ?? historyLead;
   const rideOrRunLead = dominant === "cycling" || dominant === "running";
   const other: KeySport = !rideOrRunLead
@@ -548,12 +478,13 @@ export function assignKeySports(
     : dominant === "cycling"
       ? "running"
       : "cycling";
-  const longSport: KeySport = goal?.keySport ?? (rides ? "cycling" : "running");
+  const longSport: KeySport =
+    goal?.keySport ?? (rides ? "cycling" : runs ? "running" : historyLead);
   const intervals = sessions.filter((session) => session.kind !== "long").length;
   // How many interval sessions go on the other sport, rounded to whole sessions. A swim or walk
   // goal keeps the main one and gives the rest to rides or runs when the athlete does them.
   let otherQuota = rideOrRunLead
-    ? rides && runs
+    ? rides && runs && sports.includes(other)
       ? Math.round(intervals * Math.min(runShare, 1 - runShare))
       : 0
     : both >= RIDE_RUN_MIN_SHARE
@@ -613,23 +544,45 @@ export function matchKeySessions(
     session,
     minutes: keySessionMinutes(session),
     done: done.get(index) ?? null,
-    skipped: false,
     suggestedSport: session.suggestedSport,
     sportPinned: session.sportPinned,
   }));
 }
 
+/** Moves the time of sports the athlete does not plan onto the ones they do. */
+export function planShares(
+  shares: Record<SportFamily, number>,
+  sports: readonly KeySport[],
+): Record<SportFamily, number> {
+  const allowed: Record<SportFamily, boolean> = {
+    cycling: sports.includes("cycling"),
+    running: sports.includes("running"),
+    other: sports.includes("swimming") || sports.includes("walking"),
+  };
+  const families: SportFamily[] = ["cycling", "running", "other"];
+  const kept = families.filter((family) => allowed[family]);
+  if (!kept.length) return shares;
+  const keptTotal = kept.reduce((sum, family) => sum + shares[family], 0);
+  const next = { cycling: 0, running: 0, other: 0 };
+  for (const family of kept) {
+    next[family] = keptTotal > 0 ? shares[family] / keptTotal : 1 / kept.length;
+  }
+  return next;
+}
+
 export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): WeekSummary {
-  const { plan, activities, today, weekStart } = data;
+  const { plan, activities, weekStart } = data;
   const loadPerHour = recentLoadPerHour(data.history);
   const target = weeklyTarget({
     plan,
     season: data.season,
     weekStartFitness: data.weekStartFitness,
     loadPerHour,
+    weekStart,
     recentAverageLoad: rampBaseLoad(weekLoadsBefore(data.history, weekStart)),
   });
   const form = data.fitness.ctl - data.fitness.atl;
+  const trainingDays = trainingDayCount(plan);
 
   const done: Record<SportFamily, number> = { running: 0, cycling: 0, other: 0 };
   let doneLoad = 0;
@@ -641,102 +594,34 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
   const remainingMinutes = Math.max(0, target.minutes - doneMinutes);
   const remainingLoad = Math.max(0, target.load - doneLoad);
 
-  const dayIndex = clamp(daysBetween(weekStart, today), 0, 6);
-  const daysLeft = 7 - dayIndex;
-  let restDayAhead = false;
-  for (let offset = 0; offset < daysLeft; offset += 1) {
-    if (weekdayOf(addDayKey(today, offset)) === plan.preferredRestWeekday) restDayAhead = true;
-  }
-  const trainingDaysLeft = restDayAhead && daysLeft > 1 ? daysLeft - 1 : daysLeft;
-
-  const curve = usualWeekCurve(data.history, weekStart);
-  const expectedShare = dayIndex === 0 ? 0 : curve ? curve[dayIndex - 1] : dayIndex / 7;
-  const expectedMinutes = round5(target.minutes * expectedShare);
-  const gap = doneMinutes - expectedMinutes;
-  // In a week meant to freshen up, going well past the target spends the freshness.
-  const easing =
-    data.season.kind === "taper" ||
-    data.season.kind === "race" ||
-    data.season.kind === "recovery" ||
-    data.season.lighter;
-  const status: PaceStatus =
-    remainingMinutes <= 0
-      ? easing && doneMinutes > target.minutes * OVER_SHARE
-        ? "over"
-        : "done"
-      : gap >= 30
-        ? "ahead"
-        : gap >= -20
-          ? "on-track"
-          : "behind";
-
-  const { shares, runCapped } = capRunShare(
+  const capped = capRunShare(
     blendShares(sportShares(data.history), data.season),
     data.history,
     target.minutes,
   );
+  const shares = planShares(capped.shares, plan.sports);
   const left = splitRemaining(target.minutes, remainingMinutes, shares, done);
 
   const generated = generateKeySessions({
-    weekMix: plan.weekMix,
+    count: keySessionCountFor({
+      objective: data.season.anchor.length ? data.season.objective : null,
+      phaseMax: data.season.maxKeySessions,
+      trainingDays,
+    }),
     season: data.season,
     weekStart,
     ctl: data.weekStartFitness.ctl,
     targetMinutes: target.minutes,
   });
-  // Two key sessions on one day is rarely the athlete's intent: keep only as many open ones as
-  // there are training days left (today counts unless it already had hard work), in priority order.
-  const hardToday = activities.some(
-    (activity) => activity.date === today && activity.hardMinutes >= HARD_DAY_MINUTES,
+  const planned = assignKeySports(
+    generated,
+    shares,
+    plan.keySessionSports,
+    data.season.sessions,
+    plan.sports,
   );
-  let keyDays = Math.max(0, trainingDaysLeft - (hardToday ? 1 : 0));
-  const planned = assignKeySports(generated, shares, plan.keySessionSports, data.season.sessions);
   const goalSport = data.season.sessions?.keySport ?? null;
-  const keySessions = matchKeySessions(planned, activities, goalSport).map((status) => {
-    if (status.done) return status;
-    if (keyDays > 0) {
-      keyDays -= 1;
-      return status;
-    }
-    return { ...status, skipped: true };
-  });
-  const usedByKey = new Set(keySessions.map((status) => status.done?.id).filter(Boolean));
-  const easyRange = easySessionRange(plan.weekMix);
-  const easyDone = activities.filter(
-    (activity) => !usedByKey.has(activity.id) && activity.minutes >= EASY_SESSION_MIN_MINUTES,
-  ).length;
-  const paused = form < PAUSE_FORM;
-  const keyLeftMinutes = paused
-    ? 0
-    : keySessions
-        .filter((status) => !status.done && !status.skipped)
-        .reduce((sum, status) => sum + status.minutes, 0);
-  // Within the range: aim high while there are days to spare, settle lower as they run out.
-  const openKeys = paused
-    ? 0
-    : keySessions.filter((status) => !status.done && !status.skipped).length;
-  // Any two sessions of 20 minutes or more on one date make a double day, whatever the sports.
-  const sessionsByDate = new Map<string, number>();
-  for (const activity of activities) {
-    if (activity.minutes < EASY_SESSION_MIN_MINUTES) continue;
-    sessionsByDate.set(activity.date, (sessionsByDate.get(activity.date) ?? 0) + 1);
-  }
-  const doublesUsed = [...sessionsByDate.values()].filter((count) => count >= 2).length;
-  const doublesAllowed = plan.weekMix.doubleDays;
-  const doublesLeft = Math.max(0, doublesAllowed - doublesUsed);
-  const singleDaySlots = Math.max(0, trainingDaysLeft - openKeys);
-  const easyDaysLeft = singleDaySlots + Math.min(doublesLeft, trainingDaysLeft);
-  // Fewer days left means fewer easy sessions, not shorter ones (ADR 0024).
-  const easyLeftMinutes = Math.max(0, remainingMinutes - keyLeftMinutes);
-  const easyMin = shares.cycling >= shares.running ? EASY_MIN_RIDE : EASY_MIN_RUN;
-  const easyRoom = easyLeftMinutes > 0 ? Math.max(1, Math.floor(easyLeftMinutes / easyMin)) : 0;
-  const easyPlanned = Math.min(
-    clamp(easyDone + easyDaysLeft, easyRange.min, Math.max(easyRange.max, easyDone)),
-    easyDone + Math.min(easyRoom, easyDaysLeft),
-  );
-  const keyTotal = keySessions
-    .filter((status) => !status.skipped)
-    .reduce((sum, status) => sum + status.minutes, 0);
+  const keySessions = matchKeySessions(planned, activities, goalSport);
 
   return {
     target,
@@ -744,47 +629,19 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
     doneLoad: Math.round(doneLoad),
     remainingMinutes,
     remainingLoad: Math.round(remainingLoad),
-    daysLeft,
-    trainingDaysLeft,
-    restDayAhead,
-    perDayMinutes: round5(remainingMinutes / Math.max(1, trainingDaysLeft)),
-    pace: { expectedMinutes, status, fromHistory: curve != null },
     shares,
-    runCapped,
+    runCapped: capped.runCapped,
     bySport: {
       running: { done: done.running, left: left.running },
       cycling: { done: done.cycling, left: left.cycling },
       other: { done: done.other, left: left.other },
     },
     keySessions,
-    keyLeftMinutes,
-    paused,
-    easy: {
-      target: Math.max(0, target.minutes - keyTotal),
-      left: Math.max(0, remainingMinutes - keyLeftMinutes),
-      min: easyRange.min,
-      max: easyRange.max,
-      planned: easyPlanned,
-      done: easyDone,
-      singleDaySlots,
-      perSession: round5(
-        Math.max(0, remainingMinutes - keyLeftMinutes) / Math.max(1, easyPlanned - easyDone),
-      ),
-    },
-    doubles: { allowed: doublesAllowed, used: doublesUsed, left: doublesLeft },
+    paused: form < PAUSE_FORM,
     loadPerHour,
     form,
+    trainingDays,
   };
-}
-
-/** Time picker default: the per-day share, snapped to the nearest window. */
-export function defaultWindow(summary: WeekSummary) {
-  const wanted = Math.max(45, summary.perDayMinutes);
-  let best: number = AVAILABLE_WINDOWS[0].minutes;
-  for (const window of AVAILABLE_WINDOWS) {
-    if (Math.abs(window.minutes - wanted) < Math.abs(best - wanted)) best = window.minutes;
-  }
-  return best;
 }
 
 const EASY_INTENSITY = 0.65;
@@ -900,148 +757,32 @@ function sessionTitle(
   keySession: KeySession | null,
 ) {
   const noun = PART_NOUN[sport];
-  if (sport === "strength")
-    return kind === "recovery" ? "Light strength session" : "Strength session";
   if (kind === "key" && keySession) return keySessionName(keySession);
   if (kind === "rest") return "Rest day";
   if (kind === "recovery") return `Recovery ${noun}`;
   return minutes >= 120 ? `Long easy ${noun}` : `Easy ${noun}`;
 }
 
-function isHard(session: KeySession) {
+/** Intervals or time at zone 3 and above: never on the day after another hard day. */
+export function isHardKeySession(session: KeySession) {
   return session.kind !== "long" && ZONE_INDEX[session.zone] >= 2;
 }
 
-function hardRecently(activities: WeekActivity[], today: string) {
-  const yesterday = addDayKey(today, -1);
-  return activities.some(
-    (activity) =>
-      (activity.date === today || activity.date === yesterday) &&
-      activity.hardMinutes >= HARD_DAY_MINUTES,
-  );
-}
+/** Sports a planned session can be on: those with heart-rate zones. */
+export type PartSport = KeySport;
 
-export function pickFamily(
-  summary: WeekSummary,
-  available: number,
-  sport: KeySession["sport"] = "any",
-): KeySport {
-  if (sport !== "any") return sport;
-  const rides = summary.shares.cycling >= 0.15;
-  const { running, cycling } = summary.bySport;
-  let family: "running" | "cycling" =
-    running.left > cycling.left
-      ? "running"
-      : cycling.left > running.left
-        ? "cycling"
-        : summary.shares.running > summary.shares.cycling
-          ? "running"
-          : "cycling";
-  if (family === "running" && available > 90 && rides) family = "cycling";
-  if (family === "cycling" && !rides && summary.shares.running > 0) family = "running";
-  return family;
-}
-
-/** One session for the time the athlete has today, and what it does to the week. */
-/** Sports a part of today can be. "Either" lets VO2 pick between a ride and a run. */
-export const DAY_SPORTS = [
-  { id: "any", label: "Either" },
-  { id: "cycling", label: "Ride" },
-  { id: "running", label: "Run" },
-  { id: "swimming", label: "Swim" },
-  { id: "walking", label: "Walk" },
-  { id: "strength", label: "Strength" },
-] as const;
-
-export const TODAY_FEELS = [
-  { id: "auto", label: "Let VO2 pick" },
-  { id: "easy", label: "Easy" },
-  { id: "hard", label: "Hard" },
-] as const;
-
-export type DaySport = (typeof DAY_SPORTS)[number]["id"];
-export type PartSport = Exclude<DaySport, "any">;
-export type TodayFeel = (typeof TODAY_FEELS)[number]["id"];
-
-/** A day has at most this many parts (for example swim, ride, then run). */
-export const MAX_DAY_PARTS = 3;
-
-/** What the athlete says about today: time, sports in order, and feel. VO2 adapts, it never refuses. */
-export type TodayChoice = {
-  available: number;
-  sports: DaySport[];
-  feel: TodayFeel;
-  /** Minutes per sport, in order, when the athlete set the split themselves. */
-  split?: number[] | null;
-};
-
-/** Smallest part a hand-set split can give a sport. */
-export const SPLIT_MIN_MINUTES = 10;
-
-/** The athlete's own split, when it still matches today's sports and time. */
-export function customSplit(choice: TodayChoice): number[] | null {
-  const { split, sports, available } = choice;
-  if (!split || split.length !== sports.length || sports.length < 2) return null;
-  if (split.some((minutes) => !Number.isFinite(minutes) || minutes < SPLIT_MIN_MINUTES))
-    return null;
-  const total = split.reduce((sum, minutes) => sum + minutes, 0);
-  return Math.abs(total - available) <= 5 ? split : null;
-}
-
-export function isDefaultChoice(choice: TodayChoice) {
-  return choice.feel === "auto" && choice.sports.length === 1 && choice.sports[0] === "any";
-}
-
-export function parseDaySports(value: unknown): DaySport[] {
-  const raw = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : [];
-  const sports = raw
-    .map((item) => DAY_SPORTS.find((sport) => sport.id === item)?.id)
-    .filter((sport): sport is DaySport => Boolean(sport))
-    .slice(0, MAX_DAY_PARTS);
-  return sports.length ? sports : ["any"];
-}
-
-/** One part of today, in order. The main part carries today's session kind. */
+/** One part of a day, in order. The main part carries the session kind. */
 export type DayPart = { sport: PartSport; minutes: number; main: boolean };
-
-/** Any part after the main one takes at least this long, or it is left out. */
-const PART_MIN_MINUTES = 20;
-
-/** Share of an easy day each sport takes when combined: a ride runs longest, strength shortest. */
-const PART_WEIGHT: Record<PartSport, number> = {
-  cycling: 1.5,
-  running: 1,
-  swimming: 0.8,
-  walking: 1,
-  strength: 0.6,
-};
 
 const PART_NOUN: Record<PartSport, string> = {
   cycling: "ride",
   running: "run",
   swimming: "swim",
   walking: "walk",
-  strength: "strength session",
 };
 
 export function partNoun(sport: PartSport) {
   return PART_NOUN[sport];
-}
-
-function isRideOrRun(sport: PartSport): sport is "running" | "cycling" {
-  return sport === "running" || sport === "cycling";
-}
-
-/** Key sessions go on sports with heart-rate zones: not strength. */
-function hostsKey(sport: DaySport) {
-  return sport !== "strength";
-}
-
-/** Sessions planned on today's sport come first; the others still fit, as any key sport counts. */
-function plannedFirst(sport: DaySport) {
-  const rank = (status: KeySessionStatus) =>
-    sport === "any" || status.session.sport === sport ? 0 : 1;
-  return (left: KeySessionStatus, right: KeySessionStatus) => rank(left) - rank(right);
 }
 
 /** How to hold an easy part in a sport without zones or watts in VO2. */
@@ -1054,8 +795,7 @@ function partHint(sport: PartSport, data: Pick<WeekTargetData, "collectors" | "a
     const bpm = data.collectors[sport].heartRate ? zoneBpm("z2", sport, data.anchors) : null;
     return bpm ? `${feel} Keep heart rate under ${bpm.max} bpm.` : feel;
   }
-  if (isRideOrRun(sport)) return easyCap(sport, data.collectors[sport], data.anchors);
-  return "Controlled reps, full rest between sets; no intervals.";
+  return easyCap(sport, data.collectors[sport], data.anchors);
 }
 
 function partCue(
@@ -1063,9 +803,7 @@ function partCue(
   zone: StepZone,
   data: Pick<WeekTargetData, "collectors" | "anchors">,
 ) {
-  if (isKeySport(sport)) return zoneCue(zone, sport, data.collectors[sport], data.anchors);
-  if (sport === "strength") return "Controlled, no intervals";
-  return ZONE_RPE[zone];
+  return zoneCue(zone, sport, data.collectors[sport], data.anchors);
 }
 
 /** Fewer reps (or a shorter long Z2) so a key session fits the window the athlete has. */
@@ -1081,25 +819,6 @@ export function fitKeySession(session: KeySession, available: number): KeySessio
     session.reps,
   );
   return { ...session, reps };
-}
-
-/** A key session beyond the week mix, for a day the athlete wants to go hard anyway. */
-function extraKeySession(data: WeekTargetData & { plan: TrainingPlan }) {
-  const [first] = generateKeySessions({
-    weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100, doubleDays: 0 },
-    // The athlete asked to go hard, so the phase's cap on key sessions does not apply.
-    season: { rotation: data.season.rotation, maxKeySessions: null },
-    weekStart: data.weekStart,
-    ctl: data.weekStartFitness.ctl,
-    targetMinutes: Number.MAX_SAFE_INTEGER,
-  });
-  return { ...first, id: "extra" };
-}
-
-/** Split minutes over parts by sport weight; parts under the minimum are dropped. */
-function splitByWeight(total: number, sports: PartSport[]) {
-  const weight = sports.reduce((sum, sport) => sum + PART_WEIGHT[sport], 0);
-  return sports.map((sport) => round5((total * PART_WEIGHT[sport]) / Math.max(weight, 0.1)));
 }
 
 /** Copied activities dated today, in the order they were done. */
@@ -1133,239 +852,6 @@ export const OPENER: KeySession = {
   zone: "z5",
   restMinutes: 2,
 };
-
-/** One session for today, shaped by what the athlete chose and by what the week still needs. */
-export function recommendToday(
-  data: WeekTargetData & { plan: TrainingPlan },
-  summary: WeekSummary,
-  choice: TodayChoice,
-): Recommendation {
-  const raceToday = goalsOn(data, data.today);
-  if (raceToday.length && isDefaultChoice(choice)) {
-    const names = [...new Set(raceToday.map((goal) => goal.name.split(" · ")[0]!))].join(" + ");
-    const trainThrough = raceToday.every((goal) => goal.priority === "C");
-    return buildRecommendation(
-      {
-        kind: "race",
-        keySession: null,
-        parts: [],
-        reasons: [
-          trainThrough
-            ? `${names} is a C race: race it as a hard session, no need to hold back for later.`
-            : `Race day: ${names}. 15 min easy with three short efforts to warm up, then go.`,
-        ],
-      },
-      data,
-      summary,
-    );
-  }
-  const raceTomorrow = goalsOn(data, addDayKey(data.today, 1)).filter(
-    (goal) => goal.priority !== "C",
-  );
-  if (raceTomorrow.length && isDefaultChoice(choice)) {
-    const names = [...new Set(raceTomorrow.map((goal) => goal.name.split(" · ")[0]!))].join(" + ");
-    const sport = sportGroupFor(raceTomorrow[0]!.sportType)?.id;
-    const part: PartSport = sport && isKeySport(sport) ? sport : "cycling";
-    const opener = { ...OPENER, sport: isKeySport(part) ? part : ("any" as const) };
-    return buildRecommendation(
-      {
-        kind: "key",
-        keySession: opener,
-        parts: [{ sport: part, minutes: keySessionMinutes(opener), main: true }],
-        reasons: [`${names} is tomorrow: a short opener wakes the legs without tiring them.`],
-      },
-      data,
-      summary,
-    );
-  }
-  const { available, feel } = choice;
-  const sports = choice.sports.length
-    ? choice.sports.slice(0, MAX_DAY_PARTS)
-    : (["any"] as DaySport[]);
-  const form = summary.form;
-  const reasons: string[] = [];
-  const warnings: string[] = [];
-  const hardYesterday = hardRecently(data.activities, data.today);
-  const todaySessions = data.activities.filter(
-    (activity) => activity.date === data.today && activity.minutes >= EASY_SESSION_MIN_MINUTES,
-  );
-  const todayMinutes = todaySessions.reduce((sum, activity) => sum + activity.minutes, 0);
-
-  // A ride or run part takes it first; a swim or walk day carries it when that is all there is.
-  const rideOrRunIndex = sports.findIndex(
-    (sport) => sport === "any" || sport === "cycling" || sport === "running",
-  );
-  const keyIndex = rideOrRunIndex >= 0 ? rideOrRunIndex : sports.findIndex(hostsKey);
-  const keySport = keyIndex >= 0 ? sports[keyIndex] : null;
-  const open = keySport
-    ? summary.keySessions.filter((status) => !status.done).sort(plannedFirst(keySport))
-    : [];
-  const active = summary.paused ? [] : open.filter((status) => !status.skipped);
-  const ready = active.filter((status) => !(hardYesterday && isHard(status.session)));
-  // The other parts need their own time, so the key session gets what is left,
-  // or exactly its share when the athlete set the split.
-  const custom = customSplit({ ...choice, sports });
-  const keyWindow =
-    custom && keyIndex >= 0 ? custom[keyIndex] : available - (sports.length - 1) * PART_MIN_MINUTES;
-  const fits = ready.find((status) => status.minutes <= keyWindow + 10) ?? null;
-
-  if (todayMinutes > 0) {
-    reasons.push(
-      `You already trained ${formatHours(todayMinutes / 60)} today; this is on top of it.`,
-    );
-  }
-
-  let kind: SessionKind;
-  let keySession: KeySession | null = null;
-  if (feel === "easy") {
-    kind = form < PAUSE_FORM ? "recovery" : "easy";
-    if (active.length) {
-      reasons.push(
-        `Easy today, as you asked. ${keySessionName(active[0].session)} stays open for another day.`,
-      );
-    }
-  } else if (feel === "hard" && !keySport) {
-    kind = "easy";
-    warnings.push("Strength has no key sessions. Add a ride, run, swim, or walk to go hard.");
-  } else if (feel === "hard") {
-    kind = "key";
-    const hard = (status: KeySessionStatus) => isHard(status.session);
-    const chosen =
-      active.find((status) => hard(status) && status.minutes <= keyWindow + 10) ??
-      active.find(hard) ??
-      open.find(hard) ??
-      null;
-    const base = chosen?.session ?? extraKeySession(data);
-    keySession = fitKeySession(base, keyWindow);
-    if (!chosen) warnings.push("All key sessions are done: this one is extra on top of the week.");
-    else if (chosen.skipped) {
-      warnings.push(
-        "This key session was dropped for lack of days; doing it today brings it back.",
-      );
-    }
-    if (keySession !== base) warnings.push(`Shortened to fit ${formatHours(available / 60)}.`);
-    if (hardYesterday) {
-      warnings.push("You went hard in the last day. Two hard days in a row cost more recovery.");
-    }
-    if (summary.paused) {
-      warnings.push(
-        `Form is ${Math.round(form)}, very fatigued. VO2 would keep today easy; stop early if legs feel heavy.`,
-      );
-    }
-    if (summary.remainingMinutes <= 0) warnings.push("You already hit this week’s target.");
-  } else if (summary.remainingMinutes <= 0) {
-    kind = form < -10 ? "rest" : "recovery";
-    reasons.push("You already hit this week’s target.");
-  } else if (summary.paused) {
-    kind = "recovery";
-    reasons.push(
-      `Form is ${Math.round(form)}, very fatigued. Key sessions are paused; bank easy time only.`,
-    );
-  } else if (fits) {
-    kind = "key";
-    keySession = fits.session;
-    const position = summary.keySessions.indexOf(fits) + 1;
-    reasons.push(`Key session ${position} of ${summary.keySessions.length} this week.`);
-  } else {
-    kind = "easy";
-    if (active.length && hardYesterday && ready.length < active.length) {
-      reasons.push("Hard work in the last day. Keep today easy.");
-    }
-    const tooLong = ready.find((status) => status.minutes > keyWindow + 10);
-    if (tooLong) {
-      reasons.push(
-        `${keySessionName(tooLong.session)} needs ${formatHours(tooLong.minutes / 60)}. Save it for a longer window.`,
-      );
-    }
-  }
-
-  // Resolve "Either" parts: the main one by what the week needs, the others to the other sport.
-  const mainIndex = kind === "key" && keyIndex >= 0 ? keyIndex : 0;
-  const mainChoice = sports[mainIndex];
-  const mainSport: PartSport =
-    mainChoice === "any" ? pickFamily(summary, available, keySession?.sport) : mainChoice;
-  const resolved: PartSport[] = sports.map((sport, index) => {
-    if (index === mainIndex) return mainSport;
-    if (sport !== "any") return sport;
-    return mainSport === "cycling" ? "running" : "cycling";
-  });
-  if (keySession && isKeySport(mainSport)) keySession = { ...keySession, sport: mainSport };
-
-  // Minutes per part.
-  let minutesByPart: number[];
-  if (kind === "rest") minutesByPart = resolved.map(() => 0);
-  else if (custom) minutesByPart = custom.map((minutes) => round5(minutes));
-  else if (kind === "key" && keySession) {
-    const keyMinutes = keySessionMinutes(keySession);
-    const others = resolved.filter((_, index) => index !== mainIndex);
-    const shares = splitByWeight(Math.max(0, available - keyMinutes), others);
-    let next = 0;
-    minutesByPart = resolved.map((_, index) => (index === mainIndex ? keyMinutes : shares[next++]));
-  } else {
-    const easySize =
-      summary.easy.perSession > 0 ? summary.easy.perSession : summary.remainingMinutes;
-    // One sport: the easy session's share of the week. Several: the whole time the athlete
-    // picked, split by sport. Recovery days stay short whatever the parts.
-    const dayMinutes =
-      kind === "recovery"
-        ? Math.min(available, 45)
-        : resolved.length > 1
-          ? available
-          : Math.min(available, Math.max(30, easySize));
-    minutesByPart = splitByWeight(dayMinutes, resolved);
-    if (resolved.length === 1 && resolved[0] === "running") {
-      minutesByPart[0] = Math.min(minutesByPart[0], 90);
-    }
-  }
-  const parts: DayPart[] = resolved
-    .map((sport, index) => ({ sport, minutes: minutesByPart[index], main: index === mainIndex }))
-    .filter((part) => part.main || part.minutes >= (custom ? SPLIT_MIN_MINUTES : PART_MIN_MINUTES));
-
-  // Double days: a second session on one date, up to what the week mix allows.
-  const { allowed, left } = summary.doubles;
-  const isDouble = parts.length > 1 || (todaySessions.length > 0 && kind !== "rest");
-  if (isDouble) {
-    if (left > 0) reasons.push(`Double day · ${left} of ${allowed} left this week.`);
-    else {
-      warnings.push(
-        allowed > 0
-          ? `You already used your ${allowed} double ${allowed === 1 ? "day" : "days"} this week; this one is extra.`
-          : "Your week mix has no double days; this one is extra.",
-      );
-    }
-  }
-
-  const main = parts.find((part) => part.main);
-  const family = main?.sport ?? mainSport;
-  if (kind === "easy" && feel === "auto") {
-    const { planned, done, perSession } = summary.easy;
-    if (planned > 0 && done < planned) {
-      reasons.push(
-        `Easy session ${done + 1} of ${planned} · about ${formatHours(perSession / 60)} each.`,
-      );
-    }
-    if (isRideOrRun(family)) {
-      const sportLeft = summary.bySport[family].left;
-      if (sportLeft > 0) {
-        reasons.push(
-          `${formatHours(sportLeft / 60)} of ${family === "cycling" ? "riding" : "running"} left this week.`,
-        );
-      }
-    }
-    if (summary.pace.status === "behind") {
-      reasons.push("Behind your usual pace. Easy time closes the gap without digging a hole.");
-    }
-    // More easy sessions than single days left: suggest stacking, but let the athlete pick the sport.
-    const easyNeeded = planned - done;
-    if (parts.length === 1 && left > 0 && easyNeeded > summary.easy.singleDaySlots) {
-      reasons.push(
-        `${easyNeeded} easy sessions left for ${summary.easy.singleDaySlots} ${summary.easy.singleDaySlots === 1 ? "day" : "days"}: add a second sport today.`,
-      );
-    }
-  }
-
-  return buildRecommendation({ kind, keySession, parts, reasons, warnings }, data, summary);
-}
 
 /** Load, effect on the week, and wording for a chosen day. */
 export function buildRecommendation(
@@ -1435,20 +921,14 @@ export function buildRecommendation(
         ? "Take the day off."
         : "Take the day off. The week’s target is already met.";
     }
-    if (kind === "recovery") {
-      return isKeySport(part.sport)
-        ? `Zone 1 only, no surges. ${partHint(part.sport, data)}`
-        : `Very easy ${noun}. ${partHint(part.sport, data)}`;
-    }
-    if (keySession && isKeySport(part.sport)) {
+    if (kind === "recovery") return `Zone 1 only, no surges. ${partHint(part.sport, data)}`;
+    if (keySession) {
       const extra = round5(part.minutes - keySessionMinutes(keySession));
       const steady =
         extra >= 5 ? ` Add ${formatHours(extra / 60)} steady Z2 before the cool-down.` : "";
       return `${keySessionDescription(keySession, part.sport, data)}${steady}`;
     }
-    return isKeySport(part.sport)
-      ? `Zone 2 the whole way. ${partHint(part.sport, data)}`
-      : `Easy ${noun}. ${partHint(part.sport, data)}`;
+    return `Zone 2 the whole way. ${partHint(part.sport, data)}`;
   };
   const description =
     kind === "rest"
@@ -1482,34 +962,6 @@ export function buildRecommendation(
   };
 }
 
-/** A key session from the week mix, shown on its own page whatever today's window is. */
-export function keySessionRecommendation(
-  data: WeekTargetData,
-  summary: WeekSummary,
-  sessionId: string,
-): Recommendation | null {
-  const status = summary.keySessions.find((item) => item.session.id === sessionId);
-  if (!status) return null;
-  const family = pickFamily(summary, status.minutes, status.session.sport);
-  const reasons = status.done
-    ? [`Done with ${status.done.title}.`]
-    : status.skipped
-      ? ["Dropped this week: more key sessions than training days left."]
-      : summary.paused
-        ? ["Paused this week: form is very low."]
-        : [];
-  return buildRecommendation(
-    {
-      kind: "key",
-      keySession: status.session,
-      parts: [{ sport: family, minutes: status.minutes, main: true }],
-      reasons,
-    },
-    data,
-    summary,
-  );
-}
-
 export type SessionStep = {
   label: string;
   minutes: number;
@@ -1541,14 +993,8 @@ export function sessionSteps(
       });
     };
     const session = part.main ? pick.keySession : null;
-    if (!part.main) {
-      step(
-        part.sport === "strength" ? "Strength" : "Easy",
-        part.minutes,
-        part.sport === "strength" ? "z1" : "z2",
-      );
-    } else if (pick.kind === "recovery") step("Recovery", part.minutes, "z1");
-    else if (part.sport === "strength") step("Strength", part.minutes, "z1");
+    if (!part.main) step("Easy", part.minutes, "z2");
+    else if (pick.kind === "recovery") step("Recovery", part.minutes, "z1");
     else if (!session || pick.kind !== "key" || session.kind === "long") {
       if (part.minutes < 40) step("Steady", part.minutes, "z2", Boolean(session));
       else {
@@ -1580,67 +1026,6 @@ export function minutesByZone(steps: SessionStep[]) {
   const totals: Record<StepZone, number> = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
   for (const step of steps) totals[step.zone] += step.minutes;
   return totals;
-}
-
-function recentAverageWeekLoad(history: DayTotal[], weekStart: string) {
-  const from = addDayKey(weekStart, -28);
-  let load = 0;
-  let any = false;
-  for (const day of history) {
-    if (day.date < from || day.date >= weekStart) continue;
-    load += day.load;
-    if (day.load > 0) any = true;
-  }
-  return any ? load / 4 : null;
-}
-
-/** Fitness and form if the rest of the target load is spread over the remaining training days. */
-export function projectWeek(
-  data: WeekTargetData & { plan: TrainingPlan },
-  summary: WeekSummary,
-): WeekProjection {
-  const days: string[] = [];
-  for (let offset = 0; offset < summary.daysLeft; offset += 1) {
-    days.push(addDayKey(data.today, offset));
-  }
-  const trainingDays = days.filter(
-    (day) =>
-      !(
-        summary.restDayAhead &&
-        days.length > 1 &&
-        weekdayOf(day) === data.plan.preferredRestWeekday
-      ),
-  );
-  const share = trainingDays.length ? summary.remainingLoad / trainingDays.length : 0;
-
-  let { ctl, atl } = data.fitness;
-  days.forEach((day, index) => {
-    const load = trainingDays.includes(day) ? share : 0;
-    if (index === 0) {
-      ctl += load / CTL_DAYS;
-      atl += load / ATL_DAYS;
-      return;
-    }
-    ctl += (load - ctl) / CTL_DAYS;
-    atl += (load - atl) / ATL_DAYS;
-  });
-
-  const weekLoad = Math.round(summary.doneLoad + summary.remainingLoad);
-  const average = recentAverageWeekLoad(data.history, data.weekStart);
-  const rampRatio = average && average > 0 ? weekLoad / average : null;
-  const formMonday = ctl - atl;
-  return {
-    fitnessNow: data.fitness.ctl,
-    fitnessSunday: ctl,
-    formMonday,
-    formMondayLabel: formLabel(formMonday),
-    weekLoad,
-    recentAverageLoad: average == null ? null : Math.round(average),
-    rampRatio,
-    // The target stays within 10 % of recent weeks (ADR 0024), so a jump is the athlete's own.
-    warn:
-      rampRatio != null && rampRatio > RAMP_WARNING_RATIO && summary.doneLoad > summary.target.load,
-  };
 }
 
 export const loadWeekTarget = createServerFn({ method: "GET" }).handler(

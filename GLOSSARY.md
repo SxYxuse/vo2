@@ -1,6 +1,6 @@
 # VO2
 
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and sets a week target with the best use of the time left.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and plans each training week day by day toward their goals.
 
 ## People
 
@@ -69,19 +69,31 @@ _Avoid_: Cache, mirror
 ## Planning
 
 **Training plan**:
-The athlete's standing choices for a week: whether the week target is capped at the hours they have, the week mix, rest day, and key session sports.
+What the athlete built in the plan builder: the week's shape (rest days, long session day, double-session days, sports to plan), the plan goals, when it started, and an optional starting point after a break. Settings → Training edits the shape; rebuilding the plan replaces it all (ADR 0026).
 _Avoid_: Program, schedule, calendar
+
+**Plan builder**:
+The four steps that build or rebuild the training plan: the season, where the athlete is now, when they can train, and a preview. Every answer starts from the athlete's Strava history and the goals on Season; it never adds goals.
+_Avoid_: Onboarding (that is the whole first setup), wizard
+
+**Plan goals**:
+The copy of the athlete's goals the training plan was built or last adapted on. Phases are read from it, not from Season, so a season change shows before it reshapes the week.
+_Avoid_: Season (that is the live list), snapshot
+
+**Season change**:
+A difference between the plan goals and the goals on Season. One that changes a week before the end of the current block (the leading goal and its recovery week) asks the athlete to adapt the plan or keep it; any other is taken into the plan goals at once.
+_Avoid_: Re-plan (that is laying the rest of a week out again), sync
 
 **Goal**:
 A race or event on the athlete's season: name, sport type, date, distance, elevation gain, objective, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
 _Avoid_: Target (that is the week's hours), race (not every goal is one)
 
 **Objective**:
-What the athlete wants from a goal: finish, finish well, or perform. It sets how fast fitness rises and which key session types lead.
+What the athlete wants from a goal: finish, finish well, or perform. On the goal the plan leads to, it sets how fast fitness rises and how many key sessions a week (one, two, or three); on a B or C goal it sets how many easy days go around it (ADR 0026).
 _Avoid_: Priority, ambition
 
 **Priority**:
-How much a goal matters: A (the plan builds, peaks, and fully tapers for it, with a recovery week after), B (a few lighter days before it), or C (trained through). The next A event leads the season; without one, the next B event does (ADR 0024).
+How much a goal matters: A (the plan builds, peaks, and fully tapers for it, with a recovery week after), B (lighter days before it, by its objective), or C (trained through, with easy days around it to finish well or perform). The next A event leads the season; without one, the next B event does (ADR 0024, ADR 0026).
 _Avoid_: Main goal, importance, A/B race when meaning the objective
 
 **Season**:
@@ -100,24 +112,36 @@ _Avoid_: Rest week, deload, recovery (that follows a goal)
 A limit on the phase's ramp: never more than 10 % above the last four weeks' average load, eased off when form is low, and no ramp in the two weeks after an A goal. The week target says when one held it back.
 _Avoid_: Cap (that is the hours the athlete has), safety limit
 
-**Week mix**:
-A range of sessions the athlete does a week, and what share of them are key sessions (for example 4–6 sessions at 25 / 75: one key, three to five easy). Key sessions come from the low end of the range; the number of easy sessions settles within it as the week goes. The athlete sets the mix, seeded from their last 3 months; VO2 builds the sessions.
-_Avoid_: Workout style, polarized split, session caps
+**Rest days**:
+The weekdays the athlete never trains, one to four of them. The plan puts no session on them; a race on one still shows.
+_Avoid_: Off days, recovery days
+
+**Long session day**:
+The training day the long session goes on when the week has one. Read from the weekday of the athlete's longest activities.
+_Avoid_: Weekend ride, long run day
+
+**Double-session day**:
+A training day the plan may put two sessions on. The athlete sets how many a week; the second session is always easy, never on the long session's day or a key session's day, and is used when the week's time does not fit in one session a day or a sport would get no time otherwise.
+_Avoid_: Brick (a brick is one specific double: a run straight after a ride), double day
 
 **Key session**:
-A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Other sport types get no key sessions. Intervals are ticked off when one activity of any sport spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
+A precise session VO2 generates each week: intervals, time in zone, or a long Z2. How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one activity of any sport spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
-One of the week mix's non-key sessions. Easy time left is shared evenly over the easy sessions still to do, each at least 45 minutes on a bike or 30 on foot, so fewer days left means fewer sessions; any activity of 20 minutes or more that did not tick off a key session fills one.
-_Avoid_: Filler, recovery (recovery is a separate, shorter pick when form is very low)
+A planned session in zone 2 that is not a key session, at least 45 minutes on a bike or 30 on foot. Easy time is the week target minus key sessions and races, shared over the training days left. Any activity of 20 minutes or more on its day fills one.
+_Avoid_: Filler, recovery (recovery is a shorter, zone 1 session when the athlete asks to take it easy while tired)
 
-**Day plan**:
-The rest of the training week laid out on days: the algorithm places key sessions, easy time, the rest day, a race and its opener; the coach rearranges that around the athlete's notes; every coach answer is checked against the algorithm's rules. Re-planned after a sync or a note.
-_Avoid_: Schedule, calendar (that shows activities)
+**Week plan**:
+The training week laid out Monday to Sunday: key, easy, and second sessions, rest days, races and openers. Laid out by the algorithm the first time the week is opened; the days after today are laid out again when a key session is missed or done elsewhere, a coach note arrives, the week's shape changes, or the plan adapts to the season. Days behind keep what was planned.
+_Avoid_: Schedule, calendar (that shows activities), day plan
+
+**Session status**:
+How a planned session stands against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned. An activity that fills no planned session is extra.
+_Avoid_: Completed, compliance
 
 **Coach note**:
-What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints.
+What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them.
 _Avoid_: Comment, feedback, journal
 
 **Training week**:
@@ -125,36 +149,12 @@ Monday through Sunday in the athlete's timezone. The week target is scoped to th
 _Avoid_: Microcycle, calendar week
 
 **Week target**:
-The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase within the guardrails, and capped at the hours the athlete has when they choose. Every activity counts toward it.
+The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase within the guardrails. Without history it is 45 minutes per training day; after a break it grows from the athlete's starting point by at most 10 % a week. Every activity counts toward it.
 _Avoid_: Bucket, quota, goal (that is a race or event)
-
-**Time left**:
-Week target minus the time already done this week. Split into key sessions still open and easy time, and by sport family.
-_Avoid_: Remaining sessions, still to fill
-
-**Usual pace**:
-Where the athlete normally is by this weekday, from the shape of their last eight weeks. Used to say ahead, on track, or behind.
-_Avoid_: Expected, schedule
 
 **Hard time**:
 Minutes at heart-rate zone 3 or above. Estimated from load per hour when an activity has no heart-rate stream. Used to keep the day after hard work easy.
 _Avoid_: Intensity minutes, quality time
-
-**Today's choice**:
-What the athlete says about today: the time they have, the sports in order (up to three parts, such as swim then ride, or ride then strength), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it. A key session goes on the first ride or run part, or on a swim or walk when the day has no ride or run; the other parts are easy.
-_Avoid_: Override, preference
-
-**Today's pick**:
-The one session VO2 builds for today's choice: the next key session that fits, otherwise an easy session. When the choice goes against what VO2 would pick, the pick carries warnings with the cost (for example two hard days in a row) and VO2's own pick stays one tap away.
-_Avoid_: Planned session, workout of the day
-
-**Double day**:
-A date with two or more sessions of 20 minutes or more, any sports. The week mix sets how many a week the athlete is fine with; VO2 counts the ones done, plans extra easy sessions on the rest, and suggests adding a second sport when the week needs it.
-_Avoid_: Brick (a brick is one specific double: a run straight after a ride)
-
-**Dropped key session**:
-A key session left out of this week because there are more open key sessions than training days left. Its time moves to easy. Doing it anyway still ticks it off.
-_Avoid_: Missed, failed
 
 ## Load and form
 

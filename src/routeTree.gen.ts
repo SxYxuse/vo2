@@ -17,6 +17,7 @@ import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppFuelRouteImport } from './routes/_app.fuel'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
+import { Route as AppPlanRouteImport } from './routes/_app.plan'
 import { Route as AppSeasonRouteImport } from './routes/_app.season'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppWeekRouteImport } from './routes/_app.week'
@@ -67,6 +68,11 @@ const AppHeartRateRoute = AppHeartRateRouteImport.update({
 const AppMapRoute = AppMapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPlanRoute = AppPlanRouteImport.update({
+  id: '/plan',
+  path: '/plan',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSeasonRoute = AppSeasonRouteImport.update({
@@ -138,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/plan': typeof AppPlanRoute
   '/season': typeof AppSeasonRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/week': typeof AppWeekRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/plan': typeof AppPlanRoute
   '/season': typeof AppSeasonRoute
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/_app/fuel': typeof AppFuelRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
+  '/_app/plan': typeof AppPlanRoute
   '/_app/season': typeof AppSeasonRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/week': typeof AppWeekRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/fuel'
     | '/heart-rate'
     | '/map'
+    | '/plan'
     | '/season'
     | '/settings'
     | '/week'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/fuel'
     | '/heart-rate'
     | '/map'
+    | '/plan'
     | '/season'
     | '/week'
     | '/week-bucket'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/_app/fuel'
     | '/_app/heart-rate'
     | '/_app/map'
+    | '/_app/plan'
     | '/_app/season'
     | '/_app/settings'
     | '/_app/week'
@@ -324,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof AppMapRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/plan': {
+      id: '/_app/plan'
+      path: '/plan'
+      fullPath: '/plan'
+      preLoaderRoute: typeof AppPlanRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/season': {
@@ -433,6 +452,7 @@ interface AppRouteChildren {
   AppFuelRoute: typeof AppFuelRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
+  AppPlanRoute: typeof AppPlanRoute
   AppSeasonRoute: typeof AppSeasonRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppWeekRoute: typeof AppWeekRoute
@@ -449,6 +469,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFuelRoute: AppFuelRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
+  AppPlanRoute: AppPlanRoute,
   AppSeasonRoute: AppSeasonRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppWeekRoute: AppWeekRoute,

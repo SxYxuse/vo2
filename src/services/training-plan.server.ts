@@ -19,9 +19,11 @@ export const getTrainingPlanForUser = cache(
 
 export async function saveTrainingPlanForUser(userId: string, plan: TrainingPlan) {
   logger.info("training_plan.saved", {
-    targetWeeklyHours: plan.targetWeeklyHours,
-    targetMode: plan.targetMode,
-    weekMix: plan.weekMix,
+    restDays: plan.restWeekdays.length,
+    longWeekday: plan.longWeekday,
+    doubleDays: plan.doubleDays,
+    sports: plan.sports,
+    goals: plan.goals?.length ?? null,
   });
   await db
     .insert(athleteMetrics)

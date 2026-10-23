@@ -23,12 +23,13 @@ import {
 } from "@/services/heart-rate-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
-  DEFAULT_WEEK_MIX,
-  suggestedTargetHours,
-  weekMixSchema,
+  defaultLongWeekday,
+  trainingPlanFields,
   trainingPlanSchema,
+  withWeekShapeIssues,
   type TrainingPlan,
 } from "@/services/training-plan.types.ts";
+import { NO_HISTORY_REST_WEEKDAYS } from "@/services/plan-builder.types.ts";
 
 // Age checks the max-HR anchor against spikes, and weight caps caffeine in fuel plans,
 // so every athlete gives both.
@@ -55,12 +56,11 @@ export const profileFormSchema = z.object({
     }),
 });
 
-const trainingFormFields = trainingPlanSchema.extend({
-  targetMode: z.enum(["auto", "manual"]),
-  weekMix: weekMixSchema,
-});
+// Settings → Training edits the week's shape; the rest of the plan rides along unchanged and
+// the server keeps its own copy of the plan goals (ADR 0026).
+const trainingFormFields = z.object(trainingPlanFields);
 
-export const trainingFormSchema = trainingFormFields;
+export const trainingFormSchema = withWeekShapeIssues(trainingFormFields);
 
 const sportsFormFields = {
   sportTypes: shownSportTypesSchema,
@@ -122,9 +122,7 @@ export const settingsFormSchema = profileFormSchema
   .extend(heartRateFormFields)
   .extend({ calendarPeriod: calendarPeriodSchema });
 
-export const onboardingFormSchema = profileFormSchema
-  .extend(trainingFormFields.shape)
-  .extend(sportsFormFields);
+export const onboardingFormSchema = profileFormSchema.extend(sportsFormFields);
 
 export type ProfileFormValues = z.input<typeof profileFormSchema>;
 export type TrainingFormValues = z.output<typeof trainingFormSchema>;
@@ -143,11 +141,6 @@ export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies Reado
 export const SPORTS_FIELDS = ["sportTypes", "sportGroupShares"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
 >;
-export const TRAINING_WEEK_FIELDS = [
-  "targetMode",
-  "targetWeeklyHours",
-  "preferredRestWeekday",
-] as const satisfies ReadonlyArray<keyof TrainingFormInput>;
 
 export function profileFormDefaults(profile: ProfileSettings | null): ProfileFormValues {
   return {
@@ -164,25 +157,18 @@ export function profileFromForm(values: ProfileFormValues): ProfileSave {
 
 export function trainingFormDefaults(
   plan: TrainingPlan | null,
-  avgHours: number,
   timeZone: string,
 ): TrainingFormInput {
-  if (plan) {
-    return {
-      targetMode: plan.targetMode,
-      weekMix: plan.weekMix,
-      keySessionSports: plan.keySessionSports,
-      targetWeeklyHours: plan.targetWeeklyHours,
-      preferredRestWeekday: plan.preferredRestWeekday,
-      timeZone: plan.timeZone || timeZone,
-    };
-  }
+  if (plan) return { ...plan, timeZone: plan.timeZone || timeZone };
   return {
-    targetMode: "auto",
-    weekMix: DEFAULT_WEEK_MIX,
+    restWeekdays: NO_HISTORY_REST_WEEKDAYS,
+    longWeekday: defaultLongWeekday(NO_HISTORY_REST_WEEKDAYS),
+    doubleDays: 0,
+    sports: ["cycling", "running"],
+    goals: null,
+    startWeek: null,
+    baselineMinutes: null,
     keySessionSports: {},
-    targetWeeklyHours: suggestedTargetHours(avgHours),
-    preferredRestWeekday: 0,
     timeZone,
   };
 }
@@ -271,7 +257,12 @@ export function settingsSaveFromForm(
       ? sports.data.sportGroupShares
       : (saved.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES),
     calendarPeriod: values.calendarPeriod,
-    training: training.success ? trainingFromForm(training.data) : (saved.training ?? undefined),
+    // Only a built plan has a shape to edit; the plan builder creates it.
+    training: saved.training
+      ? training.success
+        ? trainingFromForm(training.data)
+        : saved.training
+      : undefined,
     heartRate: heartRateValid ? heartRate : saved.heartRate,
   };
 }
@@ -293,12 +284,11 @@ export function settingsFormDefaults(input: {
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
-  avgHours: number;
   timeZone: string;
 }): SettingsFormInput {
   return {
     ...profileFormDefaults(input.profile),
-    ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
+    ...trainingFormDefaults(input.training, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
     calendarPeriod: input.calendarPeriod ?? "month",
@@ -307,15 +297,11 @@ export function settingsFormDefaults(input: {
 
 export function onboardingFormDefaults(input: {
   profile: ProfileSettings | null;
-  training: TrainingPlan | null;
   sportTypes: OnboardingFormValues["sportTypes"];
   sportGroupShares: OnboardingFormValues["sportGroupShares"] | undefined;
-  avgHours: number;
-  timeZone: string;
 }): OnboardingFormInput {
   return {
     ...profileFormDefaults(input.profile),
-    ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
   };
 }

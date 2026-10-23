@@ -1,18 +1,11 @@
 import { useMemo } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { SessionDetail } from "@/components/session-detail.tsx";
-import { loaderQuery, weekTargetQueryOptions } from "@/lib/queries.ts";
-import {
-  AVAILABLE_WINDOWS,
-  TODAY_FEELS,
-  parseDaySports,
-  keySessionRecommendation,
-  recommendToday,
-  summarizeWeek,
-  type TodayFeel,
-} from "@/services/week-target.ts";
+import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
+import { matchWeek, sessionRecommendation } from "@/services/week-plan.ts";
+import { summarizeWeek } from "@/services/week-target.ts";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -24,35 +17,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 type SessionSearch = {
-  /** Today's choice: shows today's pick for that window, sport, and feel. */
-  available?: number;
-  /** Today's sports in order, comma-separated: "swimming,cycling". */
-  sports?: string;
-  /** Minutes per sport, comma-separated, when the athlete set the split. */
-  split?: string;
-  feel?: TodayFeel;
-  /** A key session id from the week mix. */
-  key?: string;
+  /** The day of this week the session is planned on. */
+  date?: string;
+  /** The planned session's id within the week plan. */
+  id?: string;
 };
 
 export const Route = createFileRoute("/_app/week_/session")({
-  validateSearch: (search: Record<string, unknown>): SessionSearch => {
-    const available = Number(search.available);
-    const key = typeof search.key === "string" && search.key ? search.key : undefined;
-    if (key) return { key };
-    const sports =
-      typeof search.sports === "string" ? parseDaySports(search.sports).join(",") : null;
-    const feel = TODAY_FEELS.find((item) => item.id === search.feel)?.id;
-    return {
-      ...(AVAILABLE_WINDOWS.some((window) => window.minutes === available) ? { available } : {}),
-      ...(sports ? { sports } : {}),
-      ...(typeof search.split === "string" && /^\d+(,\d+)*$/.test(search.split)
-        ? { split: search.split }
-        : {}),
-      ...(feel ? { feel } : {}),
-    };
+  validateSearch: (search: Record<string, unknown>): SessionSearch => ({
+    ...(typeof search.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.date)
+      ? { date: search.date }
+      : {}),
+    ...(typeof search.id === "string" && search.id ? { id: search.id } : {}),
+  }),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(weekCoachQueryOptions);
+    return context.queryClient.query(loaderQuery(weekTargetQueryOptions));
   },
-  loader: ({ context }) => context.queryClient.query(loaderQuery(weekTargetQueryOptions)),
   pendingMs: 200,
   pendingComponent: () => <Skeleton className="h-96 w-full rounded-xl" />,
   errorComponent: SessionError,
@@ -61,30 +42,28 @@ export const Route = createFileRoute("/_app/week_/session")({
 
 function SessionPage() {
   const { data } = useSuspenseQuery(weekTargetQueryOptions);
-  const { available, sports, split, feel, key } = Route.useSearch();
+  const { data: coach } = useQuery(weekCoachQueryOptions);
+  const { date, id } = Route.useSearch();
   const plan = data.plan;
   const view = useMemo(() => {
-    if (!plan) return null;
+    if (!plan || !coach?.plan) return null;
     const planned = { ...data, plan };
     const summary = summarizeWeek(planned);
-    const pick = key
-      ? keySessionRecommendation(planned, summary, key)
-      : recommendToday(planned, summary, {
-          available: available ?? 60,
-          sports: parseDaySports(sports),
-          split: split ? split.split(",").map(Number) : null,
-          feel: feel ?? "auto",
-        });
-    return pick ? { pick, summary, planned } : null;
-  }, [data, plan, available, sports, split, feel, key]);
+    const dayView = matchWeek(coach.plan, data, summary).find((item) => item.day.date === date);
+    const item = dayView?.sessions.find((entry) => entry.session.id === id);
+    if (!dayView || !item) return null;
+    const pick = sessionRecommendation(planned, summary, dayView.day, item.session);
+    return pick ? { pick, summary, planned, item, dayView } : null;
+  }, [data, plan, coach?.plan, date, id]);
 
+  if (!coach) return <Skeleton className="h-96 w-full rounded-xl" />;
   if (!view) {
     return (
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyTitle>Session not found</EmptyTitle>
           <EmptyDescription>
-            This key session is no longer in your week mix. Pick one from the This week page.
+            This session is no longer in your week plan. Pick one from This week.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -101,7 +80,10 @@ function SessionPage() {
       pick={view.pick}
       data={view.planned}
       summary={view.summary}
-      source={key ? "week-mix" : "today"}
+      date={view.dayView.day.date}
+      today={data.today}
+      state={view.item.state}
+      activityTitle={view.item.activity?.title ?? null}
     />
   );
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import type { TrainingPlan } from "@/services/training-plan.types.ts";
+
 import {
   onboardingFormDefaults,
   onboardingFormSchema,
@@ -10,14 +12,17 @@ import {
   settingsSaveFromForm,
 } from "./settings-form.ts";
 
-const plan = {
-  targetMode: "auto",
-  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20, doubleDays: 0 },
+const plan: TrainingPlan = {
+  restWeekdays: [1],
+  longWeekday: 6,
+  doubleDays: 0,
+  sports: ["cycling", "running"],
+  goals: [],
+  startWeek: "2026-10-19",
+  baselineMinutes: null,
   keySessionSports: {},
-  targetWeeklyHours: 6,
-  preferredRestWeekday: 0,
   timeZone: "Europe/Paris",
-} as const;
+};
 
 const profile = { birthDate: "1990-05-14", weightKg: 72 };
 
@@ -37,7 +42,6 @@ describe("settingsFormSchema", () => {
         training: plan,
         sportTypes: { Run: sport(false), Walk: sport(false) },
         sportGroupShares: undefined,
-        avgHours: 5,
         timeZone: "Europe/Paris",
       }),
     );
@@ -53,7 +57,6 @@ describe("settingsFormSchema", () => {
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
-        avgHours: 5,
         timeZone: "Europe/Paris",
       }),
     );
@@ -68,7 +71,6 @@ describe("settingsFormSchema", () => {
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
-        avgHours: 5,
         timeZone: "Europe/Paris",
       }),
     );
@@ -83,7 +85,6 @@ describe("settingsFormSchema", () => {
         training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
-        avgHours: 5,
         timeZone: "Europe/Paris",
       }),
     );
@@ -111,11 +112,8 @@ describe("onboardingFormSchema", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
         profile,
-        training: plan,
         sportTypes: { Run: sport(false), Walk: sport(false) },
         sportGroupShares: undefined,
-        avgHours: 5,
-        timeZone: "Europe/Paris",
       }),
     );
 
@@ -127,11 +125,8 @@ describe("onboardingFormSchema", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
         profile,
-        training: plan,
         sportTypes: { Run: sport(true), Walk: sport(false) },
         sportGroupShares: undefined,
-        avgHours: 5,
-        timeZone: "Europe/Paris",
       }),
     );
 
@@ -142,11 +137,8 @@ describe("onboardingFormSchema", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
         profile,
-        training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
-        avgHours: 5,
-        timeZone: "Europe/Paris",
       }),
     );
 
@@ -157,11 +149,8 @@ describe("onboardingFormSchema", () => {
     const result = onboardingFormSchema.safeParse(
       onboardingFormDefaults({
         profile: null,
-        training: plan,
         sportTypes: {},
         sportGroupShares: undefined,
-        avgHours: 5,
-        timeZone: "Europe/Paris",
       }),
     );
 
@@ -183,7 +172,6 @@ describe("settingsSaveFromForm", () => {
         training: plan,
         sportTypes: { Run: sport(true) },
         sportGroupShares: undefined,
-        avgHours: 5,
         timeZone: "Europe/Paris",
       }),
       ...overrides,
@@ -191,10 +179,25 @@ describe("settingsSaveFromForm", () => {
   }
 
   it("saves the training edit while a half-typed weight keeps its saved value", () => {
-    const result = settingsSaveFromForm(form({ weightKg: "", targetWeeklyHours: 9 }), saved);
+    const result = settingsSaveFromForm(form({ weightKg: "", restWeekdays: [1, 3] }), saved);
 
     expect(result?.profile).toEqual(profile);
-    expect(result?.training?.targetWeeklyHours).toBe(9);
+    expect(result?.training?.restWeekdays).toEqual([1, 3]);
+  });
+
+  it("keeps the saved plan when the long session day lands on a rest day", () => {
+    const result = settingsSaveFromForm(form({ restWeekdays: [1, 6] }), saved);
+
+    expect(result?.training).toEqual(plan);
+  });
+
+  it("creates no plan from settings: the plan builder does", () => {
+    const result = settingsSaveFromForm(form({}), {
+      ...(saved as object),
+      training: null,
+    } as never);
+
+    expect(result?.training).toBeUndefined();
   });
 
   it("keeps the saved sport types when every type is hidden", () => {

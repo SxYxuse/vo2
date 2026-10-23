@@ -4,13 +4,11 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sync-panel.tsx";
-import { WeekTargetView } from "@/components/week-target.tsx";
-import {
-  loaderQuery,
-  seasonQueryOptions,
-  weekCoachQueryOptions,
-  weekTargetQueryOptions,
-} from "@/lib/queries.ts";
+import { WeekView } from "@/components/week-view.tsx";
+import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
+import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
+import { EmptyContent } from "@/components/ui/empty";
 import {
   Empty,
   EmptyDescription,
@@ -22,8 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/week")({
   loader: ({ context }) => {
-    // The season map and the stored day plan fill in when ready; the week does not wait.
-    void context.queryClient.prefetchQuery(seasonQueryOptions);
+    // The stored week plan fills in when ready; the week's activities do not wait for it.
     void context.queryClient.prefetchQuery(weekCoachQueryOptions);
     return context.queryClient.query(loaderQuery(weekTargetQueryOptions));
   },
@@ -41,7 +38,7 @@ function WeekTargetHeading() {
         This week
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        Today’s session, your week day by day, and how it builds toward your next goal.
+        Your week day by day, built from your season, your rest days, and your form.
       </p>
     </div>
   );
@@ -63,25 +60,31 @@ function WeekTargetPage() {
               </EmptyMedia>
               <EmptyTitle>Sign in to see your week</EmptyTitle>
               <EmptyDescription>
-                Connect Strava so the target counts what you already did.
+                Connect Strava so your plan starts from what you already do.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
           <SignInPanel />
         </>
       ) : plan ? (
-        <WeekTargetView data={{ ...data, plan }} />
+        <WeekView data={{ ...data, plan }} />
       ) : (
         <Empty className="min-h-64 border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <TargetIcon />
             </EmptyMedia>
-            <EmptyTitle>Finish your training plan</EmptyTitle>
+            <EmptyTitle>Build your plan</EmptyTitle>
             <EmptyDescription>
-              Set your weekly hours and week mix in Settings → Training to get a week target.
+              Four steps from your season and your last 12 weeks, and every week is laid out day by
+              day.
             </EmptyDescription>
           </EmptyHeader>
+          <EmptyContent>
+            <Button nativeButton={false} render={<Link to="/plan" />}>
+              Build your plan
+            </Button>
+          </EmptyContent>
         </Empty>
       )}
     </>

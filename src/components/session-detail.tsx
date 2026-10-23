@@ -13,6 +13,8 @@ import {
   zoneLabel,
   type TrainingPlan,
 } from "@/services/training-plan.ts";
+import type { SessionState } from "@/services/week-plan.ts";
+import { dayLabel } from "@/components/planned-session.ts";
 import {
   KEY_SESSION_DONE_SHARE,
   minutesByZone,
@@ -276,12 +278,19 @@ export function SessionDetail({
   pick,
   data,
   summary,
-  source,
+  date,
+  today,
+  state,
+  activityTitle,
 }: {
   pick: Recommendation;
   data: WeekTargetData & { plan: TrainingPlan };
   summary: WeekSummary;
-  source: "today" | "week-mix";
+  /** The day the session is planned on. */
+  date: string;
+  today: string;
+  state: SessionState;
+  activityTitle: string | null;
 }) {
   const steps = useMemo(() => sessionSteps(pick, data), [pick, data]);
   const SportIcon = pick.kind === "rest" ? MoonIcon : SPORT_STYLE[pick.family].icon;
@@ -314,10 +323,14 @@ export function SessionDetail({
             </Badge>
           ) : null}
           {pick.keySession ? <Badge variant="info">Key session</Badge> : null}
-          {status?.done ? <Badge variant="success">Done</Badge> : null}
-          {source === "today" ? <Badge variant="secondary">Today’s pick</Badge> : null}
+          {state === "done" || status?.done ? <Badge variant="success">Done</Badge> : null}
+          {state === "missed" ? <Badge variant="destructive">Missed</Badge> : null}
+          <Badge variant="secondary">{dayLabel(date, today)}</Badge>
         </h1>
-        <p className="text-muted-foreground text-sm">{pick.description}</p>
+        <p className="text-muted-foreground text-sm">
+          {state === "done" && activityTitle ? `Done with ${activityTitle}. ` : ""}
+          {pick.description}
+        </p>
       </div>
 
       {steps.length ? (
@@ -349,7 +362,9 @@ export function SessionDetail({
         <Card>
           <CardHeader>
             <CardTitle>Effect on the week</CardTitle>
-            <CardDescription>If you do it today.</CardDescription>
+            <CardDescription>
+              {date === today ? "If you do it today." : "Read from today's fitness."}
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
