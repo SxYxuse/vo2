@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/services/activity-detail.types.ts";
@@ -602,42 +603,49 @@ function BestSheetBody({
             <h3 className="text-sm font-semibold">Top {Math.min(top.length, 10)}</h3>
             <span className="text-xs text-muted-foreground">One per activity</span>
           </div>
-          <ol className="flex flex-col">
-            {top.map((effort) => (
-              <li key={effort.activity.id} className="border-b last:border-b-0">
-                <Link
-                  to="/activities/$activityId"
-                  params={{ activityId: effort.activity.id }}
-                  search={{ from: "bests", best: board.id, period }}
-                  className="grid min-h-12 grid-cols-[1.75rem_1fr_auto_1rem] items-center gap-2 py-2 hover:bg-accent/40"
-                >
-                  <span
-                    className={cn(
-                      "grid size-6 place-items-center rounded-full text-xs font-semibold tabular-nums",
-                      effort.rank === 1 ? "bg-foreground text-background" : "text-muted-foreground",
-                    )}
+          {/* Desktop shows five rows (3.25rem plus a 1px border each) and scrolls the rest;
+              the phone drawer scrolls the whole sheet instead. */}
+          <ScrollArea className="md:**:data-[slot=scroll-area-viewport]:max-h-[calc(5*(3.25rem+1px))]">
+            {/* Clears the overlay scrollbar off the chevrons. */}
+            <ol className="flex flex-col md:pe-3">
+              {top.map((effort) => (
+                <li key={effort.activity.id} className="border-b last:border-b-0">
+                  <Link
+                    to="/activities/$activityId"
+                    params={{ activityId: effort.activity.id }}
+                    search={{ from: "bests", best: board.id, period }}
+                    className="grid min-h-12 grid-cols-[1.75rem_1fr_auto_1rem] items-center gap-2 py-2 hover:bg-accent/40"
                   >
-                    {effort.rank}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm">{effort.activity.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {FULL_DATE.format(new Date(effort.activity.start))}
+                    <span
+                      className={cn(
+                        "grid size-6 place-items-center rounded-full text-xs font-semibold tabular-nums",
+                        effort.rank === 1
+                          ? "bg-foreground text-background"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {effort.rank}
                     </span>
-                  </span>
-                  <span className="text-right">
-                    <span className="block text-sm font-semibold tabular-nums">
-                      {formatValue(board, effort.value)}
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm">{effort.activity.name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {FULL_DATE.format(new Date(effort.activity.start))}
+                      </span>
                     </span>
-                    <span className="block text-xs text-muted-foreground tabular-nums">
-                      {formatDetail(board, effort, weightKg)}
+                    <span className="text-right">
+                      <span className="block text-sm font-semibold tabular-nums">
+                        {formatValue(board, effort.value)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground tabular-nums">
+                        {formatDetail(board, effort, weightKg)}
+                      </span>
                     </span>
-                  </span>
-                  <ChevronRightIcon aria-hidden className="size-4 text-muted-foreground" />
-                </Link>
-              </li>
-            ))}
-          </ol>
+                    <ChevronRightIcon aria-hidden className="size-4 text-muted-foreground" />
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </ScrollArea>
         </section>
       </div>
     </>
