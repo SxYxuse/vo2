@@ -122,10 +122,6 @@ export type SeasonData = {
   past: PastGoal[];
   /** Weeks from this one through the last goal, if every week hits its target. */
   map: SeasonWeek[];
-  /** Per goal id: duration at the athlete's own pace, or null without one. */
-  expectedMinutes: Record<string, number | null>;
-  /** Per event date: projected form on the morning of the event. */
-  raceDayForm: Record<string, number>;
 };
 
 /** The sport types a goal can pick: those the athlete shows in Settings. */

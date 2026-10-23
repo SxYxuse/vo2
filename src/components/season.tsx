@@ -28,7 +28,6 @@ import {
 } from "@/services/season.types.ts";
 import { sportGroupFor } from "@/services/sport-groups.ts";
 import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
-import { formTone } from "@/components/season-style.ts";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -103,12 +102,6 @@ function isHilly(goal: Goal) {
     goal.elevationGainM != null &&
     goal.elevationGainM / (goal.distanceM / 1000) >= HILLY_M_PER_KM
   );
-}
-
-function minutesLabel(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const rest = Math.round(minutes % 60);
-  return hours ? `${hours}h${rest ? ` ${String(rest).padStart(2, "0")}` : ""}` : `${rest} min`;
 }
 
 /** Which dialog is open: a new goal (optionally on a date) or an existing one. */
@@ -193,7 +186,7 @@ export function SeasonView({ data }: { data: SeasonData }) {
   );
 }
 
-/** One race or event: priority, countdown, legs, expected time, and form on the day. */
+/** One race or event: priority, countdown, and legs. */
 function EventCard({
   event,
   data,
@@ -204,15 +197,6 @@ function EventCard({
   onEdit: (goal: Goal) => void;
 }) {
   const priority = eventPriority(event);
-  const expected = event.goals.map((goal) => data.expectedMinutes[goal.id] ?? null);
-  const totalExpected = expected.every((minutes) => minutes != null)
-    ? expected.reduce<number>((sum, minutes) => sum + (minutes ?? 0), 0)
-    : null;
-  const form = data.raceDayForm[event.date];
-  const notes = [
-    totalExpected ? `About ${minutesLabel(totalExpected)} at your pace` : null,
-    event.goals.some(isHilly) ? "intervals on climbs" : null,
-  ].filter(Boolean);
 
   return (
     <article className="flex flex-col gap-1 rounded-xl border px-3 py-2.5">
@@ -252,22 +236,6 @@ function EventCard({
           );
         })}
       </ul>
-      {notes.length || (form != null && priority !== "C") ? (
-        <p className="text-muted-foreground text-xs">
-          {notes.join(" · ")}
-          {notes.length && form != null && priority !== "C" ? " · " : ""}
-          {form != null && priority !== "C" ? (
-            <>
-              form on the day{" "}
-              <span className={cn("font-medium tabular-nums", formTone(form))}>
-                {form >= 0 ? "+" : "−"}
-                {Math.abs(form)}
-              </span>{" "}
-              if you hit each target
-            </>
-          ) : null}
-        </p>
-      ) : null}
     </article>
   );
 }

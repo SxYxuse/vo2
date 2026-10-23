@@ -5,14 +5,7 @@ import { activities, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
-import {
-  expectedGoalMinutes,
-  projectRaceDay,
-  projectSeason,
-  recentPaces,
-  weekLoadsBefore,
-} from "./season-phase.ts";
-import { sportGroupFor } from "./sport-groups.ts";
+import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
@@ -78,15 +71,12 @@ async function matchPastActivities(
   });
 }
 
-/** Fitness now, the last four weeks' loads, and the athlete's paces, for the season map. */
+/** Fitness now and the last four weeks' loads, for the season map. */
 async function seasonContext(userId: string, timeZone: string, weekStart: string) {
   const rows = await db
     .select({
-      sportType: activities.sportType,
       startDate: activities.startDate,
       movingTime: activities.movingTime,
-      distance: activities.distance,
-      totalElevationGain: activities.totalElevationGain,
       trainingLoad: activities.trainingLoad,
       loadSource: activities.loadSource,
     })
@@ -118,7 +108,6 @@ async function seasonContext(userId: string, timeZone: string, weekStart: string
     fitness: beforeWeek ? { ctl: beforeWeek.ctl, atl: beforeWeek.atl } : { ctl: 0, atl: 0 },
     weekLoads,
     loadPerHour: recentLoadPerHour(history),
-    paces: recentPaces(rows, new Date()),
   };
 }
 
@@ -132,8 +121,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
       upcoming: [],
       past: [],
       map: [],
-      expectedMinutes: {},
-      raceDayForm: {},
     };
   }
   const userId = session.user.id;
@@ -155,19 +142,8 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     upcoming.length ? seasonContext(userId, timeZone, weekStart) : null,
   ]);
 
-  const expectedMinutes: Record<string, number | null> = {};
-  const raceDayForm: Record<string, number> = {};
   let map: SeasonData["map"] = [];
   if (context) {
-    for (const event of upcoming) {
-      for (const goal of event.goals) {
-        const group = sportGroupFor(goal.sportType)?.id;
-        expectedMinutes[goal.id] = group ? expectedGoalMinutes(goal, context.paces[group]) : null;
-      }
-      raceDayForm[event.date] = Math.round(
-        projectRaceDay(context.fitness, all, today, event.date, context.weekLoads).form,
-      );
-    }
     const last = upcoming.at(-1)!.date;
     map = projectSeason(context.fitness, all, weekStart, addDayKey(last, 7), context.weekLoads).map(
       (week) => ({
@@ -186,8 +162,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     upcoming,
     past: matched.reverse(),
     map,
-    expectedMinutes,
-    raceDayForm,
   };
 }
 

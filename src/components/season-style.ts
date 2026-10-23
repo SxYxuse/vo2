@@ -25,10 +25,3 @@ export const PRIORITY_FILL: Record<GoalPriority, string> = {
   B: "var(--ds-pink-600)",
   C: "var(--ds-gray-500)",
 };
-
-/** Race-day form as text colour, the same tones as the fitness chart. */
-export function formTone(form: number) {
-  if (form >= 5) return "text-success";
-  if (form >= -10) return "text-muted-foreground";
-  return "text-destructive";
-}
