@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, type ComponentProps } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 
 import {
@@ -27,12 +27,11 @@ import {
   streamSeriesValues,
   streamYAxis,
 } from "@/components/activity-detail-series.ts";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-type ChartLayout = "combined" | "separate";
 type ChartRow = ActivityChartPoint & Record<string, number | undefined>;
 type SeriesMeta = ReturnType<typeof seriesMetaFor>;
 
@@ -220,71 +219,6 @@ function CombinedStreamChart({
   );
 }
 
-function StreamAreaChart({
-  seriesKey,
-  data,
-  sportType,
-  meta,
-}: {
-  seriesKey: StreamSeriesKey;
-  data: ChartRow[];
-  sportType: string;
-  meta: SeriesMeta;
-}) {
-  const reactId = useId().replace(/:/g, "");
-  const gradientId = `fill-${seriesKey}-${reactId}`;
-  const series = meta[seriesKey];
-  const chartConfig = chartConfigFor(sportType);
-
-  return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-36 w-full sm:h-40">
-      <ComposedChart data={data} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={`var(--color-${seriesKey})`} stopOpacity={0.45} />
-            <stop offset="95%" stopColor={`var(--color-${seriesKey})`} stopOpacity={0.04} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="t"
-          tickLine={false}
-          axisLine={false}
-          minTickGap={48}
-          tickFormatter={(value) => formatElapsedTick(Number(value))}
-        />
-        <StreamValueAxis
-          seriesKey={seriesKey}
-          sportType={sportType}
-          yAxisId={seriesKey}
-          values={streamSeriesValues(data, seriesKey)}
-        />
-        <ChartTooltip
-          cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
-          content={
-            <StreamTooltip
-              meta={meta}
-              sportType={sportType}
-              labelFormatter={(value) => formatElapsedTick(Number(value))}
-            />
-          }
-        />
-        <Area
-          yAxisId={seriesKey}
-          dataKey={seriesKey}
-          type="monotone"
-          fill={`url(#${gradientId})`}
-          stroke={`var(--color-${seriesKey})`}
-          strokeWidth={1.75}
-          name={series.label}
-          isAnimationActive={false}
-          connectNulls={false}
-        />
-      </ComposedChart>
-    </ChartContainer>
-  );
-}
-
 export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
   const meta = seriesMetaFor(detail.sportType);
   const chartData = useMemo(
@@ -292,7 +226,6 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
     [detail.chart, detail.sportType],
   );
   const [visible, setVisible] = useState<string[]>(() => defaultVisibleSeries(detail));
-  const [chartLayout, setChartLayout] = useState<ChartLayout>("combined");
   const shown = useMemo(
     () => STREAM_SERIES.filter((key) => detail.series.includes(key) && visible.includes(key)),
     [detail.series, visible],
@@ -300,43 +233,26 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
 
   return (
     <>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <ToggleGroup
-          multiple
-          size="sm"
-          variant="outline"
-          spacing={0}
-          value={visible}
-          onValueChange={setVisible}
-          className="flex-wrap"
-        >
-          {detail.series.map((key) => (
-            <ToggleGroupItem key={key} value={key}>
-              <span
-                aria-hidden
-                className="size-2 rounded-full"
-                style={{ backgroundColor: meta[key].color }}
-              />
-              {meta[key].shortLabel}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <ToggleGroup
-          size="sm"
-          variant="outline"
-          spacing={0}
-          value={[chartLayout]}
-          onValueChange={(next) => {
-            const mode = next[0];
-            if (mode === "combined" || mode === "separate") {
-              setChartLayout(mode);
-            }
-          }}
-        >
-          <ToggleGroupItem value="combined">Combined</ToggleGroupItem>
-          <ToggleGroupItem value="separate">Separate</ToggleGroupItem>
-        </ToggleGroup>
-      </div>
+      <ToggleGroup
+        multiple
+        size="sm"
+        variant="outline"
+        spacing={0}
+        value={visible}
+        onValueChange={setVisible}
+        className="flex-wrap"
+      >
+        {detail.series.map((key) => (
+          <ToggleGroupItem key={key} value={key}>
+            <span
+              aria-hidden
+              className="size-2 rounded-full"
+              style={{ backgroundColor: meta[key].color }}
+            />
+            {meta[key].shortLabel}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
 
       {shown.length === 0 ? (
         <Empty className="min-h-48 border">
@@ -347,7 +263,7 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      ) : chartLayout === "combined" ? (
+      ) : (
         <Card size="sm" className="gap-2 py-3">
           <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 sm:px-4">
             {shown.map((key) => (
@@ -371,30 +287,6 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
             meta={meta}
           />
         </Card>
-      ) : (
-        shown.map((key) => (
-          <Card key={key} size="sm" className="gap-2 py-3">
-            <div className="flex flex-col gap-1 px-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  aria-hidden
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: meta[key].color }}
-                />
-                <CardTitle>{meta[key].label}</CardTitle>
-              </div>
-              <CardDescription className="font-mono tabular-nums sm:shrink-0">
-                {seriesSummary(detail, key)}
-              </CardDescription>
-            </div>
-            <StreamAreaChart
-              seriesKey={key}
-              data={chartData}
-              sportType={detail.sportType}
-              meta={meta}
-            />
-          </Card>
-        ))
       )}
     </>
   );
