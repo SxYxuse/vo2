@@ -160,10 +160,9 @@ export function WeekStrip({
                   : "nothing"
             }`}
             className={cn(
-              "flex min-h-20 min-w-0 flex-col items-center gap-1 rounded-lg border px-0.5 py-1.5 text-center text-[10px]",
-              isToday && "border-primary ring-primary/30 ring-2",
+              "flex min-h-20 min-w-0 flex-col items-center gap-1 rounded-lg px-0.5 py-1.5 text-center text-[10px]",
+              isToday ? "bg-muted" : !past && "hover:bg-muted/50",
               past && !done.length && "opacity-50",
-              !past && "hover:bg-muted/50",
             )}
           >
             <span className="font-semibold">{format(parseISO(`${date}T12:00:00`), "EEEEE")}</span>
@@ -179,7 +178,7 @@ export function WeekStrip({
             {!done.length && plan ? (
               <span className="flex flex-col items-center">
                 {plan.kind === "race" ? (
-                  <FlagIcon className="text-ds-red-700 size-3" aria-hidden />
+                  <FlagIcon className="size-3" aria-hidden />
                 ) : plan.kind === "rest" ? (
                   <MoonIcon className="text-muted-foreground size-3" aria-hidden />
                 ) : (
@@ -259,7 +258,7 @@ function PlannedRow({
           ) : (
             <span className="font-medium">{title}</span>
           )}
-          {sport && day.kind !== "rest" && day.kind !== "race" ? (
+          {sport && day.kind === "key" ? (
             <span className={cn("text-xs", sport.text)}>{sport.label}</span>
           ) : null}
           {day.indoor && day.kind !== "rest" ? (
@@ -303,7 +302,6 @@ export function CoachCard({
     <Card className="md:col-span-2">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          <SparklesIcon aria-hidden className="text-ds-purple-700 size-4" />
           Your week, day by day
           {replanning ? (
             <Badge variant="outline">
@@ -311,7 +309,8 @@ export function CoachCard({
               Re-planning
             </Badge>
           ) : plan ? (
-            <Badge variant={plan.source === "coach" ? "secondary" : "outline"}>
+            <Badge variant="outline">
+              {plan.source === "coach" ? <SparklesIcon data-icon="inline-start" /> : null}
               {plan.source === "coach" ? "AI coach" : "Planner"}
             </Badge>
           ) : null}
@@ -323,11 +322,7 @@ export function CoachCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <WeekStrip data={data} summary={summary} coach={coach} onPickDay={onPickDay} />
-        {plan?.note ? (
-          <p className="bg-ds-purple-100 text-ds-purple-1000 rounded-lg px-3 py-2 text-sm">
-            {plan.note}
-          </p>
-        ) : null}
+        {plan?.note ? <p className="text-muted-foreground text-sm">{plan.note}</p> : null}
         {days.length ? (
           <ul className="divide-y">
             {days.map((day) => (
@@ -417,26 +412,21 @@ function TellCoach({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <div className="flex flex-wrap gap-2">
-          {CONSTRAINT_KINDS.map((item) => {
-            const Icon = CONSTRAINT_ICON[item.id];
-            const active = kind === item.id;
-            return (
-              <Button
-                key={item.id}
-                type="button"
-                size="sm"
-                variant={active ? "default" : "outline"}
-                aria-pressed={active}
-                className="min-h-10 sm:min-h-8"
-                onClick={() => setKind(active ? null : item.id)}
-              >
-                <Icon data-icon="inline-start" />
-                {item.label}
-              </Button>
-            );
-          })}
-        </div>
+        <ToggleGroup
+          size="sm"
+          variant="outline"
+          spacing={0}
+          aria-label="What about that day"
+          className="flex-wrap"
+          value={kind ? [kind] : []}
+          onValueChange={(next) => setKind((next[0] as ConstraintKind | undefined) ?? null)}
+        >
+          {CONSTRAINT_KINDS.map((item) => (
+            <ToggleGroupItem key={item.id} value={item.id}>
+              {item.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         {kind === "short" ? (
           <ToggleGroup
             size="sm"
@@ -493,7 +483,7 @@ function TellCoach({
       {notes.length ? (
         <ul className="flex flex-col gap-2" aria-label="What you told the coach">
           {notes.map((note) => (
-            <li key={note.id} className="bg-muted/50 flex items-start gap-2 rounded-lg px-3 py-2">
+            <li key={note.id} className="flex items-start gap-2 rounded-lg border px-3 py-2">
               <span className="min-w-0 flex-1 text-sm">
                 <span className="text-muted-foreground text-xs">
                   {dayLabel(note.date, data.today)} ·{" "}

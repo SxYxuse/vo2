@@ -33,8 +33,7 @@ import {
   type SeasonData,
 } from "@/services/season.types.ts";
 import { planRecommendation, type PlannedDay } from "@/services/week-plan.ts";
-import { SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
-import { PHASE_STYLE, PRIORITY_STYLE } from "@/components/season-style.ts";
+import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
 import { CoachCard, useReplanWhenStale } from "@/components/week-coach.tsx";
 import {
   addDayKey,
@@ -193,7 +192,7 @@ function TargetCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary
             <div
               className={cn(
                 "h-full rounded-full transition-all",
-                pace.status === "behind" ? "bg-warning" : "bg-success",
+                pace.status === "behind" || pace.status === "over" ? "bg-warning" : "bg-success",
               )}
               style={{ width: `${filled * 100}%` }}
             />
@@ -362,7 +361,14 @@ function keySportHint(status: KeySessionStatus) {
   return status.sportPinned ? `Your pick · VO2 suggests a ${suggested}` : "VO2’s pick";
 }
 
-function WeekMixCard({ summary }: { summary: WeekSummary }) {
+function WeekMixCard({
+  summary,
+  plannedIds,
+}: {
+  summary: WeekSummary;
+  /** Key sessions the day plan placed; null while there is no plan. */
+  plannedIds: Set<string> | null;
+}) {
   const { keySessions, easy, paused } = summary;
   const doneCount = keySessions.filter((status) => status.done).length;
   const keyCount = keySessions.filter((status) => !status.skipped).length;
@@ -405,7 +411,13 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                   key={status.session.id}
                   variant={done ? "muted" : "outline"}
                   size="sm"
-                  className={cn((paused || status.skipped) && !done && "opacity-50")}
+                  className={cn(
+                    (paused ||
+                      status.skipped ||
+                      (plannedIds != null && !plannedIds.has(status.session.id))) &&
+                      !done &&
+                      "opacity-50",
+                  )}
                 >
                   <ItemMedia variant="icon">
                     {done ? (
@@ -435,6 +447,8 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                         </Link>
                       ) : status.skipped ? (
                         "Dropped: not enough days left. Its time moved to easy."
+                      ) : plannedIds && !plannedIds.has(status.session.id) ? (
+                        "Not in this week’s plan: it doesn’t fit the time left."
                       ) : (
                         keySportHint(status)
                       )}
@@ -1055,7 +1069,6 @@ function DoneCard({ data }: { data: PlannedWeek }) {
 /** Where the season puts this week, what comes next, and the next goals. Opens the Season page. */
 function SeasonStrip({ data, season }: { data: PlannedWeek; season: SeasonData | undefined }) {
   const phase = data.season;
-  const style = PHASE_STYLE[phase.kind];
   const outlook = season ? phaseOutlook(season.map) : null;
   const next = season?.upcoming.filter((event) => eventPriority(event) !== "C").slice(0, 2) ?? [];
   const hint =
@@ -1076,13 +1089,10 @@ function SeasonStrip({ data, season }: { data: PlannedWeek; season: SeasonData |
         preload="intent"
         className="hover:bg-muted/50 flex flex-col gap-2.5 px-4 py-3"
       >
-        <span className="flex flex-wrap items-center gap-2">
-          <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", style.chip)}>
-            {PHASES[phase.kind].label}
-            {phase.lighter ? " · lighter week" : ""}
-          </span>
-          {outlook ? <span className="text-muted-foreground text-xs">{outlook}</span> : null}
-          <ChevronRightIcon aria-hidden className="text-muted-foreground ms-auto size-4 shrink-0" />
+        <span className="flex items-center gap-2">
+          <PhaseBadge kind={phase.kind} lighter={phase.lighter} />
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{outlook}</span>
+          <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
         </span>
         {season?.map.length ? (
           <SeasonMap weeks={season.map} events={season.upcoming} compact />
@@ -1090,17 +1100,9 @@ function SeasonStrip({ data, season }: { data: PlannedWeek; season: SeasonData |
         {next.length ? (
           <span className="flex flex-col gap-1">
             {next.map((event) => {
-              const priority = eventPriority(event);
               return (
                 <span key={event.date} className="flex items-center gap-2 text-sm">
-                  <span
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] font-bold",
-                      PRIORITY_STYLE[priority].badge,
-                    )}
-                  >
-                    {priority}
-                  </span>
+                  <PriorityBadge priority={eventPriority(event)} />
                   <span className="min-w-0 flex-1 truncate font-medium">{eventTitle(event)}</span>
                   <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
                     {formatDaysLeft(daysBetween(data.today, event.date))}
@@ -1136,7 +1138,16 @@ export function WeekTargetView({ data }: { data: PlannedWeek }) {
         pickedDay={pickedDay}
         onPickDay={setPickedDay}
       />
-      <WeekMixCard summary={summary} />
+      <WeekMixCard
+        summary={summary}
+        plannedIds={
+          coach?.plan
+            ? new Set(
+                coach.plan.days.flatMap((day) => (day.keySessionId ? [day.keySessionId] : [])),
+              )
+            : null
+        }
+      />
       <SplitCard summary={summary} season={data.season} />
       <ProjectionCard data={data} summary={summary} />
       <DoneCard data={data} />

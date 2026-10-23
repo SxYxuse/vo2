@@ -2,37 +2,33 @@ import type { PhaseKind } from "@/services/season-phase.ts";
 import type { GoalPriority } from "@/services/season.types.ts";
 
 /*
- * Phases climb one purple ramp toward the peak, then turn pink for the taper and red on race
- * week. Sports already own blue, amber, teal, and green, so the two never read as each other.
+ * Colour marks a phase or a priority only: on the season map and as a small dot next to its
+ * label. Phases climb one purple ramp toward the peak, then turn pink for the taper and red on
+ * race week; sports already own blue, amber, teal, and green, so the two never read as each other.
  */
-export const PHASE_STYLE: Record<PhaseKind, { fill: string; chip: string }> = {
-  hold: { fill: "var(--ds-gray-500)", chip: "bg-ds-gray-200 text-ds-gray-1000" },
-  base: { fill: "var(--ds-purple-400)", chip: "bg-ds-purple-200 text-ds-purple-900" },
-  build: { fill: "var(--ds-purple-600)", chip: "bg-ds-purple-300 text-ds-purple-1000" },
-  maintain: { fill: "var(--ds-purple-500)", chip: "bg-ds-purple-200 text-ds-purple-1000" },
-  peak: { fill: "var(--ds-purple-800)", chip: "bg-ds-purple-700 text-white" },
-  taper: { fill: "var(--ds-pink-600)", chip: "bg-ds-pink-200 text-ds-pink-1000" },
-  race: { fill: "var(--ds-red-700)", chip: "bg-ds-red-700 text-white" },
-  recovery: { fill: "var(--ds-gray-600)", chip: "bg-ds-gray-200 text-ds-gray-1000" },
+export const PHASE_FILL: Record<PhaseKind, string> = {
+  hold: "var(--ds-gray-500)",
+  base: "var(--ds-purple-400)",
+  build: "var(--ds-purple-600)",
+  maintain: "var(--ds-purple-500)",
+  peak: "var(--ds-purple-800)",
+  taper: "var(--ds-pink-600)",
+  race: "var(--ds-red-700)",
+  recovery: "var(--ds-gray-600)",
 };
 
 /** Phases shown in the map legend, in season order. */
 export const LEGEND_PHASES: PhaseKind[] = ["base", "build", "peak", "taper", "race", "recovery"];
 
-export const PRIORITY_STYLE: Record<GoalPriority, { stripe: string; badge: string; fill: string }> =
-  {
-    A: { stripe: "bg-ds-red-700", badge: "bg-ds-red-700 text-white", fill: "var(--ds-red-700)" },
-    B: { stripe: "bg-ds-pink-600", badge: "bg-ds-pink-600 text-white", fill: "var(--ds-pink-600)" },
-    C: {
-      stripe: "bg-ds-gray-500",
-      badge: "bg-ds-gray-300 text-ds-gray-1000",
-      fill: "var(--ds-gray-500)",
-    },
-  };
+export const PRIORITY_FILL: Record<GoalPriority, string> = {
+  A: "var(--ds-red-700)",
+  B: "var(--ds-pink-600)",
+  C: "var(--ds-gray-500)",
+};
 
-/** Race-day form: fresh is what a taper is for; very negative means arriving tired. */
+/** Race-day form as text colour, the same tones as the fitness chart. */
 export function formTone(form: number) {
-  if (form >= 5) return "bg-success/15 text-success";
-  if (form >= -10) return "bg-muted text-muted-foreground";
-  return "bg-destructive/15 text-destructive";
+  if (form >= 5) return "text-success";
+  if (form >= -10) return "text-muted-foreground";
+  return "text-destructive";
 }

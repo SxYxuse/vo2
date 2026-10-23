@@ -10,7 +10,6 @@ import { cn } from "cn";
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
-import { PHASES } from "@/services/season-phase.ts";
 import { createEvent, createGoal, deleteGoal, updateGoal } from "@/services/season.ts";
 import {
   GOAL_OBJECTIVES,
@@ -21,7 +20,6 @@ import {
   eventTitle,
   formatDaysLeft,
   goalInputSchema,
-  legLabel,
   type Goal,
   type GoalInput,
   type PastGoal,
@@ -29,8 +27,8 @@ import {
   type SeasonEvent,
 } from "@/services/season.types.ts";
 import { sportGroupFor } from "@/services/sport-groups.ts";
-import { SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
-import { PHASE_STYLE, PRIORITY_STYLE, formTone } from "@/components/season-style.ts";
+import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
+import { formTone } from "@/components/season-style.ts";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -156,20 +154,11 @@ export function SeasonView({ data }: { data: SeasonData }) {
                 <CardTitle className="flex flex-wrap items-center gap-2">
                   Season map
                   {data.map[0] ? (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-semibold",
-                        PHASE_STYLE[data.map[0].kind].chip,
-                      )}
-                    >
-                      {PHASES[data.map[0].kind].label}
-                      {data.map[0].lighter ? " · lighter week" : ""}
-                    </span>
+                    <PhaseBadge kind={data.map[0].kind} lighter={data.map[0].lighter} />
                   ) : null}
                 </CardTitle>
                 <CardDescription>
-                  {outlook}. Bar height is the hours a week if you hit each target; the plan never
-                  asks for more than 10 % above your last four weeks.
+                  {outlook}. Bars are the weekly hours if you hit each target.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -215,114 +204,70 @@ function EventCard({
   onEdit: (goal: Goal) => void;
 }) {
   const priority = eventPriority(event);
-  const days = daysBetween(data.today, event.date);
   const expected = event.goals.map((goal) => data.expectedMinutes[goal.id] ?? null);
   const totalExpected = expected.every((minutes) => minutes != null)
     ? expected.reduce<number>((sum, minutes) => sum + (minutes ?? 0), 0)
     : null;
   const form = data.raceDayForm[event.date];
-  const multi = event.goals.length > 1;
+  const notes = [
+    totalExpected ? `About ${minutesLabel(totalExpected)} at your pace` : null,
+    event.goals.some(isHilly) ? "intervals on climbs" : null,
+  ].filter(Boolean);
 
   return (
-    <article className="bg-card relative overflow-hidden rounded-xl border">
-      <span
-        aria-hidden
-        className={cn("absolute inset-y-0 left-0 w-1.5", PRIORITY_STYLE[priority].stripe)}
-      />
-      <div className="flex flex-col gap-2 py-3 ps-5 pe-3">
-        <div className="flex items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-[10px] font-bold",
-                  PRIORITY_STYLE[priority].badge,
-                )}
-                title={GOAL_PRIORITIES.find((item) => item.id === priority)?.hint}
-              >
-                {priority}
-              </span>
-              <h2 className="truncate font-semibold">{eventTitle(event)}</h2>
-            </div>
-            <p className="text-muted-foreground text-xs tabular-nums">
-              {formatGoalDate(event.date)} · {objectiveLabel(event.goals[0]!.objective)}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end">
-            <span className="font-mono text-2xl leading-none font-semibold tabular-nums">
-              {Math.max(0, days)}
-            </span>
-            <span className="text-muted-foreground text-[10px]">{days === 1 ? "day" : "days"}</span>
-          </div>
-        </div>
-        {multi ? (
-          <div className="flex h-2 overflow-hidden rounded-full" aria-hidden>
-            {event.goals.map((goal, index) => {
-              const group = sportGroupFor(goal.sportType)?.id;
-              const share =
-                totalExpected && expected[index]
-                  ? expected[index]! / totalExpected
-                  : 1 / event.goals.length;
-              return (
-                <span
-                  key={goal.id}
-                  className={group ? SPORT_STYLE[group].bar : "bg-muted-foreground"}
-                  style={{ width: `${share * 100}%` }}
-                />
-              );
-            })}
-          </div>
-        ) : null}
-        <ul className="-mx-2 flex flex-col">
-          {event.goals.map((goal) => {
-            const group = sportGroupFor(goal.sportType)?.id;
-            const Icon = group ? SPORT_STYLE[group].icon : FlagIcon;
-            return (
-              <li key={goal.id}>
-                <button
-                  type="button"
-                  onClick={() => onEdit(goal)}
-                  className="hover:bg-muted/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm"
-                >
-                  <Icon
-                    aria-hidden
-                    className={cn("size-4 shrink-0", group ? SPORT_STYLE[group].text : "")}
-                  />
-                  <span className="min-w-0 flex-1 truncate">
-                    {multi ? `${legLabel(goal, event) ?? goal.name} · ` : ""}
-                    {goalFacts(goal)}
-                    {goal.elevationGainM ? (
-                      <span className={cn(isHilly(goal) && "text-ds-amber-700 font-medium")}>
-                        {" "}
-                        · {formatElevation(goal.elevationGainM)} D+
-                      </span>
-                    ) : null}
-                  </span>
-                  <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          {totalExpected ? (
-            <span className="bg-ds-purple-200 text-ds-purple-1000 rounded-full px-2 py-0.5">
-              About {minutesLabel(totalExpected)} at your pace
-            </span>
-          ) : null}
-          {form != null && priority !== "C" ? (
-            <span className={cn("rounded-full px-2 py-0.5", formTone(form))}>
-              Form on the day {form >= 0 ? "+" : "−"}
-              {Math.abs(form)} if you hit each target
-            </span>
-          ) : null}
-          {event.goals.some(isHilly) ? (
-            <span className="bg-ds-amber-200 text-ds-amber-1000 rounded-full px-2 py-0.5">
-              Hilly: intervals on climbs
-            </span>
-          ) : null}
-        </div>
+    <article className="flex flex-col gap-1 rounded-xl border px-3 py-2.5">
+      <div className="flex min-h-8 items-center gap-2">
+        <PriorityBadge priority={priority} />
+        <h2 className="min-w-0 flex-1 truncate font-medium">{eventTitle(event)}</h2>
+        <span className="shrink-0 text-sm font-semibold tabular-nums">
+          {formatDaysLeft(daysBetween(data.today, event.date))}
+        </span>
       </div>
+      <p className="text-muted-foreground text-xs tabular-nums">
+        {formatGoalDate(event.date)} · {objectiveLabel(event.goals[0]!.objective)}
+      </p>
+      <ul className="-mx-2 flex flex-col">
+        {event.goals.map((goal) => {
+          const group = sportGroupFor(goal.sportType)?.id;
+          const Icon = group ? SPORT_STYLE[group].icon : FlagIcon;
+          return (
+            <li key={goal.id}>
+              <button
+                type="button"
+                onClick={() => onEdit(goal)}
+                className="hover:bg-muted/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm"
+              >
+                <Icon
+                  aria-hidden
+                  className={cn("size-4 shrink-0", group ? SPORT_STYLE[group].text : "")}
+                />
+                <span className="min-w-0 flex-1 truncate">
+                  {goalFacts(goal)}
+                  {goal.elevationGainM ? ` · ${formatElevation(goal.elevationGainM)} D+` : ""}
+                  {isHilly(goal) ? " (hilly)" : ""}
+                </span>
+                <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {notes.length || (form != null && priority !== "C") ? (
+        <p className="text-muted-foreground text-xs">
+          {notes.join(" · ")}
+          {notes.length && form != null && priority !== "C" ? " · " : ""}
+          {form != null && priority !== "C" ? (
+            <>
+              form on the day{" "}
+              <span className={cn("font-medium tabular-nums", formTone(form))}>
+                {form >= 0 ? "+" : "−"}
+                {Math.abs(form)}
+              </span>{" "}
+              if you hit each target
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </article>
   );
 }
@@ -774,17 +719,7 @@ function GoalFormBody({
                     <Field orientation="horizontal" className="items-start p-3">
                       <RadioGroupItem value={priority.id} id={id} />
                       <FieldContent>
-                        <FieldTitle>
-                          <span
-                            className={cn(
-                              "rounded px-1.5 py-0.5 text-[10px] font-bold",
-                              PRIORITY_STYLE[priority.id].badge,
-                            )}
-                          >
-                            {priority.id}
-                          </span>
-                          {priority.label}
-                        </FieldTitle>
+                        <FieldTitle>{priority.label}</FieldTitle>
                         <FieldDescription>{priority.hint}</FieldDescription>
                       </FieldContent>
                     </Field>

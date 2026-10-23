@@ -1,15 +1,42 @@
 import { format, parseISO } from "date-fns";
 import { cn } from "cn";
 
-import { PHASES } from "@/services/season-phase.ts";
+import { PHASES, type PhaseKind } from "@/services/season-phase.ts";
 import {
   daysBetween,
   eventPriority,
   eventTitle,
+  type GoalPriority,
   type SeasonEvent,
   type SeasonWeek,
 } from "@/services/season.types.ts";
-import { LEGEND_PHASES, PHASE_STYLE, PRIORITY_STYLE } from "@/components/season-style.ts";
+import { LEGEND_PHASES, PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
+import { Badge } from "@/components/ui/badge";
+
+function Dot({ fill }: { fill: string }) {
+  return <span aria-hidden className="size-1.5 rounded-full" style={{ background: fill }} />;
+}
+
+/** The phase as an outline badge with its map colour. */
+export function PhaseBadge({ kind, lighter = false }: { kind: PhaseKind; lighter?: boolean }) {
+  return (
+    <Badge variant="outline">
+      <Dot fill={PHASE_FILL[kind]} />
+      {PHASES[kind].label}
+      {lighter ? " · lighter week" : ""}
+    </Badge>
+  );
+}
+
+/** A goal's priority as an outline badge: "A", "B", or "C" with its colour. */
+export function PriorityBadge({ priority }: { priority: GoalPriority }) {
+  return (
+    <Badge variant="outline" aria-label={`${priority} race`}>
+      <Dot fill={PRIORITY_FILL[priority]} />
+      {priority}
+    </Badge>
+  );
+}
 
 /** "Base for 22 more weeks, then Build from 12 Apr", from the map's first week on. */
 export function phaseOutlook(weeks: SeasonWeek[]) {
@@ -41,17 +68,19 @@ export function SeasonMap({
   const maxHours = Math.max(1, ...weeks.map((week) => week.hours));
   const first = weeks[0]!.weekStart;
   const indexOf = (date: string) => Math.floor(daysBetween(first, date) / 7);
+  // A month label per month, skipped when the first one would crowd the next.
   const months = weeks
     .map((week, index) => ({ week, index }))
     .filter(
       ({ week, index }) =>
         index === 0 || week.weekStart.slice(0, 7) !== weeks[index - 1]!.weekStart.slice(0, 7),
-    );
+    )
+    .filter(({ index }, at, all) => at > 0 || (all[1]?.index ?? Infinity) - index >= 3);
   const kinds = LEGEND_PHASES.filter((kind) => weeks.some((week) => week.kind === kind));
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="relative h-4" aria-hidden>
+      <div className="relative h-3" aria-hidden>
         {events.map((event) => {
           const index = indexOf(event.date);
           if (index < 0 || index >= weeks.length) return null;
@@ -59,11 +88,11 @@ export function SeasonMap({
             <span
               key={event.date}
               title={eventTitle(event)}
-              className={cn(
-                "absolute top-0 size-3 -translate-x-1/2 rotate-45 rounded-[2px]",
-                PRIORITY_STYLE[eventPriority(event)].stripe,
-              )}
-              style={{ left: `${((index + 0.5) / weeks.length) * 100}%` }}
+              className="absolute top-0.5 size-2 -translate-x-1/2 rounded-full"
+              style={{
+                left: `${((index + 0.5) / weeks.length) * 100}%`,
+                background: PRIORITY_FILL[eventPriority(event)],
+              }}
             />
           );
         })}
@@ -80,11 +109,11 @@ export function SeasonMap({
             className={cn(
               "min-w-0 flex-1 rounded-t-[2px]",
               week.lighter && "opacity-50",
-              index === 0 && "outline-foreground outline-2 outline-offset-1",
+              index === 0 && "outline-foreground outline-1 outline-offset-1",
             )}
             style={{
               height: `${Math.max(8, (week.hours / maxHours) * 100)}%`,
-              background: PHASE_STYLE[week.kind].fill,
+              background: PHASE_FILL[week.kind],
             }}
           />
         ))}
@@ -106,15 +135,15 @@ export function SeasonMap({
         <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
           {kinds.map((kind) => (
             <span key={kind} className="flex items-center gap-1.5">
-              <span
-                className="size-2.5 rounded-sm"
-                style={{ background: PHASE_STYLE[kind].fill }}
-              />
+              <span className="size-2 rounded-full" style={{ background: PHASE_FILL[kind] }} />
               {PHASES[kind].label}
             </span>
           ))}
           <span className="flex items-center gap-1.5">
-            <span className="bg-ds-purple-600 size-2.5 rounded-sm opacity-50" />
+            <span
+              className="size-2 rounded-full opacity-50"
+              style={{ background: PHASE_FILL.build }}
+            />
             Lighter week
           </span>
         </div>
