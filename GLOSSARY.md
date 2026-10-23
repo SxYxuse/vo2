@@ -175,7 +175,7 @@ Where the athlete is in the cycle of building, consolidating, recovering, and fr
 _Avoid_: Block, periodization, status
 
 **Best effort**:
-One activity's best over a fixed duration or distance: the best average power on a ride with a power meter, or the fastest time over a distance inside a road run, an outdoor ride, or a swim. Progress compares the last six weeks with the six before and the best of the year (ADR 0020, ADR 0021).
+One activity's best over a fixed duration or distance: the best average power on a ride with a power meter, or the fastest time over a distance inside a road run, an outdoor ride, or a swim. Progress compares the last six weeks with the six before and the best of the year (ADR 0020, ADR 0025).
 _Avoid_: PR, record, mean-max
 
 **Power curve**:

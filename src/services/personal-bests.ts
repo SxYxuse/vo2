@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 /**
  * Road runs, rides, and swims. Walks and other sports have no distance or output VO2 can rank,
- * so they are not shown on the bests page (ADR 0021).
+ * so they are not shown on the bests page (ADR 0025).
  */
 export const BESTS_SPORTS = ["running", "cycling", "swimming"] as const;
 export type BestsSport = (typeof BESTS_SPORTS)[number];
