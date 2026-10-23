@@ -447,6 +447,7 @@ function GoalFormBody({
     goal && !sportTypes.includes(goal.sportType) ? [goal.sportType, ...sportTypes] : sportTypes;
   const [form, setForm] = useState(() => formFor(goal, sportOptions[0] ?? "Run"));
   const [submitted, setSubmitted] = useState(false);
+  const [step, setStep] = useState<"details" | "priority">("details");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const parsed = toInput(form);
   const issues = parsed.success
@@ -487,7 +488,9 @@ function GoalFormBody({
   function submit(event: FormEvent) {
     event.preventDefault();
     setSubmitted(true);
-    if (parsed.success) save.mutate(parsed.data);
+    if (!parsed.success) return;
+    if (step === "details") setStep("priority");
+    else save.mutate(parsed.data);
   }
 
   return (
@@ -495,245 +498,256 @@ function GoalFormBody({
       <ResponsiveDialogHeader>
         <ResponsiveDialogTitle>{goal ? "Edit goal" : "Add a goal"}</ResponsiveDialogTitle>
         <ResponsiveDialogDescription>
-          A race or event on your season. The plan builds toward your next A race.
+          {step === "details"
+            ? "Step 1 of 2 · The race or event: what, when, and how far."
+            : "Step 2 of 2 · How much it matters. The plan builds toward your next A race."}
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
+      <div key={step} className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
         <FieldGroup>
-          <Field data-invalid={errorFor("name") != null}>
-            <FieldLabel htmlFor="goal-name">Name</FieldLabel>
-            <Input
-              id="goal-name"
-              autoComplete="off"
-              placeholder="Trail des Fagnes"
-              className="h-10 sm:h-7"
-              value={form.name}
-              onChange={(event) => set({ name: event.target.value })}
-            />
-            <FieldError>{errorFor("name")}</FieldError>
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field>
-              <FieldLabel htmlFor="goal-sport">Sport</FieldLabel>
-              <Select
-                value={form.sportType}
-                onValueChange={(next) => {
-                  if (next != null) set({ sportType: String(next) });
-                }}
-              >
-                <SelectTrigger
-                  id="goal-sport"
-                  className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
-                >
-                  <SelectValue>{formatSportType(form.sportType)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {sportOptions.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {formatSportType(type)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field data-invalid={errorFor("date") != null}>
-              <FieldLabel htmlFor="goal-date">Date</FieldLabel>
-              <GoalDatePicker
-                id="goal-date"
-                value={form.date}
-                // A new goal is ahead; an existing one may be moved to any date.
-                fromDate={goal ? undefined : today}
-                invalid={errorFor("date") != null}
-                onChange={(date) => set({ date })}
-              />
-              <FieldError>{errorFor("date")}</FieldError>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field data-invalid={errorFor("distanceM") != null}>
-              <FieldLabel htmlFor="goal-distance">Distance</FieldLabel>
-              <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
-                <InputGroupInput
-                  id="goal-distance"
-                  type="text"
-                  inputMode="decimal"
+          {step === "details" ? (
+            <>
+              <Field data-invalid={errorFor("name") != null}>
+                <FieldLabel htmlFor="goal-name">Name</FieldLabel>
+                <Input
+                  id="goal-name"
                   autoComplete="off"
-                  placeholder="42.2"
-                  value={form.distanceKm}
-                  onChange={(event) => set({ distanceKm: event.target.value })}
+                  placeholder="Trail des Fagnes"
+                  className="h-10 sm:h-7"
+                  value={form.name}
+                  onChange={(event) => set({ name: event.target.value })}
                 />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupText>km</InputGroupText>
-                </InputGroupAddon>
-              </InputGroup>
-              <FieldError>{errorFor("distanceM")}</FieldError>
-            </Field>
-            <Field data-invalid={errorFor("elevationGainM") != null}>
-              <FieldLabel htmlFor="goal-elevation">Elevation gain</FieldLabel>
-              <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
-                <InputGroupInput
-                  id="goal-elevation"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="0"
-                  value={form.elevationGainM}
-                  onChange={(event) => set({ elevationGainM: event.target.value })}
-                />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupText>m</InputGroupText>
-                </InputGroupAddon>
-              </InputGroup>
-              <FieldError>{errorFor("elevationGainM")}</FieldError>
-            </Field>
-          </div>
-          {!goal ? (
-            <div className="flex flex-col gap-3">
-              {form.legs.map((leg, index) => (
-                // Legs are positional: the order is the race order.
-                // oxlint-disable-next-line react/no-array-index-key
-                <div key={index} className="flex flex-col gap-2 rounded-lg border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">Then</span>
+                <FieldError>{errorFor("name")}</FieldError>
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field>
+                  <FieldLabel htmlFor="goal-sport">Sport</FieldLabel>
+                  <Select
+                    value={form.sportType}
+                    onValueChange={(next) => {
+                      if (next != null) set({ sportType: String(next) });
+                    }}
+                  >
+                    <SelectTrigger
+                      id="goal-sport"
+                      className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
+                    >
+                      <SelectValue>{formatSportType(form.sportType)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {sportOptions.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {formatSportType(type)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field data-invalid={errorFor("date") != null}>
+                  <FieldLabel htmlFor="goal-date">Date</FieldLabel>
+                  <GoalDatePicker
+                    id="goal-date"
+                    value={form.date}
+                    // A new goal is ahead; an existing one may be moved to any date.
+                    fromDate={goal ? undefined : today}
+                    invalid={errorFor("date") != null}
+                    onChange={(date) => set({ date })}
+                  />
+                  <FieldError>{errorFor("date")}</FieldError>
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field data-invalid={errorFor("distanceM") != null}>
+                  <FieldLabel htmlFor="goal-distance">Distance</FieldLabel>
+                  <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                    <InputGroupInput
+                      id="goal-distance"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="42.2"
+                      value={form.distanceKm}
+                      onChange={(event) => set({ distanceKm: event.target.value })}
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>km</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  <FieldError>{errorFor("distanceM")}</FieldError>
+                </Field>
+                <Field data-invalid={errorFor("elevationGainM") != null}>
+                  <FieldLabel htmlFor="goal-elevation">Elevation gain</FieldLabel>
+                  <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                    <InputGroupInput
+                      id="goal-elevation"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="0"
+                      value={form.elevationGainM}
+                      onChange={(event) => set({ elevationGainM: event.target.value })}
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>m</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
+                  <FieldError>{errorFor("elevationGainM")}</FieldError>
+                </Field>
+              </div>
+              {!goal ? (
+                <div className="flex flex-col gap-3">
+                  {form.legs.map((leg, index) => (
+                    // Legs are positional: the order is the race order.
+                    // oxlint-disable-next-line react/no-array-index-key
+                    <div key={index} className="flex flex-col gap-2 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">Then</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Remove sport ${index + 2}`}
+                          onClick={() => set({ legs: form.legs.filter((_, at) => at !== index) })}
+                        >
+                          <XIcon />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Select
+                          value={leg.sportType}
+                          onValueChange={(next) => {
+                            if (next != null) setLeg(index, { sportType: String(next) });
+                          }}
+                        >
+                          <SelectTrigger
+                            aria-label={`Sport ${index + 2}`}
+                            className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
+                          >
+                            <SelectValue>{formatSportType(leg.sportType)}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {sportOptions.map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {formatSportType(type)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                        <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                          <InputGroupInput
+                            aria-label={`Distance ${index + 2}`}
+                            type="text"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            placeholder="10"
+                            value={leg.distanceKm}
+                            onChange={(event) => setLeg(index, { distanceKm: event.target.value })}
+                          />
+                          <InputGroupAddon align="inline-end">
+                            <InputGroupText>km</InputGroupText>
+                          </InputGroupAddon>
+                        </InputGroup>
+                        <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                          <InputGroupInput
+                            aria-label={`Elevation gain ${index + 2}`}
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="0"
+                            value={leg.elevationGainM}
+                            onChange={(event) =>
+                              setLeg(index, { elevationGainM: event.target.value })
+                            }
+                          />
+                          <InputGroupAddon align="inline-end">
+                            <InputGroupText>m</InputGroupText>
+                          </InputGroupAddon>
+                        </InputGroup>
+                      </div>
+                    </div>
+                  ))}
+                  {form.legs.length < 4 ? (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Remove sport ${index + 2}`}
-                      onClick={() => set({ legs: form.legs.filter((_, at) => at !== index) })}
+                      variant="outline"
+                      size="sm"
+                      className="h-10 self-start sm:h-7"
+                      onClick={() =>
+                        set({
+                          legs: [
+                            ...form.legs,
+                            { sportType: form.sportType, distanceKm: "", elevationGainM: "" },
+                          ],
+                        })
+                      }
                     >
-                      <XIcon />
+                      <PlusIcon data-icon="inline-start" />
+                      Add another sport, same day
                     </Button>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Select
-                      value={leg.sportType}
-                      onValueChange={(next) => {
-                        if (next != null) setLeg(index, { sportType: String(next) });
-                      }}
-                    >
-                      <SelectTrigger
-                        aria-label={`Sport ${index + 2}`}
-                        className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
-                      >
-                        <SelectValue>{formatSportType(leg.sportType)}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {sportOptions.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {formatSportType(type)}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
-                      <InputGroupInput
-                        aria-label={`Distance ${index + 2}`}
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        placeholder="10"
-                        value={leg.distanceKm}
-                        onChange={(event) => setLeg(index, { distanceKm: event.target.value })}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>km</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                    <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
-                      <InputGroupInput
-                        aria-label={`Elevation gain ${index + 2}`}
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="off"
-                        placeholder="0"
-                        value={leg.elevationGainM}
-                        onChange={(event) => setLeg(index, { elevationGainM: event.target.value })}
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>m</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
-                  </div>
+                  ) : null}
                 </div>
-              ))}
-              {form.legs.length < 4 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-10 self-start sm:h-7"
-                  onClick={() =>
-                    set({
-                      legs: [
-                        ...form.legs,
-                        { sportType: form.sportType, distanceKm: "", elevationGainM: "" },
-                      ],
-                    })
-                  }
-                >
-                  <PlusIcon data-icon="inline-start" />
-                  Add another sport, same day
-                </Button>
               ) : null}
-            </div>
-          ) : null}
-          <FieldSet>
-            <FieldLegend variant="label">Priority</FieldLegend>
-            <RadioGroup
-              name="goal-priority"
-              value={form.priority}
-              onValueChange={(next) => {
-                if (next) set({ priority: next as Goal["priority"] });
-              }}
-              className="gap-2"
-            >
-              {GOAL_PRIORITIES.map((priority) => {
-                const id = `goal-priority-${priority.id}`;
-                return (
-                  <FieldLabel key={priority.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start p-3">
-                      <RadioGroupItem value={priority.id} id={id} />
-                      <FieldContent>
-                        <FieldTitle>{priority.label}</FieldTitle>
-                        <FieldDescription>{priority.hint}</FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                );
-              })}
-            </RadioGroup>
-          </FieldSet>
-          <FieldSet>
-            <FieldLegend variant="label">Objective</FieldLegend>
-            <RadioGroup
-              name="goal-objective"
-              value={form.objective}
-              onValueChange={(next) => {
-                if (next) set({ objective: next as Goal["objective"] });
-              }}
-              className="gap-2"
-            >
-              {GOAL_OBJECTIVES.map((objective) => {
-                const id = `goal-objective-${objective.id}`;
-                return (
-                  <FieldLabel key={objective.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start p-3">
-                      <RadioGroupItem value={objective.id} id={id} />
-                      <FieldContent>
-                        <FieldTitle>{objective.label}</FieldTitle>
-                        <FieldDescription>{objective.hint}</FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                );
-              })}
-            </RadioGroup>
-          </FieldSet>
+            </>
+          ) : (
+            <>
+              <FieldSet>
+                <FieldLegend variant="label">Priority</FieldLegend>
+                <RadioGroup
+                  name="goal-priority"
+                  value={form.priority}
+                  onValueChange={(next) => {
+                    if (next) set({ priority: next as Goal["priority"] });
+                  }}
+                  className="gap-2"
+                >
+                  {GOAL_PRIORITIES.map((priority) => {
+                    const id = `goal-priority-${priority.id}`;
+                    return (
+                      <FieldLabel key={priority.id} htmlFor={id} className="w-full">
+                        <Field orientation="horizontal" className="items-start p-3">
+                          <RadioGroupItem value={priority.id} id={id} />
+                          <FieldContent>
+                            <FieldTitle>{priority.label}</FieldTitle>
+                            <FieldDescription>{priority.hint}</FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    );
+                  })}
+                </RadioGroup>
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend variant="label">Objective</FieldLegend>
+                <RadioGroup
+                  name="goal-objective"
+                  value={form.objective}
+                  onValueChange={(next) => {
+                    if (next) set({ objective: next as Goal["objective"] });
+                  }}
+                  className="gap-2"
+                >
+                  {GOAL_OBJECTIVES.map((objective) => {
+                    const id = `goal-objective-${objective.id}`;
+                    return (
+                      <FieldLabel key={objective.id} htmlFor={id} className="w-full">
+                        <Field orientation="horizontal" className="items-start p-3">
+                          <RadioGroupItem value={objective.id} id={id} />
+                          <FieldContent>
+                            <FieldTitle>{objective.label}</FieldTitle>
+                            <FieldDescription>{objective.hint}</FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    );
+                  })}
+                </RadioGroup>
+              </FieldSet>
+            </>
+          )}
           {save.error || remove.error ? (
             <Alert variant="destructive">
               <AlertDescription>{(save.error ?? remove.error)?.message}</AlertDescription>
@@ -744,9 +758,19 @@ function GoalFormBody({
       <ResponsiveDialogFooter>
         <Button type="submit" disabled={save.isPending} className="h-10 sm:h-7">
           {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-          {goal ? "Save" : "Add goal"}
+          {step === "details" ? "Next" : goal ? "Save" : "Add goal"}
         </Button>
-        {goal ? (
+        {step === "priority" ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={save.isPending}
+            onClick={() => setStep("details")}
+            className="h-10 sm:order-first sm:h-7"
+          >
+            Back
+          </Button>
+        ) : goal ? (
           confirmingDelete ? (
             <Button
               type="button"
