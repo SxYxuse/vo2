@@ -53,14 +53,12 @@ function week(
     season: { ...seasonPhase([], WEEK_START), kind: "build", ramp: 5, rotation: "steady" },
     anchors: {
       ftpWatts: null,
-      cyclingLthr: 160,
-      cyclingMaxHr: 190,
-      runLthr: 170,
-      runMaxHr: 195,
-      swimLthr: 150,
-      swimMaxHr: 180,
-      walkLthr: null,
-      walkMaxHr: null,
+      heartRate: {
+        cycling: { maxHr: 190, lthr: 160 },
+        running: { maxHr: 195, lthr: 170 },
+        swimming: { maxHr: 180, lthr: 150 },
+        walking: { maxHr: null, lthr: null },
+      },
     },
     ...overrides,
   };
