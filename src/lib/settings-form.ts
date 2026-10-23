@@ -120,7 +120,7 @@ export const settingsFormSchema = profileFormSchema
   .extend(trainingFormFields.shape)
   .extend(sportsFormFields)
   .extend(heartRateFormFields)
-  .extend({ calendarPeriod: calendarPeriodSchema });
+  .extend({ calendarPeriod: calendarPeriodSchema, celebrateTopEfforts: z.boolean() });
 
 export const onboardingFormSchema = profileFormSchema.extend(sportsFormFields);
 
@@ -257,6 +257,7 @@ export function settingsSaveFromForm(
       ? sports.data.sportGroupShares
       : (saved.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES),
     calendarPeriod: values.calendarPeriod,
+    celebrateTopEfforts: values.celebrateTopEfforts,
     // Only a built plan has a shape to edit; the plan builder creates it.
     training: saved.training
       ? training.success
@@ -284,6 +285,7 @@ export function settingsFormDefaults(input: {
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
+  celebrateTopEfforts?: boolean;
   timeZone: string;
 }): SettingsFormInput {
   return {
@@ -292,6 +294,7 @@ export function settingsFormDefaults(input: {
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
     calendarPeriod: input.calendarPeriod ?? "month",
+    celebrateTopEfforts: input.celebrateTopEfforts ?? false,
   };
 }
 

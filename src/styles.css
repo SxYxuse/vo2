@@ -541,3 +541,17 @@ body {
     @apply text-foreground!;
   }
 }
+
+/* Top 10 effort cards (ADR 0027): dealt onto the table, the personal best with a turning sheen. */
+@keyframes top-effort-deal {
+  from {
+    transform: translateY(120%) rotate(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes top-effort-sheen {
+  to {
+    transform: rotate(360deg);
+  }
+}

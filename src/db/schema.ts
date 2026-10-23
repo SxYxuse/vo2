@@ -207,3 +207,24 @@ export const weekCoach = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.weekStart] })],
 );
+
+/**
+ * Each activity checked for top 10 efforts after its stream arrived, with the placements it held
+ * then (ADR 0027). An activity with none is stored seen, so it is never checked again.
+ */
+export const topEffortCelebrations = pgTable(
+  "top_effort_celebrations",
+  {
+    activityId: text("activity_id")
+      .primaryKey()
+      .references(() => activities.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** TopEffortPlacement[], best first. */
+    placements: jsonb("placements").notNull(),
+    foundAt: timestamp("found_at", { withTimezone: true }).notNull().defaultNow(),
+    seenAt: timestamp("seen_at", { withTimezone: true }),
+  },
+  (table) => [index("top_effort_celebrations_user_idx").on(table.userId, table.seenAt)],
+);

@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Field,
   FieldContent,
@@ -320,6 +321,35 @@ export function CalendarPeriodField({
             })}
           </RadioGroup>
         </FieldSet>
+      )}
+    />
+  );
+}
+
+export function CelebrateTopEffortsField({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<SettingsFormInput>;
+}) {
+  const id = `${idPrefix}-celebrate-top-efforts`;
+  return (
+    <Controller
+      name="celebrateTopEfforts"
+      control={control}
+      render={({ field }) => (
+        <Field orientation="horizontal" className="items-start">
+          <Switch id={id} checked={field.value} onCheckedChange={field.onChange} />
+          <FieldContent>
+            <FieldLabel htmlFor={id}>Celebrate top 10 efforts</FieldLabel>
+            <FieldDescription>
+              When a new activity from the last 7 days ranks in your top 10, all time or this year,
+              VO2 shows it the next time you open the app. Only activities synced after you turn
+              this on count.
+            </FieldDescription>
+          </FieldContent>
+        </Field>
       )}
     />
   );
