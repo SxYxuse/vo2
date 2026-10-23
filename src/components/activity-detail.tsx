@@ -23,6 +23,7 @@ import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
 import { StatCard } from "@/components/stat-card.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
+import type { BestsReturn } from "@/services/personal-bests.ts";
 import { weekStartKey } from "@/services/training-plan.types.ts";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -126,15 +127,29 @@ function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
   );
 }
 
+type ActivitySearch = DiarySearch & BestsReturn;
+
 /**
- * Returns to the calendar period the activity was opened from, or the activity's own month and
- * week so either calendar view lands on it.
+ * Returns to the bests board or calendar period the activity was opened from, or else the
+ * activity's own month and week so either calendar view lands on it.
  */
-function CalendarBackLink({ diary, start }: { diary?: DiarySearch; start?: string }) {
+function BackLink({ diary, start }: { diary?: ActivitySearch; start?: string }) {
+  if (diary?.from === "bests") {
+    return (
+      <Link
+        to="/bests"
+        search={{ best: diary.best, period: diary.period }}
+        className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "self-start")}
+      >
+        <ChevronLeftIcon />
+        Bests
+      </Link>
+    );
+  }
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   let search: DiarySearch = {};
   if (diary?.month || diary?.week) {
-    search = diary;
+    search = { month: diary.month, week: diary.week };
   } else if (start) {
     const now = new Date();
     const month = monthKey(new Date(start), timeZone);
@@ -156,11 +171,11 @@ function CalendarBackLink({ diary, start }: { diary?: DiarySearch; start?: strin
   );
 }
 
-export function ActivityDetailPending({ diary }: { diary?: DiarySearch }) {
+export function ActivityDetailPending({ diary }: { diary?: ActivitySearch }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink diary={diary} />
+        <BackLink diary={diary} />
         <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-4 w-80 max-w-full" />
       </div>
@@ -182,7 +197,7 @@ export function ActivityDetailView({
 }: {
   detail: ActivityDetail;
   color?: string;
-  diary?: DiarySearch;
+  diary?: ActivitySearch;
 }) {
   useEffect(() => {
     void import("@/components/activity-analysis.tsx");
@@ -196,7 +211,7 @@ export function ActivityDetailView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <CalendarBackLink diary={diary} start={detail.start} />
+        <BackLink diary={diary} start={detail.start} />
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">
             {detail.title}
@@ -225,10 +240,10 @@ export function ActivityDetailView({
   );
 }
 
-export function ActivityDetailMissing({ diary }: { diary?: DiarySearch }) {
+export function ActivityDetailMissing({ diary }: { diary?: ActivitySearch }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <CalendarBackLink diary={diary} />
+      <BackLink diary={diary} />
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">

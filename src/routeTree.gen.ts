@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppBestsRouteImport } from './routes/_app.bests'
 import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppFuelRouteImport } from './routes/_app.fuel'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
@@ -41,6 +42,11 @@ const OnboardingRoute = OnboardingRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBestsRoute = AppBestsRouteImport.update({
+  id: '/bests',
+  path: '/bests',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFitnessRoute = AppFitnessRouteImport.update({
@@ -127,6 +133,7 @@ const ApiMockStravaSplatRoute = ApiMockStravaSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/onboarding': typeof OnboardingRoute
+  '/bests': typeof AppBestsRoute
   '/fitness': typeof AppFitnessRoute
   '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
+  '/bests': typeof AppBestsRoute
   '/fitness': typeof AppFitnessRoute
   '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/_app/bests': typeof AppBestsRoute
   '/_app/fitness': typeof AppFitnessRoute
   '/_app/fuel': typeof AppFuelRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/onboarding'
+    | '/bests'
     | '/fitness'
     | '/fuel'
     | '/heart-rate'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/onboarding'
+    | '/bests'
     | '/fitness'
     | '/fuel'
     | '/heart-rate'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/onboarding'
+    | '/_app/bests'
     | '/_app/fitness'
     | '/_app/fuel'
     | '/_app/heart-rate'
@@ -277,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/bests': {
+      id: '/_app/bests'
+      path: '/bests'
+      fullPath: '/bests'
+      preLoaderRoute: typeof AppBestsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/fitness': {
@@ -409,6 +428,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 )
 
 interface AppRouteChildren {
+  AppBestsRoute: typeof AppBestsRoute
   AppFitnessRoute: typeof AppFitnessRoute
   AppFuelRoute: typeof AppFuelRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
@@ -424,6 +444,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppBestsRoute: AppBestsRoute,
   AppFitnessRoute: AppFitnessRoute,
   AppFuelRoute: AppFuelRoute,
   AppHeartRateRoute: AppHeartRateRoute,

@@ -1,11 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import type { PowerBest, RunBest } from "./best-efforts.ts";
+import type { DistanceBest, PowerBest } from "./best-efforts.ts";
 import type { EfficiencyPoint } from "./heart-insights.ts";
 
 /** Fitness settles over about six weeks, so "now" and "before" are six-week blocks. */
 export const PROGRESS_WINDOW_DAYS = 42;
 export const BEST_YEAR_DAYS = 365;
+/** Progress keeps four rows per sport; the bests page shows the rest. */
+export const PROGRESS_POWER_DURATIONS = [60, 300, 1200, 3600] as const;
+export const PROGRESS_RUN_DISTANCES = [1000, 5000, 10000, 21097.5] as const;
 const MIN_WINDOW_SESSIONS = 3;
 /** Efficiency moves a little week to week; smaller changes read as steady. */
 const STEADY_PCT = 2;
@@ -149,7 +152,7 @@ export function comparePowerBests(
 }
 
 export function compareRunBests(
-  activities: DatedBests<RunBest>[],
+  activities: DatedBests<DistanceBest>[],
   distances: readonly number[],
   now = new Date(),
 ) {

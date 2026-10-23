@@ -14,11 +14,16 @@ import {
 } from "@/lib/queries.ts";
 import { sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
+import { parseBestsReturn, type BestsReturn } from "@/services/personal-bests.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
 export const Route = createFileRoute("/_app/activities/$activityId")({
-  // The calendar period the activity was opened from, so the Calendar link returns to it.
-  validateSearch: (search: Record<string, unknown>): DiarySearch => parseDiarySearch(search),
+  // Where the activity was opened from (a calendar period or a bests board), so the back link
+  // returns there.
+  validateSearch: (search: Record<string, unknown>): DiarySearch & BestsReturn => ({
+    ...parseDiarySearch(search),
+    ...parseBestsReturn(search),
+  }),
   loader: ({ context, params }) => {
     prefetchActivityDetail(context.queryClient, params.activityId);
     return context.queryClient.query(loaderQuery(activityDetailQueryOptions(params.activityId)));
