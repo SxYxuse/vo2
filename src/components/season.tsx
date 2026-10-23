@@ -202,7 +202,8 @@ export function SeasonView({ data }: { data: SeasonData }) {
                   ) : null}
                 </CardTitle>
                 <CardDescription>
-                  {outlook}. Bars are the weekly hours if you hit each target.
+                  {outlook}. Bars are the weekly hours if you hit each target; tap one to see its
+                  week.
                 </CardDescription>
               </CardHeader>
               <CardContent>
