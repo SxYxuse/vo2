@@ -13,7 +13,6 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog.tsx";
-import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
@@ -237,32 +236,31 @@ export function BestsView({ data, copyIncomplete, search, onSearchChange }: Best
             )
           }
         >
-          <TabsList className="w-full sm:w-fit">
+          <TabsList>
             {sports.map((item) => (
-              <TabsTrigger key={item} value={item} className="min-h-9 flex-1 sm:min-w-24">
+              <TabsTrigger key={item} value={item}>
                 {SPORT_TAB[item]}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
-        <div className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:px-0">
-          <ToggleGroup
-            size="sm"
-            variant="outline"
-            spacing={0}
-            value={[period]}
-            onValueChange={(next) => {
-              const value = next[0] as BestsPeriod | undefined;
-              if (value) onSearchChange({ ...search, period: value }, { replace: true });
-            }}
-          >
-            {(["all", "12m", "6w", ...years] as BestsPeriod[]).map((item) => (
-              <ToggleGroupItem key={item} value={item} className="min-h-9 shrink-0 px-3">
-                {periodLabel(item)}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
+        <ToggleGroup
+          size="sm"
+          variant="outline"
+          spacing={0}
+          value={[period]}
+          onValueChange={(next) => {
+            const value = next[0] as BestsPeriod | undefined;
+            if (value) onSearchChange({ ...search, period: value }, { replace: true });
+          }}
+          className="flex-wrap"
+        >
+          {(["all", "12m", "6w", ...years] as BestsPeriod[]).map((item) => (
+            <ToggleGroupItem key={item} value={item}>
+              {periodLabel(item)}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </div>
 
       {sport === "cycling" ? (
@@ -376,46 +374,40 @@ function BestCard({
   weightKg,
 }: BoardContext & { board: Board; onOpen: (board: Board) => void }) {
   const best = topEfforts(board, activities, period, now, 1)[0];
+  const fresh = best != null && isNewBest(best.activity.start, now);
   const detail = best ? formatDetail(board, best, weightKg) : null;
+  const date = best ? cardDate(best.activity.start, now) : null;
   return (
     <button
       type="button"
       disabled={!best}
       onClick={() => onOpen(board)}
-      className="relative flex min-h-24 flex-col rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default disabled:hover:bg-card"
+      className="flex min-h-24 flex-col rounded-lg border bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default disabled:hover:bg-card"
     >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-r",
-          SPORT_STYLE[board.sport].bar,
-        )}
-      />
       <span className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
         {boardLabel(board)}
-        {best && isNewBest(best.activity.start, now) ? (
+        {fresh ? (
           <Badge variant="secondary" className="h-4 bg-success/15 px-1.5 text-[10px] text-success">
             New
           </Badge>
-        ) : null}
+        ) : (
+          <span className="shrink-0">{date}</span>
+        )}
       </span>
       <span
         className={cn(
-          "mt-0.5 text-2xl font-semibold tracking-tight tabular-nums",
+          "mt-1 text-2xl font-semibold tracking-tight tabular-nums",
           !best && "text-muted-foreground/50",
         )}
       >
         {best ? formatValue(board, best.value) : "—"}
       </span>
       <span className="mt-auto flex justify-between gap-2 pt-1 text-xs text-muted-foreground">
-        {best ? (
-          <>
-            <span className="truncate tabular-nums">{detail ?? best.activity.name}</span>
-            <span className="shrink-0">{cardDate(best.activity.start, now)}</span>
-          </>
-        ) : (
-          <span>{emptyText(board)}</span>
-        )}
+        <span className="truncate tabular-nums">
+          {best ? (detail ?? best.activity.name) : emptyText(board)}
+        </span>
+        {/* The badge took the date's place at the top. */}
+        {fresh ? <span className="shrink-0">{date}</span> : null}
       </span>
     </button>
   );
@@ -528,13 +520,24 @@ function BestSheet({
   onClose,
   ...ctx
 }: BoardContext & { board: Board | null; onClose: () => void }) {
+  // On desktop the top 10 sits beside the chart, so the dialog widens when there is one.
+  const charted = board != null && hasProgressionChart(board, ctx);
   return (
     <ResponsiveDialog open={board != null} onOpenChange={(open) => (open ? undefined : onClose())}>
-      <ResponsiveDialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden sm:max-w-lg">
+      <ResponsiveDialogContent
+        className={cn(
+          "flex max-h-[92dvh] flex-col gap-0 overflow-hidden sm:max-w-lg",
+          charted && "md:max-w-4xl",
+        )}
+      >
         {board ? <BestSheetBody board={board} {...ctx} /> : null}
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
+}
+
+function hasProgressionChart(board: Board, { activities, period, now }: BoardContext) {
+  return progression(board, activities, period, now).length > 1;
 }
 
 function BestSheetBody({
@@ -576,9 +579,9 @@ function BestSheetBody({
         ) : null}
       </ResponsiveDialogHeader>
       {/* The drawer pads its header but not its body; the desktop dialog pads both. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-0 md:pb-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:flex-row md:items-start md:gap-6 md:px-0 md:pb-0">
         {points.length > 1 ? (
-          <section className="flex flex-col gap-2">
+          <section className="flex flex-col gap-2 md:min-w-0 md:flex-1">
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-semibold">Progression</h3>
               <span className="text-xs text-muted-foreground">
@@ -589,7 +592,12 @@ function BestSheetBody({
             <ProgressionChart board={board} points={points} />
           </section>
         ) : null}
-        <section className="flex flex-col gap-1">
+        <section
+          className={cn(
+            "flex flex-col gap-1 md:flex-1",
+            points.length > 1 && "md:w-80 md:flex-none",
+          )}
+        >
           <div className="flex items-baseline justify-between">
             <h3 className="text-sm font-semibold">Top {Math.min(top.length, 10)}</h3>
             <span className="text-xs text-muted-foreground">One per activity</span>
