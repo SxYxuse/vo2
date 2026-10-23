@@ -197,9 +197,16 @@ function EventCard({
   onEdit: (goal: Goal) => void;
 }) {
   const priority = eventPriority(event);
+  // Each leg opens on its own, so only a single-leg event can make the whole card its button.
+  const whole = event.goals.length === 1;
 
   return (
-    <article className="flex flex-col gap-1 rounded-xl border px-3 py-2.5">
+    <article
+      className={cn(
+        "flex flex-col gap-1 rounded-xl border px-3 py-2.5",
+        whole && "hover:bg-muted/50 relative",
+      )}
+    >
       <div className="flex min-h-8 items-center gap-2">
         <PriorityBadge priority={priority} />
         <h2 className="min-w-0 flex-1 truncate font-medium">{eventTitle(event)}</h2>
@@ -219,7 +226,12 @@ function EventCard({
               <button
                 type="button"
                 onClick={() => onEdit(goal)}
-                className="hover:bg-muted/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm"
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm",
+                  whole
+                    ? "focus-visible:after:ring-ring/50 outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-[3px]"
+                    : "hover:bg-muted/50",
+                )}
               >
                 <Icon
                   aria-hidden
