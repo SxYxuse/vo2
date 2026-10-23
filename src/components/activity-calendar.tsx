@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent,
-  type SyntheticEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent, type SyntheticEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
@@ -433,27 +426,32 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
     : undefined;
   const stepWeek = (direction: 1 | -1) =>
     show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) });
-  // A sideways swipe on the phone's day list pages a week; vertical scroll stays native.
+  // A sideways swipe on the phone's day list pages a week. Touch events, not pointer events:
+  // the browser sends pointercancel once it claims the touch for scrolling the list, but
+  // touchend still arrives (as pull-to-refresh relies on).
   const swipeHandlers = {
-    onPointerDown: (event: PointerEvent) => {
-      swipeStart.current = { x: event.clientX, y: event.clientY };
+    onTouchStart: (event: TouchEvent) => {
+      const touch = event.touches[0];
+      swipeStart.current =
+        event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
       swiped.current = false;
     },
-    onPointerUp: (event: PointerEvent) => {
+    onTouchEnd: (event: TouchEvent) => {
       const start = swipeStart.current;
       swipeStart.current = null;
-      if (!start) return;
-      const dx = event.clientX - start.x;
-      const dy = event.clientY - start.y;
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
       if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.5) return;
       swiped.current = true;
       if (dx > 0) stepWeek(-1);
       else if (cursorWeek < currentWeek) stepWeek(1);
     },
-    onPointerCancel: () => {
+    onTouchCancel: () => {
       swipeStart.current = null;
     },
-    // The swipe's pointerup can land on the activity it started on; that is not a tap.
+    // A swipe can end on the activity it started on; that is not a tap.
     onClickCapture: (event: SyntheticEvent) => {
       if (!swiped.current) return;
       swiped.current = false;
