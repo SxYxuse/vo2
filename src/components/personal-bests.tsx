@@ -78,8 +78,15 @@ const DAYS_LABEL = { longest: "Longest", climbing: "Most climbing", climb: "Bigg
 
 const PERIOD_LABEL = { all: "All time", "12m": "12 months", "6w": "6 weeks" };
 
-const MONTH_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
+// A four-digit year: "Sep 26" read as the 26th, not September 2026.
+const MONTH_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
 const DAY_MONTH = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+/** "Sep 20" this year, "Nov 3, 2025" before it. */
+function cardDate(iso: string, now: Date) {
+  const date = new Date(iso);
+  return date.getFullYear() === now.getFullYear() ? DAY_MONTH.format(date) : FULL_DATE.format(date);
+}
+
 const FULL_DATE = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
@@ -404,7 +411,7 @@ function BestCard({
         {best ? (
           <>
             <span className="truncate tabular-nums">{detail ?? best.activity.name}</span>
-            <span className="shrink-0">{MONTH_YEAR.format(new Date(best.activity.start))}</span>
+            <span className="shrink-0">{cardDate(best.activity.start, now)}</span>
           </>
         ) : (
           <span>{emptyText(board)}</span>
