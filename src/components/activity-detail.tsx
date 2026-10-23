@@ -17,6 +17,7 @@ import {
   type ActivityDetail,
 } from "@/services/activity-detail.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
+import { ActivityDetailMap } from "@/components/activity-detail-map.tsx";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
 import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
@@ -51,9 +52,23 @@ const ActivityStreamCharts = lazy(() =>
 const ESTIMATED_HR_INFO =
   "No heart rate was recorded, so it is the middle value of your most similar sessions of this sport within two months (duration, speed, and date). Training load, fitness, and form use this estimate.";
 
-function ActivityDetailBody({ detail }: { detail: ActivityDetail }) {
+type MapState = { mapOpen: boolean; onMapOpenChange: (open: boolean) => void };
+
+function ActivityDetailBody({
+  detail,
+  color,
+  mapOpen,
+  onMapOpenChange,
+}: { detail: ActivityDetail; color?: string } & MapState) {
   return (
     <div className="flex flex-col gap-4">
+      <ActivityDetailMap
+        outline={detail.outline}
+        title={detail.title}
+        color={color}
+        open={mapOpen}
+        onOpenChange={onMapOpenChange}
+      />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Distance"
@@ -194,11 +209,13 @@ export function ActivityDetailView({
   detail,
   color,
   diary,
+  mapOpen,
+  onMapOpenChange,
 }: {
   detail: ActivityDetail;
   color?: string;
   diary?: ActivitySearch;
-}) {
+} & MapState) {
   useEffect(() => {
     void import("@/components/activity-analysis.tsx");
     void import("@/components/activity-analysis-live.tsx");
@@ -235,7 +252,13 @@ export function ActivityDetailView({
         </div>
         <p className="text-muted-foreground text-sm">{formatActivitySchedule(detail.start, end)}</p>
       </div>
-      <ActivityDetailBody key={detail.id} detail={detail} />
+      <ActivityDetailBody
+        key={detail.id}
+        detail={detail}
+        color={color}
+        mapOpen={mapOpen}
+        onMapOpenChange={onMapOpenChange}
+      />
     </div>
   );
 }

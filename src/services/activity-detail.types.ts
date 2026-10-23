@@ -35,6 +35,8 @@ export type ActivityDetail = {
   distance: number | null;
   totalElevationGain: number | null;
   hasStreams: boolean;
+  /** Strava's encoded outline of the path, drawn as the activity map. Null or empty indoors. */
+  outline: string | null;
   kpis: ActivityKpis;
   /** Average HR borrowed from similar activities when none was recorded (ADR 0019). */
   estimatedHeartrate: number | null;

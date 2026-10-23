@@ -17,27 +17,11 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Map as MapView, MapControls, MapGeoJSON, useMap } from "@/components/ui/map";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
+import { resolveThemeColor } from "./map-theme-color.ts";
+
 import type { ActivityMapProps } from "./activity-map.tsx";
 
 type DecoratedTrack = ActivityMapProps["tracks"][number] & { coordinates: LngLat[] };
-
-function resolveThemeColor(token: string) {
-  const probe = document.createElement("span");
-  probe.style.color = token;
-  document.body.append(probe);
-  const cssColor = getComputedStyle(probe).color;
-  probe.remove();
-  const canvas = document.createElement("canvas");
-  canvas.width = 1;
-  canvas.height = 1;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return cssColor || token;
-  ctx.fillStyle = cssColor;
-  ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-  if (a === 255) return `rgb(${r}, ${g}, ${b})`;
-  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
-}
 
 function FitTracks({
   bounds,

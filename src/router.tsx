@@ -43,3 +43,10 @@ declare module "@tanstack/react-router" {
     router: ReturnType<typeof getRouter>;
   }
 }
+
+declare module "@tanstack/history" {
+  interface HistoryState {
+    /** Set on the entry pushed by tapping the activity map, so closing it can pop that entry. */
+    activityMapPushed?: true;
+  }
+}
