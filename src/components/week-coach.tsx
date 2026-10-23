@@ -511,7 +511,7 @@ function TellCoach({
               </span>
               <Button
                 type="button"
-                variant="ghost"
+                variant="destructive"
                 size="icon-sm"
                 aria-label="Remove this note"
                 disabled={remove.isPending || !online}

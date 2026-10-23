@@ -761,9 +761,9 @@ function GoalFormBody({
           ) : (
             <Button
               type="button"
-              variant="ghost"
+              variant="destructive"
               onClick={() => setConfirmingDelete(true)}
-              className="text-destructive h-10 sm:order-first sm:mr-auto sm:h-7"
+              className="h-10 sm:order-first sm:mr-auto sm:h-7"
             >
               Delete
             </Button>

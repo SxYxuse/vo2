@@ -582,7 +582,7 @@ function RouteActions({ plan }: { plan: RoutePlanView }) {
         )}
         Predict again
       </Button>
-      <Button variant="ghost" className="text-destructive" onClick={() => setConfirming(true)}>
+      <Button variant="destructive" onClick={() => setConfirming(true)}>
         <Trash2Icon data-icon="inline-start" />
         Delete route
       </Button>
