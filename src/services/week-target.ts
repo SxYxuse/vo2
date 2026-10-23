@@ -651,24 +651,12 @@ const ZONE_RPE: Record<StepZone, string> = {
   z5: "RPE 9, still controlled",
 };
 
-function familyLthr(family: "running" | "cycling", anchors: PlanningAnchors) {
-  return family === "cycling" ? anchors.cyclingLthr : anchors.runLthr;
-}
-
-function familyMaxHr(family: "running" | "cycling", anchors: PlanningAnchors) {
-  return family === "cycling" ? anchors.cyclingMaxHr : anchors.runMaxHr;
-}
-
 /** Heart-rate bounds of a zone, cut by the same sport model as the heart rate page. */
 function zoneBpm(zone: StepZone, family: "running" | "cycling", anchors: PlanningAnchors) {
-  const maxHr = familyMaxHr(family, anchors);
-  const lthr = familyLthr(family, anchors);
-  if (!maxHr && !lthr) return null;
   const zones = zonesFromHistogram(
     emptyHistogram(),
     family === "cycling" ? "Ride" : "Run",
-    maxHr,
-    lthr,
+    anchors.heartRate[family],
   );
   const stat = zones[ZONE_INDEX[zone]];
   if (!stat || stat.minBpm == null || stat.maxBpm == null) return null;

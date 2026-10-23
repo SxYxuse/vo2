@@ -158,7 +158,7 @@ export function HeartRateZones({
         />
         <StatCard
           hintClassName="line-clamp-2"
-          label="Est. LTHR"
+          label={selected.lthrSource === "athlete" ? "LTHR" : "Est. LTHR"}
           value={selected.lthr ? `${selected.lthr} bpm` : "—"}
           hint={lthrHint(selected)}
           info={lthrInfo(selected)}

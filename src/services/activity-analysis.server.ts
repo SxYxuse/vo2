@@ -14,6 +14,8 @@ import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
+import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
+import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { analysisMessages, persistAnalysisOnce } from "./activity-analysis-run.ts";
 import {
   correlateStreamsDef,
@@ -68,13 +70,7 @@ async function loadActivityAnalysisSnapshot(activityId: string, userId: string) 
       .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
       .limit(1),
     db
-      .select({
-        ftp: athleteMetrics.ftp,
-        cyclingLthr: athleteMetrics.cyclingLthr,
-        runLthr: athleteMetrics.runLthr,
-        swimLthr: athleteMetrics.swimLthr,
-        lthr: athleteMetrics.lthr,
-      })
+      .select({ ...HEART_RATE_METRICS, ftp: athleteMetrics.ftp })
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
@@ -106,9 +102,7 @@ async function loadActivityAnalysisSnapshot(activityId: string, userId: string) 
       samples,
       athlete: {
         ftp: metrics?.ftp ?? null,
-        cyclingLthr: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
-        runLthr: metrics?.runLthr ?? null,
-        swimLthr: metrics?.swimLthr ?? null,
+        heartRate: athleteHeartRateFrom(metrics),
       },
     }),
     samples,

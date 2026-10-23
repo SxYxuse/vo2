@@ -1,0 +1,1 @@
+ALTER TABLE "athlete_metrics" ADD COLUMN "heart_rate" jsonb;

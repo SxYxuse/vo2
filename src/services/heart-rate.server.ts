@@ -7,6 +7,7 @@ import { getOptionalSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { ageFromBirthDate, isSportTypeShown } from "./athlete-settings.types.ts";
 import { efficiencyKindFor, histogramFromStreams, toEfficiencyPoint } from "./heart-insights.ts";
+import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import {
   ALL_SPORTS,
   addSessionToSport,
@@ -16,19 +17,31 @@ import {
   overallFromSports,
   type HeartRateData,
   type HeartRateSport,
-  type SportLthrAnchors,
 } from "./heart-rate.ts";
 const STREAM_BATCH = 40;
+
+/** The `athlete_metrics` columns every view resolves heart-rate zones from. */
+export const HEART_RATE_METRICS = {
+  heartRate: athleteMetrics.heartRate,
+  restHr: athleteMetrics.restHr,
+  cyclingLthr: athleteMetrics.cyclingLthr,
+  runLthr: athleteMetrics.runLthr,
+  swimLthr: athleteMetrics.swimLthr,
+  lthr: athleteMetrics.lthr,
+};
 
 const EMPTY_OVERALL: HeartRateSport = {
   sportType: ALL_SPORTS,
   members: [],
   family: null,
   zoneModel: "Each sport uses its own zone model",
+  zoneMethod: null,
   maxHeartrate: null,
   maxAnchor: null,
   lthr: null,
   lthrSource: null,
+  restHr: null,
+  customZones: null,
   activityCount: 0,
   sampleSeconds: 0,
   peakActivityName: null,
@@ -68,13 +81,7 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
       .where(eq(activities.userId, session.user.id)),
     getAthleteSettings(session.user.id),
     db
-      .select({
-        cyclingLthr: athleteMetrics.cyclingLthr,
-        runLthr: athleteMetrics.runLthr,
-        swimLthr: athleteMetrics.swimLthr,
-        lthr: athleteMetrics.lthr,
-        birthDate: athleteMetrics.birthDate,
-      })
+      .select({ ...HEART_RATE_METRICS, birthDate: athleteMetrics.birthDate })
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, session.user.id))
       .limit(1),
@@ -99,34 +106,11 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
   }
 
   const metrics = metricsRows[0];
-  const lthrAnchors: SportLthrAnchors = {};
-  const cyclingLthr = metrics?.cyclingLthr ?? metrics?.lthr ?? null;
-  const runLthr = metrics?.runLthr ?? null;
-  const swimLthr = metrics?.swimLthr ?? null;
-  if (cyclingLthr) {
-    lthrAnchors.cycling = {
-      bpm: cyclingLthr,
-      source: "estimated-from-max",
-    };
-  }
-  if (runLthr) {
-    lthrAnchors.running = {
-      bpm: runLthr,
-      source: "estimated-from-max",
-    };
-  }
-  if (swimLthr) {
-    lthrAnchors.swimming = {
-      bpm: swimLthr,
-      source: "estimated-from-max",
-    };
-  }
-
   const sports = collapseSportBuckets(
     bySport,
     settings.sportGroupShares,
     (sportType) => isSportTypeShown(settings.sportTypes, sportType),
-    lthrAnchors,
+    athleteHeartRateFrom(metrics),
     { age: ageFromBirthDate(metrics?.birthDate ?? null) },
   );
   const sportByMember = new Map<string, HeartRateSport>();

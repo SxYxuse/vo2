@@ -11,6 +11,16 @@ import {
   type ProfileSettings,
 } from "@/services/athlete-settings.types.ts";
 import type { AthleteSettingsSave, SavedAthleteSettings } from "@/services/athlete-settings.ts";
+import { BPM_MAX, BPM_MIN, ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
+import {
+  DEFAULT_HEART_RATE_SETTINGS,
+  REST_HR_MAX,
+  REST_HR_MIN,
+  heartRateSettingsIssues,
+  heartRateSettingsSchema,
+  type HeartRateEstimates,
+  type HeartRateSettings,
+} from "@/services/heart-rate-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 import {
   DEFAULT_WEEK_MIX,
@@ -64,9 +74,57 @@ const sportsFormFields = {
 
 const sportsFormSchema = z.object(sportsFormFields);
 
+/** Blank means "use the estimate"; anything typed must be a whole bpm in range. */
+function bpmText(min: number, max: number) {
+  return z
+    .string()
+    .trim()
+    .refine((value) => value === "" || isBpmInRange(value, min, max), {
+      error: `Enter a heart rate between ${min} and ${max} bpm, or leave it blank.`,
+    });
+}
+
+function isBpmInRange(value: string, min: number, max: number) {
+  const parsed = Number(value);
+  return /^\d+$/.test(value) && parsed >= min && parsed <= max;
+}
+
+const sportHeartRateFormSchema = z
+  .object({
+    method: z.enum(["lthr", "max", "reserve", "custom"]),
+    lthr: bpmText(BPM_MIN, BPM_MAX),
+    maxHr: bpmText(BPM_MIN, BPM_MAX),
+    customZones: z.array(z.string().trim()).length(4),
+  })
+  .superRefine((value, ctx) => {
+    if (value.method !== "custom") return;
+    value.customZones.forEach((top, index) => {
+      if (isBpmInRange(top, BPM_MIN, BPM_MAX)) return;
+      ctx.addIssue({
+        code: "custom",
+        path: ["customZones", index],
+        message: `Enter a heart rate between ${BPM_MIN} and ${BPM_MAX} bpm.`,
+      });
+    });
+  });
+
+const heartRateFormFields = {
+  heartRate: z.object({
+    restHr: bpmText(REST_HR_MIN, REST_HR_MAX),
+    sports: z.object({
+      cycling: sportHeartRateFormSchema,
+      running: sportHeartRateFormSchema,
+      swimming: sportHeartRateFormSchema,
+    }),
+  }),
+};
+
+const heartRateFormSchema = z.object(heartRateFormFields);
+
 export const settingsFormSchema = profileFormSchema
   .extend(trainingFormFields.shape)
   .extend(sportsFormFields)
+  .extend(heartRateFormFields)
   .extend({ calendarPeriod: calendarPeriodSchema });
 
 export const onboardingFormSchema = profileFormSchema
@@ -81,6 +139,8 @@ export type SettingsFormInput = z.input<typeof settingsFormSchema>;
 export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
+export type HeartRateFormInput = z.input<typeof heartRateFormSchema>;
+export type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][ZonedFamily];
 
 export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
@@ -144,13 +204,63 @@ export function trainingFromForm(values: TrainingFormValues): TrainingPlan {
   return trainingPlanSchema.parse(values);
 }
 
+function bpmString(value: number | null) {
+  return value == null ? "" : String(value);
+}
+
+export function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFormInput {
+  const sport = (family: ZonedFamily): SportHeartRateFormInput => {
+    const value = settings.sports[family];
+    return {
+      method: value.method,
+      lthr: bpmString(value.lthr),
+      maxHr: bpmString(value.maxHr),
+      customZones: value.customZones?.map(String) ?? ["", "", "", ""],
+    };
+  };
+  return {
+    heartRate: {
+      restHr: bpmString(settings.restHr),
+      sports: { cycling: sport("cycling"), running: sport("running"), swimming: sport("swimming") },
+    },
+  };
+}
+
+/** The settings the form describes, reading any value that isn't a valid bpm as blank. */
+export function heartRateFormPreview(values: HeartRateFormInput): HeartRateSettings {
+  const { restHr, sports } = values.heartRate;
+  const bpm = (value: string, min = BPM_MIN, max = BPM_MAX) => {
+    const trimmed = value.trim();
+    return isBpmInRange(trimmed, min, max) ? Number(trimmed) : null;
+  };
+  const sport = (family: ZonedFamily) => {
+    const value = sports[family];
+    const tops = value.customZones.map((top) => bpm(top));
+    return {
+      method: value.method,
+      lthr: bpm(value.lthr),
+      maxHr: bpm(value.maxHr),
+      customZones: tops.every((top) => top != null) ? tops : null,
+    };
+  };
+  return heartRateSettingsSchema.parse({
+    restHr: bpm(restHr, REST_HR_MIN, REST_HR_MAX),
+    sports: Object.fromEntries(ZONED_FAMILIES.map((family) => [family, sport(family)])),
+  });
+}
+
+/** The settings the form describes, or null while a typed value is incomplete. */
+export function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
+  return heartRateFormSchema.safeParse(values).success ? heartRateFormPreview(values) : null;
+}
+
 /**
  * Settings save as the athlete edits, so one half-typed field must not hold back the rest:
  * each part that fails validation keeps its last saved value. Null when nothing valid is known.
  */
 export function settingsSaveFromForm(
   values: SettingsFormInput,
-  saved: SavedAthleteSettings,
+  saved: SavedAthleteSettings & { heartRateEstimates?: HeartRateEstimates },
 ): AthleteSettingsSave | null {
   const profile = profileFormSchema.safeParse(values);
   const training = trainingFormSchema.safeParse(values);
@@ -162,6 +272,11 @@ export function settingsSaveFromForm(
       ? savedProfile.data
       : null;
   if (!profileSave) return null;
+  const heartRate = heartRateFromForm(values);
+  const heartRateValid =
+    heartRate != null &&
+    (!saved.heartRateEstimates ||
+      heartRateSettingsIssues(heartRate, saved.heartRateEstimates).length === 0);
   return {
     profile: profileSave,
     sportTypes: sports.success ? sports.data.sportTypes : saved.settings.sportTypes,
@@ -170,6 +285,7 @@ export function settingsSaveFromForm(
       : (saved.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES),
     calendarPeriod: values.calendarPeriod,
     training: training.success ? trainingFromForm(training.data) : (saved.training ?? undefined),
+    heartRate: heartRateValid ? heartRate : saved.heartRate,
   };
 }
 
@@ -186,6 +302,7 @@ function sportsFormDefaults(
 export function settingsFormDefaults(input: {
   profile: ProfileSettings | null;
   training: TrainingPlan | null;
+  heartRate?: HeartRateSettings;
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
@@ -196,6 +313,7 @@ export function settingsFormDefaults(input: {
     ...profileFormDefaults(input.profile),
     ...trainingFormDefaults(input.training, input.avgHours, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
+    ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
     calendarPeriod: input.calendarPeriod ?? "month",
   };
 }

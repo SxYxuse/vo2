@@ -3,10 +3,12 @@ import { addDays, startOfDay, subDays, subMonths, subYears } from "date-fns";
 import { createServerFn } from "@tanstack/react-start";
 
 import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
+import type { HeartRateSettings } from "./heart-rate-settings.ts";
 import {
   estimateLthrFromMax,
   heartRateFamily,
   isPlausibleBpm,
+  isZonedFamily,
   type HeartRateFamily,
 } from "./heart-rate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
@@ -179,7 +181,11 @@ function sportLthr(sportType: string, anchors: LoadAnchors) {
   return null;
 }
 
-export type AnchorOptions = { age?: number | null; now?: Date };
+export type AnchorOptions = { age?: number | null; now?: Date; heartRate?: HeartRateSettings };
+
+function athleteMaxHr(family: HeartRateFamily, settings: HeartRateSettings | undefined) {
+  return isZonedFamily(family) ? (settings?.sports[family].maxHr ?? null) : null;
+}
 
 /** Recent max HR per family, with sensor spikes dropped (same rules as the heart rate page). */
 function peakByFamily(activities: LoadInputs[], options: AnchorOptions) {
@@ -202,8 +208,13 @@ function peakByFamily(activities: LoadInputs[], options: AnchorOptions) {
     });
   }
   const observed = (family: HeartRateFamily) => {
-    const anchor = estimateMaxHrAnchor(peaks[family], { family, age: options.age, now });
-    return anchor.peak ? anchor.bpm : null;
+    const anchor = estimateMaxHrAnchor(peaks[family], {
+      family,
+      age: options.age,
+      now,
+      athleteBpm: athleteMaxHr(family, options.heartRate),
+    });
+    return anchor.peak || anchor.source === "athlete" ? anchor.bpm : null;
   };
   return {
     cyclingMaxHr: observed("cycling"),
@@ -259,6 +270,21 @@ export function estimateLoadAnchors(
   };
 }
 
+/** Estimates with the athlete's set LTHR and resting heart rate laid over; the zone method plays no part. */
+export function withAthleteAnchors(
+  anchors: LoadAnchors,
+  settings: HeartRateSettings | undefined,
+): LoadAnchors {
+  if (!settings) return anchors;
+  return {
+    ...anchors,
+    cyclingLthr: settings.sports.cycling.lthr ?? anchors.cyclingLthr,
+    runLthr: settings.sports.running.lthr ?? anchors.runLthr,
+    swimLthr: settings.sports.swimming.lthr ?? anchors.swimLthr,
+    restHr: settings.restHr ?? anchors.restHr,
+  };
+}
+
 function hrCeiling(sportType: string, anchors: LoadAnchors) {
   return sportLthr(sportType, anchors) ?? sportMaxHr(sportType, anchors);
 }
@@ -266,7 +292,7 @@ function hrCeiling(sportType: string, anchors: LoadAnchors) {
 function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
   const avg = activity.averageHeartrate;
   if (avg == null || avg <= 0) return null;
-  const rest = clampRestHr(anchors.restHr);
+  const rest = Math.round(anchors.restHr);
   const ceiling = hrCeiling(activity.sportType, anchors);
   if (ceiling == null || ceiling <= rest) return null;
   return (avg - rest) / (ceiling - rest);
@@ -395,7 +421,7 @@ export function activityTrainingLoad(
   if (!isPlausibleBpm(activity.averageHeartrate)) {
     const borrowed = estimateHrIntensity(activity, pool, anchors);
     if (borrowed != null) {
-      const rest = clampRestHr(anchors.restHr);
+      const rest = Math.round(anchors.restHr);
       const ceiling = hrCeiling(activity.sportType, anchors);
       return {
         load: trainingStress(hours, borrowed),

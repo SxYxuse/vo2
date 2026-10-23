@@ -14,6 +14,8 @@ import {
   type BestEfforts,
 } from "./best-efforts.ts";
 import { toEfficiencyPoint, type EfficiencyPoint } from "./heart-insights.ts";
+import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
+import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import {
   BEST_YEAR_DAYS,
   compareEfficiency,
@@ -95,20 +97,16 @@ export async function loadProgressImpl(now = new Date()): Promise<ProgressData> 
       .orderBy(activities.startDate),
     getAthleteSettings(userId),
     db
-      .select({
-        cyclingLthr: athleteMetrics.cyclingLthr,
-        lthr: athleteMetrics.lthr,
-        runLthr: athleteMetrics.runLthr,
-      })
+      .select(HEART_RATE_METRICS)
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
   ]);
 
-  const metrics = metricsRows[0];
+  const athlete = athleteHeartRateFrom(metricsRows[0]);
   const lthr = {
-    cycling: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
-    running: metrics?.runLthr ?? null,
+    cycling: athlete.settings?.sports.cycling.lthr ?? athlete.lthr.cycling ?? null,
+    running: athlete.settings?.sports.running.lthr ?? athlete.lthr.running ?? null,
   } satisfies Record<ProgressSport, number | null>;
 
   const shown = rows.flatMap((row) => {
