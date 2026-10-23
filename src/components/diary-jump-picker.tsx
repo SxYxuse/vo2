@@ -16,7 +16,7 @@ import {
   formatDiaryMonth,
   formatDiaryRange,
   trainingWeeksOfMonth,
-  type diaryTotals,
+  type DiaryTotals,
 } from "@/services/diary-window.ts";
 import { formatHours } from "@/services/training-plan.types.ts";
 
@@ -25,7 +25,8 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 type DiaryJumpPickerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  totals: ReturnType<typeof diaryTotals> & { oldestMonth: string };
+  totals: DiaryTotals;
+  oldestMonth: string;
   cursorMonth: string;
   currentMonth: string;
   currentWeek: string;
@@ -40,6 +41,7 @@ export function DiaryJumpPicker({
   open,
   onOpenChange,
   totals,
+  oldestMonth,
   cursorMonth,
   currentMonth,
   currentWeek,
@@ -47,21 +49,16 @@ export function DiaryJumpPicker({
   onPickMonth,
   onPickWeek,
 }: DiaryJumpPickerProps) {
-  const [year, setYear] = useState(() => Number(cursorMonth.slice(0, 4)));
-  const [month, setMonth] = useState<string | null>(null);
-  const oldestYear = Number(totals.oldestMonth.slice(0, 4));
+  const oldestYear = Number(oldestMonth.slice(0, 4));
   const currentYear = Number(currentMonth.slice(0, 4));
-
-  const changeOpen = (next: boolean) => {
-    if (next) {
-      setYear(Number(cursorMonth.slice(0, 4)));
-      setMonth(null);
-    }
-    onOpenChange(next);
-  };
+  // The parent remounts the picker on every open, so it starts on the cursor's year.
+  const [year, setYear] = useState(() =>
+    Math.min(currentYear, Math.max(oldestYear, Number(cursorMonth.slice(0, 4)))),
+  );
+  const [month, setMonth] = useState<string | null>(null);
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={changeOpen}>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent className="sm:max-w-sm">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>
@@ -134,7 +131,7 @@ export function DiaryJumpPicker({
               <div className="grid grid-cols-3 gap-2">
                 {MONTHS.map((name, index) => {
                   const key = `${year}-${String(index + 1).padStart(2, "0")}`;
-                  const outside = key < totals.oldestMonth || key > currentMonth;
+                  const outside = key < oldestMonth || key > currentMonth;
                   const total = totals.months.get(key);
                   return (
                     <button

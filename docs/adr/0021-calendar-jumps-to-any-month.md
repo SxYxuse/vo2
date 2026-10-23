@@ -2,7 +2,7 @@
 
 This supersedes how [0014](0014-calendar-period-is-a-setting.md) pages; its cursor rules still hold.
 
-Paging one training week at a time made last October dozens of taps away on a phone. Tapping the calendar's date label now opens a picker: a year, then its months, each with its activity count and hours (hidden sport types left out, as in the calendar). Years run from the oldest synced activity to this one; future months and months before that activity are disabled. Without any synced activity the label is not a picker.
+Paging one training week at a time made last October dozens of taps away on a phone. Tapping the calendar's date label now opens a picker: a year, then its months, each with its activity count and hours (hidden sport types left out, as in the calendar). Years run from the oldest activity the calendar shows to this one; future months and months before that activity are disabled. Without any such activity, as before the first sync, the label is not a picker. A sync paused on rate limits needs no message: older months fill in as it resumes.
 
 What a picked month opens follows the calendar period:
 

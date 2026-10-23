@@ -404,6 +404,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
   );
   const weekRange = diaryWindow(cursorWeek, weeks);
   const [jumping, setJumping] = useState(false);
+  const [jumpKey, setJumpKey] = useState(0);
   const totals = useMemo(() => diaryTotals(activities, timeZone), [activities, timeZone]);
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const swiped = useRef(false);
@@ -424,6 +425,12 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
       replace: true,
     });
 
+  const openJump = totals.oldestMonth
+    ? () => {
+        setJumpKey((key) => key + 1);
+        setJumping(true);
+      }
+    : undefined;
   const stepWeek = (direction: 1 | -1) =>
     show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) });
   // A sideways swipe on the phone's day list pages a week; vertical scroll stays native.
@@ -542,7 +549,7 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                   show({ month: stepDiaryMonth(cursorMonth, direction, currentMonth) })
                 }
                 onToday={() => show({})}
-                onJump={totals.oldestMonth ? () => setJumping(true) : undefined}
+                onJump={openJump}
               />
             ) : (
               <DiaryNav
@@ -551,14 +558,16 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                 atPresent={cursorWeek >= currentWeek}
                 onStep={stepWeek}
                 onToday={() => show({})}
-                onJump={totals.oldestMonth ? () => setJumping(true) : undefined}
+                onJump={openJump}
               />
             )}
             {totals.oldestMonth ? (
               <DiaryJumpPicker
+                key={jumpKey}
                 open={jumping}
                 onOpenChange={setJumping}
-                totals={{ ...totals, oldestMonth: totals.oldestMonth }}
+                totals={totals}
+                oldestMonth={totals.oldestMonth}
                 cursorMonth={byMonth ? cursorMonth : monthOfWeek(cursorWeek)}
                 currentMonth={currentMonth}
                 currentWeek={currentWeek}

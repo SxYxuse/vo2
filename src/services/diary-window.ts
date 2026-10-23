@@ -121,6 +121,8 @@ export function diaryTotals(
   return { months, weeks, oldestMonth };
 }
 
+export type DiaryTotals = ReturnType<typeof diaryTotals>;
+
 /** The month a training week ends in. */
 export function monthOfWeek(week: string) {
   return addDayKey(week, 6).slice(0, 7);
