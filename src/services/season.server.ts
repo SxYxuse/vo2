@@ -13,6 +13,7 @@ import { recentLoadPerHour } from "./week-target.ts";
 import {
   LEG_SEPARATOR,
   goalSportTypes,
+  newGoals,
   seasonEvents,
   type Goal,
   type GoalInput,
@@ -230,6 +231,20 @@ export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }
         ),
       );
   }
+}
+
+/** Adds a copied season's goals, skipping those already on this athlete's season. */
+export async function pasteSeasonImpl(pasted: GoalInput[]) {
+  const session = await getRequiredSession();
+  const userId = session.user.id;
+  const added = newGoals(pasted, await goalsFor(userId));
+  if (added.length) {
+    await db
+      .insert(goals)
+      .values(added.map((goal) => ({ id: crypto.randomUUID(), userId, ...goal })));
+  }
+  logger.info("goal.season_pasted", { added: added.length, skipped: pasted.length - added.length });
+  return { added: added.length, skipped: pasted.length - added.length };
 }
 
 export async function deleteGoalImpl(id: string) {

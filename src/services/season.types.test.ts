@@ -7,8 +7,12 @@ import {
   formatDaysLeft,
   goalSportTypes,
   legLabel,
+  newGoals,
+  seasonCopy,
+  seasonCopySchema,
   seasonEvents,
   type Goal,
+  type PastGoal,
 } from "./season.types.ts";
 
 function goal(id: string, date: string, overrides: Partial<Goal> = {}): Goal {
@@ -91,4 +95,30 @@ test("goal sports are the ones shown in Settings, in picker order", () => {
   const shown = { Hike: { visible: true }, Run: { visible: true }, Ride: { visible: false } };
   expect(goalSportTypes(shown)).toEqual(["Run", "Hike"]);
   expect(goalSportTypes({}).length).toBeGreaterThan(40);
+});
+
+describe("season copy", () => {
+  test("a copied season parses back into the same goals, without their ids", () => {
+    const { id: _id, ...marathon } = goal("Marathon", "2027-04-10", {
+      distanceM: 42_195,
+      priority: "B",
+    });
+    const past: PastGoal = { id: "past", ...marathon, activityId: "123" };
+    const copied = seasonCopy([past]);
+    expect(seasonCopySchema.parse(JSON.parse(JSON.stringify(copied))).goals).toEqual([marathon]);
+  });
+
+  test("pasting skips goals the season already has, and repeats within the paste", () => {
+    const existing = [goal("Marathon", "2027-04-10")];
+    const pasted = [
+      goal(" marathon ", "2027-04-10"),
+      goal("Marathon", "2027-04-10", { sportType: "Ride" }),
+      goal("10K", "2027-03-01"),
+      goal("10K", "2027-03-01"),
+    ];
+    expect(newGoals(pasted, existing).map((g) => [g.name, g.sportType])).toEqual([
+      ["Marathon", "Ride"],
+      ["10K", "Run"],
+    ]);
+  });
 });

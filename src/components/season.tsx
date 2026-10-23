@@ -4,13 +4,22 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { addYears, format, parseISO } from "date-fns";
-import { CalendarIcon, ChevronRightIcon, FlagIcon, PlusIcon, XIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronRightIcon,
+  ClipboardPasteIcon,
+  CopyIcon,
+  EllipsisIcon,
+  FlagIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import { cn } from "cn";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
-import { createEvent, createGoal, deleteGoal, updateGoal } from "@/services/season.ts";
+import { createEvent, createGoal, deleteGoal, pasteSeason, updateGoal } from "@/services/season.ts";
 import {
   GOAL_OBJECTIVES,
   GOAL_PRIORITIES,
@@ -20,6 +29,8 @@ import {
   eventTitle,
   formatDaysLeft,
   goalInputSchema,
+  seasonCopy,
+  seasonCopySchema,
   type Goal,
   type GoalInput,
   type PastGoal,
@@ -78,6 +89,14 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const objectiveLabel = (id: Goal["objective"]) =>
   GOAL_OBJECTIVES.find((objective) => objective.id === id)?.label ?? id;
@@ -109,12 +128,44 @@ type Editing = { goal: Goal | null } | null;
 
 export function SeasonView({ data }: { data: SeasonData }) {
   const [editing, setEditing] = useState<Editing>(null);
+  const [pasting, setPasting] = useState(false);
   const open = (goal: Goal | null) => setEditing({ goal });
   const outlook = phaseOutlook(data.map);
+  const allGoals = [...data.upcoming.flatMap((event) => event.goals), ...data.past];
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(seasonCopy(allGoals)));
+      toast.add({
+        type: "success",
+        title: "Season copied",
+        description: `${allGoals.length} goals. Open Season in the other VO2 and paste them there.`,
+      });
+    } catch {
+      toast.add({ type: "error", title: "Could not copy the season" });
+    }
+  }
 
   return (
     <>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="outline" size="icon" aria-label="More season actions" />}
+          >
+            <EllipsisIcon />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem disabled={!allGoals.length} onClick={() => void copy()}>
+              <CopyIcon />
+              Copy season
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setPasting(true)}>
+              <ClipboardPasteIcon />
+              Paste season
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button onClick={() => open(null)}>
           <PlusIcon data-icon="inline-start" />
           Add a goal
@@ -182,7 +233,89 @@ export function SeasonView({ data }: { data: SeasonData }) {
         sportTypes={data.sportTypes}
         onClose={() => setEditing(null)}
       />
+      <PasteSeasonDialog open={pasting} onClose={() => setPasting(false)} />
     </>
+  );
+}
+
+function PasteSeasonDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <ResponsiveDialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        {open ? <PasteSeasonBody onDone={onClose} /> : null}
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
+  );
+}
+
+function PasteSeasonBody({ onDone }: { onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useState("");
+  const paste = useMutation({
+    mutationFn: async () => {
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error("This isn't a copied season. Use Copy season in the other VO2.");
+      }
+      const parsed = seasonCopySchema.safeParse(json);
+      if (!parsed.success) {
+        throw new Error("This isn't a copied season. Use Copy season in the other VO2.");
+      }
+      return pasteSeason({ data: parsed.data });
+    },
+    onSuccess: async ({ added, skipped }) => {
+      await afterGoalsChanged(queryClient);
+      toast.add({
+        type: "success",
+        title: added ? `${added} goals added` : "Nothing new to add",
+        description: skipped ? `${skipped} were already on your season.` : undefined,
+      });
+      onDone();
+    },
+  });
+
+  return (
+    <form
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        paste.mutate();
+      }}
+      className="flex min-h-0 flex-1 flex-col gap-4"
+    >
+      <ResponsiveDialogHeader>
+        <ResponsiveDialogTitle>Paste a season</ResponsiveDialogTitle>
+        <ResponsiveDialogDescription>
+          Paste what Copy season gave you in the other VO2. Goals you already have are skipped.
+        </ResponsiveDialogDescription>
+      </ResponsiveDialogHeader>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
+        <FieldGroup>
+          <Field data-invalid={paste.error != null}>
+            <FieldLabel htmlFor="season-paste">Copied season</FieldLabel>
+            <Textarea
+              id="season-paste"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder='{"vo2Season":1,"goals":[…]}'
+              className="max-h-48 font-mono"
+              value={text}
+              aria-invalid={paste.error != null}
+              onChange={(event) => setText(event.target.value)}
+            />
+            <FieldError>{paste.error?.message}</FieldError>
+          </Field>
+        </FieldGroup>
+      </div>
+      <ResponsiveDialogFooter>
+        <Button type="submit" disabled={!text.trim() || paste.isPending} className="h-10 sm:h-7">
+          {paste.isPending ? <Spinner data-icon="inline-start" /> : null}
+          Add goals
+        </Button>
+      </ResponsiveDialogFooter>
+    </form>
   );
 }
 

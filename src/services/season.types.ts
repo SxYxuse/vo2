@@ -97,6 +97,44 @@ export const goalInputSchema = z.object({
 
 export type GoalInput = z.input<typeof goalInputSchema>;
 
+/** A season as copied text, to paste into another VO2 account or install. */
+export const seasonCopySchema = z.object({
+  vo2Season: z.literal(1),
+  goals: z.array(goalInputSchema).min(1).max(500),
+});
+
+export function seasonCopy(goals: Goal[]): z.input<typeof seasonCopySchema> {
+  return {
+    vo2Season: 1,
+    goals: goals.map((goal) => ({
+      name: goal.name,
+      sportType: goal.sportType,
+      date: goal.date,
+      distanceM: goal.distanceM,
+      elevationGainM: goal.elevationGainM,
+      objective: goal.objective,
+      priority: goal.priority,
+    })),
+  };
+}
+
+const goalKey = (goal: Pick<Goal, "name" | "sportType" | "date">) =>
+  `${goal.date}|${goal.sportType}|${goal.name.trim().toLowerCase()}`;
+
+/** The pasted goals the season doesn't have yet, so pasting twice adds nothing. */
+export function newGoals<T extends Pick<Goal, "name" | "sportType" | "date">>(
+  pasted: T[],
+  existing: Pick<Goal, "name" | "sportType" | "date">[],
+) {
+  const seen = new Set(existing.map(goalKey));
+  return pasted.filter((goal) => {
+    const key = goalKey(goal);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export type Goal = z.output<typeof goalInputSchema> & { id: string };
 
 /** Goals on the same date are one event, such as a triathlon entered as swim, ride, and run. */
