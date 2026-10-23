@@ -1,9 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
 
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
+import { boardId } from "@/services/personal-bests.ts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -120,6 +122,13 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
       <div className="flex items-center gap-1">
         <h3 className="text-sm font-medium">What you can do</h3>
         <InfoTooltip label="About best efforts">{BESTS_INFO}</InfoTooltip>
+        <Link
+          to="/bests"
+          search={{ sport }}
+          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          All bests
+        </Link>
       </div>
       {!rows.length ? (
         <p className="text-muted-foreground text-sm">
@@ -137,7 +146,16 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
             const change = bestChangePct(row, sport);
             return (
               <div key={row.key} className="contents">
-                <span className="text-muted-foreground">{labels[row.key]}</span>
+                <Link
+                  to="/bests"
+                  search={{
+                    sport,
+                    best: boardId(sport, sport === "cycling" ? "power" : "time", row.key),
+                  }}
+                  className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  {labels[row.key]}
+                </Link>
                 <span className="text-right font-mono tabular-nums">
                   {formatBest(row.now, sport)}
                   {change != null ? (

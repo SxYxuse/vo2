@@ -8,6 +8,7 @@ import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
 import { loadHomeData } from "@/services/home-data.ts";
+import { loadBests } from "@/services/personal-bests.ts";
 import { loadProgress } from "@/services/progress.ts";
 import { loadSeason } from "@/services/season.ts";
 import { loadWeekCoach } from "@/services/week-coach.ts";
@@ -59,6 +60,12 @@ export const fitnessQueryOptions = queryOptions({
 export const progressQueryOptions = queryOptions({
   queryKey: ["progress"],
   queryFn: () => loadProgress(),
+  staleTime: 60_000,
+});
+
+export const bestsQueryOptions = queryOptions({
+  queryKey: ["bests"],
+  queryFn: () => loadBests(),
   staleTime: 60_000,
 });
 

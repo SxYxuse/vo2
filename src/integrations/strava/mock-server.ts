@@ -214,6 +214,10 @@ function buildCatalog(now: Date): MockSpec[] {
       push("virtualRide", "Indoor ride", atUtcHour(addUtcDays(weekMonday, 4), 18), 45);
     }
     if (week === 5) push("swim", "Pool swim", atUtcHour(addUtcDays(weekMonday, 4), 12), 30);
+    // A weekly swim and two very long rides, so every bests tab has distances to rank.
+    push("swim", "Morning swim", atUtcHour(weekMonday, 7), 35 + (week % 3) * 10);
+    if (week === 3) push("ride", "Gran fondo", atUtcHour(addUtcDays(weekMonday, 6), 7), 240);
+    if (week === 6) push("ride", "Century ride", atUtcHour(addUtcDays(weekMonday, 6), 7), 260);
   }
 
   return items.sort((left, right) => right.start.getTime() - left.start.getTime());
@@ -242,7 +246,7 @@ function climbFor(spec: MockSpec) {
  * hilly ones climb from 30 % to 55 % of the time, descend until 75 %, and slow on the way up.
  */
 function terrainFor(spec: MockSpec, samples: number) {
-  const base = speedMps(spec.kind);
+  const base = speedMps(spec.kind) * formFactor(spec);
   const gpsOn = hasGps(spec.kind);
   const climbM = gpsOn ? climbFor(spec) : 0;
   const onFoot = spec.kind === "run" || spec.kind === "trailRun" || spec.kind === "walk";
@@ -262,7 +266,8 @@ function terrainFor(spec: MockSpec, samples: number) {
     } else if (climbM === 0) {
       altitude.push(40 + wave * 18);
       grade.push(wave * 3);
-      speed.push(base);
+      // A faster stretch mid-session, so short bests beat long ones.
+      speed.push(base * (progress > 0.4 && progress < 0.5 ? 1.08 : 1));
     } else {
       const up = Math.min(1, Math.max(0, (progress - 0.3) / 0.25));
       const down = Math.min(1, Math.max(0, (progress - 0.55) / 0.2));
@@ -350,7 +355,9 @@ function streamsFor(spec: MockSpec): StreamSet {
       ? undefined
       : stream(indexes.map((i) => heartAt(spec.kind, progress(i)))),
     cadence: stream(indexes.map(() => (power ? 88 : spec.kind === "swim" ? 0 : 164))),
-    watts: power ? stream(indexes.map((i) => wattsAt(spec.kind, progress(i)))) : undefined,
+    watts: power
+      ? stream(indexes.map((i) => Math.round(wattsAt(spec.kind, progress(i)) * formFactor(spec))))
+      : undefined,
     temp: stream(indexes.map(() => 16)),
     moving: stream(indexes.map(() => true)),
     grade_smooth: stream(terrain.grade),
@@ -364,7 +371,19 @@ function heartAt(kind: MockKind, progress: number) {
   return 142 + Math.round(Math.sin(progress * Math.PI) * 14);
 }
 
+/**
+ * Each session a little faster or slower than the last, and the athlete fitter week by week,
+ * so best efforts differ between activities and progress over the eight weeks.
+ */
+function formFactor(spec: MockSpec) {
+  const ageDays = (Date.now() - spec.start.getTime()) / 86_400_000;
+  const jitter = ((spec.id * 7919) % 13) - 6;
+  return (1 + jitter / 100) * (1 - ageDays * 0.0008);
+}
+
 function wattsAt(kind: MockKind, progress: number) {
+  // A short sprint in every ride, so the power curve has a real peak.
+  if (progress > 0.5 && progress < 0.505) return 620;
   if (kind === "ftpRide") return progress < 0.2 ? 150 : progress < 0.6 ? 250 : 120;
   return 185 + Math.round(Math.sin(progress * Math.PI * 2) * 20);
 }

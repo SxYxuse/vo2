@@ -175,8 +175,20 @@ Where the athlete is in the cycle of building, consolidating, recovering, and fr
 _Avoid_: Block, periodization, status
 
 **Best effort**:
-The best average power over a fixed duration on a ride with a power meter, or the fastest time over a fixed distance inside a run. Progress compares the last six weeks with the six before and the best of the year.
-_Avoid_: PR, record, power curve, mean-max
+One activity's best over a fixed duration or distance: the best average power on a ride with a power meter, or the fastest time over a distance inside a road run, an outdoor ride, or a swim. Progress compares the last six weeks with the six before and the best of the year (ADR 0020, ADR 0025).
+_Avoid_: PR, record, mean-max
+
+**Power curve**:
+The athlete's best average power at every duration from seconds to hours, drawn as one line.
+_Avoid_: Mean-max curve, power duration curve, critical power
+
+**Personal best**:
+The top best effort for one distance or duration across the local copy, or within a chosen period. "All time" means everything copied so far, which may not yet be the athlete's whole Strava history.
+_Avoid_: PR, record, all-time best
+
+**Biggest day**:
+A single-activity best that is not a pace or power: the longest activity, the most climbing in one activity, or the biggest single climb.
+_Avoid_: Record, achievement, milestone
 
 ## Anchors
 

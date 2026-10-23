@@ -13,6 +13,7 @@ import {
   RouteIcon,
   Settings2Icon,
   TrendingUpIcon,
+  TrophyIcon,
 } from "lucide-react";
 
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
@@ -63,6 +64,7 @@ const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 const NAV_ITEMS = [
   { title: "Map", to: "/map", icon: MapIcon },
   { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
+  { title: "Bests", to: "/bests", icon: TrophyIcon },
   { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
 ] as const;
 
