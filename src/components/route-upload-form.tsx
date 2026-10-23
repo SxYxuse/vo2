@@ -16,7 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { BottleFields } from "@/components/route-bottle-fields.tsx";
 
@@ -112,22 +119,29 @@ export function RouteUploadForm({
             </Field>
             <Field>
               <FieldLabel htmlFor="route-sport">Sport</FieldLabel>
-              <NativeSelect
-                id="route-sport"
+              <Select
                 value={sportType}
-                onChange={(event) => {
-                  const next = event.target.value as RouteSportType;
+                onValueChange={(value) => {
+                  if (value == null) return;
+                  const next = value as RouteSportType;
                   const changesGroup = routeSportGroup(next) !== routeSportGroup(sportType);
                   setSportType(next);
                   if (changesGroup) setSettings(settingsFor(next, defaults));
                 }}
               >
-                {ROUTE_SPORT_TYPES.map((type) => (
-                  <NativeSelectOption key={type} value={type}>
-                    {formatSportType(type)}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="route-sport" className="w-full sm:w-48">
+                  <SelectValue>{formatSportType(sportType)}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {ROUTE_SPORT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {formatSportType(type)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field data-invalid={!carbValid}>
               <FieldLabel htmlFor="route-carbs">Carbs per hour</FieldLabel>

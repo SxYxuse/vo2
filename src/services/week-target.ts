@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { emptyHistogram, zonesFromHistogram } from "./heart-rate.ts";
 import { ATL_DAYS, CTL_DAYS, formLabel } from "./training-load.ts";
-import { blendShares, type GoalSessions, type SeasonPhase } from "./season-phase.ts";
+import { blendShares, phaseWeekLoad, type GoalSessions, type SeasonPhase } from "./season-phase.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import {
   DEFAULT_LOAD_PER_HOUR,
@@ -202,14 +202,6 @@ function stress(minutes: number, intensity: number) {
   return (minutes / 60) * 100 * intensity * intensity;
 }
 
-/** The phase's ramp, eased off when form is already low. */
-export function rampFor(ramp: number, form: number) {
-  if (form < -30) return Math.min(ramp, 0);
-  if (form < -18) return Math.min(ramp, 5);
-  if (form < -10) return Math.min(ramp, 8);
-  return ramp;
-}
-
 /** Hard minutes when an activity has no heart-rate stream: from its load per hour. */
 export function estimatedHardMinutes(minutes: number, load: number) {
   if (minutes <= 0 || load <= 0) return 0;
@@ -249,10 +241,7 @@ export function weeklyTarget(input: {
   if (ctl <= 5) {
     return fromMinutes(round5(fixedMinutes * (season.loadFactor ?? 1)), "no-history");
   }
-  const load =
-    season.loadFactor != null
-      ? 7 * ctl * season.loadFactor
-      : Math.max(0, 7 * ctl + CTL_DAYS * rampFor(season.ramp, ctl - atl));
+  const load = phaseWeekLoad(season, { ctl, atl });
   const hours = clamp(Math.round((load / loadPerHour) * 4) / 4, 0.5, 30);
   const minutes = Math.round(hours * 60);
   if (plan.targetMode === "manual" && fixedMinutes < minutes) {
@@ -354,7 +343,7 @@ const HARD_DAY_MINUTES = 15;
 /** An activity this long counts as one of the week's easy sessions. */
 export const EASY_SESSION_MIN_MINUTES = 20;
 
-/** Key session types per build pace. The first always comes; the others rotate week to week. */
+/** Key session types per rotation, picked by the season phase. The first always comes; the others rotate week to week. */
 const KEY_ROTATION: Record<BuildPace, KeySessionPresetId[]> = {
   hold: ["long", "tempo"],
   slow: ["tempo", "long", "threshold"],

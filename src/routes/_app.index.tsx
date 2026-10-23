@@ -50,7 +50,7 @@ export const Route = createFileRoute("/_app/")({
 function CalendarPage() {
   const { month, week } = Route.useSearch();
   const { data } = useSuspenseQuery(homeQueryOptions);
-  const { signedIn, activities, settings } = data;
+  const { signedIn, activities, goals, settings } = data;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -60,7 +60,7 @@ function CalendarPage() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Time left this week lives in the Week target.
+          Completed Strava activities. Time left lives on the This week page.
         </p>
       </div>
       {signedIn && Object.keys(settings.sportTypes).length === 0 ? (
@@ -78,6 +78,7 @@ function CalendarPage() {
       ) : (
         <ActivityCalendar
           activities={activities}
+          goals={goals}
           initialSettings={settings}
           diary={{ month, week }}
         />
@@ -95,7 +96,7 @@ function CalendarPending() {
           Activity calendar
         </h1>
         <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Time left this week lives in the Week target.
+          Completed Strava activities. Time left lives on the This week page.
         </p>
       </div>
       <Skeleton className="h-[40rem] w-full rounded-xl" />

@@ -68,7 +68,7 @@ export function WeekMixFields<T extends TrainingFormInput>({
       <FieldLegend>Week mix</FieldLegend>
       <FieldDescription>
         How many sessions you do a week, and how many of them are key sessions. VO2 builds the key
-        sessions each week from your build pace and fitness; the rest of the target is spread over
+        sessions each week from your season phase and fitness; the rest of the target is spread over
         easy sessions.
       </FieldDescription>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr]">

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/_app/fitness")({
 
 function FitnessPage() {
   const { data } = useSuspenseQuery(fitnessQueryOptions);
-  const { signedIn, fitnessLoads } = data;
+  const { signedIn, fitnessLoads, goals } = data;
 
   return (
     <>
@@ -45,7 +45,7 @@ function FitnessPage() {
       </div>
       {signedIn ? (
         <>
-          <FitnessChart loads={fitnessLoads} />
+          <FitnessChart loads={fitnessLoads} goals={goals} />
           <ProgressCards />
         </>
       ) : (

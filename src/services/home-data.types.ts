@@ -19,9 +19,13 @@ export function isMissingHeartrate(
   return activity.hasStreams && !activity.hasHeartrate;
 }
 
+/** A season goal shown on its date (ADR 0021). */
+export type CalendarGoal = { id: string; name: string; sportType: string; date: string };
+
 export type HomeData = {
   signedIn: boolean;
   activities: CalendarActivity[];
+  goals: CalendarGoal[];
   settings: AthleteSettings;
   training: TrainingPlan | null;
 };

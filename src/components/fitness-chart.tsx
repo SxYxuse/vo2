@@ -2,6 +2,8 @@
 
 import { useId, useMemo, useState } from "react";
 import { cn } from "cn";
+import { Link } from "@tanstack/react-router";
+import { ChevronRightIcon, FlagIcon } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -24,6 +26,7 @@ import {
   averageWeeklyMovingSeconds,
   buildPmc,
   ctlChange,
+  dayKey,
   formLabel,
   trainingPhase,
   pmcWithCurrentForm,
@@ -31,7 +34,10 @@ import {
   slicePmc,
   type FitnessLoad,
   type FitnessPeriod,
+  type PmcPoint,
 } from "@/services/training-load.ts";
+import { projectRaceDay } from "@/services/season-phase.ts";
+import { daysBetween, formatDaysLeft, seasonClusters, type Goal } from "@/services/season.types.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -172,7 +178,43 @@ function Sparkline({
   );
 }
 
-export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
+/** The next goal with form and fitness on race day if every week hits its target. */
+function NextGoal({ goals, pmc, timeZone }: { goals: Goal[]; pmc: PmcPoint[]; timeZone: string }) {
+  const today = dayKey(new Date(), timeZone);
+  const latest = pmc.at(-1);
+  const [cluster] = seasonClusters(goals.filter((goal) => goal.date >= today));
+  if (!cluster || !latest) return null;
+  const main = cluster.events.find((event) => event.date === cluster.mainDate)!;
+  const projected = projectRaceDay(latest, goals, today, main.date);
+  return (
+    <Link
+      to="/season"
+      preload="intent"
+      className="hover:bg-muted/50 flex min-h-14 items-center gap-3 rounded-lg border p-3"
+    >
+      <FlagIcon aria-hidden className="text-muted-foreground size-5 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-muted-foreground text-xs">
+          Next goal · {formatDaysLeft(daysBetween(today, main.date))}
+        </span>
+        <span className="truncate font-medium">
+          {main.goals.map((goal) => goal.name).join(" + ")}
+        </span>
+        <span className="text-muted-foreground text-sm">
+          Race-day form{" "}
+          <span className={cn("font-medium tabular-nums", formTone(projected.form))}>
+            {projected.form >= 0 ? "+" : ""}
+            {roundLoad(projected.form).toFixed(0)} ({formLabel(projected.form).toLowerCase()})
+          </span>
+          , fitness {roundLoad(projected.ctl).toFixed(0)}, if you hit each week’s target.
+        </span>
+      </div>
+      <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+    </Link>
+  );
+}
+
+export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goals?: Goal[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const isDesktop = useDesktopMedia();
   const sharedPeriod = useTrainingPeriod();
@@ -186,6 +228,14 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
     [pmc, period, timeZone, isDesktop],
   );
   const latest = series.at(-1);
+  // Goals inside the period, on the x value of their day.
+  const goalMarks = useMemo(() => {
+    const byDate = new Map(series.map((point) => [point.date, point.t]));
+    return goals.flatMap((goal) => {
+      const t = byDate.get(goal.date);
+      return t == null ? [] : [{ id: goal.id, t }];
+    });
+  }, [goals, series]);
   const ramp = ctlChange(pmc);
   const phase = useMemo(() => trainingPhase(pmc), [pmc]);
   const estimatedShare =
@@ -262,6 +312,7 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                 {phase.detail}
               </p>
             </div>
+            <NextGoal goals={goals} pmc={pmc} timeZone={timeZone} />
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               <StatCard
                 label="Fitness (CTL)"
@@ -376,6 +427,16 @@ export function FitnessChart({ loads }: { loads: FitnessLoad[] }) {
                     {showPmc ? (
                       <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" />
                     ) : null}
+                    {goalMarks.map((mark) => (
+                      <ReferenceLine
+                        key={mark.id}
+                        yAxisId={showPmc ? "pmc" : "load"}
+                        x={mark.t}
+                        stroke="var(--color-foreground)"
+                        strokeDasharray="4 3"
+                        strokeOpacity={0.6}
+                      />
+                    ))}
                     <ChartTooltip
                       cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
                       content={

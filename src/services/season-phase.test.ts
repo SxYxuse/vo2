@@ -1,6 +1,13 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { blendShares, expectedGoalMinutes, goalSessions, seasonPhase } from "./season-phase.ts";
+import {
+  blendShares,
+  expectedGoalMinutes,
+  goalSessions,
+  phaseWeekLoad,
+  projectRaceDay,
+  seasonPhase,
+} from "./season-phase.ts";
 import { addDayKey } from "./training-plan.types.ts";
 import type { Goal } from "./season.types.ts";
 
@@ -189,5 +196,27 @@ describe("goalSessions", () => {
   test("other sport types set no key sport", () => {
     const phase = seasonPhase([goal("ski", inWeeks(6), { sportType: "NordicSki" })], WEEK);
     expect(goalSessions(phase, paces)).toBeNull();
+  });
+});
+
+describe("race-day projection", () => {
+  test("a build raises the week's load and a taper cuts it", () => {
+    const fit = { ctl: 60, atl: 60 };
+    expect(phaseWeekLoad({ ramp: 5, loadFactor: null }, fit)).toBe(7 * 60 + 42 * 5);
+    expect(phaseWeekLoad({ ramp: 0, loadFactor: 0.5 }, fit)).toBe(210);
+    // Very fatigued: the ramp eases off to holding.
+    expect(phaseWeekLoad({ ramp: 8, loadFactor: null }, { ctl: 60, atl: 95 })).toBe(420);
+  });
+
+  test("arrives fresh after the taper, having built fitness on the way", () => {
+    const race = inWeeks(8);
+    const projected = projectRaceDay({ ctl: 50, atl: 55 }, [goal("a", race)], WEEK, race);
+    expect(projected.form).toBeGreaterThan(5);
+    expect(projected.ctl).toBeGreaterThan(50);
+  });
+
+  test("without a taper ahead form stays around neutral", () => {
+    const projected = projectRaceDay({ ctl: 50, atl: 50 }, [], WEEK, addDayKey(WEEK, 28));
+    expect(Math.abs(projected.form)).toBeLessThan(1);
   });
 });

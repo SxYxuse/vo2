@@ -5,6 +5,7 @@ import { activities, activityStreams } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { goalsFor } from "./season.server.ts";
 import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
 import type { CalendarActivity, HomeData } from "./home-data.types.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
@@ -42,12 +43,13 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     return {
       signedIn: false,
       activities: [],
+      goals: [],
       settings: DEFAULT_ATHLETE_SETTINGS,
       training: null,
     };
   }
 
-  const [rows, settings, training, streamedWithoutFlag] = await Promise.all([
+  const [rows, settings, training, streamedWithoutFlag, goals] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -70,6 +72,7 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       .from(activities)
       .innerJoin(activityStreams, eq(activityStreams.activityId, activities.id))
       .where(and(eq(activities.userId, session.user.id), isNull(activities.streamsSyncedAt))),
+    goalsFor(session.user.id),
   ]);
 
   const hasStoredStreams = new Set(streamedWithoutFlag.map((row) => row.activityId));
@@ -90,6 +93,7 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
   return {
     signedIn: true,
     activities: calendarActivities,
+    goals: goals.map(({ id, name, sportType, date }) => ({ id, name, sportType, date })),
     training,
     settings,
   };
