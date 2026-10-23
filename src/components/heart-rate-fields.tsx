@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { Controller, useWatch, type Control, type UseFormSetValue } from "react-hook-form";
 
 import {
@@ -28,6 +29,7 @@ import {
   type HeartRateEstimates,
   type HeartRateSettings,
 } from "@/services/heart-rate-settings.ts";
+import { loadStravaZoneTops } from "@/services/strava-zones.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,6 +86,28 @@ function reserveZonesLabel(families: ZonedFamily[]) {
 function zoneTops(family: ZonedFamily, resolved: ResolvedHeartRate) {
   const zones = zonesFromHistogram(emptyHistogram(), SPORT_TYPE[family], resolved);
   return zones.slice(0, 4).map((zone) => zone.maxBpm);
+}
+
+/** Fills one sport's custom zone tops from Strava once; nothing stays linked. */
+function CopyStravaZones({ onCopy }: { onCopy: (tops: number[]) => void }) {
+  const copy = useMutation({ mutationFn: () => loadStravaZoneTops(), onSuccess: onCopy });
+  return (
+    <Field>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-fit"
+        disabled={copy.isPending}
+        onClick={() => copy.mutate()}
+      >
+        {copy.isPending ? "Copying…" : "Copy from Strava"}
+      </Button>
+      <FieldDescription>
+        Strava keeps one set of zones for every sport, so this fills these four only.
+      </FieldDescription>
+      {copy.error ? <FieldError>{copy.error.message}</FieldError> : null}
+    </Field>
+  );
 }
 
 type Estimate = { bpm: number | null; source?: string };
@@ -196,14 +220,14 @@ export function HeartRateFields({
   control,
   setValue,
   estimates,
-  onReset,
+  onSave,
 }: {
   idPrefix: string;
   control: Control<SettingsFormInput>;
   setValue: UseFormSetValue<SettingsFormInput>;
   estimates: HeartRateEstimates;
-  /** Typed fields save on blur, so going back to an estimate asks for its own save. */
-  onReset: () => void;
+  /** Typed fields save on blur, so going back to an estimate or copying zones saves right away. */
+  onSave: () => void;
 }) {
   const heartRate = useWatch({ control, name: "heartRate" }) as HeartRateFormInput["heartRate"];
   // A half-typed value reads as blank, so the rest of the card keeps up while typing.
@@ -230,7 +254,7 @@ export function HeartRateFields({
         setsZones={reserveZonesLabel(
           ZONED_FAMILIES.filter((family) => settings.sports[family].method === "reserve"),
         )}
-        onReset={onReset}
+        onReset={onSave}
         description="Scores training load, for every sport."
         issue={issueAt("restHr")}
         control={control}
@@ -330,6 +354,14 @@ export function HeartRateFields({
                       control={control}
                     />
                   ))}
+                  <div className="col-span-2">
+                    <CopyStravaZones
+                      onCopy={(tops) => {
+                        setValue(`${base}.customZones`, tops.map(String), { shouldDirty: true });
+                        onSave();
+                      }}
+                    />
+                  </div>
                 </div>
               ) : null}
               {issueAt(`sports.${family}.customZones`) ? (
@@ -341,7 +373,7 @@ export function HeartRateFields({
                 label="LTHR"
                 estimate={{ bpm: lthrEstimate, source: "from your max heart rate" }}
                 setsZones={anchors.includes("lthr") ? "Sets these zones" : undefined}
-                onReset={onReset}
+                onReset={onSave}
                 description="Lactate threshold: about the highest heart rate you can hold for an hour. Scores training load."
                 issue={issueAt(`sports.${family}.lthr`)}
                 control={control}
@@ -352,7 +384,7 @@ export function HeartRateFields({
                 label="Max heart rate"
                 estimate={{ bpm: estimates.maxHr[family], source: "from your recent peaks" }}
                 setsZones={anchors.includes("max") ? "Sets these zones" : undefined}
-                onReset={onReset}
+                onReset={onSave}
                 description="The highest heart rate you reach in this sport."
                 control={control}
               />

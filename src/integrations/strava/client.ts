@@ -5,6 +5,7 @@ import type { components, operations } from "./strava.types.ts";
 
 export type SummaryActivity = components["schemas"]["SummaryActivity"];
 export type StreamSet = components["schemas"]["StreamSet"];
+export type StravaZones = components["schemas"]["Zones"];
 type StreamKey = NonNullable<
   operations["getActivityStreams"]["parameters"]["query"]
 >["keys"][number];
@@ -79,6 +80,11 @@ export class StravaApi {
       }
       throw error;
     }
+  }
+
+  /** Needs the profile:read_all scope, which sign-in already requests. */
+  async getAthleteZones() {
+    return this.request<StravaZones>("/athlete/zones");
   }
 
   /** Revokes VO2's access for this athlete; Strava echoes back the revoked token. */
