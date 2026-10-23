@@ -15,9 +15,9 @@ import {
 } from "./worktree-env.ts";
 
 // Run by T3's worktree hook (t3.json) and by `vp run db:setup`. Gives a feature worktree its own
-// database on the shared vo-postgres server and its own dev-server port. Safe to run twice.
+// database on the shared vo2-postgres server and its own dev-server port. Safe to run twice.
 
-const CONTAINER = "vo-postgres";
+const CONTAINER = "vo2-postgres";
 const isolate = process.argv.includes("--isolate");
 
 function git(...args: string[]) {
@@ -40,7 +40,19 @@ export function worktreePaths() {
 export function psql(sql: string) {
   return execFileSync(
     "docker",
-    ["exec", CONTAINER, "psql", "-U", "vo", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-Atc", sql],
+    [
+      "exec",
+      CONTAINER,
+      "psql",
+      "-U",
+      "vo2",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-Atc",
+      sql,
+    ],
     { encoding: "utf8" },
   ).trim();
 }
@@ -59,7 +71,7 @@ function isHealthy() {
 }
 
 function startServer() {
-  // A running vo-postgres may belong to an older compose project; `up` would collide on its name.
+  // Skips compose when another checkout already started the server.
   if (isHealthy()) return;
   execFileSync("docker", ["compose", "up", "-d", "--wait"], { stdio: "inherit" });
 }
@@ -112,7 +124,7 @@ async function main() {
       copyFileSync(examplePath, envPath);
       console.log("Main checkout: copied .env.example to .env");
     } else {
-      console.log("Main checkout: keeps database vo and its .env");
+      console.log("Main checkout: keeps database vo2 and its .env");
     }
     return;
   }

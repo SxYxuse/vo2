@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.hoisted(() => {
   process.env.STRAVA_MOCK = "1";
-  process.env.DATABASE_URL ??= "postgresql://vo:vo@localhost:5432/vo";
+  process.env.DATABASE_URL ??= "postgresql://vo2:vo2@localhost:5432/vo2";
   process.env.BETTER_AUTH_SECRET ??= "test-secret";
   process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 });

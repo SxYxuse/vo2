@@ -52,8 +52,6 @@ Or set `STRAVA_MOCK=1` in `.env`. Open http://localhost:3000, click **Connect St
 
 The mock lives at `/api/mock-strava` and implements the parts of Strava's OAuth and v3 API that the app uses. Only the Strava base URL changes, so sign-in, token refresh, and sync run the same code as in production. `STRAVA_MOCK` is ignored in production.
 
-Local Postgres still uses the `vo` user, password, and database name so existing `.env` files and volumes keep working.
-
 ## Sync behavior
 
 Strava read limits are typically 100 requests / 15 minutes and 1,000 / day. VO2:

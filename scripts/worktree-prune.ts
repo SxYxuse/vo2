@@ -11,7 +11,7 @@ import {
 } from "./worktree-env.ts";
 import { psql, worktreePaths } from "./worktree-setup.ts";
 
-// `vp run db:prune [--dry-run]`: drops vo_wt_* databases whose worktree no longer exists. A
+// `vp run db:prune [--dry-run]`: drops vo2_wt_* databases whose worktree no longer exists. A
 // database belongs to the worktree whose path hash ends its name, so renaming a branch keeps it.
 
 const dryRun = process.argv.includes("--dry-run");

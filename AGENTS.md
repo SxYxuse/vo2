@@ -32,10 +32,10 @@ The most common defect is a change that works on the path you tested and is miss
 ### Databases
 
 - Every checkout shares one Postgres server, compose project `vo2`. `vp run db:up` attaches to it. `vp run db:down` stops it for every checkout.
-- The main checkout uses database `vo`. A new worktree's setup hook (`vp run db:setup`) creates its own `vo_wt_*` database, migrates it, and writes `DATABASE_URL`, `PORT`, and `BETTER_AUTH_URL` to `.env`.
-- A worktree's database stays empty until **Sync from Strava**. Do not point a feature worktree at database `vo`, and do not migrate `vo` from a feature worktree.
-- A worktree created before the hook still shares `vo`. `bun scripts/worktree-setup.ts --isolate` gives it its own database.
-- `vp run db:prune` drops `vo_wt_*` databases whose worktree is gone (`--dry-run` lists them).
+- The main checkout uses database `vo2`. A new worktree's setup hook (`vp run db:setup`) creates its own `vo2_wt_*` database, migrates it, and writes `DATABASE_URL`, `PORT`, and `BETTER_AUTH_URL` to `.env`.
+- A worktree's database stays empty until **Sync from Strava**. Do not point a feature worktree at database `vo2`, and do not migrate `vo2` from a feature worktree.
+- A worktree created before the hook still shares `vo2`. `bun scripts/worktree-setup.ts --isolate` gives it its own database.
+- `vp run db:prune` drops `vo2_wt_*` databases whose worktree is gone (`--dry-run` lists them).
 
 ## Generated files
 

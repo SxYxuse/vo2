@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { parseEnv } from "./env-schema.ts";
 
 const required = {
-  DATABASE_URL: "postgresql://vo:vo@localhost:5432/vo",
+  DATABASE_URL: "postgresql://vo2:vo2@localhost:5432/vo2",
   BETTER_AUTH_SECRET: "secret",
 };
 

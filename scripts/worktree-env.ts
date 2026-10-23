@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 // Pure helpers for worktree-setup.ts and worktree-prune.ts, kept apart so they test without Docker.
 
-export const SHARED_DATABASE = "vo";
-export const DATABASE_PREFIX = "vo_wt_";
+export const SHARED_DATABASE = "vo2";
+export const DATABASE_PREFIX = "vo2_wt_";
 export const PORT_RANGE = { first: 3100, last: 3999 } as const;
 
 /** Postgres truncates identifiers past 63 bytes, which would make two worktrees collide. */
@@ -14,7 +14,7 @@ export function pathHash(worktreePath: string) {
   return createHash("sha256").update(worktreePath).digest("hex").slice(0, HASH_LENGTH);
 }
 
-/** `fix/app-slowness` at some path becomes `vo_wt_fix_app_slowness_a1b2c3`. */
+/** `fix/app-slowness` at some path becomes `vo2_wt_fix_app_slowness_a1b2c3`. */
 export function worktreeDatabaseName(branch: string, worktreePath: string) {
   const room = MAX_IDENTIFIER - DATABASE_PREFIX.length - 1 - HASH_LENGTH;
   const slug = branch
@@ -35,7 +35,7 @@ export function assertSafeIdentifier(name: string) {
 }
 
 export function databaseUrl(database: string) {
-  return `postgresql://vo:vo@localhost:5432/${database}`;
+  return `postgresql://vo2:vo2@localhost:5432/${database}`;
 }
 
 export function databaseFromUrl(url: string | undefined) {
@@ -73,7 +73,7 @@ export function setEnvValues(text: string, values: Record<string, string>) {
 export type EnvPlan =
   /** No `.env` yet, or it already uses this worktree's database: write the three keys. */
   | { kind: "write" }
-  /** `.env` uses another database, such as the shared `vo`: leave it unless `--isolate`. */
+  /** `.env` uses another database, such as the shared `vo2`: leave it unless `--isolate`. */
   | { kind: "keep"; database: string | undefined };
 
 export function planEnv(existing: string | undefined, database: string, isolate: boolean): EnvPlan {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 vi.hoisted(() => {
   process.env.STRAVA_MOCK = "";
   process.env.APP_ENV = "development";
-  process.env.DATABASE_URL ??= "postgresql://vo:vo@localhost:5432/vo";
+  process.env.DATABASE_URL ??= "postgresql://vo2:vo2@localhost:5432/vo2";
   process.env.BETTER_AUTH_SECRET ??= "test-secret";
   process.env.STRAVA_CLIENT_ID ??= "test-id";
   process.env.STRAVA_CLIENT_SECRET ??= "test-secret";

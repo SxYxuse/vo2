@@ -14,10 +14,10 @@ const path = "/Users/me/.t3/worktrees/sxyxuse-vo2/t3-763c4ce5";
 describe("worktreeDatabaseName", () => {
   it("sanitizes the branch and ends with a hash of the worktree path", () => {
     expect(worktreeDatabaseName("fix/app-slowness", path)).toBe(
-      `vo_wt_fix_app_slowness_${pathHash(path)}`,
+      `vo2_wt_fix_app_slowness_${pathHash(path)}`,
     );
     expect(worktreeDatabaseName("Feat/Ünïcode--Branch", path)).toMatch(
-      /^vo_wt_feat_n_code_branch_[0-9a-f]{6}$/,
+      /^vo2_wt_feat_n_code_branch_[0-9a-f]{6}$/,
     );
   });
 
@@ -33,24 +33,24 @@ describe("worktreeDatabaseName", () => {
   });
 
   it("never produces the shared database name", () => {
-    expect(worktreeDatabaseName("vo", path)).not.toBe("vo");
-    expect(worktreeDatabaseName("", path)).toBe(`vo_wt_head_${pathHash(path)}`);
+    expect(worktreeDatabaseName("vo2", path)).not.toBe("vo2");
+    expect(worktreeDatabaseName("", path)).toBe(`vo2_wt_head_${pathHash(path)}`);
   });
 });
 
 describe("assertSafeIdentifier", () => {
   it("rejects anything that could escape the quoted identifier", () => {
-    expect(() => assertSafeIdentifier('vo"; DROP DATABASE vo; --')).toThrow();
+    expect(() => assertSafeIdentifier('vo2"; DROP DATABASE vo2; --')).toThrow();
     expect(() => assertSafeIdentifier("Vo_wt")).toThrow();
   });
 });
 
 describe("planEnv", () => {
   const own = worktreeDatabaseName("fix/app-slowness", path);
-  const sharedEnv = "DATABASE_URL=postgresql://vo:vo@localhost:5432/vo\nPORT=3000\n";
+  const sharedEnv = "DATABASE_URL=postgresql://vo2:vo2@localhost:5432/vo2\nPORT=3000\n";
 
-  it("leaves an existing .env that still shares vo alone", () => {
-    expect(planEnv(sharedEnv, own, false)).toEqual({ kind: "keep", database: "vo" });
+  it("leaves an existing .env that still shares vo2 alone", () => {
+    expect(planEnv(sharedEnv, own, false)).toEqual({ kind: "keep", database: "vo2" });
   });
 
   it("switches a shared .env only with --isolate", () => {
@@ -59,7 +59,9 @@ describe("planEnv", () => {
 
   it("writes a missing .env and refreshes one already on this worktree's database", () => {
     expect(planEnv(undefined, own, false)).toEqual({ kind: "write" });
-    expect(planEnv(`DATABASE_URL=postgresql://vo:vo@localhost:5432/${own}\n`, own, false)).toEqual({
+    expect(
+      planEnv(`DATABASE_URL=postgresql://vo2:vo2@localhost:5432/${own}\n`, own, false),
+    ).toEqual({
       kind: "write",
     });
   });
