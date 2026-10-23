@@ -83,7 +83,7 @@ function BestsPending() {
   return (
     <>
       <BestsHeading />
-      <Skeleton className="h-9 w-full rounded-lg sm:w-72" />
+      <Skeleton className="h-8 w-48 rounded-lg" />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 10 }, (_, index) => (
           <Skeleton key={index} className="h-24 rounded-lg" />
