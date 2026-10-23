@@ -51,12 +51,19 @@ export const REST_HR_MAX = 100;
 
 const bpm = z.number().int().min(BPM_MIN).max(BPM_MAX);
 
+/** Tops of zones 1 to 4, as saved. Rising order is checked separately so the form can explain it. */
+export const customZoneTopsSchema = z.array(bpm).length(4);
+
+export function customZoneTopsRise(tops: number[]) {
+  return tops.every((top, index) => index === 0 || top > tops[index - 1]);
+}
+
 const sportHeartRateSchema = z.object({
   method: z.enum(["lthr", "max", "reserve", "custom"]).default("lthr"),
   lthr: bpm.nullable().default(null),
   maxHr: bpm.nullable().default(null),
   /** Tops of zones 1 to 4. Kept when switching away from custom so switching back restores them. */
-  customZones: z.array(bpm).length(4).nullable().default(null),
+  customZones: customZoneTopsSchema.nullable().default(null),
 });
 
 export const heartRateSettingsSchema = z.object({
@@ -136,11 +143,7 @@ export function heartRateSettingsIssues(
       lowestLthr = { family, bpm: resolved.lthr };
     }
     const tops = settings.sports[family].customZones;
-    if (
-      resolved.method === "custom" &&
-      tops &&
-      tops.some((top, index) => index > 0 && top <= tops[index - 1])
-    ) {
+    if (resolved.method === "custom" && tops && !customZoneTopsRise(tops)) {
       issues.push({
         path: `sports.${family}.customZones`,
         message: "Each zone must top out higher than the one before.",

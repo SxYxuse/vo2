@@ -18,6 +18,20 @@ const ATHLETE = {
   profile_medium: null,
 };
 
+/** Strava's shape: five heart-rate ranges, each starting where the last ends, the top one open. */
+const ZONES = {
+  heart_rate: {
+    custom_zones: true,
+    zones: [
+      { min: 0, max: 123 },
+      { min: 123, max: 153 },
+      { min: 153, max: 169 },
+      { min: 169, max: 184 },
+      { min: 184, max: -1 },
+    ],
+  },
+};
+
 /** Far below Strava's real limits, so sync never pauses against the mock. */
 const RATE_LIMIT_HEADERS = {
   "X-ReadRateLimit-Limit": "100000,1000000",
@@ -50,6 +64,7 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
   if (path === "/oauth/deauthorize" && request.method === "POST") return deauthorize(request);
   if (!isLive(bearerToken(request), "access")) return unauthorized("access_token");
   if (path === "/api/v3/athlete") return json(ATHLETE);
+  if (path === "/api/v3/athlete/zones") return json(ZONES);
   if (path === "/api/v3/athlete/activities") {
     return json(
       listActivities({

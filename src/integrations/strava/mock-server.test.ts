@@ -108,6 +108,12 @@ describe("StravaApi against mock Strava", () => {
     accessToken = (await signIn()).access_token;
   });
 
+  it("returns five heart-rate zones for the athlete", async () => {
+    const zones = await new StravaApi(accessToken).getAthleteZones();
+
+    expect(zones.heart_rate?.zones).toHaveLength(5);
+  });
+
   it("pages about eight weeks of Ride and Run activities, newest first", async () => {
     const api = new StravaApi(accessToken);
     const firstPage = await api.listAthleteActivities({ page: 1, perPage: 10 });
