@@ -3,16 +3,13 @@
 import { Controller, useController, useWatch, type Control } from "react-hook-form";
 
 import {
-  BUILD_PACES,
   KEY_SHARE_PRESETS,
   MAX_SESSIONS_PER_WEEK,
   easySessionRange,
   keySessionCount,
-  type BuildPace,
   type SessionHistory,
   type WeekMix,
 } from "@/services/training-plan.ts";
-import { keySessionTypes } from "@/services/week-target.ts";
 import type { TrainingFormInput } from "@/lib/settings-form.ts";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,7 +49,6 @@ export function WeekMixFields<T extends TrainingFormInput>({
 }) {
   const control = anyControl as unknown as Control<Form>;
   const mix = useWatch({ control, name: "weekMix" }) as WeekMix | undefined;
-  const buildPace = useWatch({ control, name: "buildPace" }) as BuildPace | "";
   const minField = useController({ control, name: "weekMix.minSessions" });
   const maxField = useController({ control, name: "weekMix.maxSessions" });
   const minSessions = mix?.minSessions ?? 1;
@@ -66,8 +62,6 @@ export function WeekMixFields<T extends TrainingFormInput>({
   const rangeError = minField.fieldState.error ?? maxField.fieldState.error;
   const matchesHistory =
     history != null && history.low === minSessions && history.high === maxSessions;
-  const [main, ...rotating] = buildPace ? keySessionTypes(buildPace) : [];
-  const paceLabel = BUILD_PACES.find((pace) => pace.id === buildPace)?.label;
 
   return (
     <FieldSet>
@@ -168,13 +162,10 @@ export function WeekMixFields<T extends TrainingFormInput>({
       <p className="text-sm font-medium">
         {`${rangeLabel(minSessions, maxSessions, "session")} → ${plural(keys, "key session")} · ${rangeLabel(easy.min, easy.max, "easy session")}`}
       </p>
-      {keys > 0 && main && paceLabel ? (
+      {keys > 0 ? (
         <FieldDescription>
-          {paceLabel}: {main} every week
-          {keys > 1 && rotating.length
-            ? `, plus ${keys - 1} from ${rotating.join(" and ")}, rotating week to week`
-            : ""}
-          . Reps and length follow your fitness, and key sessions pause when form is very low.
+          Your season phase picks the key session types, and the weeks before a race may hold fewer.
+          Reps and length follow your fitness, and key sessions pause when form is very low.
         </FieldDescription>
       ) : keys === 0 && keyShare === 0 ? (
         <FieldDescription>All easy: no intervals or time in zone this week.</FieldDescription>

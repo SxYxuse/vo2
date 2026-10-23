@@ -8,53 +8,8 @@ import { buildPmc, dayKey, periodStartMs, type FitnessLoad } from "./training-lo
 
 export { dayKey };
 
-export const BUILD_PACES = [
-  {
-    id: "hold",
-    label: "Hold",
-    hint: "Keep fitness about where it is and stay fresher.",
-    ramp: 0,
-    risk: "Low fatigue",
-  },
-  {
-    id: "slow",
-    label: "Build slowly",
-    hint: "Gentle fitness rise you can hold for months.",
-    ramp: 3,
-    risk: "Sustainable",
-  },
-  {
-    id: "steady",
-    label: "Build steadily",
-    hint: "Normal progression. Some fatigue is expected.",
-    ramp: 5,
-    risk: "Normal load",
-  },
-  {
-    id: "fast",
-    label: "Build fast",
-    hint: "Aggressive. Form will sit negative more often.",
-    ramp: 8,
-    risk: "High fatigue",
-  },
-  {
-    id: "overreach",
-    label: "Overreach",
-    hint: "Very fast fitness jump. Dangerous if it lasts — short blocks only.",
-    ramp: 12,
-    risk: "Injury risk",
-  },
-] as const;
-
-export type BuildPace = (typeof BUILD_PACES)[number]["id"];
-
-export const HOURS_INTENTS = [
-  { id: "lower", label: "Cut back", factor: 0.85 },
-  { id: "keep", label: "Keep this volume", factor: 1 },
-  { id: "higher", label: "Add hours", factor: 1.15 },
-] as const;
-
-export type HoursIntent = (typeof HOURS_INTENTS)[number]["id"];
+/** Which key session types lead a week; the season phase picks one (ADR 0021). */
+export type BuildPace = "hold" | "slow" | "steady" | "fast" | "overreach";
 
 export const HR_TARGET_ZONES = ["z2", "z3", "z4", "z5"] as const;
 export type TargetZone = (typeof HR_TARGET_ZONES)[number];
@@ -254,22 +209,20 @@ export const WEEKDAYS = [
 export const TARGET_MODES = [
   {
     id: "auto",
-    label: "From build pace",
-    hint: "VO2 sets the hours each week from your fitness and build pace.",
+    label: "From my goals",
+    hint: "VO2 sets the hours each week from your fitness and where your season is.",
   },
   {
     id: "manual",
-    label: "Fixed hours",
-    hint: "You pick the hours. Load still follows your build pace.",
+    label: "Cap my hours",
+    hint: "The same, but never more than the hours you have each week.",
   },
 ] as const;
 
 export type TargetMode = (typeof TARGET_MODES)[number]["id"];
 
 export const trainingPlanSchema = z.object({
-  buildPace: z.enum(["hold", "slow", "steady", "fast", "overreach"]),
   targetMode: z.enum(["auto", "manual"]).default("auto"),
-  hoursIntent: z.enum(["lower", "keep", "higher"]),
   weekMix: weekMixSchema.default(DEFAULT_WEEK_MIX),
   /** The athlete's own sport for a key session, by session id (ids start with their week). */
   keySessionSports: z.record(z.string(), z.enum(["cycling", "running"])).default({}),
@@ -321,13 +274,13 @@ export function isTrainingPlanComplete(value: unknown): value is TrainingPlan {
   return parseTrainingPlan(value) != null;
 }
 
-export function suggestedTargetHours(avgWeeklyHours: number, intent: HoursIntent) {
-  const factor = HOURS_INTENTS.find((item) => item.id === intent)?.factor ?? 1;
+/** Starting hours: the last 3 months' average, or 5 without history. */
+export function suggestedTargetHours(avgWeeklyHours: number) {
   const base = avgWeeklyHours > 0.5 ? avgWeeklyHours : 5;
-  return Math.round(base * factor * 10) / 10;
+  return Math.round(base * 10) / 10;
 }
 
-/** Last-3-month average below this is not a usable hours-intent baseline. */
+/** Last-3-month average below this is not a usable baseline. */
 const THIN_WEEKLY_HOURS = 0.2;
 
 export function hasRecentWeeklyHours(avgHours: number) {

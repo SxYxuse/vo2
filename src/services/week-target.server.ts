@@ -18,6 +18,8 @@ import {
 } from "./heart-rate.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { goalsFor } from "./season.server.ts";
+import { seasonPhase } from "./season-phase.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
@@ -50,6 +52,7 @@ function emptyWeek(signedIn: boolean, timeZone: string): WeekTargetData {
     fitness: { ctl: 0, atl: 0 },
     collectors: { running: NO_COLLECTORS, cycling: NO_COLLECTORS },
     anchors: NO_ANCHORS,
+    season: seasonPhase([], weekStartKey(now, timeZone)),
   };
 }
 
@@ -85,7 +88,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
   const weekEnd = addDayKey(weekStart, 6);
   const historyStart = addDayKey(weekStart, -7 * HISTORY_WEEKS);
 
-  const [rows, settings, metricsRows] = await Promise.all([
+  const [rows, settings, metricsRows, goals] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -111,6 +114,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
+    goalsFor(userId),
   ]);
 
   const pmc = buildPmc(
@@ -229,6 +233,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
     plan,
     today,
     weekStart,
+    season: seasonPhase(goals, weekStart),
     activities: weekActivities,
     history: [...history.values()],
     weekStartFitness: beforeWeek

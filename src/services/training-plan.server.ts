@@ -20,7 +20,6 @@ export const getTrainingPlanForUser = cache(
 export async function saveTrainingPlanForUser(userId: string, plan: TrainingPlan) {
   logger.info("training_plan.saved", {
     targetWeeklyHours: plan.targetWeeklyHours,
-    buildPace: plan.buildPace,
     targetMode: plan.targetMode,
     weekMix: plan.weekMix,
   });

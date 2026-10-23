@@ -44,7 +44,7 @@ _Avoid_: Disabled sport, filtered sport, sport selection
 
 **Pace**:
 Time to cover a fixed distance. Running and walking use minutes per kilometre; swimming uses minutes per 100 metres.
-_Avoid_: Speed, build pace
+_Avoid_: Speed
 
 **Speed**:
 Distance covered per time, in km/h. Used for cycling and for sport types that are not running, walking, or swimming.
@@ -65,23 +65,35 @@ _Avoid_: Cache, mirror
 ## Planning
 
 **Training plan**:
-The athlete's standing choices for a week: build pace, how the week target is set, rest day, and key sessions.
+The athlete's standing choices for a week: whether the week target is capped at the hours they have, the week mix, rest day, and key session sports.
 _Avoid_: Program, schedule, calendar
 
-**Build pace**:
-How aggressively fitness should rise this block: hold, slow, steady, fast, or overreach.
-_Avoid_: Intensity, ramp rate, Pace (time per distance)
+**Goal**:
+A race or event on the athlete's season: name, sport type, date, distance, elevation gain, and objective. Goals on the same date are one event (a triathlon entered as swim, ride, and run).
+_Avoid_: Target (that is the week's hours), race (not every goal is one)
 
-**Hours intent**:
-Whether fixed weekly hours should cut, keep, or add volume relative to recent weeks.
-_Avoid_: Volume target (the numeric hours live on the training plan)
+**Objective**:
+What the athlete wants from a goal: finish, finish well, or perform. It sets how fast fitness rises and how much of the week is key sessions.
+_Avoid_: Priority, ambition
+
+**Season**:
+The athlete's goals in date order. The plan works toward the next one.
+_Avoid_: Calendar, year, block
+
+**Main goal**:
+The goal the plan peaks and fully tapers for among goals less than 4 weeks apart. The athlete picks it; until then it is the longest. The others get a short taper.
+_Avoid_: A race, priority race
+
+**Phase**:
+Where the week sits on the way to the next goal, read at the start of Monday: base, build (or maintain when the last goal was close), peak, taper, race week, recovery, or hold without a goal. It sets the ramp, the key session types, and the sport split (ADR 0021).
+_Avoid_: Build pace, block, training phase (that is read from fitness)
 
 **Week mix**:
 A range of sessions the athlete does a week, and what share of them are key sessions (for example 4–6 sessions at 25 / 75: one key, three to five easy). Key sessions come from the low end of the range; the number of easy sessions settles within it as the week goes. The athlete sets the mix, seeded from their last 3 months; VO2 builds the sessions.
 _Avoid_: Workout style, polarized split, session caps
 
 **Key session**:
-A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the build pace (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
+A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
@@ -93,8 +105,8 @@ Monday through Sunday in the athlete's timezone. The week target is scoped to th
 _Avoid_: Microcycle, calendar week
 
 **Week target**:
-The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the build pace, or fixed by the athlete. Every activity counts toward it.
-_Avoid_: Bucket, quota, goal (too vague)
+The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase, and capped at the hours the athlete has when they choose. Every activity counts toward it.
+_Avoid_: Bucket, quota, goal (that is a race or event)
 
 **Time left**:
 Week target minus the time already done this week. Split into key sessions still open and easy time, and by sport family.
