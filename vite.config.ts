@@ -1,4 +1,4 @@
-import { defineConfig, lazyPlugins } from "vite-plus";
+import { defineConfig, lazyPlugins, loadEnv } from "vite-plus";
 import { devtools } from "@tanstack/devtools-vite";
 
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -46,13 +46,18 @@ const config = defineConfig({
     ],
   },
   resolve: { tsconfigPaths: true },
+  server: {
+    // BETTER_AUTH_URL names this port, so sliding onto another one would break sign-in.
+    port: Number(loadEnv("development", process.cwd(), "PORT").PORT) || 3000,
+    strictPort: true,
+  },
   build: {
     // MapLibre alone is about 1 MB minified and loads only with the map page; every other
     // chunk stays well under the 500 kB default.
     chunkSizeWarningLimit: 1100,
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
   },
   plugins: isTest
     ? []

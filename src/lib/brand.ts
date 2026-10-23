@@ -1,4 +1,4 @@
-/** User-facing product name. Local DB/auth identifiers stay `vo` so existing setups keep working. */
+/** User-facing product name. */
 export const APP_NAME = "VO2";
 
 export type AppChrome = {

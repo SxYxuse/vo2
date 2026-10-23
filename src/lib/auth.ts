@@ -62,7 +62,7 @@ export const auth = betterAuth({
             return {
               id: String(athlete.id),
               name,
-              email: `strava-${athlete.id}@users.vo.local`,
+              email: `strava-${athlete.id}@users.vo2.local`,
               image: athlete.profile || athlete.profile_medium || undefined,
               emailVerified: false,
             };
