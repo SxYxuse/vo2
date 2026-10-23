@@ -188,7 +188,7 @@ function CelebrationContent({
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
 
-      <div className="flex items-center justify-center gap-2 px-4">
+      <div className="flex items-center justify-center gap-2 px-4 py-3">
         {isDesktop && count > 1 ? (
           <Button
             variant="ghost"
