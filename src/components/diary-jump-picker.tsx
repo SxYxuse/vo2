@@ -36,7 +36,7 @@ type DiaryJumpPickerProps = {
   onPickWeek: (week: string) => void;
 };
 
-/** Year → month (→ training week) picker behind the calendar's date label (ADR 0021). */
+/** Year → month (→ training week) picker behind the calendar's date label (ADR 0022). */
 export function DiaryJumpPicker({
   open,
   onOpenChange,
