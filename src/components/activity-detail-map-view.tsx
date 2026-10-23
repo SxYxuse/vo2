@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { Feature, LineString } from "geojson";
 
-import { boundsOf, type ActivityMapTrace } from "@/services/activity-map.types.ts";
+import { boundsOf, type ActivityMapTrace, type LngLat } from "@/services/activity-map.types.ts";
 import {
   Map as MapView,
   MapControls,
@@ -23,33 +23,44 @@ type ActivityDetailMapViewProps = {
   onFail: () => void;
 };
 
-function FitTrace({ trace, padding }: { trace: ActivityMapTrace; padding: number }) {
+function FitTrace({ bounds, padding }: { bounds: [LngLat, LngLat]; padding: number }) {
   const { map, isLoaded } = useMap();
-  const latest = useRef(trace);
-  latest.current = trace;
+  const latest = useRef(bounds);
+  latest.current = bounds;
 
   useEffect(() => {
     if (!isLoaded || !map) return;
-    const viewport = boundsOf(latest.current.coordinates);
-    if (viewport?.bounds) map.fitBounds(viewport.bounds, { padding, maxZoom: 15, duration: 0 });
+    map.fitBounds(latest.current, { padding, maxZoom: 15, duration: 0 });
   }, [isLoaded, map, padding]);
 
   return null;
 }
 
-/** Hands over to the plain outline when the basemap can't load (offline, weak signal). */
+// A stalled worker or style request fires no error, so give up on the basemap after this long.
+const FIRST_LOAD_TIMEOUT_MS = 10_000;
+
+/**
+ * Hands over to the plain outline when the basemap can't load (offline, weak signal). Only the
+ * first load counts: a tile failing later, mid-pan, keeps the map.
+ */
 function FailBeforeLoad({ onFail }: { onFail: () => void }) {
   const { map } = useMap();
 
   useEffect(() => {
-    if (!map) return;
-    const handleError = () => {
-      if (!map.loaded()) onFail();
-    };
-    map.on("error", handleError);
-    return () => {
+    if (!map || map.loaded()) return;
+    const timeout = window.setTimeout(onFail, FIRST_LOAD_TIMEOUT_MS);
+    const stop = () => {
+      window.clearTimeout(timeout);
+      map.off("load", stop);
       map.off("error", handleError);
     };
+    const handleError = () => {
+      stop();
+      onFail();
+    };
+    map.on("load", stop);
+    map.on("error", handleError);
+    return stop;
   }, [map, onFail]);
 
   return null;
@@ -82,7 +93,9 @@ export function ActivityDetailMapView({
       touchPitch={false}
     >
       <FailBeforeLoad onFail={onFail} />
-      <FitTrace trace={trace} padding={interactive ? 56 : 24} />
+      {viewport.bounds ? (
+        <FitTrace bounds={viewport.bounds} padding={interactive ? 56 : 24} />
+      ) : null}
       <MapGeoJSON
         data={{ type: "FeatureCollection", features: [line] }}
         fillPaint={false}

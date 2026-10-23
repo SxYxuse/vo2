@@ -31,7 +31,7 @@ The time-series recording attached to an activity (position, heart rate, power, 
 _Avoid_: Telemetry, samples, GPS track
 
 **Activity map**:
-The map showing where an activity happened, drawn from Strava's outline of its path. Activities with no outline, such as indoor sessions, have none.
+The map of one activity, showing where it happened, drawn from Strava's outline of its path. Activities without an outline, such as most indoor sessions, have none. Not the map of all activities.
 _Avoid_: Route (that is an uploaded GPX), GPS track
 
 **Sport type**:

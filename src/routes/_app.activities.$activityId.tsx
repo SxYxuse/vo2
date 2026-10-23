@@ -1,5 +1,4 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { useRef } from "react";
 import { createFileRoute, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 
 import {
@@ -44,7 +43,6 @@ function ActivityPage() {
   const diary = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
-  const openedHere = useRef(false);
   const { data: detail } = useSuspenseQuery(activityDetailQueryOptions(activityId));
   const settingsQuery = useQuery(settingsSnapshotQueryOptions);
 
@@ -54,14 +52,17 @@ function ActivityPage() {
 
   const onMapOpenChange = (open: boolean) => {
     if (open) {
-      openedHere.current = true;
-      void navigate({ search: (prev) => ({ ...prev, map: true }), resetScroll: false });
+      void navigate({
+        search: (prev) => ({ ...prev, map: true }),
+        state: (prev) => ({ ...prev, activityMapPushed: true }),
+        resetScroll: false,
+      });
       return;
     }
-    // Pop the entry the tap pushed, so back from the activity still leaves it. A map opened
+    // Pop the entry the tap pushed, so back from the activity still leaves it. The mark lives in
+    // history state, so it survives the app being reloaded with the map open; a map opened
     // straight from a link has no such entry to pop.
-    if (openedHere.current) {
-      openedHere.current = false;
+    if (router.state.location.state.activityMapPushed) {
       router.history.back();
       return;
     }
