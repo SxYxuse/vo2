@@ -12,10 +12,12 @@ import {
 } from "./training-plan.types.ts";
 import {
   assignKeySports,
+  capRunShare,
   customSplit,
   estimatedHardMinutes,
   generateKeySessions,
   keySessionRecommendation,
+  matchKeySessions,
   minutesByZone,
   sessionSteps,
   projectWeek,
@@ -30,6 +32,7 @@ import {
   type WeekTargetData,
 } from "./week-target.ts";
 import { seasonPhase, type SeasonPhase } from "./season-phase.ts";
+import type { Goal } from "./season.types.ts";
 
 const WEEK_START = "2026-10-19";
 const WEDNESDAY = "2026-10-21";
@@ -191,7 +194,10 @@ describe("summarizeWeek", () => {
     ];
     const summary = summarizeWeek(week({ history: mostlyRides }));
     expect(summary.bySport.cycling.left).toBeGreaterThan(summary.bySport.running.left);
-    expect(summary.bySport.cycling.left + summary.bySport.running.left).toBeCloseTo(480, -1);
+    expect(summary.bySport.cycling.left + summary.bySport.running.left).toBeCloseTo(
+      summary.target.minutes,
+      -1,
+    );
   });
 
   it("splits time left into key sessions and easy time", () => {
@@ -361,13 +367,17 @@ describe("recommendToday", () => {
 });
 
 describe("projectWeek", () => {
-  it("flags a week far above the last four weeks", () => {
+  it("flags a week the athlete pushed far above the last four weeks", () => {
     const light = history([0, 30, 0, 30, 0, 60, 0]);
     const data = week({ history: light });
     const projection = projectWeek(data, summarizeWeek(data));
     expect(projection.recentAverageLoad).toBe(96);
-    expect(projection.warn).toBe(true);
+    // VO2's own target never jumps like that.
+    expect(projection.warn).toBe(false);
     expect(projection.fitnessSunday).toBeGreaterThan(projection.fitnessNow);
+
+    const pushed = week({ history: light, activities: [activity({ minutes: 600, load: 700 })] });
+    expect(projectWeek(pushed, summarizeWeek(pushed)).warn).toBe(true);
   });
 
   it("does not warn without recent weeks to compare", () => {
@@ -594,15 +604,42 @@ describe("generateKeySessions", () => {
     expect(keySessionName(high)).toBe("4 × 10 min Z4");
   });
 
-  it("keeps key sessions under 60% of a small week, dropping the long one first", () => {
+  it("keeps key sessions under 60% of a small week, dropping intervals before the long one", () => {
     const sessions = generateKeySessions({
       ...base,
       targetMinutes: 180,
       weekMix: { minSessions: 3, maxSessions: 3, keyShare: 100, doubleDays: 0 },
       season: { rotation: "steady", maxKeySessions: null },
     });
-    expect(sessions.map((session) => session.kind)).not.toContain("long");
-    expect(sessions.length).toBe(1);
+    expect(sessions.map((session) => session.kind)).toEqual(["long"]);
+  });
+
+  it("shortens the long session rather than dropping it", () => {
+    const sessions = generateKeySessions({
+      ...base,
+      targetMinutes: 150,
+      weekMix: { minSessions: 2, maxSessions: 2, keyShare: 100, doubleDays: 0 },
+      season: {
+        rotation: "slow",
+        maxKeySessions: null,
+        kind: "base",
+        sessions: { longMinutes: 180 },
+      },
+    });
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({ kind: "long", workMinutes: 90 });
+  });
+
+  it("toward a goal the long session leads in base and comes second from build on", () => {
+    const toward = (kind: SeasonPhase["kind"]) =>
+      generateKeySessions({
+        ...base,
+        targetMinutes: 900,
+        weekMix: { minSessions: 3, maxSessions: 3, keyShare: 70, doubleDays: 0 },
+        season: { rotation: "fast", maxKeySessions: null, kind, sessions: { longMinutes: 150 } },
+      }).map((session) => session.kind);
+    expect(toward("base")[0]).toBe("long");
+    expect(toward("build")[1]).toBe("long");
   });
 });
 
@@ -818,8 +855,9 @@ describe("session range", () => {
     const monday = summarizeWeek(week({ plan, today: WEEK_START }));
     // 6 training days (Sunday rest), one taken by the key session: 5 easy, within 3–6.
     expect(monday.easy).toMatchObject({ min: 3, max: 6, planned: 5, done: 0 });
+    // Saturday: one training day left and the key session takes it. No crammed easy sessions.
     const saturday = summarizeWeek(week({ plan, today: "2026-10-24" }));
-    expect(saturday.easy.planned).toBe(3);
+    expect(saturday.easy.planned).toBe(0);
   });
 
   it("reads the usual range from the last 3 months of activities", () => {
@@ -910,5 +948,88 @@ describe("splitting today's time", () => {
     expect(customSplit({ ...choice, sports: [...choice.sports], split: [30, 60] })).toEqual([
       30, 60,
     ]);
+  });
+});
+
+describe("guardrails (ADR 0024)", () => {
+  const goal = (date: string, overrides: Partial<Goal> = {}): Goal => ({
+    id: "g",
+    name: "Valencia Marathon",
+    sportType: "Run",
+    date,
+    distanceM: 42_195,
+    elevationGainM: null,
+    objective: "perform",
+    priority: "A",
+    ...overrides,
+  });
+
+  it("holds running to recent running plus 15 %, moving the rest to riding", () => {
+    const rides = history([60, 0, 60, 0, 0, 120, 0]);
+    const runs = history([0, 30, 0, 30, 0, 0, 0], "running");
+    const { shares, runCapped } = capRunShare(
+      { running: 0.7, cycling: 0.3, other: 0 },
+      [...rides, ...runs],
+      600,
+    );
+    expect(runCapped).toBe(true);
+    expect(shares.running * 600).toBeCloseTo(69);
+    expect(shares.running + shares.cycling).toBeCloseTo(1);
+    expect(
+      capRunShare({ running: 0.1, cycling: 0.9, other: 0 }, [...rides, ...runs], 600).runCapped,
+    ).toBe(false);
+  });
+
+  it("the day before an A goal is an opener, and its day is the race", () => {
+    const season = seasonPhase([goal("2026-10-25")], WEEK_START);
+    const saturday = week({ season, today: "2026-10-24" });
+    const opener = recommendToday(saturday, summarizeWeek(saturday), auto(90));
+    expect(opener.kind).toBe("key");
+    expect(keySessionName(opener.keySession!)).toBe("3 × 1 min Z5");
+    expect(opener.parts[0]).toMatchObject({ sport: "running" });
+
+    const sunday = week({ season, today: "2026-10-25" });
+    expect(recommendToday(sunday, summarizeWeek(sunday), auto(90))).toMatchObject({
+      kind: "race",
+      title: "Race day",
+    });
+    // The athlete's own choice still wins.
+    expect(recommendToday(sunday, summarizeWeek(sunday), { ...auto(60), feel: "easy" }).kind).toBe(
+      "easy",
+    );
+  });
+
+  it("a goal's long session only counts on the goal's sport", () => {
+    const long = {
+      ...generateKeySessions({
+        weekStart: WEEK_START,
+        ctl: 50,
+        targetMinutes: 600,
+        weekMix: { minSessions: 1, maxSessions: 1, keyShare: 100, doubleDays: 0 },
+        season: {
+          rotation: "hold",
+          maxKeySessions: null,
+          kind: "base",
+          sessions: { longMinutes: 120 },
+        },
+      })[0]!,
+      sport: "running" as const,
+      suggestedSport: "running" as const,
+      sportPinned: false,
+    };
+    const ride = activity({ id: "ride", minutes: 180 });
+    const run = activity({ id: "run", sportType: "Run", family: "running", minutes: 130 });
+    expect(matchKeySessions([long], [ride], "running")[0]!.done).toBeNull();
+    expect(matchKeySessions([long], [ride, run], "running")[0]!.done?.id).toBe("run");
+  });
+
+  it("going well past a taper target is over, not done", () => {
+    const season = seasonPhase([goal("2026-11-01")], WEEK_START);
+    expect(season.kind).toBe("taper");
+    const big = week({
+      season,
+      activities: [activity({ id: "x", minutes: 900, load: 600, date: "2026-10-20" })],
+    });
+    expect(summarizeWeek(big).pace.status).toBe("over");
   });
 });

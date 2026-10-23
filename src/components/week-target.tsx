@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import {
@@ -18,9 +18,23 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 
-import { settingsSnapshotQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
-import { PHASES, type SeasonPhase } from "@/services/season-phase.ts";
-import { daysBetween, formatDaysLeft } from "@/services/season.types.ts";
+import {
+  seasonQueryOptions,
+  settingsSnapshotQueryOptions,
+  weekCoachQueryOptions,
+  weekTargetQueryOptions,
+} from "@/lib/queries.ts";
+import { LIGHTER_HINT, PHASES, type SeasonPhase } from "@/services/season-phase.ts";
+import {
+  daysBetween,
+  eventPriority,
+  eventTitle,
+  formatDaysLeft,
+  type SeasonData,
+} from "@/services/season.types.ts";
+import { planRecommendation, type PlannedDay } from "@/services/week-plan.ts";
+import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
+import { CoachCard, useReplanWhenStale } from "@/components/week-coach.tsx";
 import {
   addDayKey,
   formatHours,
@@ -84,6 +98,7 @@ const STATUS_BADGE: Record<
   { label: string; variant: "success" | "info" | "warning" | "outline" }
 > = {
   done: { label: "Target met", variant: "success" },
+  over: { label: "Past the taper", variant: "warning" },
   ahead: { label: "Ahead", variant: "success" },
   "on-track": { label: "On track", variant: "info" },
   behind: { label: "Behind", variant: "warning" },
@@ -110,11 +125,21 @@ function minutesLabel(minutes: number) {
 
 function targetSourceLabel(summary: WeekSummary, season: SeasonPhase) {
   const phase = PHASES[season.kind].label.toLowerCase();
-  if (summary.target.source === "auto") return `Set from your fitness and the ${phase} phase.`;
-  if (summary.target.source === "no-history") {
-    return "Starting hours until VO2 has enough history to set it from your fitness.";
+  const lighter = season.lighter
+    ? " A lighter week: 70 % of your usual load, one key session."
+    : "";
+  switch (summary.target.source) {
+    case "auto":
+      return `Set from your fitness and the ${phase} phase.${lighter}`;
+    case "ramp-cap":
+      return `The ${phase} phase asks for more, but VO2 keeps you within 10 % of your last four weeks.`;
+    case "form":
+      return `Eased off: form is low, so the ${phase} phase holds instead of building.`;
+    case "no-history":
+      return "Starting hours until VO2 has enough history to set it from your fitness.";
+    default:
+      return `Capped at the hours you have; the ${phase} phase asks for more.`;
   }
-  return `Capped at the hours you have; the ${phase} phase asks for more.`;
 }
 
 function Stat({
@@ -142,7 +167,7 @@ function TargetCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary
   const status = STATUS_BADGE[pace.status];
 
   return (
-    <Card className="md:col-span-2">
+    <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           Week target
@@ -167,7 +192,7 @@ function TargetCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary
             <div
               className={cn(
                 "h-full rounded-full transition-all",
-                pace.status === "behind" ? "bg-warning" : "bg-success",
+                pace.status === "behind" || pace.status === "over" ? "bg-warning" : "bg-success",
               )}
               style={{ width: `${filled * 100}%` }}
             />
@@ -336,7 +361,14 @@ function keySportHint(status: KeySessionStatus) {
   return status.sportPinned ? `Your pick · VO2 suggests a ${suggested}` : "VO2’s pick";
 }
 
-function WeekMixCard({ summary }: { summary: WeekSummary }) {
+function WeekMixCard({
+  summary,
+  plannedIds,
+}: {
+  summary: WeekSummary;
+  /** Key sessions the day plan placed; null while there is no plan. */
+  plannedIds: Set<string> | null;
+}) {
   const { keySessions, easy, paused } = summary;
   const doneCount = keySessions.filter((status) => status.done).length;
   const keyCount = keySessions.filter((status) => !status.skipped).length;
@@ -355,7 +387,7 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
         </CardTitle>
         <CardDescription>
           {keyCount
-            ? `This week: ${keyCount} key ${keyCount === 1 ? "session" : "sessions"} and ${easyCount} easy ones. A key session counts once any ride or run spends enough time in its zone. Pick the sport you plan it on.`
+            ? `This week: ${keyCount} key ${keyCount === 1 ? "session" : "sessions"} and ${easyCount} easy ones. Intervals count on any sport once enough time is in their zone; a goal's long session counts on its own sport. Pick the sport you plan each on.`
             : `This week: ${easyCount} easy sessions.`}
         </CardDescription>
       </CardHeader>
@@ -379,7 +411,13 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                   key={status.session.id}
                   variant={done ? "muted" : "outline"}
                   size="sm"
-                  className={cn((paused || status.skipped) && !done && "opacity-50")}
+                  className={cn(
+                    (paused ||
+                      status.skipped ||
+                      (plannedIds != null && !plannedIds.has(status.session.id))) &&
+                      !done &&
+                      "opacity-50",
+                  )}
                 >
                   <ItemMedia variant="icon">
                     {done ? (
@@ -409,6 +447,8 @@ function WeekMixCard({ summary }: { summary: WeekSummary }) {
                         </Link>
                       ) : status.skipped ? (
                         "Dropped: not enough days left. Its time moved to easy."
+                      ) : plannedIds && !plannedIds.has(status.session.id) ? (
+                        "Not in this week’s plan: it doesn’t fit the time left."
                       ) : (
                         keySportHint(status)
                       )}
@@ -490,6 +530,9 @@ function SplitCard({ summary, season }: { summary: WeekSummary; season: SeasonPh
           {season.goalWeight > 0
             ? `Split from your last ${HISTORY_WEEKS} weeks, leaning toward your goals’ sports.`
             : `Split from your last ${HISTORY_WEEKS} weeks.`}
+          {summary.runCapped
+            ? " Running is held to your recent running plus 15 %, so impact grows slowly."
+            : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -499,7 +542,7 @@ function SplitCard({ summary, season }: { summary: WeekSummary; season: SeasonPh
             return (
               <SplitBar
                 key={family}
-                label={style.label}
+                label={family === "other" ? "Other sports" : style.label}
                 icon={style.icon}
                 iconClass={style.text}
                 barClass={style.bar}
@@ -737,24 +780,39 @@ function TodayDoneList({ activities }: { activities: WeekActivity[] }) {
   );
 }
 
-function TodayCard({ data, summary }: { data: PlannedWeek; summary: WeekSummary }) {
+function TodayCard({
+  data,
+  summary,
+  planned,
+}: {
+  data: PlannedWeek;
+  summary: WeekSummary;
+  planned: PlannedDay | null;
+}) {
   const [choice, setChoice] = useTodayChoice(data.today, {
     available: defaultWindow(summary),
     sports: ["any"],
     feel: "auto",
   });
-  const pick = useMemo(() => recommendToday(data, summary, choice), [data, summary, choice]);
+  // Until the athlete says otherwise, today follows the day plan.
+  const fromPlan = useMemo(
+    () => (planned && !isTodayComplete(data) ? planRecommendation(data, summary, planned) : null),
+    [data, summary, planned],
+  );
   const vo2Pick = useMemo(
-    () => recommendToday(data, summary, { ...choice, sports: ["any"], feel: "auto" }),
-    [data, summary, choice],
+    () => fromPlan ?? recommendToday(data, summary, { ...choice, sports: ["any"], feel: "auto" }),
+    [fromPlan, data, summary, choice],
+  );
+  const pick = useMemo(
+    () => (isDefaultChoice(choice) ? vo2Pick : recommendToday(data, summary, choice)),
+    [vo2Pick, data, summary, choice],
   );
   const steps = useMemo(() => sessionSteps(pick, data), [pick, data]);
   const doneToday = todayActivities(data);
   const complete = isTodayComplete(data);
   const overridden = !isDefaultChoice(choice) && vo2Pick.title !== pick.title;
   const style = FAMILY_STYLE[pick.family];
-  const Icon = pick.kind === "rest" ? MoonIcon : style.icon;
-
+  const Icon = pick.kind === "rest" ? MoonIcon : pick.kind === "race" ? FlagIcon : style.icon;
   const planner = (
     <>
       <ChoiceToggle
@@ -952,9 +1010,9 @@ function ProjectionCard({ data, summary }: { data: PlannedWeek; summary: WeekSum
             <TriangleAlertIcon />
             <AlertTitle>Big jump in load</AlertTitle>
             <AlertDescription>
-              This week would be {rampPct}% above your last 4-week average of{" "}
-              {projection.recentAverageLoad}. Jumps over 30% raise injury risk. Consider capping
-              your hours in Settings, or a less demanding objective on your next goal.
+              What you have done this week is already {rampPct}% above your last 4-week average of{" "}
+              {projection.recentAverageLoad}. Jumps over 30% raise injury risk: keep the rest of the
+              week easy.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -1008,44 +1066,53 @@ function DoneCard({ data }: { data: PlannedWeek }) {
   );
 }
 
-/** Where the season puts this week, and how far the goal is. Opens the Season page. */
-function SeasonCard({ data }: { data: PlannedWeek }) {
-  const { season, today } = data;
-  const phase = PHASES[season.kind];
-  const anchorDate = season.anchor[0]?.date;
-  const names = season.anchor.map((goal) => goal.name).join(" + ");
-  const headline =
-    season.kind === "hold"
-      ? "No goal ahead"
-      : season.kind === "recovery" && anchorDate && anchorDate < today
-        ? `After ${names}`
-        : anchorDate
-          ? `${formatDaysLeft(daysBetween(today, anchorDate))} · ${names}`
-          : phase.label;
-  const tuneUp = season.tuneUp.length
-    ? `Tune-up this week: ${season.tuneUp.map((goal) => goal.name).join(" + ")}, with a short taper.`
-    : null;
+/** Where the season puts this week, what comes next, and the next goals. Opens the Season page. */
+function SeasonStrip({ data, season }: { data: PlannedWeek; season: SeasonData | undefined }) {
+  const phase = data.season;
+  const outlook = season ? phaseOutlook(season.map) : null;
+  const next = season?.upcoming.filter((event) => eventPriority(event) !== "C").slice(0, 2) ?? [];
+  const hint =
+    phase.kind === "hold"
+      ? "No goal ahead: the plan holds your fitness. Add a race or event to build toward it."
+      : phase.tuneUp.length
+        ? `B race this week: ${phase.tuneUp.map((goal) => goal.name).join(" + ")}, with a few lighter days before it.`
+        : phase.trainThrough.length
+          ? `C race this week: ${phase.trainThrough.map((goal) => goal.name).join(" + ")}. Race it as a hard session.`
+          : phase.lighter
+            ? LIGHTER_HINT
+            : PHASES[phase.kind].hint;
 
   return (
     <Card className="py-0 md:col-span-2">
       <Link
         to="/season"
         preload="intent"
-        className="hover:bg-muted/50 flex min-h-14 items-center gap-3 px-4 py-3"
+        className="hover:bg-muted/50 flex flex-col gap-2.5 px-4 py-3"
       >
-        <FlagIcon aria-hidden className="text-muted-foreground size-5 shrink-0" />
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex flex-wrap items-center gap-2">
-            <Badge variant={season.kind === "hold" ? "outline" : "secondary"}>{phase.label}</Badge>
-            <span className="truncate text-sm font-medium">{headline}</span>
+        <span className="flex items-center gap-2">
+          <PhaseBadge kind={phase.kind} lighter={phase.lighter} />
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{outlook}</span>
+          <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+        </span>
+        {season?.map.length ? (
+          <SeasonMap weeks={season.map} events={season.upcoming} compact />
+        ) : null}
+        {next.length ? (
+          <span className="flex flex-col gap-1">
+            {next.map((event) => {
+              return (
+                <span key={event.date} className="flex items-center gap-2 text-sm">
+                  <PriorityBadge priority={eventPriority(event)} />
+                  <span className="min-w-0 flex-1 truncate font-medium">{eventTitle(event)}</span>
+                  <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                    {formatDaysLeft(daysBetween(data.today, event.date))}
+                  </span>
+                </span>
+              );
+            })}
           </span>
-          <span className="text-muted-foreground text-xs">
-            {season.kind === "hold"
-              ? "The plan holds your fitness. Add a race or event to build toward it."
-              : (tuneUp ?? phase.hint)}
-          </span>
-        </div>
-        <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+        ) : null}
+        <span className="text-muted-foreground text-xs">{hint}</span>
       </Link>
     </Card>
   );
@@ -1053,12 +1120,34 @@ function SeasonCard({ data }: { data: PlannedWeek }) {
 
 export function WeekTargetView({ data }: { data: PlannedWeek }) {
   const summary = useMemo(() => summarizeWeek(data), [data]);
+  const { data: season } = useQuery(seasonQueryOptions);
+  const { data: coach } = useQuery(weekCoachQueryOptions);
+  const replanning = useReplanWhenStale(coach);
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const plannedToday = coach?.plan?.days.find((day) => day.date === data.today) ?? null;
   return (
     <div className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-2">
-      <SeasonCard data={data} />
+      <SeasonStrip data={data} season={season} />
+      <TodayCard data={data} summary={summary} planned={plannedToday} />
       <TargetCard data={data} summary={summary} />
-      <TodayCard data={data} summary={summary} />
-      <WeekMixCard summary={summary} />
+      <CoachCard
+        data={data}
+        summary={summary}
+        coach={coach}
+        replanning={replanning}
+        pickedDay={pickedDay}
+        onPickDay={setPickedDay}
+      />
+      <WeekMixCard
+        summary={summary}
+        plannedIds={
+          coach?.plan
+            ? new Set(
+                coach.plan.days.flatMap((day) => (day.keySessionId ? [day.keySessionId] : [])),
+              )
+            : null
+        }
+      />
       <SplitCard summary={summary} season={data.season} />
       <ProjectionCard data={data} summary={summary} />
       <DoneCard data={data} />

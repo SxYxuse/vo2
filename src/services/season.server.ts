@@ -5,13 +5,16 @@ import { activities, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
+import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
-import { addDayKey, dayKey } from "./training-plan.types.ts";
+import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
+import { recentLoadPerHour } from "./week-target.ts";
 import {
+  LEG_SEPARATOR,
   goalSportTypes,
-  mainFlagsAfterPick,
-  normalizedMainFlags,
-  seasonClusters,
+  newGoals,
+  seasonEvents,
   type Goal,
   type GoalInput,
   type PastGoal,
@@ -26,30 +29,12 @@ const goalColumns = {
   distanceM: goals.distanceM,
   elevationGainM: goals.elevationGainM,
   objective: goals.objective,
-  main: goals.main,
+  priority: goals.priority,
 };
 
 export async function goalsFor(userId: string): Promise<Goal[]> {
   const rows = await db.select(goalColumns).from(goals).where(eq(goals.userId, userId));
   return rows as Goal[];
-}
-
-/** Writes the main flags that changed. */
-async function saveMainFlags(userId: string, current: Goal[], flags: Map<string, boolean>) {
-  const changed = current.filter((goal) => (flags.get(goal.id) ?? false) !== goal.main);
-  await Promise.all(
-    changed.map((goal) =>
-      db
-        .update(goals)
-        .set({ main: !goal.main, updatedAt: new Date() })
-        .where(and(eq(goals.id, goal.id), eq(goals.userId, userId))),
-    ),
-  );
-}
-
-async function normalizeMainFlags(userId: string) {
-  const current = await goalsFor(userId);
-  await saveMainFlags(userId, current, normalizedMainFlags(current));
 }
 
 /** Past goals (oldest first) with the longest activity of their sport type on their date. */
@@ -87,6 +72,46 @@ async function matchPastActivities(
   });
 }
 
+/** Fitness now and the last four weeks' loads, for the season map. */
+async function seasonContext(userId: string, timeZone: string, weekStart: string) {
+  const rows = await db
+    .select({
+      startDate: activities.startDate,
+      movingTime: activities.movingTime,
+      trainingLoad: activities.trainingLoad,
+      loadSource: activities.loadSource,
+    })
+    .from(activities)
+    .where(eq(activities.userId, userId));
+  const pmc = buildPmc(
+    rows.map((row) =>
+      toFitnessLoad(
+        row.startDate,
+        row.trainingLoad ?? 0,
+        row.loadSource ?? "duration",
+        row.movingTime,
+      ),
+    ),
+    timeZone,
+  );
+  const beforeWeek = [...pmc].reverse().find((point) => point.date < weekStart);
+  const days = rows.map((row) => ({
+    date: dayKey(row.startDate, timeZone),
+    family: "other" as const,
+    minutes: Math.round(row.movingTime / 60),
+    load: row.trainingLoad ?? 0,
+  }));
+  const weekLoads = weekLoadsBefore(days, weekStart);
+  const history = days.filter(
+    (day) => day.date < weekStart && day.date >= addDayKey(weekStart, -7 * 8),
+  );
+  return {
+    fitness: beforeWeek ? { ctl: beforeWeek.ctl, atl: beforeWeek.atl } : { ctl: 0, atl: 0 },
+    weekLoads,
+    loadPerHour: recentLoadPerHour(history),
+  };
+}
+
 export async function loadSeasonImpl(): Promise<SeasonData> {
   const session = await getOptionalSession();
   if (!session) {
@@ -96,6 +121,7 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
       today: dayKey(new Date(), "UTC"),
       upcoming: [],
       past: [],
+      map: [],
     };
   }
   const userId = session.user.id;
@@ -105,47 +131,123 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     getAthleteSettings(userId),
   ]);
   const timeZone = plan?.timeZone ?? "UTC";
-  const today = dayKey(new Date(), timeZone);
+  const now = new Date();
+  const today = dayKey(now, timeZone);
+  const weekStart = weekStartKey(now, timeZone);
   const past = all
     .filter((goal) => goal.date < today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
-  const matched = await matchPastActivities(userId, past, timeZone);
+  const upcoming = seasonEvents(all.filter((goal) => goal.date >= today));
+  const [matched, context] = await Promise.all([
+    matchPastActivities(userId, past, timeZone),
+    upcoming.length ? seasonContext(userId, timeZone, weekStart) : null,
+  ]);
+
+  let map: SeasonData["map"] = [];
+  if (context) {
+    const last = upcoming.at(-1)!.date;
+    map = projectSeason(context.fitness, all, weekStart, addDayKey(last, 7), context.weekLoads).map(
+      (week) => ({
+        weekStart: week.weekStart,
+        kind: week.phase.kind,
+        lighter: week.phase.lighter,
+        hours: Math.round((week.load / context.loadPerHour) * 10) / 10,
+      }),
+    );
+  }
+
   return {
     signedIn: true,
     sportTypes: goalSportTypes(settings.sportTypes),
     today,
-    upcoming: seasonClusters(all.filter((goal) => goal.date >= today)),
+    upcoming,
     past: matched.reverse(),
+    map,
   };
+}
+
+/** The legs of `goal`'s event: same date and same name before the leg separator. */
+function siblingsOf(goal: Goal, all: Goal[]) {
+  const base = goal.name.split(LEG_SEPARATOR)[0]!.trim();
+  return all.filter(
+    (other) =>
+      other.id !== goal.id &&
+      other.date === goal.date &&
+      other.name.split(LEG_SEPARATOR)[0]!.trim() === base,
+  );
 }
 
 export async function createGoalImpl(data: GoalInput) {
   const session = await getRequiredSession();
   const id = crypto.randomUUID();
   await db.insert(goals).values({ id, userId: session.user.id, ...data });
-  await normalizeMainFlags(session.user.id);
-  logger.info("goal.created", { sportType: data.sportType, objective: data.objective });
+  logger.info("goal.created", {
+    sportType: data.sportType,
+    objective: data.objective,
+    priority: data.priority,
+  });
   return { id };
+}
+
+/** Several sports on one date, such as a triathlon: one goal per leg, named "Event · Leg". */
+export async function createEventImpl(data: { legs: GoalInput[] }) {
+  const session = await getRequiredSession();
+  const ids = data.legs.map(() => crypto.randomUUID());
+  await db
+    .insert(goals)
+    .values(data.legs.map((leg, index) => ({ id: ids[index]!, userId: session.user.id, ...leg })));
+  logger.info("goal.event_created", { legs: data.legs.length });
+  return { ids };
 }
 
 export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }) {
   const session = await getRequiredSession();
+  const userId = session.user.id;
+  const all = await goalsFor(userId);
+  const current = all.find((goal) => goal.id === id);
+  if (!current) return;
   await db
     .update(goals)
     .set({ ...data, updatedAt: new Date() })
-    .where(and(eq(goals.id, id), eq(goals.userId, session.user.id)));
-  await normalizeMainFlags(session.user.id);
+    .where(and(eq(goals.id, id), eq(goals.userId, userId)));
+  // The legs of one event move, and matter, together.
+  const siblings = siblingsOf(current, all);
+  if (siblings.length) {
+    await db
+      .update(goals)
+      .set({
+        date: data.date,
+        priority: data.priority,
+        objective: data.objective,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(goals.userId, userId),
+          inArray(
+            goals.id,
+            siblings.map((goal) => goal.id),
+          ),
+        ),
+      );
+  }
+}
+
+/** Adds a copied season's goals, skipping those already on this athlete's season. */
+export async function pasteSeasonImpl(pasted: GoalInput[]) {
+  const session = await getRequiredSession();
+  const userId = session.user.id;
+  const added = newGoals(pasted, await goalsFor(userId));
+  if (added.length) {
+    await db
+      .insert(goals)
+      .values(added.map((goal) => ({ id: crypto.randomUUID(), userId, ...goal })));
+  }
+  logger.info("goal.season_pasted", { added: added.length, skipped: pasted.length - added.length });
+  return { added: added.length, skipped: pasted.length - added.length };
 }
 
 export async function deleteGoalImpl(id: string) {
   const session = await getRequiredSession();
   await db.delete(goals).where(and(eq(goals.id, id), eq(goals.userId, session.user.id)));
-  await normalizeMainFlags(session.user.id);
-}
-
-export async function pickMainGoalImpl(id: string) {
-  const session = await getRequiredSession();
-  const current = await goalsFor(session.user.id);
-  await saveMainFlags(session.user.id, current, mainFlagsAfterPick(current, id));
-  logger.info("goal.main_picked");
 }

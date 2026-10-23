@@ -83,7 +83,7 @@ export function SessionProfile({ steps }: { steps: SessionStep[] }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground min-h-5 text-sm" aria-live="polite">
-        {shown ? stepSummary(shown) : "Hover or focus a block for its target."}
+        {shown ? stepSummary(shown) : "Tap a block for its target."}
       </p>
       <div className="flex gap-2">
         <div
@@ -133,6 +133,7 @@ export function SessionProfile({ steps }: { steps: SessionStep[] }) {
                       backgroundColor: info.color,
                     }}
                     onMouseEnter={() => setActive(index)}
+                    onClick={() => setActive(index)}
                     onFocus={() => setActive(index)}
                     onBlur={() => setActive(null)}
                   />

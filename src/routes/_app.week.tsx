@@ -5,7 +5,12 @@ import { TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sync-panel.tsx";
 import { WeekTargetView } from "@/components/week-target.tsx";
-import { loaderQuery, weekTargetQueryOptions } from "@/lib/queries.ts";
+import {
+  loaderQuery,
+  seasonQueryOptions,
+  weekCoachQueryOptions,
+  weekTargetQueryOptions,
+} from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -16,7 +21,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/week")({
-  loader: ({ context }) => context.queryClient.query(loaderQuery(weekTargetQueryOptions)),
+  loader: ({ context }) => {
+    // The season map and the stored day plan fill in when ready; the week does not wait.
+    void context.queryClient.prefetchQuery(seasonQueryOptions);
+    void context.queryClient.prefetchQuery(weekCoachQueryOptions);
+    return context.queryClient.query(loaderQuery(weekTargetQueryOptions));
+  },
   pendingMs: 200,
   pendingComponent: WeekTargetPending,
   errorComponent: WeekTargetError,
@@ -31,7 +41,7 @@ function WeekTargetHeading() {
         This week
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        Time left to reach this training week’s target, and the best use of the time you have today.
+        Today’s session, your week day by day, and how it builds toward your next goal.
       </p>
     </div>
   );
