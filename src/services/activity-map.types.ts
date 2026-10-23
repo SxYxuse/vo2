@@ -59,6 +59,20 @@ export function decodePolyline(encoded: string): LngLat[] {
   return coords;
 }
 
+export type ActivityMapTrace = {
+  coordinates: LngLat[];
+  start: LngLat;
+  finish: LngLat;
+};
+
+/** The activity map's line, or null when the activity has no outline to draw (indoor sessions). */
+export function activityMapTrace(outline: string | null): ActivityMapTrace | null {
+  if (!outline) return null;
+  const coordinates = decodePolyline(outline);
+  if (coordinates.length < 2) return null;
+  return { coordinates, start: coordinates[0]!, finish: coordinates.at(-1)! };
+}
+
 export function mapSportOptions(
   sportTypes: string[],
   shares: AthleteSettings["sportGroupShares"],

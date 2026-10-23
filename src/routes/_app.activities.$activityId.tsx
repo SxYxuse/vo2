@@ -1,5 +1,6 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
+import { useRef } from "react";
+import { createFileRoute, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 
 import {
   ActivityDetailMissing,
@@ -17,12 +18,16 @@ import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
 import { parseBestsReturn, type BestsReturn } from "@/services/personal-bests.ts";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
+type ActivitySearch = DiarySearch & BestsReturn & { map?: true };
+
 export const Route = createFileRoute("/_app/activities/$activityId")({
   // Where the activity was opened from (a calendar period or a bests board), so the back link
-  // returns there.
-  validateSearch: (search: Record<string, unknown>): DiarySearch & BestsReturn => ({
+  // returns there. `map` is the full-screen activity map: in the URL so the back gesture of an
+  // installed app closes it.
+  validateSearch: (search: Record<string, unknown>): ActivitySearch => ({
     ...parseDiarySearch(search),
     ...parseBestsReturn(search),
+    ...(search.map === true ? { map: true as const } : {}),
   }),
   loader: ({ context, params }) => {
     prefetchActivityDetail(context.queryClient, params.activityId);
@@ -37,6 +42,9 @@ export const Route = createFileRoute("/_app/activities/$activityId")({
 function ActivityPage() {
   const { activityId } = Route.useParams();
   const diary = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const router = useRouter();
+  const openedHere = useRef(false);
   const { data: detail } = useSuspenseQuery(activityDetailQueryOptions(activityId));
   const settingsQuery = useQuery(settingsSnapshotQueryOptions);
 
@@ -44,7 +52,35 @@ function ActivityPage() {
 
   const color = sportTypeColor(settingsQuery.data?.settings.sportTypes ?? {}, detail.sportType);
 
-  return <ActivityDetailView detail={detail} color={color} diary={diary} />;
+  const onMapOpenChange = (open: boolean) => {
+    if (open) {
+      openedHere.current = true;
+      void navigate({ search: (prev) => ({ ...prev, map: true }), resetScroll: false });
+      return;
+    }
+    // Pop the entry the tap pushed, so back from the activity still leaves it. A map opened
+    // straight from a link has no such entry to pop.
+    if (openedHere.current) {
+      openedHere.current = false;
+      router.history.back();
+      return;
+    }
+    void navigate({
+      search: ({ map: _map, ...rest }) => rest,
+      replace: true,
+      resetScroll: false,
+    });
+  };
+
+  return (
+    <ActivityDetailView
+      detail={detail}
+      color={color}
+      diary={diary}
+      mapOpen={diary.map === true}
+      onMapOpenChange={onMapOpenChange}
+    />
+  );
 }
 
 function ActivityPending() {

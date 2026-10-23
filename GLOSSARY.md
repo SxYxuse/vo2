@@ -30,6 +30,10 @@ _Avoid_: Workout, exercise, ride (too specific)
 The time-series recording attached to an activity (position, heart rate, power, and similar samples).
 _Avoid_: Telemetry, samples, GPS track
 
+**Activity map**:
+The map showing where an activity happened, drawn from Strava's outline of its path. Activities with no outline, such as indoor sessions, have none.
+_Avoid_: Route (that is an uploaded GPX), GPS track
+
 **Sport type**:
 Strava's specific classification of an activity, such as Run, TrailRun, Ride, or VirtualRide.
 _Avoid_: Sport, discipline

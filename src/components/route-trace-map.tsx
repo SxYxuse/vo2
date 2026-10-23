@@ -15,6 +15,8 @@ import {
   useMap,
 } from "@/components/ui/map";
 
+import { resolveThemeColor } from "./map-theme-color.ts";
+
 type RouteTraceMapViewProps = {
   points: ProfilePoint[];
   climbs: RouteClimb[];
@@ -23,24 +25,6 @@ type RouteTraceMapViewProps = {
   onHoverKm: (km: number | null) => void;
   onSelectClimb: (startSec: number | null) => void;
 };
-
-function resolveThemeColor(token: string) {
-  const probe = document.createElement("span");
-  probe.style.color = token;
-  document.body.append(probe);
-  const cssColor = getComputedStyle(probe).color;
-  probe.remove();
-  const canvas = document.createElement("canvas");
-  canvas.width = 1;
-  canvas.height = 1;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return cssColor || token;
-  ctx.fillStyle = cssColor;
-  ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-  if (a === 255) return `rgb(${r}, ${g}, ${b})`;
-  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
-}
 
 function FitRoute({ bounds }: { bounds: [LngLat, LngLat] }) {
   const { map, isLoaded } = useMap();

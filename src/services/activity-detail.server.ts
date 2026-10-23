@@ -68,6 +68,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
       distance: activities.distance,
       totalElevationGain: activities.totalElevationGain,
       streamsSyncedAt: activities.streamsSyncedAt,
+      summaryPolyline: activities.summaryPolyline,
       averageHeartrate: activities.averageHeartrate,
       estimatedHeartrate: activities.estimatedHeartrate,
       averageWatts: activities.averageWatts,
@@ -133,6 +134,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     distance: row.distance,
     totalElevationGain: row.totalElevationGain,
     hasStreams: hasStreamsRow && preview.series.length > 0,
+    outline: row.summaryPolyline,
     kpis: {
       ...preview.kpis,
       normalizedWatts: cycling
