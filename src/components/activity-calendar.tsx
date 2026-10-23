@@ -1,16 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+  type SyntheticEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
 import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { cn } from "cn";
-import { ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, HeartOffIcon } from "lucide-react";
 
 import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { DiaryJumpPicker } from "@/components/diary-jump-picker.tsx";
 import {
   formatSportType,
   sportTypeColor,
@@ -23,11 +31,13 @@ import {
 } from "@/services/activity-detail.ts";
 import { isMissingHeartrate, type CalendarActivity } from "@/services/home-data.types.ts";
 import {
+  diaryTotals,
   diaryWindow,
   formatDiaryMonth,
   formatDiaryRange,
   lastWeekOfMonth,
   monthKey,
+  monthLandingWeek,
   monthOfWeek,
   resolveDiaryCursorMonth,
   resolveDiaryCursorWeek,
@@ -71,6 +81,7 @@ const DIARY_VIEWS: CalendarView[] = ["month", "days"];
 const MONDAY = 1;
 const DESKTOP_WEEKS = 4;
 const MOBILE_WEEKS = 1;
+const SWIPE_DISTANCE = 60;
 
 function MissingHeartrateMark() {
   return (
@@ -307,12 +318,15 @@ function DiaryNav({
   atPresent,
   onStep,
   onToday,
+  onJump,
 }: {
   label: string;
   unit: string;
   atPresent: boolean;
   onStep: (direction: 1 | -1) => void;
   onToday: () => void;
+  /** Opens the jump picker; absent before the first activity is synced. */
+  onJump?: () => void;
 }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-2">
@@ -338,9 +352,23 @@ function DiaryNav({
           <ChevronRightIcon aria-hidden />
         </Button>
       </div>
-      <div aria-live="polite" className="ms-3 min-w-0 truncate text-sm font-semibold">
-        {label}
-      </div>
+      {onJump ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-live="polite"
+          aria-haspopup="dialog"
+          className="ms-1 min-w-0 font-semibold"
+          onClick={onJump}
+        >
+          <span className="truncate">{label}</span>
+          <ChevronDownIcon aria-hidden className="text-muted-foreground" />
+        </Button>
+      ) : (
+        <div aria-live="polite" className="ms-3 min-w-0 truncate text-sm font-semibold">
+          {label}
+        </div>
+      )}
     </div>
   );
 }
@@ -375,6 +403,10 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
     currentWeek,
   );
   const weekRange = diaryWindow(cursorWeek, weeks);
+  const [jumping, setJumping] = useState(false);
+  const totals = useMemo(() => diaryTotals(activities, timeZone), [activities, timeZone]);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
   const anchor = useMemo(
     () => dayKeyDate(byMonth ? `${cursorMonth}-01` : weekRange.start, timeZone),
     [byMonth, cursorMonth, weekRange.start, timeZone],
@@ -391,6 +423,37 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
       }),
       replace: true,
     });
+
+  const stepWeek = (direction: 1 | -1) =>
+    show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) });
+  // A sideways swipe on the phone's day list pages a week; vertical scroll stays native.
+  const swipeHandlers = {
+    onPointerDown: (event: PointerEvent) => {
+      swipeStart.current = { x: event.clientX, y: event.clientY };
+      swiped.current = false;
+    },
+    onPointerUp: (event: PointerEvent) => {
+      const start = swipeStart.current;
+      swipeStart.current = null;
+      if (!start) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      swiped.current = true;
+      if (dx > 0) stepWeek(-1);
+      else if (cursorWeek < currentWeek) stepWeek(1);
+    },
+    onPointerCancel: () => {
+      swipeStart.current = null;
+    },
+    // The swipe's pointerup can land on the activity it started on; that is not a tap.
+    onClickCapture: (event: SyntheticEvent) => {
+      if (!swiped.current) return;
+      swiped.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  };
 
   // The month view still lays bars across its padded weeks, even with outside days hidden.
   const events = useMemo<CalendarEvent<CalendarActivity>[]>(() => {
@@ -479,19 +542,41 @@ export function ActivityCalendar({ activities, initialSettings, diary }: Activit
                   show({ month: stepDiaryMonth(cursorMonth, direction, currentMonth) })
                 }
                 onToday={() => show({})}
+                onJump={totals.oldestMonth ? () => setJumping(true) : undefined}
               />
             ) : (
               <DiaryNav
                 label={formatDiaryRange(weekRange.start, weekRange.end)}
                 unit={weeks === 1 ? "week" : `${weeks} weeks`}
                 atPresent={cursorWeek >= currentWeek}
-                onStep={(direction) =>
-                  show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) })
-                }
+                onStep={stepWeek}
                 onToday={() => show({})}
+                onJump={totals.oldestMonth ? () => setJumping(true) : undefined}
               />
             )}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {totals.oldestMonth ? (
+              <DiaryJumpPicker
+                open={jumping}
+                onOpenChange={setJumping}
+                totals={{ ...totals, oldestMonth: totals.oldestMonth }}
+                cursorMonth={byMonth ? cursorMonth : monthOfWeek(cursorWeek)}
+                currentMonth={currentMonth}
+                currentWeek={currentWeek}
+                pickWeek={!isDesktop}
+                onPickMonth={(month) => {
+                  setJumping(false);
+                  show(byMonth ? { month } : { week: monthLandingWeek(month, weeks, currentWeek) });
+                }}
+                onPickWeek={(week) => {
+                  setJumping(false);
+                  show({ week });
+                }}
+              />
+            ) : null}
+            <div
+              className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !isDesktop && "touch-pan-y")}
+              {...(isDesktop ? {} : swipeHandlers)}
+            >
               <EventCalendarContent
                 components={{
                   month: EventCalendarMonthView,

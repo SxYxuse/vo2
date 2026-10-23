@@ -1,4 +1,4 @@
-import { addDayKey, dayKey } from "./training-plan.types.ts";
+import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
   month: "long",
@@ -72,6 +72,53 @@ export function lastWeekOfMonth(month: string) {
   const lastDay = new Date(Date.UTC(year, index, 0));
   const offset = (lastDay.getUTCDay() + 6) % 7;
   return addDayKey(lastDay.toISOString().slice(0, 10), -offset);
+}
+
+/** The training week holding a month's 1st. */
+export function firstWeekOfMonth(month: string) {
+  const firstDay = new Date(`${month}-01T00:00:00Z`);
+  const offset = (firstDay.getUTCDay() + 6) % 7;
+  return addDayKey(`${month}-01`, -offset);
+}
+
+/** Cursor for a month picked in the week views: its weeks read from the top, never past now. */
+export function monthLandingWeek(month: string, weeks: number, currentWeek: string) {
+  const last = addDayKey(firstWeekOfMonth(month), (weeks - 1) * 7);
+  return last > currentWeek ? currentWeek : last;
+}
+
+/** Training weeks that touch a month, oldest first, never past the current week. */
+export function trainingWeeksOfMonth(month: string, currentWeek: string) {
+  const weeks: string[] = [];
+  const last = lastWeekOfMonth(month);
+  for (let week = firstWeekOfMonth(month); week <= last && week <= currentWeek;) {
+    weeks.push(week);
+    week = addDayKey(week, 7);
+  }
+  return weeks;
+}
+
+/** Activity count and moving time per month, moving time per training week, for the jump picker. */
+export function diaryTotals(
+  activities: readonly { start: string; movingTime: number }[],
+  timeZone: string,
+) {
+  const months = new Map<string, { count: number; movingTime: number }>();
+  const weeks = new Map<string, number>();
+  let oldestMonth: string | undefined;
+  for (const activity of activities) {
+    const start = new Date(activity.start);
+    const month = monthKey(start, timeZone);
+    const total = months.get(month) ?? { count: 0, movingTime: 0 };
+    months.set(month, {
+      count: total.count + 1,
+      movingTime: total.movingTime + activity.movingTime,
+    });
+    const week = weekStartKey(start, timeZone);
+    weeks.set(week, (weeks.get(week) ?? 0) + activity.movingTime);
+    if (!oldestMonth || month < oldestMonth) oldestMonth = month;
+  }
+  return { months, weeks, oldestMonth };
 }
 
 /** The month a training week ends in. */
