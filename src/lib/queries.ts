@@ -9,6 +9,7 @@ import { loadHeartRate } from "@/services/heart-rate.ts";
 import { getRoutePlan, listRoutePlans } from "@/services/route-plan.ts";
 import { loadHomeData } from "@/services/home-data.ts";
 import { loadProgress } from "@/services/progress.ts";
+import { loadSeason } from "@/services/season.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
@@ -63,6 +64,12 @@ export const progressQueryOptions = queryOptions({
 export const weekTargetQueryOptions = queryOptions({
   queryKey: ["week-target"],
   queryFn: () => loadWeekTarget(),
+  staleTime: 60_000,
+});
+
+export const seasonQueryOptions = queryOptions({
+  queryKey: ["season"],
+  queryFn: () => loadSeason(),
   staleTime: 60_000,
 });
 

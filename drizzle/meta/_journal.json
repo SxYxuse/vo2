@@ -169,6 +169,13 @@
       "when": 1792677356345,
       "tag": "0023_heart_rate_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792679428202,
+      "tag": "0024_goals",
+      "breakpoints": true
     }
   ]
 }
