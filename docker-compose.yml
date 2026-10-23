@@ -1,3 +1,5 @@
+name: vo2
+
 services:
   postgres:
     image: postgres:17-alpine

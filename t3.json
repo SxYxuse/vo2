@@ -4,7 +4,7 @@
   "scripts": [
     {
       "name": "Setup",
-      "command": "bun install --frozen-lockfile && if [ -n \"$T3CODE_PROJECT_ROOT\" ] && [ -f \"$T3CODE_PROJECT_ROOT/.env\" ]; then cp \"$T3CODE_PROJECT_ROOT/.env\" .env; elif [ ! -f .env ]; then cp .env.example .env; fi",
+      "command": "bun install --frozen-lockfile && bun scripts/worktree-setup.ts",
       "icon": "configure",
       "runOnWorktreeCreate": true,
       "async": false
@@ -12,8 +12,7 @@
     {
       "name": "Dev",
       "command": "bun run db:up && bun run dev",
-      "icon": "play",
-      "previewUrl": "http://localhost:3000"
+      "icon": "play"
     },
     {
       "name": "Build",
