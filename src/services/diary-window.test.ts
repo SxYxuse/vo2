@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  diaryTotals,
   diaryWindow,
   formatDiaryMonth,
   formatDiaryRange,
   lastWeekOfMonth,
+  monthLandingWeek,
   monthKey,
   monthOfWeek,
   parseDiaryMonthSearch,
@@ -12,6 +14,7 @@ import {
   resolveDiaryCursorMonth,
   stepDiaryMonth,
   stepDiaryWeek,
+  trainingWeeksOfMonth,
 } from "./diary-window.ts";
 
 describe("monthKey", () => {
@@ -103,5 +106,65 @@ describe("formatDiaryRange", () => {
     expect(formatDiaryRange("2026-09-28", "2026-10-25")).toBe("Sep 28 – Oct 25, 2026");
     expect(formatDiaryRange("2026-10-19", "2026-10-25")).toBe("Oct 19 – 25, 2026");
     expect(formatDiaryRange("2025-12-29", "2026-01-04")).toBe("Dec 29, 2025 – Jan 4, 2026");
+  });
+});
+
+describe("monthLandingWeek", () => {
+  it("shows four weeks starting with the one that holds the 1st", () => {
+    // Oct 1, 2025 is a Wednesday: Sep 29 – Oct 26.
+    expect(monthLandingWeek("2025-10", 4, "2026-10-19")).toBe("2025-10-20");
+    // Jun 1, 2026 is a Monday.
+    expect(monthLandingWeek("2026-06", 4, "2026-10-19")).toBe("2026-06-22");
+  });
+
+  it("never lands past the current week", () => {
+    expect(monthLandingWeek("2026-10", 4, "2026-10-19")).toBe("2026-10-19");
+  });
+});
+
+describe("trainingWeeksOfMonth", () => {
+  it("lists every training week that touches the month", () => {
+    expect(trainingWeeksOfMonth("2025-10", "2026-10-19")).toEqual([
+      "2025-09-29",
+      "2025-10-06",
+      "2025-10-13",
+      "2025-10-20",
+      "2025-10-27",
+    ]);
+  });
+
+  it("stops at the current week", () => {
+    expect(trainingWeeksOfMonth("2026-10", "2026-10-19")).toEqual([
+      "2026-09-28",
+      "2026-10-05",
+      "2026-10-12",
+      "2026-10-19",
+    ]);
+  });
+});
+
+describe("diaryTotals", () => {
+  const activities = [
+    { start: "2025-10-01T07:00:00Z", movingTime: 3600 },
+    { start: "2025-10-05T09:00:00Z", movingTime: 5400 },
+    // Oct 31 at 23:30 UTC is already November in Brussels.
+    { start: "2025-10-31T23:30:00Z", movingTime: 1800 },
+  ];
+
+  it("counts activities and moving time per month in the athlete's timezone", () => {
+    const totals = diaryTotals(activities, "Europe/Brussels");
+    expect(totals.months.get("2025-10")).toEqual({ count: 2, movingTime: 9000 });
+    expect(totals.months.get("2025-11")).toEqual({ count: 1, movingTime: 1800 });
+    expect(totals.oldestMonth).toBe("2025-10");
+  });
+
+  it("adds moving time per training week", () => {
+    const totals = diaryTotals(activities, "Europe/Brussels");
+    expect(totals.weeks.get("2025-09-29")).toBe(9000);
+    expect(totals.weeks.get("2025-10-27")).toBe(1800);
+  });
+
+  it("has no oldest month before the first sync", () => {
+    expect(diaryTotals([], "UTC").oldestMonth).toBeUndefined();
   });
 });
