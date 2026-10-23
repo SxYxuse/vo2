@@ -19,8 +19,14 @@ import {
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { goalsFor } from "./season.server.ts";
-import { goalSessions, seasonPhase, type GroupPace, type SeasonPhase } from "./season-phase.ts";
-import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
+import {
+  goalSessions,
+  recentPaces,
+  seasonPhase,
+  type GroupPace,
+  type SeasonPhase,
+} from "./season-phase.ts";
+import type { SportGroupId } from "./sport-groups.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
@@ -79,41 +85,6 @@ function zoneMinutesFromStream(
   const zones = zonesFromHistogram(histogram, sportType, anchors);
   if (!zones.length || zones.every((zone) => zone.minBpm == null)) return null;
   return zones.map((zone) => Math.round(zone.seconds / 60));
-}
-
-/** Days of activities that set the athlete's usual pace for a goal. */
-const PACE_DAYS = 120;
-
-/** Usual speed and climbing per sport group, from recent activities that recorded distance. */
-function recentPaces(
-  rows: {
-    sportType: string;
-    startDate: Date;
-    movingTime: number;
-    distance: number | null;
-    totalElevationGain: number | null;
-  }[],
-  now: Date,
-): Partial<Record<SportGroupId, GroupPace>> {
-  const since = now.getTime() - PACE_DAYS * 86_400_000;
-  const totals = new Map<SportGroupId, { km: number; hours: number; climb: number }>();
-  for (const row of rows) {
-    const group = sportGroupFor(row.sportType)?.id;
-    if (!group || !row.distance || row.movingTime <= 0 || row.startDate.getTime() < since) continue;
-    // Indoor sessions have no real distance or climbing to learn a pace from.
-    if (row.sportType.startsWith("Virtual")) continue;
-    const total = totals.get(group) ?? { km: 0, hours: 0, climb: 0 };
-    total.km += row.distance / 1000;
-    total.hours += row.movingTime / 3600;
-    total.climb += row.totalElevationGain ?? 0;
-    totals.set(group, total);
-  }
-  const paces: Partial<Record<SportGroupId, GroupPace>> = {};
-  for (const [group, total] of totals) {
-    if (total.hours < 1 || total.km <= 0) continue;
-    paces[group] = { kmh: total.km / total.hours, climbPerKm: total.climb / total.km };
-  }
-  return paces;
 }
 
 function withGoalSessions(

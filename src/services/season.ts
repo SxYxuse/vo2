@@ -33,9 +33,9 @@ export const deleteGoal = createServerFn({ method: "POST" })
     await deleteGoalImpl(data.id);
   });
 
-export const pickMainGoal = createServerFn({ method: "POST" })
-  .validator(idSchema)
-  .handler(async ({ data }): Promise<void> => {
-    const { pickMainGoalImpl } = await import("./season.server.ts");
-    await pickMainGoalImpl(data.id);
+export const createEvent = createServerFn({ method: "POST" })
+  .validator(z.object({ legs: z.array(goalInputSchema).min(2).max(5) }))
+  .handler(async ({ data }): Promise<{ ids: string[] }> => {
+    const { createEventImpl } = await import("./season.server.ts");
+    return createEventImpl(data);
   });

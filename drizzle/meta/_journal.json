@@ -176,6 +176,20 @@
       "when": 1792679428202,
       "tag": "0024_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792740935672,
+      "tag": "0025_goal_priority_week_coach",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792740936248,
+      "tag": "0026_drop_goal_main",
+      "breakpoints": true
     }
   ]
 }

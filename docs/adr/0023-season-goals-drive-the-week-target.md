@@ -1,5 +1,7 @@
 # Season goals drive the week target
 
+The cluster and main-goal rules are superseded by goal priority in [0024](0024-goal-priority-guardrails-and-week-coach.md).
+
 The athlete plans a season as a list of goals: races or events, each with a name, sport type, date, distance, elevation gain, and an objective (finish, finish well, or perform). Any sport type can be a goal. Build pace and hours intent go away; the week target is set by the goals instead. Fixed hours stay, as the time the athlete has each week, a cap rather than a lever for progression.
 
 Goals are worked toward in date order. The next goal sets the phase from the weeks left to it: base more than about 12 weeks out, then build, peak, taper, and recovery after the date. Its objective sets how fast fitness rises and how much of the week is key sessions. Its distance and elevation gain shape the long session and the climbing. The time split between sports follows the sport types of all upcoming goals during base and leans on the next goal's sport from build on. With no goal ahead, the plan holds fitness.

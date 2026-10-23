@@ -69,43 +69,59 @@ The athlete's standing choices for a week: whether the week target is capped at 
 _Avoid_: Program, schedule, calendar
 
 **Goal**:
-A race or event on the athlete's season: name, sport type, date, distance, elevation gain, and objective. Goals on the same date are one event (a triathlon entered as swim, ride, and run).
+A race or event on the athlete's season: name, sport type, date, distance, elevation gain, objective, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
 _Avoid_: Target (that is the week's hours), race (not every goal is one)
 
 **Objective**:
-What the athlete wants from a goal: finish, finish well, or perform. It sets how fast fitness rises and how much of the week is key sessions.
+What the athlete wants from a goal: finish, finish well, or perform. It sets how fast fitness rises and which key session types lead.
 _Avoid_: Priority, ambition
 
+**Priority**:
+How much a goal matters: A (the plan builds, peaks, and fully tapers for it, with a recovery week after), B (a few lighter days before it), or C (trained through). The next A event leads the season; without one, the next B event does (ADR 0024).
+_Avoid_: Main goal, importance, A/B race when meaning the objective
+
 **Season**:
-The athlete's goals in date order. The plan works toward the next one.
+The athlete's goals in date order. The plan works toward the next A goal. The season map shows each week's phase and expected hours through the last goal.
 _Avoid_: Calendar, year, block
 
-**Main goal**:
-The goal the plan peaks and fully tapers for among goals less than 4 weeks apart. The athlete picks it; until then it is the longest. The others get a short taper.
-_Avoid_: A race, priority race
-
 **Phase**:
-Where the week sits on the way to the next goal, read at the start of Monday: base, build (or maintain when the last goal was close), peak, taper, race week, recovery, or hold without a goal. It sets the ramp, the key session types, and the sport split (ADR 0021).
+Where the week sits on the way to the next A goal, read at the start of Monday: base, build (or maintain when the last goal was close or ended under two weeks ago), peak, taper, race week, recovery, or hold without a goal. It sets the ramp, the key session types, and the sport split (ADR 0021, 0022).
 _Avoid_: Build pace, block, training phase (that is read from fitness)
+
+**Lighter week**:
+Every fourth week before the peak, counted back from the goal: 70 % of the usual load and one key session, so the work of the three weeks before sinks in.
+_Avoid_: Rest week, deload, recovery (that follows a goal)
+
+**Guardrail**:
+A limit on the phase's ramp: never more than 10 % above the last four weeks' average load, eased off when form is low, and no ramp in the two weeks after an A goal. The week target says when one held it back.
+_Avoid_: Cap (that is the hours the athlete has), safety limit
 
 **Week mix**:
 A range of sessions the athlete does a week, and what share of them are key sessions (for example 4–6 sessions at 25 / 75: one key, three to five easy). Key sessions come from the low end of the range; the number of easy sessions settles within it as the week goes. The athlete sets the mix, seeded from their last 3 months; VO2 builds the sessions.
 _Avoid_: Workout style, polarized split, session caps
 
 **Key session**:
-A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session grows toward the goal's expected time at the athlete's own pace, and a hilly goal puts intervals on a climb. Other sport types get no key sessions. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
+A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Other sport types get no key sessions. Intervals are ticked off when one activity of any sport spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
-One of the week mix's non-key sessions. Easy time left is shared evenly over the easy sessions still to do; any activity of 20 minutes or more that did not tick off a key session fills one.
+One of the week mix's non-key sessions. Easy time left is shared evenly over the easy sessions still to do, each at least 45 minutes on a bike or 30 on foot, so fewer days left means fewer sessions; any activity of 20 minutes or more that did not tick off a key session fills one.
 _Avoid_: Filler, recovery (recovery is a separate, shorter pick when form is very low)
+
+**Day plan**:
+The rest of the training week laid out on days: the algorithm places key sessions, easy time, the rest day, a race and its opener; the coach rearranges that around the athlete's notes; every coach answer is checked against the algorithm's rules. Re-planned after a sync or a note.
+_Avoid_: Schedule, calendar (that shows activities)
+
+**Coach note**:
+What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints.
+_Avoid_: Comment, feedback, journal
 
 **Training week**:
 Monday through Sunday in the athlete's timezone. The week target is scoped to the current week, not a season.
 _Avoid_: Microcycle, calendar week
 
 **Week target**:
-The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase, and capped at the hours the athlete has when they choose. Every activity counts toward it.
+The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase within the guardrails, and capped at the hours the athlete has when they choose. Every activity counts toward it.
 _Avoid_: Bucket, quota, goal (that is a race or event)
 
 **Time left**:

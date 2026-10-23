@@ -7,6 +7,7 @@ import {
   homeQueryOptions,
   seasonQueryOptions,
   settingsSnapshotQueryOptions,
+  weekCoachQueryOptions,
   weekTargetQueryOptions,
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
@@ -58,6 +59,7 @@ export function afterGoalsChanged(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: weekCoachQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
   ]);

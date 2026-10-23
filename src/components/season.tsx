@@ -4,25 +4,35 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { addYears, format, parseISO } from "date-fns";
-import { CalendarIcon, ChevronRightIcon, FlagIcon, PlusIcon } from "lucide-react";
+import { CalendarIcon, ChevronRightIcon, FlagIcon, PlusIcon, XIcon } from "lucide-react";
+import { cn } from "cn";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
-import { createGoal, deleteGoal, pickMainGoal, updateGoal } from "@/services/season.ts";
+import { PHASES } from "@/services/season-phase.ts";
+import { createEvent, createGoal, deleteGoal, updateGoal } from "@/services/season.ts";
 import {
-  CLUSTER_GAP_DAYS,
   GOAL_OBJECTIVES,
+  GOAL_PRIORITIES,
+  LEG_SEPARATOR,
   daysBetween,
+  eventPriority,
+  eventTitle,
   formatDaysLeft,
   goalInputSchema,
+  legLabel,
   type Goal,
   type GoalInput,
   type PastGoal,
-  type SeasonCluster,
   type SeasonData,
   type SeasonEvent,
 } from "@/services/season.types.ts";
+import { sportGroupFor } from "@/services/sport-groups.ts";
+import { SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
+import { PHASE_STYLE, PRIORITY_STYLE, formTone } from "@/components/season-style.ts";
+import { SPORT_STYLE } from "@/components/sport-style.ts";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -32,7 +42,6 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -78,14 +87,30 @@ const objectiveLabel = (id: Goal["objective"]) =>
 
 const formatGoalDate = (key: string) => format(parseISO(key), "EEE d MMM yyyy");
 
+/** Metres of climbing per km from which a goal reads as hilly, as the plan treats it. */
+const HILLY_M_PER_KM = 15;
+
 function goalFacts(goal: Goal) {
   return [
     formatSportType(goal.sportType),
     goal.distanceM != null ? formatDistanceKm(goal.distanceM) : null,
-    goal.elevationGainM ? `${formatElevation(goal.elevationGainM)} D+` : null,
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+function isHilly(goal: Goal) {
+  return (
+    goal.distanceM != null &&
+    goal.elevationGainM != null &&
+    goal.elevationGainM / (goal.distanceM / 1000) >= HILLY_M_PER_KM
+  );
+}
+
+function minutesLabel(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes % 60);
+  return hours ? `${hours}h${rest ? ` ${String(rest).padStart(2, "0")}` : ""}` : `${rest} min`;
 }
 
 /** Which dialog is open: a new goal (optionally on a date) or an existing one. */
@@ -94,6 +119,7 @@ type Editing = { goal: Goal | null } | null;
 export function SeasonView({ data }: { data: SeasonData }) {
   const [editing, setEditing] = useState<Editing>(null);
   const open = (goal: Goal | null) => setEditing({ goal });
+  const outlook = phaseOutlook(data.map);
 
   return (
     <>
@@ -123,16 +149,47 @@ export function SeasonView({ data }: { data: SeasonData }) {
           </EmptyContent>
         </Empty>
       ) : (
-        <section className="flex flex-col gap-3" aria-label="Upcoming goals">
-          {data.upcoming.map((cluster) => (
-            <ClusterCard
-              key={cluster.events[0]!.date}
-              cluster={cluster}
-              today={data.today}
-              onEdit={open}
-            />
-          ))}
-        </section>
+        <>
+          {data.map.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  Season map
+                  {data.map[0] ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs font-semibold",
+                        PHASE_STYLE[data.map[0].kind].chip,
+                      )}
+                    >
+                      {PHASES[data.map[0].kind].label}
+                      {data.map[0].lighter ? " · lighter week" : ""}
+                    </span>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>
+                  {outlook}. Bar height is the hours a week if you hit each target; the plan never
+                  asks for more than 10 % above your last four weeks.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SeasonMap weeks={data.map} events={data.upcoming} />
+              </CardContent>
+            </Card>
+          ) : null}
+          <section className="flex flex-col gap-3" aria-label="Upcoming goals">
+            {data.upcoming.map((event) => (
+              <EventCard key={event.date} event={event} data={data} onEdit={open} />
+            ))}
+          </section>
+          <p className="text-muted-foreground text-xs">
+            <span className="text-foreground font-medium">A</span> races get the full build, peak,
+            and taper. <span className="text-foreground font-medium">B</span> races get a few
+            lighter days and no recovery week.{" "}
+            <span className="text-foreground font-medium">C</span> races are trained through. Tap a
+            goal to change it.
+          </p>
+        </>
       )}
 
       {data.past.length > 0 ? <PastGoals goals={data.past} today={data.today} /> : null}
@@ -147,114 +204,126 @@ export function SeasonView({ data }: { data: SeasonData }) {
   );
 }
 
-function ClusterCard({
-  cluster,
-  today,
-  onEdit,
-}: {
-  cluster: SeasonCluster;
-  today: string;
-  onEdit: (goal: Goal) => void;
-}) {
-  const queryClient = useQueryClient();
-  const pick = useMutation({
-    mutationFn: (id: string) => pickMainGoal({ data: { id } }),
-    onSettled: () => afterGoalsChanged(queryClient),
-  });
-  const several = cluster.events.length > 1;
-
-  if (!several) {
-    return (
-      <div className="rounded-xl border">
-        <EventRows event={cluster.events[0]!} today={today} onEdit={onEdit} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-xl border p-3">
-      <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">Which one do you peak for?</p>
-        <p className="text-muted-foreground text-xs">
-          These are less than {CLUSTER_GAP_DAYS / 7} weeks apart, so the plan fully tapers for one.
-          The others get a short taper and a few easy days after.
-          {cluster.chosen ? "" : " VO2 picked the longest."}
-        </p>
-      </div>
-      <ul className="flex flex-col gap-2">
-        {cluster.events.map((event) => {
-          const isMain = event.date === cluster.mainDate;
-          return (
-            <li
-              key={event.date}
-              className={isMain ? "border-primary rounded-lg border" : "rounded-lg border"}
-            >
-              <EventRows event={event} today={today} onEdit={onEdit} />
-              <div className="flex items-center justify-between gap-2 border-t px-3 py-1.5">
-                {isMain ? (
-                  <Badge>Peak</Badge>
-                ) : (
-                  <span className="text-muted-foreground text-xs">Tune-up</span>
-                )}
-                {isMain ? null : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="min-h-11 sm:min-h-8"
-                    disabled={pick.isPending}
-                    onClick={() => pick.mutate(event.goals[0]!.id)}
-                  >
-                    {pick.isPending && pick.variables === event.goals[0]!.id ? (
-                      <Spinner data-icon="inline-start" />
-                    ) : null}
-                    Peak for this one
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-      {pick.error ? <p className="text-destructive text-sm">{pick.error.message}</p> : null}
-    </div>
-  );
-}
-
-function EventRows({
+/** One race or event: priority, countdown, legs, expected time, and form on the day. */
+function EventCard({
   event,
-  today,
+  data,
   onEdit,
 }: {
   event: SeasonEvent;
-  today: string;
+  data: SeasonData;
   onEdit: (goal: Goal) => void;
 }) {
+  const priority = eventPriority(event);
+  const days = daysBetween(data.today, event.date);
+  const expected = event.goals.map((goal) => data.expectedMinutes[goal.id] ?? null);
+  const totalExpected = expected.every((minutes) => minutes != null)
+    ? expected.reduce<number>((sum, minutes) => sum + (minutes ?? 0), 0)
+    : null;
+  const form = data.raceDayForm[event.date];
+  const multi = event.goals.length > 1;
+
   return (
-    <ul className="flex flex-col divide-y">
-      {event.goals.map((goal) => (
-        <li key={goal.id}>
-          <button
-            type="button"
-            onClick={() => onEdit(goal)}
-            className="hover:bg-muted/50 flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-start"
-          >
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate font-medium">{goal.name}</span>
-              <span className="text-muted-foreground text-xs tabular-nums">
-                {formatGoalDate(goal.date)} · {goalFacts(goal)}
+    <article className="bg-card relative overflow-hidden rounded-xl border">
+      <span
+        aria-hidden
+        className={cn("absolute inset-y-0 left-0 w-1.5", PRIORITY_STYLE[priority].stripe)}
+      />
+      <div className="flex flex-col gap-2 py-3 ps-5 pe-3">
+        <div className="flex items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[10px] font-bold",
+                  PRIORITY_STYLE[priority].badge,
+                )}
+                title={GOAL_PRIORITIES.find((item) => item.id === priority)?.hint}
+              >
+                {priority}
               </span>
-              <span className="text-muted-foreground text-xs">
-                {objectiveLabel(goal.objective)}
-              </span>
+              <h2 className="truncate font-semibold">{eventTitle(event)}</h2>
             </div>
-            <span className="shrink-0 text-sm font-semibold tabular-nums">
-              {formatDaysLeft(daysBetween(today, goal.date))}
+            <p className="text-muted-foreground text-xs tabular-nums">
+              {formatGoalDate(event.date)} · {objectiveLabel(event.goals[0]!.objective)}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end">
+            <span className="font-mono text-2xl leading-none font-semibold tabular-nums">
+              {Math.max(0, days)}
             </span>
-            <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-          </button>
-        </li>
-      ))}
-    </ul>
+            <span className="text-muted-foreground text-[10px]">{days === 1 ? "day" : "days"}</span>
+          </div>
+        </div>
+        {multi ? (
+          <div className="flex h-2 overflow-hidden rounded-full" aria-hidden>
+            {event.goals.map((goal, index) => {
+              const group = sportGroupFor(goal.sportType)?.id;
+              const share =
+                totalExpected && expected[index]
+                  ? expected[index]! / totalExpected
+                  : 1 / event.goals.length;
+              return (
+                <span
+                  key={goal.id}
+                  className={group ? SPORT_STYLE[group].bar : "bg-muted-foreground"}
+                  style={{ width: `${share * 100}%` }}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+        <ul className="-mx-2 flex flex-col">
+          {event.goals.map((goal) => {
+            const group = sportGroupFor(goal.sportType)?.id;
+            const Icon = group ? SPORT_STYLE[group].icon : FlagIcon;
+            return (
+              <li key={goal.id}>
+                <button
+                  type="button"
+                  onClick={() => onEdit(goal)}
+                  className="hover:bg-muted/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm"
+                >
+                  <Icon
+                    aria-hidden
+                    className={cn("size-4 shrink-0", group ? SPORT_STYLE[group].text : "")}
+                  />
+                  <span className="min-w-0 flex-1 truncate">
+                    {multi ? `${legLabel(goal, event) ?? goal.name} · ` : ""}
+                    {goalFacts(goal)}
+                    {goal.elevationGainM ? (
+                      <span className={cn(isHilly(goal) && "text-ds-amber-700 font-medium")}>
+                        {" "}
+                        · {formatElevation(goal.elevationGainM)} D+
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          {totalExpected ? (
+            <span className="bg-ds-purple-200 text-ds-purple-1000 rounded-full px-2 py-0.5">
+              About {minutesLabel(totalExpected)} at your pace
+            </span>
+          ) : null}
+          {form != null && priority !== "C" ? (
+            <span className={cn("rounded-full px-2 py-0.5", formTone(form))}>
+              Form on the day {form >= 0 ? "+" : "−"}
+              {Math.abs(form)} if you hit each target
+            </span>
+          ) : null}
+          {event.goals.some(isHilly) ? (
+            <span className="bg-ds-amber-200 text-ds-amber-1000 rounded-full px-2 py-0.5">
+              Hilly: intervals on climbs
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -357,13 +426,16 @@ function GoalDatePicker({
   );
 }
 
-type GoalForm = {
+/** One sport of an event; a triathlon has three. */
+type LegForm = { sportType: string; distanceKm: string; elevationGainM: string };
+
+type GoalForm = LegForm & {
   name: string;
-  sportType: string;
   date: string;
-  distanceKm: string;
-  elevationGainM: string;
   objective: Goal["objective"];
+  priority: Goal["priority"];
+  /** Further sports on the same day, for a new multisport event. */
+  legs: LegForm[];
 };
 
 function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
@@ -374,6 +446,8 @@ function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
     distanceKm: goal?.distanceM != null ? String(goal.distanceM / 1000) : "",
     elevationGainM: goal?.elevationGainM != null ? String(goal.elevationGainM) : "",
     objective: goal?.objective ?? "finishWell",
+    priority: goal?.priority ?? "A",
+    legs: [],
   };
 }
 
@@ -385,16 +459,22 @@ function parseOptionalNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
-function toInput(form: GoalForm) {
-  const distanceKm = parseOptionalNumber(form.distanceKm);
+function toInput(form: GoalForm, leg: LegForm = form, name = form.name) {
+  const distanceKm = parseOptionalNumber(leg.distanceKm);
   return goalInputSchema.safeParse({
-    name: form.name,
-    sportType: form.sportType,
+    name,
+    sportType: leg.sportType,
     date: form.date,
     distanceM: distanceKm == null ? null : distanceKm * 1000,
-    elevationGainM: parseOptionalNumber(form.elevationGainM),
+    elevationGainM: parseOptionalNumber(leg.elevationGainM),
     objective: form.objective,
+    priority: form.priority,
   });
+}
+
+/** "Ironman WA · Swim": the event's name with the leg's sport. */
+function legName(form: GoalForm, leg: LegForm) {
+  return `${form.name.trim()}${LEG_SEPARATOR}${formatSportType(leg.sportType)}`;
 }
 
 function GoalDialog({
@@ -451,11 +531,20 @@ function GoalFormBody({
       );
   const errorFor = (key: keyof GoalInput) => (submitted ? issues[key] : undefined);
   const set = (next: Partial<GoalForm>) => setForm((current) => ({ ...current, ...next }));
+  const setLeg = (index: number, next: Partial<LegForm>) =>
+    setForm((current) => ({
+      ...current,
+      legs: current.legs.map((leg, at) => (at === index ? { ...leg, ...next } : leg)),
+    }));
 
   const save = useMutation({
     mutationFn: async (data: GoalInput) => {
       if (goal) await updateGoal({ data: { ...data, id: goal.id } });
-      else await createGoal({ data });
+      else if (form.legs.length) {
+        const legs = [form, ...form.legs].map((leg) => toInput(form, leg, legName(form, leg)));
+        if (legs.some((leg) => !leg.success)) throw new Error("Check each sport's distance.");
+        await createEvent({ data: { legs: legs.map((leg) => leg.data!) } });
+      } else await createGoal({ data });
     },
     onSuccess: async () => {
       await afterGoalsChanged(queryClient);
@@ -481,7 +570,7 @@ function GoalFormBody({
       <ResponsiveDialogHeader>
         <ResponsiveDialogTitle>{goal ? "Edit goal" : "Add a goal"}</ResponsiveDialogTitle>
         <ResponsiveDialogDescription>
-          A race or event on your season. The plan works toward your goals in date order.
+          A race or event on your season. The plan builds toward your next A race.
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
@@ -575,6 +664,135 @@ function GoalFormBody({
               <FieldError>{errorFor("elevationGainM")}</FieldError>
             </Field>
           </div>
+          {!goal ? (
+            <div className="flex flex-col gap-3">
+              {form.legs.map((leg, index) => (
+                // Legs are positional: the order is the race order.
+                // oxlint-disable-next-line react/no-array-index-key
+                <div key={index} className="flex flex-col gap-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">Then</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove sport ${index + 2}`}
+                      onClick={() => set({ legs: form.legs.filter((_, at) => at !== index) })}
+                    >
+                      <XIcon />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Select
+                      value={leg.sportType}
+                      onValueChange={(next) => {
+                        if (next != null) setLeg(index, { sportType: String(next) });
+                      }}
+                    >
+                      <SelectTrigger
+                        aria-label={`Sport ${index + 2}`}
+                        className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
+                      >
+                        <SelectValue>{formatSportType(leg.sportType)}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {sportOptions.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {formatSportType(type)}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                      <InputGroupInput
+                        aria-label={`Distance ${index + 2}`}
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="10"
+                        value={leg.distanceKm}
+                        onChange={(event) => setLeg(index, { distanceKm: event.target.value })}
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>km</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                    <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                      <InputGroupInput
+                        aria-label={`Elevation gain ${index + 2}`}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="0"
+                        value={leg.elevationGainM}
+                        onChange={(event) => setLeg(index, { elevationGainM: event.target.value })}
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>m</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                  </div>
+                </div>
+              ))}
+              {form.legs.length < 4 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-10 self-start sm:h-7"
+                  onClick={() =>
+                    set({
+                      legs: [
+                        ...form.legs,
+                        { sportType: form.sportType, distanceKm: "", elevationGainM: "" },
+                      ],
+                    })
+                  }
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Add another sport, same day
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <FieldSet>
+            <FieldLegend variant="label">Priority</FieldLegend>
+            <RadioGroup
+              name="goal-priority"
+              value={form.priority}
+              onValueChange={(next) => {
+                if (next) set({ priority: next as Goal["priority"] });
+              }}
+              className="gap-2"
+            >
+              {GOAL_PRIORITIES.map((priority) => {
+                const id = `goal-priority-${priority.id}`;
+                return (
+                  <FieldLabel key={priority.id} htmlFor={id} className="w-full">
+                    <Field orientation="horizontal" className="items-start p-3">
+                      <RadioGroupItem value={priority.id} id={id} />
+                      <FieldContent>
+                        <FieldTitle>
+                          <span
+                            className={cn(
+                              "rounded px-1.5 py-0.5 text-[10px] font-bold",
+                              PRIORITY_STYLE[priority.id].badge,
+                            )}
+                          >
+                            {priority.id}
+                          </span>
+                          {priority.label}
+                        </FieldTitle>
+                        <FieldDescription>{priority.hint}</FieldDescription>
+                      </FieldContent>
+                    </Field>
+                  </FieldLabel>
+                );
+              })}
+            </RadioGroup>
+          </FieldSet>
           <FieldSet>
             <FieldLegend variant="label">Objective</FieldLegend>
             <RadioGroup

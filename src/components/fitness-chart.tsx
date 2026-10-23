@@ -36,8 +36,15 @@ import {
   type FitnessPeriod,
   type PmcPoint,
 } from "@/services/training-load.ts";
-import { projectRaceDay } from "@/services/season-phase.ts";
-import { daysBetween, formatDaysLeft, seasonClusters, type Goal } from "@/services/season.types.ts";
+import { mondayOf, projectRaceDay, weekLoadsBefore } from "@/services/season-phase.ts";
+import {
+  anchorEvent,
+  daysBetween,
+  eventTitle,
+  formatDaysLeft,
+  seasonEvents,
+  type Goal,
+} from "@/services/season.types.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,10 +189,15 @@ function Sparkline({
 function NextGoal({ goals, pmc, timeZone }: { goals: Goal[]; pmc: PmcPoint[]; timeZone: string }) {
   const today = dayKey(new Date(), timeZone);
   const latest = pmc.at(-1);
-  const [cluster] = seasonClusters(goals.filter((goal) => goal.date >= today));
-  if (!cluster || !latest) return null;
-  const main = cluster.events.find((event) => event.date === cluster.mainDate)!;
-  const projected = projectRaceDay(latest, goals, today, main.date);
+  const main = anchorEvent(seasonEvents(goals.filter((goal) => goal.date >= today)));
+  if (!main || !latest) return null;
+  const projected = projectRaceDay(
+    latest,
+    goals,
+    today,
+    main.date,
+    weekLoadsBefore(pmc, mondayOf(today)),
+  );
   return (
     <Link
       to="/season"
@@ -197,9 +209,7 @@ function NextGoal({ goals, pmc, timeZone }: { goals: Goal[]; pmc: PmcPoint[]; ti
         <span className="text-muted-foreground text-xs">
           Next goal · {formatDaysLeft(daysBetween(today, main.date))}
         </span>
-        <span className="truncate font-medium">
-          {main.goals.map((goal) => goal.name).join(" + ")}
-        </span>
+        <span className="truncate font-medium">{eventTitle(main)}</span>
         <span className="text-muted-foreground text-sm">
           Race-day form{" "}
           <span className={cn("font-medium tabular-nums", formTone(projected.form))}>

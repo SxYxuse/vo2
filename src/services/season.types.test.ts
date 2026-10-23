@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vite-plus/test";
 
 import {
+  anchorEvent,
+  eventPriority,
+  eventTitle,
   formatDaysLeft,
   goalSportTypes,
-  mainFlagsAfterPick,
-  normalizedMainFlags,
-  seasonClusters,
+  legLabel,
+  seasonEvents,
   type Goal,
 } from "./season.types.ts";
 
@@ -18,99 +20,60 @@ function goal(id: string, date: string, overrides: Partial<Goal> = {}): Goal {
     distanceM: 10_000,
     elevationGainM: null,
     objective: "finish",
-    main: false,
+    priority: "A",
     ...overrides,
   };
 }
 
-const dates = (goals: Goal[]) =>
-  seasonClusters(goals).map((cluster) => cluster.events.map((event) => event.date));
-
-describe("seasonClusters", () => {
-  test("goals 4 weeks or more apart stand alone", () => {
-    expect(dates([goal("a", "2027-04-01"), goal("b", "2027-04-29")])).toEqual([
-      ["2027-04-01"],
-      ["2027-04-29"],
+describe("seasonEvents", () => {
+  test("goals on the same date are one event, in date order", () => {
+    const events = seasonEvents([
+      goal("later", "2027-08-01"),
+      goal("swim", "2027-06-01", { sportType: "Swim" }),
+      goal("run", "2027-06-01"),
+    ]);
+    expect(events.map((event) => event.goals.map((g) => g.id))).toEqual([
+      ["swim", "run"],
+      ["later"],
     ]);
   });
 
-  test("goals less than 4 weeks apart chain into one cluster", () => {
-    const goals = [goal("c", "2027-05-20"), goal("a", "2027-04-01"), goal("b", "2027-04-28")];
-    expect(dates(goals)).toEqual([["2027-04-01", "2027-04-28", "2027-05-20"]]);
+  test("an event is as important as its most important goal", () => {
+    const [event] = seasonEvents([
+      goal("swim", "2027-06-01", { priority: "C" }),
+      goal("run", "2027-06-01", { priority: "B" }),
+    ]);
+    expect(eventPriority(event!)).toBe("B");
   });
 
-  test("goals on the same date are one event", () => {
-    const [cluster] = seasonClusters([goal("swim", "2027-06-01"), goal("run", "2027-06-01")]);
-    expect(cluster?.events).toHaveLength(1);
-    expect(cluster?.events[0]?.goals.map((g) => g.id)).toEqual(["run", "swim"]);
-  });
-
-  test("the longest event is the main one until the athlete picks", () => {
-    const goals = [
-      goal("10k", "2027-04-01"),
-      goal("marathon", "2027-04-20", { distanceM: 42_195 }),
-    ];
-    expect(seasonClusters(goals)[0]).toMatchObject({ mainDate: "2027-04-20", chosen: false });
-  });
-
-  test("elevation and sport count toward the longest", () => {
-    const goals = [
-      goal("ride", "2027-04-01", { sportType: "Ride", distanceM: 100_000 }),
-      goal("trail", "2027-04-20", {
-        sportType: "TrailRun",
-        distanceM: 30_000,
-        elevationGainM: 1_800,
-      }),
-    ];
-    expect(seasonClusters(goals)[0]?.mainDate).toBe("2027-04-20");
-  });
-
-  test("a same-day multisport event adds its parts up", () => {
-    const goals = [
-      goal("swim", "2027-04-01", { sportType: "Swim", distanceM: 1_500 }),
-      goal("ride", "2027-04-01", { sportType: "Ride", distanceM: 40_000 }),
-      goal("run", "2027-04-01", { distanceM: 10_000 }),
-      goal("ride-only", "2027-04-15", { sportType: "Ride", distanceM: 60_000 }),
-    ];
-    expect(seasonClusters(goals)[0]?.mainDate).toBe("2027-04-01");
-  });
-
-  test("the athlete's pick wins", () => {
-    const goals = [
-      goal("10k", "2027-04-01", { main: true }),
-      goal("marathon", "2027-04-20", { distanceM: 42_195 }),
-    ];
-    expect(seasonClusters(goals)[0]).toMatchObject({ mainDate: "2027-04-01", chosen: true });
+  test("legs share the event's name", () => {
+    const [event] = seasonEvents([
+      goal("b", "2027-06-01", { name: "Ironman WA · Bike", sportType: "Ride" }),
+      goal("a", "2027-06-01", { name: "Ironman WA · Swim", sportType: "Swim" }),
+    ]);
+    expect(eventTitle(event!)).toBe("Ironman WA");
+    expect(legLabel(event!.goals[0]!, event!)).toBe("Swim");
+    const [single] = seasonEvents([goal("Marathon", "2027-06-01")]);
+    expect(legLabel(single!.goals[0]!, single!)).toBeNull();
   });
 });
 
-describe("main flags", () => {
-  test("picking an event flags all its goals and clears the rest of the cluster", () => {
-    const goals = [
-      goal("a", "2027-04-01", { main: true }),
-      goal("b-swim", "2027-04-20"),
-      goal("b-run", "2027-04-20"),
-      goal("later", "2027-08-01"),
-    ];
-    expect(Object.fromEntries(mainFlagsAfterPick(goals, "b-run"))).toEqual({
-      a: false,
-      "b-swim": true,
-      "b-run": true,
-      later: false,
-    });
+describe("anchorEvent", () => {
+  test("the next A event leads, even after a B one", () => {
+    const events = seasonEvents([
+      goal("half", "2027-04-01", { priority: "B" }),
+      goal("marathon", "2027-05-10"),
+    ]);
+    expect(anchorEvent(events)?.date).toBe("2027-05-10");
   });
 
-  test("a pick is dropped once its cluster breaks up", () => {
-    const goals = [goal("a", "2027-04-01", { main: true }), goal("b", "2027-06-01")];
-    expect(normalizedMainFlags(goals).get("a")).toBe(false);
-  });
-
-  test("only the first picked event survives when clusters merge", () => {
-    const goals = [
-      goal("a", "2027-04-01", { main: true }),
-      goal("b", "2027-04-20", { main: true }),
-    ];
-    expect(Object.fromEntries(normalizedMainFlags(goals))).toEqual({ a: true, b: false });
+  test("without an A event the next B one leads; C events never do", () => {
+    const events = seasonEvents([
+      goal("club race", "2027-04-01", { priority: "C" }),
+      goal("half", "2027-05-01", { priority: "B" }),
+    ]);
+    expect(anchorEvent(events)?.date).toBe("2027-05-01");
+    expect(anchorEvent(seasonEvents([goal("c", "2027-04-01", { priority: "C" })]))).toBeNull();
   });
 });
 

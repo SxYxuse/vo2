@@ -2,6 +2,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import { z } from "zod";
 
 import type { components } from "@/integrations/strava/strava.types.ts";
+import type { PhaseKind } from "./season-phase.ts";
 import { SPORT_GROUPS, sportGroupFor } from "./sport-groups.ts";
 
 type StravaSportType = components["schemas"]["SportType"];
@@ -65,8 +66,14 @@ export const GOAL_OBJECTIVES = [
 
 export type GoalObjective = (typeof GOAL_OBJECTIVES)[number]["id"];
 
-/** Goals closer than this share a taper, so the athlete picks which one to peak for. */
-export const CLUSTER_GAP_DAYS = 28;
+/** How much a goal matters: the plan peaks for A, eases off for B, and trains through C (ADR 0024). */
+export const GOAL_PRIORITIES = [
+  { id: "A", label: "A race", hint: "What the season is for: full build, peak, and taper." },
+  { id: "B", label: "B race", hint: "A few lighter days before it, no recovery week after." },
+  { id: "C", label: "C race", hint: "Trained through, like a hard session." },
+] as const;
+
+export type GoalPriority = (typeof GOAL_PRIORITIES)[number]["id"];
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Pick a date." });
 
@@ -85,24 +92,25 @@ export const goalInputSchema = z.object({
     .max(50_000, { error: "50,000 m at most." })
     .nullable(),
   objective: z.enum(["finish", "finishWell", "perform"]),
+  priority: z.enum(["A", "B", "C"]).default("A"),
 });
 
-export type GoalInput = z.infer<typeof goalInputSchema>;
+export type GoalInput = z.input<typeof goalInputSchema>;
 
-export type Goal = GoalInput & { id: string; main: boolean };
+export type Goal = z.output<typeof goalInputSchema> & { id: string };
 
 /** Goals on the same date are one event, such as a triathlon entered as swim, ride, and run. */
 export type SeasonEvent = { date: string; goals: Goal[] };
 
-export type SeasonCluster = {
-  events: SeasonEvent[];
-  /** The event the plan peaks for. */
-  mainDate: string;
-  /** False while VO2's default stands; only asked when the cluster has more than one event. */
-  chosen: boolean;
-};
-
 export type PastGoal = Goal & { activityId: string | null };
+
+/** One week of the season map: its phase and the hours the plan expects. */
+export type SeasonWeek = {
+  weekStart: string;
+  kind: PhaseKind;
+  lighter: boolean;
+  hours: number;
+};
 
 export type SeasonData = {
   signedIn: boolean;
@@ -110,8 +118,14 @@ export type SeasonData = {
   sportTypes: string[];
   /** Today in the athlete's timezone, so days left match the week target. */
   today: string;
-  upcoming: SeasonCluster[];
+  upcoming: SeasonEvent[];
   past: PastGoal[];
+  /** Weeks from this one through the last goal, if every week hits its target. */
+  map: SeasonWeek[];
+  /** Per goal id: duration at the athlete's own pace, or null without one. */
+  expectedMinutes: Record<string, number | null>;
+  /** Per event date: projected form on the morning of the event. */
+  raceDayForm: Record<string, number>;
 };
 
 /** The sport types a goal can pick: those the athlete shows in Settings. */
@@ -146,9 +160,19 @@ export function roughGoalHours(goal: Pick<Goal, "sportType" | "distanceM" | "ele
   return flat + climb;
 }
 
-function eventsOf(goals: Goal[]): SeasonEvent[] {
+/** Multisport legs in race order: swim, ride, run, then the rest. */
+const LEG_ORDER = ["swimming", "cycling", "running", "walking"];
+
+function legRank(goal: Goal) {
+  const index = LEG_ORDER.indexOf(sportGroupFor(goal.sportType)?.id ?? "");
+  return index < 0 ? LEG_ORDER.length : index;
+}
+
+/** Same-date goals grouped into events, in date order; legs in race order. */
+export function seasonEvents(goals: Goal[]): SeasonEvent[] {
   const sorted = [...goals].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name),
+    (a, b) =>
+      a.date.localeCompare(b.date) || legRank(a) - legRank(b) || a.name.localeCompare(b.name),
   );
   const events: SeasonEvent[] = [];
   for (const goal of sorted) {
@@ -159,56 +183,37 @@ function eventsOf(goals: Goal[]): SeasonEvent[] {
   return events;
 }
 
-/**
- * Groups goals into clusters: events less than CLUSTER_GAP_DAYS after the previous one join its
- * cluster. The main event is the athlete's pick, else the longest by rough duration.
- */
-export function seasonClusters(goals: Goal[]): SeasonCluster[] {
-  const clusters: SeasonEvent[][] = [];
-  for (const event of eventsOf(goals)) {
-    const current = clusters.at(-1);
-    const previous = current?.at(-1);
-    if (current && previous && daysBetween(previous.date, event.date) < CLUSTER_GAP_DAYS) {
-      current.push(event);
-    } else {
-      clusters.push([event]);
-    }
-  }
-  return clusters.map((events) => {
-    const picked =
-      events.length > 1 ? events.find((event) => event.goals.some((goal) => goal.main)) : undefined;
-    const hours = (event: SeasonEvent) =>
-      event.goals.reduce((sum, goal) => sum + roughGoalHours(goal), 0);
-    const longest = events.reduce((best, event) => (hours(event) > hours(best) ? event : best));
-    return { events, mainDate: (picked ?? longest).date, chosen: picked != null };
-  });
-}
+const PRIORITY_RANK: Record<GoalPriority, number> = { A: 0, B: 1, C: 2 };
 
-/**
- * The stored main flag each goal should have: set only on the goals of a picked main event in a
- * cluster of several events. A cluster that broke up or merged loses stale picks.
- */
-export function normalizedMainFlags(goals: Goal[]): Map<string, boolean> {
-  const flags = new Map(goals.map((goal) => [goal.id, false]));
-  for (const cluster of seasonClusters(goals)) {
-    if (!cluster.chosen) continue;
-    const main = cluster.events.find((event) => event.date === cluster.mainDate);
-    for (const goal of main?.goals ?? []) flags.set(goal.id, true);
-  }
-  return flags;
-}
-
-/** Flags after the athlete picks `goalId`'s event as the main one of its cluster. */
-export function mainFlagsAfterPick(goals: Goal[], goalId: string): Map<string, boolean> {
-  const picked = goals.find((goal) => goal.id === goalId);
-  if (!picked) return normalizedMainFlags(goals);
-  const cluster = seasonClusters(goals).find((candidate) =>
-    candidate.events.some((event) => event.date === picked.date),
+/** An event matters as much as its most important goal. */
+export function eventPriority(event: SeasonEvent): GoalPriority {
+  return event.goals.reduce<GoalPriority>(
+    (best, goal) => (PRIORITY_RANK[goal.priority] < PRIORITY_RANK[best] ? goal.priority : best),
+    "C",
   );
-  const inCluster = new Set(cluster?.events.flatMap((event) => event.goals.map((goal) => goal.id)));
-  return normalizedMainFlags(
-    goals.map((goal) =>
-      inCluster.has(goal.id) ? { ...goal, main: goal.date === picked.date } : goal,
-    ),
+}
+
+/** Separates an event's name from its leg: "Ironman WA · Bike". */
+export const LEG_SEPARATOR = " · ";
+
+/** One name for an event: the shared name of its legs, or the names joined. */
+export function eventTitle(event: SeasonEvent) {
+  const bases = [...new Set(event.goals.map((goal) => goal.name.split(LEG_SEPARATOR)[0]!.trim()))];
+  return bases.join(" + ");
+}
+
+/** The leg's own label within its event, or null for a one-goal event. */
+export function legLabel(goal: Goal, event: SeasonEvent) {
+  if (event.goals.length < 2) return null;
+  const [, leg] = goal.name.split(LEG_SEPARATOR);
+  return leg?.trim() || null;
+}
+
+/** The event the plan builds toward: the next with an A goal, else the next with a B goal. */
+export function anchorEvent(events: SeasonEvent[]): SeasonEvent | null {
+  return (
+    events.find((event) => eventPriority(event) === "A") ??
+    events.find((event) => eventPriority(event) === "B") ??
+    null
   );
 }
