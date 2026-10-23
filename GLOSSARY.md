@@ -51,7 +51,7 @@ Distance covered per time, in km/h. Used for cycling and for sport types that ar
 _Avoid_: Pace, velocity, kph
 
 **Sport family**:
-How the week target splits time: running, cycling, or other. Recommended sessions are runs or rides only.
+How the week target splits time: running, cycling, or other (swims and walks count as other).
 _Avoid_: Sport group, sport type
 
 **Sync**:
@@ -93,7 +93,7 @@ A range of sessions the athlete does a week, and what share of them are key sess
 _Avoid_: Workout style, polarized split, session caps
 
 **Key session**:
-A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
+A precise session VO2 generates each week from the week mix: intervals, time in zone, or a long Z2. The type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session grows toward the goal's expected time at the athlete's own pace, and a hilly goal puts intervals on a climb. Other sport types get no key sessions. One is ticked off when one activity spends at least 80 % of its work time at or above its zone.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
@@ -121,7 +121,7 @@ Minutes at heart-rate zone 3 or above. Estimated from load per hour when an acti
 _Avoid_: Intensity minutes, quality time
 
 **Today's choice**:
-What the athlete says about today: the time they have, the sports in order (up to three parts, such as swim then ride, or ride then strength), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it. A key session goes on the first ride or run part; the other parts are easy.
+What the athlete says about today: the time they have, the sports in order (up to three parts, such as swim then ride, or ride then strength), and how they feel (let VO2 pick, easy, or hard). VO2 shapes today's pick around it and never refuses it. A key session goes on the first ride or run part, or on a swim or walk when the day has no ride or run; the other parts are easy.
 _Avoid_: Override, preference
 
 **Today's pick**:

@@ -11,13 +11,21 @@ export { dayKey };
 /** Which key session types lead a week; the season phase picks one (ADR 0021). */
 export type BuildPace = "hold" | "slow" | "steady" | "fast" | "overreach";
 
+/** Sports a key session can go on: the sport groups with heart-rate zones (ADR 0021). */
+export const KEY_SPORTS = ["cycling", "running", "swimming", "walking"] as const;
+export type KeySport = (typeof KEY_SPORTS)[number];
+
+export function isKeySport(value: string): value is KeySport {
+  return (KEY_SPORTS as readonly string[]).includes(value);
+}
+
 export const HR_TARGET_ZONES = ["z2", "z3", "z4", "z5"] as const;
 export type TargetZone = (typeof HR_TARGET_ZONES)[number];
 
 export const keySessionSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(["intervals", "zone", "long"]),
-  sport: z.enum(["cycling", "running", "any"]),
+  sport: z.enum([...KEY_SPORTS, "any"]),
   reps: z
     .number()
     .int()
@@ -26,7 +34,7 @@ export const keySessionSchema = z.object({
   workMinutes: z
     .number()
     .min(1, { error: "At least 1 minute." })
-    .max(300, { error: "5 hours at most." }),
+    .max(360, { error: "6 hours at most." }),
   zone: z.enum(HR_TARGET_ZONES),
   restMinutes: z.number().min(0).max(30, { error: "30 minutes at most." }),
 });
@@ -193,7 +201,7 @@ export type FamilyCollectors = {
 export type PlanningAnchors = {
   ftpWatts: number | null;
   /** Each sport's zone anchors and method, so session cues match the athlete's zones. */
-  heartRate: Record<"cycling" | "running", ZoneAnchors>;
+  heartRate: Record<KeySport, ZoneAnchors>;
 };
 
 export const WEEKDAYS = [
@@ -225,7 +233,7 @@ export const trainingPlanSchema = z.object({
   targetMode: z.enum(["auto", "manual"]).default("auto"),
   weekMix: weekMixSchema.default(DEFAULT_WEEK_MIX),
   /** The athlete's own sport for a key session, by session id (ids start with their week). */
-  keySessionSports: z.record(z.string(), z.enum(["cycling", "running"])).default({}),
+  keySessionSports: z.record(z.string(), z.enum(KEY_SPORTS)).default({}),
   targetWeeklyHours: z.number().min(0.5).max(30),
   preferredRestWeekday: z.number().int().min(0).max(6),
   timeZone: z.string().min(1),
@@ -236,7 +244,7 @@ export type TrainingPlan = z.infer<typeof trainingPlanSchema>;
 export const keySessionSportSchema = z.object({
   id: z.string().regex(/^\d{4}-\d{2}-\d{2}-/),
   /** Null goes back to VO2's suggestion. */
-  sport: z.enum(["cycling", "running"]).nullable(),
+  sport: z.enum(KEY_SPORTS).nullable(),
 });
 
 /** Sets or clears one pick; picks from other weeks are dropped, their sessions are gone. */
