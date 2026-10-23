@@ -11,6 +11,7 @@ import {
   planEnv,
   readEnvValue,
   setEnvValues,
+  usesRenamedVoDatabase,
   worktreeDatabaseName,
 } from "./worktree-env.ts";
 
@@ -118,6 +119,17 @@ async function main() {
   const examplePath = join(root, ".env.example");
   const gitDir = git("rev-parse", "--path-format=absolute", "--git-dir");
   const isMain = gitDir === git("rev-parse", "--path-format=absolute", "--git-common-dir");
+  const existing = readOptional(envPath);
+
+  // --isolate rewrites DATABASE_URL, so only a worktree can repair the old URL that way.
+  if (existing && usesRenamedVoDatabase(existing) && (isMain || !isolate)) {
+    console.error(
+      `.env still connects as the pre-rename \`vo\` user or database, which vo2-postgres rejects.\n` +
+        `Set DATABASE_URL=${databaseUrl(SHARED_DATABASE)} to share the main database` +
+        `${isMain ? "" : ", or run with --isolate for this worktree's own"}.`,
+    );
+    process.exit(1);
+  }
 
   if (isMain) {
     if (!existsSync(envPath)) {
@@ -131,7 +143,6 @@ async function main() {
 
   const branch = git("rev-parse", "--abbrev-ref", "HEAD");
   const database = worktreeDatabaseName(branch === "HEAD" ? "" : branch, root);
-  const existing = readOptional(envPath);
   const plan = planEnv(existing, database, isolate);
 
   if (plan.kind === "keep") {

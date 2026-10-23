@@ -35,6 +35,11 @@ for (const name of stale) {
     console.log(`Would drop ${name}`);
     continue;
   }
-  psql(`DROP DATABASE "${assertSafeIdentifier(name)}"`);
-  console.log(`Dropped ${name}`);
+  // No WITH (FORCE): a session means something still uses it, so skip it and keep going.
+  try {
+    psql(`DROP DATABASE "${assertSafeIdentifier(name)}"`);
+    console.log(`Dropped ${name}`);
+  } catch {
+    console.warn(`Skipped ${name}: still in use. Stop whatever is connected and run again.`);
+  }
 }

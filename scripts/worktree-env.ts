@@ -47,6 +47,18 @@ export function databaseFromUrl(url: string | undefined) {
   }
 }
 
+/** Before the vo2 rename the server's user and database were `vo`; that role no longer exists. */
+export function usesRenamedVoDatabase(envText: string) {
+  const url = readEnvValue(envText, "DATABASE_URL");
+  if (!url) return false;
+  try {
+    const { username } = new URL(url);
+    return username === "vo" || databaseFromUrl(url) === "vo";
+  } catch {
+    return false;
+  }
+}
+
 export function readEnvValue(text: string, key: string) {
   for (const line of text.split("\n")) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);

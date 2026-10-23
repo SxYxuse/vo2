@@ -6,6 +6,7 @@ import {
   pickPort,
   planEnv,
   setEnvValues,
+  usesRenamedVoDatabase,
   worktreeDatabaseName,
 } from "./worktree-env.ts";
 
@@ -64,6 +65,22 @@ describe("planEnv", () => {
     ).toEqual({
       kind: "write",
     });
+  });
+});
+
+describe("usesRenamedVoDatabase", () => {
+  it("flags a pre-rename URL by its user or its database", () => {
+    expect(usesRenamedVoDatabase("DATABASE_URL=postgresql://vo:vo@localhost:5432/vo\n")).toBe(true);
+    expect(
+      usesRenamedVoDatabase("DATABASE_URL=postgresql://vo:vo@localhost:5432/vo_wt_x_abc123\n"),
+    ).toBe(true);
+  });
+
+  it("accepts vo2 URLs and an .env without one", () => {
+    expect(usesRenamedVoDatabase("DATABASE_URL=postgresql://vo2:vo2@localhost:5432/vo2\n")).toBe(
+      false,
+    );
+    expect(usesRenamedVoDatabase("PORT=3100\n")).toBe(false);
   });
 });
 
