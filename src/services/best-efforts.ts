@@ -47,14 +47,14 @@ const MAX_RIDE_SPEED_MS = 80 / 3.6;
 const RUN_FLOOR_SEC: Record<number, number> = {
   400: 43,
   1000: 131,
-  [MILE]: 223,
+  [MILE]: 220,
   [2 * MILE]: 470,
   5000: 755,
   [5 * MILE]: 1200,
   10000: 1571,
   [10 * MILE]: 2600,
-  21097.5: 3451,
-  42195: 7235,
+  21097.5: 3400,
+  42195: 7200,
 };
 const SWIM_FLOOR_SEC: Record<number, number> = {
   100: 44,
@@ -114,7 +114,9 @@ export function powerBests(
   if (!watts?.length || !time || time.length !== watts.length) return [];
   const grid: number[] = [];
   for (let index = 0; index < watts.length; index += 1) {
-    const value = Math.max(0, Number.isFinite(watts[index]) ? watts[index] : 0);
+    const raw = Number.isFinite(watts[index]) ? watts[index] : 0;
+    // A sample no rider can produce is a sensor spike; it would lift every longer average.
+    const value = raw > MAX_WATTS ? 0 : Math.max(0, raw);
     const next = time[index + 1];
     const delta = next == null ? 1 : Math.round(next - time[index]);
     if (delta <= 0) continue;
@@ -133,7 +135,7 @@ export function powerBests(
       if (sum > best) best = sum;
     }
     const average = Math.round(best / seconds);
-    if (average > 0 && average <= MAX_WATTS) results.push({ seconds, watts: average });
+    if (average > 0) results.push({ seconds, watts: average });
   }
   return results;
 }
@@ -184,14 +186,6 @@ export function distanceBests(
     }
   }
   return results;
-}
-
-export function runBests(
-  distance: number[] | null,
-  time: number[] | null,
-  distances: readonly number[] = RUN_DISTANCES,
-) {
-  return distanceBests(distance, time, distances, "run");
 }
 
 function biggestClimb(

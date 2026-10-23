@@ -25,7 +25,6 @@ import {
   type BoardKind,
   type Effort,
 } from "./personal-bests.ts";
-import { isPowerCyclingSport } from "./training-load.ts";
 
 /** Every sport type any board reads; the rest of the local copy is never loaded here. */
 const BESTS_SPORT_TYPES = [
@@ -128,10 +127,8 @@ export async function loadBestsImpl(): Promise<BestsData> {
     const cached: BestEfforts | undefined = bests.get(row.id);
     const days = daysSport(row.sportType);
     if (cached) {
-      if (isPowerCyclingSport(row.sportType)) {
-        for (const best of cached.power) {
-          add(row, board("cycling", "power", best.seconds), { value: best.watts });
-        }
+      for (const best of cached.power) {
+        add(row, board("cycling", "power", best.seconds), { value: best.watts });
       }
       for (const [sport, list] of [
         ["running", cached.run],

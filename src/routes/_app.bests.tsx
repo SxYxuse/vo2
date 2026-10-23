@@ -1,11 +1,11 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrophyIcon } from "lucide-react";
 
 import { BestsView } from "@/components/personal-bests.tsx";
 import { SignInPanel } from "@/components/sync-panel.tsx";
-import { bestsQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { bestsQueryOptions, loaderQuery, syncStatusQueryOptions } from "@/lib/queries.ts";
 import { parseBestsSearch, type BestsSearch } from "@/services/personal-bests.ts";
 import {
   Empty,
@@ -43,6 +43,8 @@ function BestsPage() {
   const { data } = useSuspenseQuery(bestsQueryOptions);
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  const sync = useQuery({ ...syncStatusQueryOptions, enabled: data.signedIn }).data;
+  const copyIncomplete = sync != null && (!sync.historyComplete || sync.streamsPending > 0);
 
   return (
     <>
@@ -50,6 +52,7 @@ function BestsPage() {
       {data.signedIn ? (
         <BestsView
           data={data}
+          copyIncomplete={copyIncomplete}
           search={search}
           // Opening a board pushes history, so a back gesture closes the sheet.
           onSearchChange={(next, options) =>

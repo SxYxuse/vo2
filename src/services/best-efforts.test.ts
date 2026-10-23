@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { buildBestEfforts, distanceBests, powerBests, runBests } from "./best-efforts.ts";
+import { buildBestEfforts, distanceBests, powerBests } from "./best-efforts.ts";
 
 function seconds(count: number) {
   return Array.from({ length: count }, (_, index) => index);
@@ -30,6 +30,12 @@ describe("power bests", () => {
     expect(powerBests(Array(10).fill(3000), seconds(10), [5])).toEqual([]);
   });
 
+  test("a single spike does not lift longer averages", () => {
+    const watts = [...Array(30).fill(200), 30000, ...Array(29).fill(200)];
+    // 59 s at 200 W and the spike counted as zero.
+    expect(powerBests(watts, seconds(60), [60])).toEqual([{ seconds: 60, watts: 197 }]);
+  });
+
   test("skips durations longer than the ride", () => {
     expect(powerBests(Array(100).fill(200), seconds(100), [60, 300])).toEqual([
       { seconds: 60, watts: 200 },
@@ -48,7 +54,7 @@ describe("run bests", () => {
       time.push(second);
       at += second < 667 ? 3 : 4;
     }
-    const [oneK] = runBests(distance, time, [1000]);
+    const [oneK] = distanceBests(distance, time, [1000], "run");
     expect(oneK.metres).toBe(1000);
     expect(oneK.seconds).toBe(250);
   });
@@ -56,17 +62,17 @@ describe("run bests", () => {
   test("paused time stops the clock", () => {
     const distance = [0, 500, 500, 1000];
     const time = [0, 150, 750, 900];
-    expect(runBests(distance, time, [1000])).toEqual([{ metres: 1000, seconds: 300 }]);
+    expect(distanceBests(distance, time, [1000], "run")).toEqual([{ metres: 1000, seconds: 300 }]);
   });
 
   test("sparse samples while moving still count", () => {
-    expect(runBests([0, 500, 1000], [0, 150, 300], [1000])).toEqual([
+    expect(distanceBests([0, 500, 1000], [0, 150, 300], [1000], "run")).toEqual([
       { metres: 1000, seconds: 300 },
     ]);
   });
 
   test("skips distances longer than the run", () => {
-    expect(runBests([0, 500, 900], [0, 150, 270], [1000])).toEqual([]);
+    expect(distanceBests([0, 500, 900], [0, 150, 270], [1000], "run")).toEqual([]);
   });
 });
 

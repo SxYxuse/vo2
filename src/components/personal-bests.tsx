@@ -170,13 +170,16 @@ function emptyText(board: Board) {
 
 type BestsViewProps = {
   data: BestsData;
+  /** Older history or streams are still being copied, so a best can still change. */
+  copyIncomplete: boolean;
   search: BestsSearch;
   onSearchChange: (next: BestsSearch, options?: { replace?: boolean }) => void;
 };
 
 /** Personal bests per sport: cards for every distance and duration, and a sheet per board. */
-export function BestsView({ data, search, onSearchChange }: BestsViewProps) {
-  const now = useMemo(() => new Date(), []);
+export function BestsView({ data, copyIncomplete, search, onSearchChange }: BestsViewProps) {
+  // Read on every render, so a PWA resumed days later measures "New" and periods from today.
+  const now = new Date();
   const sports = BESTS_SPORTS.filter((sport) =>
     data.boards.some((board) => board.sport === sport && board.efforts.length),
   );
@@ -312,8 +315,9 @@ export function BestsView({ data, search, onSearchChange }: BestsViewProps) {
       </Section>
 
       <p className="text-xs text-muted-foreground">
-        All time covers everything VO2 has copied from Strava so far. Efforts faster than a world
-        record are left out as GPS errors.
+        {copyIncomplete
+          ? "VO2 is still copying your older Strava history, so these bests can still change."
+          : "All time covers everything VO2 has copied from Strava."}
       </p>
 
       <BestSheet
