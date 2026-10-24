@@ -3,6 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   blendShares,
   expectedGoalMinutes,
+  goalDay,
   goalSessions,
   phaseWeekLoad,
   projectRaceDay,
@@ -97,8 +98,12 @@ describe("seasonPhase", () => {
     expect(at(3).lighter).toBe(false);
   });
 
-  test("works toward the A goal, with a few lighter days for a B goal this week", () => {
-    const tuneUp = goal("10k", inWeeks(0), { distanceM: 10_000, priority: "B" });
+  test("works toward the A goal, with a lighter week for a B goal raced to perform", () => {
+    const tuneUp = goal("10k", inWeeks(0), {
+      distanceM: 10_000,
+      priority: "B",
+      objective: "perform",
+    });
     const marathon = goal("marathon", inWeeks(3), { distanceM: 42_195 });
     const phase = seasonPhase([tuneUp, marathon], WEEK);
     expect(phase.anchor.map((g) => g.id)).toEqual(["marathon"]);
@@ -106,8 +111,20 @@ describe("seasonPhase", () => {
     expect(phase.tuneUp.map((g) => g.id)).toEqual(["10k"]);
   });
 
+  test("a B goal to finish or finish well leaves its week's load alone", () => {
+    const tuneUp = goal("10k", inWeeks(0), { distanceM: 10_000, priority: "B" });
+    const marathon = goal("marathon", inWeeks(3), { distanceM: 42_195 });
+    const phase = seasonPhase([tuneUp, marathon], WEEK);
+    expect(phase).toMatchObject({ kind: "peak", loadFactor: null, maxKeySessions: null });
+    expect(phase.tuneUp.map((g) => g.id)).toEqual(["10k"]);
+  });
+
   test("a B goal six weeks before the A goal stays a tune-up", () => {
-    const half = goal("half", inWeeks(0), { distanceM: 21_100, priority: "B" });
+    const half = goal("half", inWeeks(0), {
+      distanceM: 21_100,
+      priority: "B",
+      objective: "perform",
+    });
     const marathon = goal("marathon", inWeeks(6), { distanceM: 42_195 });
     expect(seasonPhase([half, marathon], WEEK)).toMatchObject({ kind: "build", loadFactor: 0.85 });
     // No recovery week after it.
@@ -320,5 +337,39 @@ describe("race-day projection", () => {
   test("without a taper ahead form stays around neutral", () => {
     const projected = projectRaceDay({ ctl: 50, atl: 50 }, [], WEEK, addDayKey(WEEK, 28));
     expect(Math.abs(projected.form)).toBeLessThan(1);
+  });
+});
+
+describe("goalDay", () => {
+  const raceDay = "2027-01-10";
+  const on = (offset: number) => addDayKey(raceDay, offset);
+  const rules = (g: Goal) =>
+    [-3, -2, -1, 1, 2, 3].map((offset) => {
+      const day = goalDay([g], on(offset));
+      return day.opener ? "opener" : day.easy ? "easy" : "-";
+    });
+
+  test("the goal's own day is the race", () => {
+    expect(goalDay([goal("a", raceDay)], raceDay).race.map((g) => g.id)).toEqual(["a"]);
+  });
+
+  test("an A goal has an opener the day before and two easy days after", () => {
+    expect(rules(goal("a", raceDay))).toEqual(["-", "-", "opener", "easy", "easy", "-"]);
+  });
+
+  test("a B goal's days follow its objective", () => {
+    const b = (objective: Goal["objective"]) =>
+      rules(goal("b", raceDay, { priority: "B", objective }));
+    expect(b("finish")).toEqual(["-", "-", "easy", "-", "-", "-"]);
+    expect(b("finishWell")).toEqual(["easy", "easy", "opener", "easy", "-", "-"]);
+    expect(b("perform")).toEqual(["easy", "easy", "opener", "easy", "easy", "-"]);
+  });
+
+  test("a C goal is trained through, with easy days around it to finish well or perform", () => {
+    const c = (objective: Goal["objective"]) =>
+      rules(goal("c", raceDay, { priority: "C", objective }));
+    expect(c("finish")).toEqual(["-", "-", "-", "-", "-", "-"]);
+    expect(c("finishWell")).toEqual(["-", "-", "easy", "-", "-", "-"]);
+    expect(c("perform")).toEqual(["-", "-", "easy", "easy", "-", "-"]);
   });
 });

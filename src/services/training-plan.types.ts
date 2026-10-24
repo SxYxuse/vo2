@@ -42,61 +42,33 @@ export const keySessionSchema = z.object({
 export type KeySession = z.infer<typeof keySessionSchema>;
 export type KeySessionKind = KeySession["kind"];
 
-/** Generated key sessions are capped here whatever the split says. */
+/** Generated key sessions are capped here whatever the objective asks. */
 export const MAX_KEY_SESSIONS = 4;
-export const KEY_SHARE_PRESETS = [
-  { share: 0, label: "All easy" },
-  { share: 20, label: "20 / 80" },
-  { share: 30, label: "30 / 70" },
-  { share: 50, label: "50 / 50" },
-] as const;
 
-export const MAX_SESSIONS_PER_WEEK = 14;
+/** Key sessions a week by the leading goal's objective (ADR 0026); one while holding fitness. */
+const KEY_SESSIONS_BY_OBJECTIVE = { finish: 1, finishWell: 2, perform: 3 } as const;
 
-/** A range of sessions a week, and what share of them are key sessions. */
-export const weekMixSchema = z
-  .object({
-    minSessions: z
-      .number()
-      .int()
-      .min(1, { error: "At least 1 session a week." })
-      .max(MAX_SESSIONS_PER_WEEK),
-    maxSessions: z
-      .number()
-      .int()
-      .min(1)
-      .max(MAX_SESSIONS_PER_WEEK, { error: `${MAX_SESSIONS_PER_WEEK} sessions a week at most.` }),
-    keyShare: z.number().int().min(0).max(100),
-    /** Days a week the athlete is fine doing two sessions, of any sports. */
-    doubleDays: z.number().int().min(0).max(7).default(0),
-  })
-  .refine((mix) => mix.maxSessions >= mix.minSessions, {
-    error: "The busiest week can't have fewer sessions than the quietest.",
-    path: ["maxSessions"],
-  });
-
-export type WeekMix = z.infer<typeof weekMixSchema>;
-
-export const DEFAULT_WEEK_MIX: WeekMix = {
-  minSessions: 4,
-  maxSessions: 6,
-  keyShare: 20,
-  doubleDays: 0,
-};
-
-/** Key sessions come from the low end of the range: they are the sessions that always happen. */
-export function keySessionCount(mix: WeekMix) {
-  return Math.min(MAX_KEY_SESSIONS, Math.round((mix.minSessions * mix.keyShare) / 100));
+/**
+ * This week's key sessions: the objective's count, within the phase's own limit and half the
+ * training days, so hard days never have to sit back to back.
+ */
+export function keySessionCountFor(input: {
+  objective: keyof typeof KEY_SESSIONS_BY_OBJECTIVE | null;
+  phaseMax: number | null;
+  trainingDays: number;
+}) {
+  const wanted = input.objective ? KEY_SESSIONS_BY_OBJECTIVE[input.objective] : 1;
+  return Math.max(
+    0,
+    Math.min(
+      wanted,
+      input.phaseMax ?? MAX_KEY_SESSIONS,
+      Math.floor(input.trainingDays / 2),
+      MAX_KEY_SESSIONS,
+    ),
+  );
 }
 
-/** Easy sessions fill the rest of the range. */
-export function easySessionRange(mix: WeekMix) {
-  const keys = keySessionCount(mix);
-  return {
-    min: Math.max(0, mix.minSessions - keys),
-    max: Math.max(0, mix.maxSessions - keys),
-  };
-}
 export const WARM_UP_MINUTES = 15;
 export const COOL_DOWN_MINUTES = 10;
 
@@ -165,33 +137,6 @@ export function keySessionName(session: KeySession) {
   return `${session.reps} × ${session.workMinutes} min ${zone}`;
 }
 
-/** A single "sessions" count saved before ranges becomes a range of one. */
-function normalizeWeekMix(raw: Record<string, unknown>) {
-  const mix = raw.weekMix;
-  if (!mix || typeof mix !== "object") return legacyWeekMix(raw);
-  const stored = mix as Record<string, unknown>;
-  if (typeof stored.sessions === "number" && stored.minSessions == null) {
-    return {
-      minSessions: stored.sessions,
-      maxSessions: stored.sessions,
-      keyShare: stored.keyShare,
-    };
-  }
-  return mix;
-}
-
-/** Plans saved before the week mix: "Intervals and zones" keeps some key sessions. */
-function legacyWeekMix(raw: Record<string, unknown>): WeekMix {
-  if (Array.isArray(raw.keySessions)) {
-    return { ...DEFAULT_WEEK_MIX, keyShare: Math.min(100, raw.keySessions.length * 20) };
-  }
-  if (raw.workoutStyle !== "structured" || raw.buildPace === "hold") {
-    return { ...DEFAULT_WEEK_MIX, keyShare: 0 };
-  }
-  const fast = raw.buildPace === "fast" || raw.buildPace === "overreach";
-  return { ...DEFAULT_WEEK_MIX, keyShare: fast ? 40 : 20 };
-}
-
 export type FamilyCollectors = {
   heartRate: boolean;
   power: boolean;
@@ -214,32 +159,125 @@ export const WEEKDAYS = [
   { id: 0, label: "Sunday" },
 ] as const;
 
-export const TARGET_MODES = [
-  {
-    id: "auto",
-    label: "From my goals",
-    hint: "VO2 sets the hours each week from your fitness and where your season is.",
-  },
-  {
-    id: "manual",
-    label: "Cap my hours",
-    hint: "The same, but never more than the hours you have each week.",
-  },
-] as const;
+/** Sports the plan can put sessions on: those with heart-rate zones. */
+export const PLAN_SPORTS = KEY_SPORTS;
+export type PlanSport = KeySport;
 
-export type TargetMode = (typeof TARGET_MODES)[number]["id"];
+export const MIN_REST_DAYS = 1;
+export const MAX_REST_DAYS = 4;
+export const MAX_DOUBLE_DAYS = 4;
+/** Easy time per training day while VO2 has no history to set the week from. */
+export const NO_HISTORY_MINUTES_PER_DAY = 45;
 
-export const trainingPlanSchema = z.object({
-  targetMode: z.enum(["auto", "manual"]).default("auto"),
-  weekMix: weekMixSchema.default(DEFAULT_WEEK_MIX),
-  /** The athlete's own sport for a key session, by session id (ids start with their week). */
-  keySessionSports: z.record(z.string(), z.enum(KEY_SPORTS)).default({}),
-  targetWeeklyHours: z.number().min(0.5).max(30),
-  preferredRestWeekday: z.number().int().min(0).max(6),
-  timeZone: z.string().min(1),
+const weekdaySchema = z.number().int().min(0).max(6);
+const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** A goal as the plan was built or last adapted on (ADR 0026). */
+export const planGoalSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  sportType: z.string(),
+  date: dateKeySchema,
+  distanceM: z.number().nullable(),
+  elevationGainM: z.number().nullable(),
+  objective: z.enum(["finish", "finishWell", "perform"]),
+  priority: z.enum(["A", "B", "C"]),
 });
 
+export type PlanGoal = z.infer<typeof planGoalSchema>;
+
+/** The week's shape: what the athlete chooses in the plan builder and Settings → Training. */
+export const weekShapeFields = {
+  restWeekdays: z
+    .array(weekdaySchema)
+    .min(MIN_REST_DAYS, { error: "Pick at least one rest day." })
+    .max(MAX_REST_DAYS, { error: "Leave at least three days to train." }),
+  longWeekday: weekdaySchema,
+  doubleDays: z.number().int().min(0).max(MAX_DOUBLE_DAYS),
+  sports: z.array(z.enum(PLAN_SPORTS)).min(1, { error: "Pick at least one sport." }),
+};
+
+export const WEEK_SHAPE_KEYS = ["restWeekdays", "longWeekday", "doubleDays", "sports"] as const;
+
+export type WeekShape = {
+  restWeekdays: number[];
+  longWeekday: number;
+  doubleDays: number;
+  sports: PlanSport[];
+};
+
+/** Problems with a week shape that its fields alone cannot catch. */
+export function weekShapeIssues(shape: WeekShape) {
+  const issues: { path: keyof WeekShape; message: string }[] = [];
+  if (new Set(shape.restWeekdays).size !== shape.restWeekdays.length) {
+    issues.push({ path: "restWeekdays", message: "A day is listed twice." });
+  }
+  if (shape.restWeekdays.includes(shape.longWeekday)) {
+    issues.push({ path: "longWeekday", message: "Pick a training day for the long session." });
+  }
+  if (shape.doubleDays > trainingDayCount(shape)) {
+    issues.push({ path: "doubleDays", message: "More double-session days than training days." });
+  }
+  return issues;
+}
+
+export function withWeekShapeIssues<T extends z.ZodType<WeekShape>>(schema: T) {
+  return schema.superRefine((value, ctx) => {
+    for (const issue of weekShapeIssues(value)) {
+      ctx.addIssue({ code: "custom", path: [issue.path], message: issue.message });
+    }
+  });
+}
+
+export const trainingPlanFields = {
+  ...weekShapeFields,
+  /** The goals the plan was built on; null for a plan saved before the plan builder. */
+  goals: z.array(planGoalSchema).nullable().default(null),
+  /** Monday of the week the plan was built. */
+  startWeek: dateKeySchema.nullable().default(null),
+  /** Weekly minutes to grow from after a break, instead of what history says. */
+  baselineMinutes: z.number().int().min(30).max(1800).nullable().default(null),
+  /** The athlete's own sport for a key session, by session id (ids start with their week). */
+  keySessionSports: z.record(z.string(), z.enum(KEY_SPORTS)).default({}),
+  timeZone: z.string().min(1),
+};
+
+export const trainingPlanSchema = withWeekShapeIssues(z.object(trainingPlanFields));
+
 export type TrainingPlan = z.infer<typeof trainingPlanSchema>;
+
+export function trainingDayCount(shape: Pick<WeekShape, "restWeekdays">) {
+  return 7 - new Set(shape.restWeekdays).size;
+}
+
+export function isRestWeekday(shape: Pick<WeekShape, "restWeekdays">, weekday: number) {
+  return shape.restWeekdays.includes(weekday);
+}
+
+/**
+ * A shape the athlete just edited, made whole: the long session moves off a new rest day to the
+ * closest training day, and double-session days never outnumber training days.
+ */
+export function normalizeShape<T extends WeekShape>(shape: T): T {
+  const restWeekdays = [...new Set(shape.restWeekdays)].sort((a, b) => a - b);
+  let { longWeekday } = shape;
+  if (restWeekdays.includes(longWeekday)) {
+    const near = [0, 1, -1, 2, -2, 3, -3]
+      .map((offset) => (longWeekday + offset + 7) % 7)
+      .find((weekday) => !restWeekdays.includes(weekday));
+    longWeekday = near ?? defaultLongWeekday(restWeekdays);
+  }
+  const doubleDays = Math.min(shape.doubleDays, 7 - restWeekdays.length);
+  return { ...shape, restWeekdays, longWeekday, doubleDays };
+}
+
+/** The training day closest to Saturday, Sunday first on a tie: where a long session fits best. */
+export function defaultLongWeekday(restWeekdays: number[]) {
+  for (const weekday of [6, 0, 5, 4, 3, 2, 1]) {
+    if (!restWeekdays.includes(weekday)) return weekday;
+  }
+  return 6;
+}
 
 export const keySessionSportSchema = z.object({
   id: z.string().regex(/^\d{4}-\d{2}-\d{2}-/),
@@ -263,13 +301,28 @@ export function withKeySessionSport(
 /** Load per hour of mostly aerobic work, used until the athlete has history. */
 export const DEFAULT_LOAD_PER_HOUR = 42;
 
+/**
+ * Plans saved before the plan builder had one preferred rest day, a week mix, and hours: they
+ * keep the rest day and double days, plan rides and runs, and follow the season directly.
+ */
 function withPlanDefaults(value: unknown) {
   if (!value || typeof value !== "object") return value;
   const raw = value as Record<string, unknown>;
+  if (Array.isArray(raw.restWeekdays)) return raw;
+  const rest = typeof raw.preferredRestWeekday === "number" ? raw.preferredRestWeekday : 1;
+  const restWeekdays = [rest];
+  const mix = raw.weekMix as { doubleDays?: unknown } | undefined;
+  const doubleDays = typeof mix?.doubleDays === "number" ? mix.doubleDays : 0;
   return {
-    ...raw,
-    targetMode: raw.targetMode === "manual" ? "manual" : "auto",
-    weekMix: normalizeWeekMix(raw),
+    restWeekdays,
+    longWeekday: defaultLongWeekday(restWeekdays),
+    doubleDays: Math.min(MAX_DOUBLE_DAYS, doubleDays),
+    sports: ["cycling", "running"],
+    goals: null,
+    startWeek: null,
+    baselineMinutes: null,
+    keySessionSports: raw.keySessionSports ?? {},
+    timeZone: raw.timeZone,
   };
 }
 
@@ -280,12 +333,6 @@ export function parseTrainingPlan(value: unknown): TrainingPlan | null {
 
 export function isTrainingPlanComplete(value: unknown): value is TrainingPlan {
   return parseTrainingPlan(value) != null;
-}
-
-/** Starting hours: the last 3 months' average, or 5 without history. */
-export function suggestedTargetHours(avgWeeklyHours: number) {
-  const base = avgWeeklyHours > 0.5 ? avgWeeklyHours : 5;
-  return Math.round(base * 10) / 10;
 }
 
 /** Last-3-month average below this is not a usable baseline. */

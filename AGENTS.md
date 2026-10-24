@@ -1,4 +1,4 @@
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and fills the rest of the week with planned sessions.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and plans each training week day by day toward the athlete's goals.
 
 Keep it simple. Solve the real constraint with the smallest change that makes the behavior obvious, and fight scope creep. These are good defaults, not hard rules: the developer's instructions override anything here.
 

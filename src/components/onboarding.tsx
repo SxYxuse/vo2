@@ -12,13 +12,11 @@ import { afterProfileSaved, afterSettingsSaved } from "@/lib/query-events.ts";
 import {
   PROFILE_FIELDS,
   SPORTS_FIELDS,
-  TRAINING_WEEK_FIELDS,
   onboardingFormDefaults,
   onboardingFormSchema,
   profileFormSchema,
   profileFormDefaults,
   profileFromForm,
-  trainingFromForm,
   type OnboardingFormInput,
   type OnboardingFormValues,
   type ProfileFormValues,
@@ -28,12 +26,14 @@ import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { saveAthleteSettings, saveProfile } from "@/services/athlete-settings.ts";
 import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/athlete-settings.types.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
-import { hasRecentWeeklyHours, recentAverageWeeklyHours } from "@/services/training-plan.ts";
+import { startPlan } from "@/services/plan-builder.ts";
+import type { PlanDraft } from "@/services/plan-builder.types.ts";
 import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
-import { BirthDateField, TrainingWeekFields, WeightField } from "@/components/settings-fields.tsx";
+import { BirthDateField, WeightField } from "@/components/settings-fields.tsx";
+import { PlanBuilder } from "@/components/plan-builder.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -66,9 +66,9 @@ const STEPS = [
       "Choose what shows in your calendar, map, and heart rate, and the gear you train with.",
   },
   {
-    id: "week",
-    title: "Your week",
-    description: "How the weekly target is set, and a preferred rest day.",
+    id: "plan",
+    title: "Your plan",
+    description: "Built from your season and your last 12 weeks.",
   },
   {
     id: "ready",
@@ -81,25 +81,16 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data } = useSuspenseQuery(settingsSnapshotQueryOptions);
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const avgHours = useMemo(
-    () => recentAverageWeeklyHours(data.fitnessLoads, timeZone),
-    [data.fitnessLoads, timeZone],
-  );
-  const hasActivityHistory = hasRecentWeeklyHours(avgHours);
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
         profile: data.profile,
-        training: data.training,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
-        avgHours,
-        timeZone,
       }),
-    [data.profile, data.training, data.settings, avgHours, timeZone],
+    [data.profile, data.settings],
   );
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormValues>({
     resolver: zodResolver(onboardingFormSchema),
@@ -133,8 +124,18 @@ export function OnboardingForm({ userName }: { userName: string }) {
     activityCount: syncStatus?.activityCount ?? 0,
   });
 
+  // The plan first, then the profile and sports: the app opens once both are saved.
   const save = useMutation({
-    mutationFn: saveAthleteSettings,
+    mutationFn: async ({ draft, values }: { draft: PlanDraft; values: OnboardingFormValues }) => {
+      await startPlan({ data: draft });
+      return saveAthleteSettings({
+        data: {
+          profile: profileFromForm(values),
+          sportTypes: values.sportTypes,
+          sportGroupShares: values.sportGroupShares,
+        },
+      });
+    },
     onSuccess: (saved) => {
       // Marking the profile done keeps the onboarding route on "You're set" instead of the
       // profile prompt.
@@ -170,26 +171,37 @@ export function OnboardingForm({ userName }: { userName: string }) {
       const ok = await form.trigger([...SPORTS_FIELDS]);
       if (!ok) return;
       setStepIndex((current) => current + 1);
+    }
+  }
+
+  async function startWith(draft: PlanDraft) {
+    const ok = await form.trigger([...PROFILE_FIELDS, ...SPORTS_FIELDS]);
+    if (!ok) {
+      setSaveError("Check your birthday, weight, and sports in the steps before.");
       return;
     }
-    if (step.id !== "week") return;
-    const ok = await form.trigger([...PROFILE_FIELDS, ...SPORTS_FIELDS, ...TRAINING_WEEK_FIELDS]);
-    if (!ok) return;
-    await form.handleSubmit((values) => {
-      save.mutate({
-        data: {
-          profile: profileFromForm(values),
-          sportTypes: values.sportTypes,
-          sportGroupShares: values.sportGroupShares,
-          training: trainingFromForm(values),
-        },
-      });
-    })();
+    await form.handleSubmit((values) => save.mutate({ draft, values }))();
   }
 
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const isReady = step.id === "ready";
   const copyUnfinished = syncStatus?.status !== "complete";
+
+  if (step.id === "plan") {
+    return (
+      <PlanBuilder
+        onStart={(draft) => void startWith(draft)}
+        starting={save.isPending}
+        error={saveError}
+        onExit={() => {
+          setSaveError(null);
+          setStepIndex((current) => current - 1);
+        }}
+        exitLabel="Back"
+        onboarding
+      />
+    );
+  }
 
   return (
     <form
@@ -233,9 +245,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
           <p className="text-muted-foreground text-sm">
             {step.id === "sync"
               ? "Start by copying your activities from Strava."
-              : step.id === "week" && !hasActivityHistory
-                ? "How many hours you want to train each week."
-                : step.description}
+              : step.description}
           </p>
         </CardHeader>
         <CardContent>
@@ -273,8 +283,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   </FieldDescription>
                 ) : null}
               </>
-            ) : step.id === "week" ? (
-              <TrainingWeekFields idPrefix="onboard" control={form.control} avgHours={avgHours} />
             ) : (
               <Empty className="min-h-48 border-0">
                 <EmptyHeader>
@@ -286,8 +294,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   <EmptyTitle>Ready to train</EmptyTitle>
                   <EmptyDescription>
                     {copyUnfinished
-                      ? "Your week is set. Add your races on the Season page so the plan builds toward them. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. You can change anything later from Settings."
-                      : "Your week is set. Add your races on the Season page so the plan builds toward them, or change anything later from Settings."}
+                      ? "Your plan is set: This week shows your days. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. Change your week or rebuild the plan from Settings."
+                      : "Your plan is set: This week shows your days. Change your week or rebuild the plan from Settings."}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -306,11 +314,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
               type="button"
               className="w-full sm:w-auto"
               onClick={() => {
-                void navigate({ to: "/" });
+                void navigate({ to: "/week" });
               }}
             >
               <CalendarDaysIcon data-icon="inline-start" />
-              Open calendar
+              Open This week
             </Button>
           ) : (
             <>
@@ -334,7 +342,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 }
               >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-                {step.id === "week" ? "Finish" : "Continue"}
+                Continue
               </Button>
             </>
           )}

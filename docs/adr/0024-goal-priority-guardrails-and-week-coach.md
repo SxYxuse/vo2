@@ -1,5 +1,7 @@
 # Goal priority, load guardrails, and a week coach
 
+The coach's layout of the rest of the week and the same easing for every B goal are superseded by the week plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md).
+
 Each goal has a priority. **A** goals are what the season is for: the plan builds, peaks, and fully tapers for the next A event, with a recovery week after it. **B** goals get a few lighter days in their week and no recovery week. **C** goals are trained through, like a hard session. With no A goal ahead, the next B goal leads; with neither, the plan holds fitness. Priority replaces the 4-week cluster rule and the main-goal pick.
 
 The week target has three guardrails on top of the phase's ramp. It never asks for more than 10 % above the average of the last four weeks' load. Every fourth week before the peak is a lighter week at 70 % of the usual load, with one key session. And the two weeks after an A goal never ramp, however close the next one is. When the phase asks for more than a guardrail allows, the target says which one held it back.

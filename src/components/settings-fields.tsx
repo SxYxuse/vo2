@@ -2,8 +2,8 @@
 
 import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
-import { CalendarIcon, FlagIcon, WeightIcon } from "lucide-react";
-import { Controller, useWatch, type Control, type FieldPath } from "react-hook-form";
+import { CalendarIcon, RefreshCwIcon, SparklesIcon, WeightIcon } from "lucide-react";
+import { Controller, useController, useWatch, type Control, type FieldPath } from "react-hook-form";
 
 import {
   ageFromBirthDate,
@@ -11,12 +11,18 @@ import {
   formatBirthDate,
   parseBirthDate,
 } from "@/services/athlete-settings.types.ts";
+import { mondayOf } from "@/services/season-phase.ts";
 import {
-  TARGET_MODES,
-  WEEKDAYS,
-  formatHours,
-  hasRecentWeeklyHours,
-} from "@/services/training-plan.ts";
+  GOAL_OBJECTIVES,
+  anchorEvent,
+  daysBetween,
+  eventTitle,
+  formatDaysLeft,
+  seasonEvents,
+  type Goal,
+} from "@/services/season.types.ts";
+import type { KeySport, TrainingPlan, WeekShape } from "@/services/training-plan.types.ts";
+import { WeekShapeFields } from "@/components/week-shape-fields.tsx";
 import type {
   ProfileFormValues,
   SettingsFormInput,
@@ -45,8 +51,6 @@ import {
 } from "@/components/ui/input-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Slider } from "@/components/ui/slider";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function ProfileFields<T extends ProfileFormValues>({
   idPrefix,
@@ -175,151 +179,101 @@ export function WeightField<T extends ProfileFormValues>({
   );
 }
 
-/** Goals replaced build pace: the Season page sets how fast the plan builds (ADR 0021). */
-export function SeasonGoalsNote() {
+/** Settings → Training: the week's shape, saved as the athlete edits it (ADR 0026). */
+export function TrainingShapeField<T extends TrainingFormInput>({
+  control,
+}: {
+  control: Control<T>;
+}) {
+  const rest = useController({ control, name: "restWeekdays" as FieldPath<T> });
+  const long = useController({ control, name: "longWeekday" as FieldPath<T> });
+  const doubles = useController({ control, name: "doubleDays" as FieldPath<T> });
+  const sports = useController({ control, name: "sports" as FieldPath<T> });
+  const value: WeekShape = {
+    restWeekdays: rest.field.value as number[],
+    longWeekday: long.field.value as number,
+    doubleDays: doubles.field.value as number,
+    sports: sports.field.value as KeySport[],
+  };
+  return (
+    <WeekShapeFields
+      value={value}
+      onChange={(next) => {
+        // One change event per field that moved, so the settings save sees each of them.
+        if (JSON.stringify(next.restWeekdays) !== JSON.stringify(value.restWeekdays)) {
+          rest.field.onChange(next.restWeekdays);
+        }
+        if (next.longWeekday !== value.longWeekday) long.field.onChange(next.longWeekday);
+        if (next.doubleDays !== value.doubleDays) doubles.field.onChange(next.doubleDays);
+        if (JSON.stringify(next.sports) !== JSON.stringify(value.sports)) {
+          sports.field.onChange(next.sports);
+        }
+      }}
+    />
+  );
+}
+
+/** The plan at a glance, with the way to rebuild it. Without a plan, the way to build one. */
+export function PlanSummary({ plan, today }: { plan: TrainingPlan | null; today: string }) {
+  if (!plan || !plan.goals) {
+    return (
+      <FieldSet>
+        <FieldLegend>Your plan</FieldLegend>
+        <FieldDescription>
+          {plan
+            ? "Your plan was set up before the plan builder. Build it again to plan your weeks around your season, rest days, and long session day."
+            : "Build your plan to get each week laid out day by day."}
+        </FieldDescription>
+        <Button className="self-start" nativeButton={false} render={<Link to="/plan" />}>
+          <SparklesIcon data-icon="inline-start" />
+          Build your plan
+        </Button>
+      </FieldSet>
+    );
+  }
+  const goals = plan.goals as Goal[];
+  const lead = anchorEvent(seasonEvents(goals.filter((goal) => goal.date >= today)));
+  const weekStart = mondayOf(today);
+  const weeksIn = plan.startWeek
+    ? Math.max(1, Math.floor(daysBetween(plan.startWeek, weekStart) / 7) + 1)
+    : null;
+  const weeksTotal =
+    lead && plan.startWeek
+      ? Math.floor(daysBetween(plan.startWeek, mondayOf(lead.date)) / 7) + 1
+      : null;
+  const objective = lead
+    ? GOAL_OBJECTIVES.find((item) => item.id === lead.goals[0]!.objective)?.label
+    : null;
   return (
     <FieldSet>
-      <FieldLegend>Goals</FieldLegend>
+      <FieldLegend>Your plan</FieldLegend>
+      <div className="bg-muted/50 flex flex-col gap-1 rounded-lg border p-3">
+        <span className="font-medium">
+          {lead ? `${eventTitle(lead)} · ${objective}` : "Holding your fitness"}
+        </span>
+        <span className="text-muted-foreground text-sm">
+          {weeksIn != null && weeksTotal != null
+            ? `Week ${Math.min(weeksIn, weeksTotal)} of ${weeksTotal}`
+            : weeksIn != null
+              ? `Week ${weeksIn}`
+              : null}
+          {lead ? ` · ${formatDaysLeft(daysBetween(today, lead.date)).toLowerCase()}` : ""}
+          {!lead ? "Add a goal on Season and VO2 will offer to adapt the plan." : ""}
+        </span>
+      </div>
       <FieldDescription>
-        Your races and events set how fast the plan builds: base work when the next goal is far,
-        then build, peak, and taper toward it. Without a goal, the plan holds your fitness.
+        Rebuilding starts from your goals on Season and your last 12 weeks again.
       </FieldDescription>
       <Button
         variant="outline"
         className="self-start"
         nativeButton={false}
-        render={<Link to="/season" />}
+        render={<Link to="/plan" />}
       >
-        <FlagIcon data-icon="inline-start" />
-        Open Season
+        <RefreshCwIcon data-icon="inline-start" />
+        Rebuild plan
       </Button>
     </FieldSet>
-  );
-}
-
-export function TrainingWeekFields<T extends TrainingFormInput>({
-  idPrefix,
-  control,
-  avgHours,
-}: {
-  idPrefix: string;
-  control: Control<T>;
-  avgHours: number;
-}) {
-  const targetMode = useWatch({ control, name: "targetMode" as FieldPath<T> }) as string;
-  const hoursMax = Math.min(30, Math.max(12, Math.ceil((avgHours || 5) * 1.5)));
-  const hasHistory = hasRecentWeeklyHours(avgHours);
-  const showHours = targetMode === "manual" || !hasHistory;
-
-  return (
-    <FieldGroup>
-      <Controller
-        name={"targetMode" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <FieldSet data-invalid={fieldState.invalid}>
-            <FieldLegend>Weekly target</FieldLegend>
-            <FieldDescription>Hours are the headline on the This week page.</FieldDescription>
-            <RadioGroup
-              name={field.name}
-              value={field.value as string}
-              onValueChange={(next) => {
-                if (!next) return;
-                field.onChange(next);
-              }}
-              className="gap-2"
-            >
-              {TARGET_MODES.map((mode) => {
-                const id = `${idPrefix}-target-${mode.id}`;
-                return (
-                  <FieldLabel key={mode.id} htmlFor={id} className="w-full">
-                    <Field orientation="horizontal" className="items-start p-3">
-                      <RadioGroupItem value={mode.id} id={id} />
-                      <FieldContent>
-                        <FieldTitle>{mode.label}</FieldTitle>
-                        <FieldDescription>{mode.hint}</FieldDescription>
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                );
-              })}
-            </RadioGroup>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </FieldSet>
-        )}
-      />
-      {showHours ? (
-        <FieldSet>
-          <FieldLegend>
-            {targetMode === "manual" ? "Hours you have each week" : "Starting hours"}
-          </FieldLegend>
-          <FieldDescription>
-            {targetMode !== "manual"
-              ? "No recent history yet. VO2 uses these hours until it can set the target from your fitness."
-              : hasHistory
-                ? `Your last 3 months average ${formatHours(avgHours)}. The week target never goes above the hours you set.`
-                : "No activities copied from Strava yet. VO2 uses these hours until it can set the target from your fitness, and never goes above them."}
-          </FieldDescription>
-          <Controller
-            name={"targetWeeklyHours" as FieldPath<T>}
-            control={control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={`${idPrefix}-hours-slider`}>
-                  {targetMode === "manual" ? "Up to" : "Start with"}{" "}
-                  {formatHours(field.value as number)} a week
-                </FieldLabel>
-                <Slider
-                  id={`${idPrefix}-hours-slider`}
-                  min={0.5}
-                  max={Math.max(hoursMax, field.value as number)}
-                  step={0.5}
-                  value={[field.value as number]}
-                  onValueChange={(next) => {
-                    const value = Array.isArray(next) ? next[0] : next;
-                    if (typeof value !== "number") return;
-                    field.onChange(value);
-                  }}
-                />
-                {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-              </Field>
-            )}
-          />
-        </FieldSet>
-      ) : null}
-      <Controller
-        name={"preferredRestWeekday" as FieldPath<T>}
-        control={control}
-        render={({ field, fieldState }) => (
-          <FieldSet data-invalid={fieldState.invalid}>
-            <FieldLegend>Preferred rest day</FieldLegend>
-            <FieldDescription>
-              Left out when the remaining time is spread over the week. You can still train that day
-              if it is when you have time.
-            </FieldDescription>
-            <ToggleGroup
-              size="sm"
-              variant="outline"
-              spacing={0}
-              value={[String(field.value as number)]}
-              onValueChange={(next) => {
-                const value = next[0];
-                if (value == null) return;
-                field.onChange(Number(value));
-              }}
-              className="flex-wrap"
-            >
-              {WEEKDAYS.map((day) => (
-                <ToggleGroupItem key={day.id} value={String(day.id)}>
-                  {day.label.slice(0, 3)}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-            {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
-          </FieldSet>
-        )}
-      />
-    </FieldGroup>
   );
 }
 

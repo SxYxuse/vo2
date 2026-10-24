@@ -73,7 +73,7 @@ async function matchPastActivities(
 }
 
 /** Fitness now and the last four weeks' loads, for the season map. */
-async function seasonContext(userId: string, timeZone: string, weekStart: string) {
+export async function seasonContext(userId: string, timeZone: string, weekStart: string) {
   const rows = await db
     .select({
       startDate: activities.startDate,

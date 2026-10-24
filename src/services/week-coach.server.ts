@@ -11,32 +11,38 @@ import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getRequiredSession } from "@/lib/session.server.ts";
 import { ANALYSIS_MODEL } from "./activity-analysis.server.ts";
+import { planGoalsFrom } from "./plan-builder.types.ts";
+import { adoptedNote, planImpact, type PlanImpact } from "./plan-impact.ts";
 import { PHASES } from "./season-phase.ts";
-import { addDayKey, keySessionName, type TrainingPlan } from "./training-plan.types.ts";
+import { goalsFor } from "./season.server.ts";
+import type { Goal } from "./season.types.ts";
+import { saveTrainingPlanForUser } from "./training-plan.server.ts";
+import { keySessionName, trainingDayCount, type TrainingPlan } from "./training-plan.types.ts";
 import {
   acceptConstraints,
-  acceptProposedPlan,
+  coachReadingSchema,
+  isWeekPlan,
   noteFrom,
-  planDates,
   planWeek,
-  proposedPlanSchema,
+  replanSignals,
+  weekDates,
   withParsedConstraints,
   type CoachNote,
   type CoachNoteInput,
-  type ProposedPlan,
+  type CoachReading,
   type WeekCoachState,
   type WeekPlan,
 } from "./week-plan.ts";
 import { loadWeekTargetImpl } from "./week-target.server.ts";
 import { summarizeWeek, type WeekSummary, type WeekTargetData } from "./week-target.ts";
 
-const SYSTEM_PROMPT = `You are an endurance coach arranging the rest of one training week for an athlete. VO2's planner has already decided how much to train, which key sessions are left, and a default day-by-day layout. You read what the athlete says about their days, then rearrange the layout around it and their goal. Never invent key sessions, races, or extra volume; use only the ids you are given. Answer only with the requested JSON.`;
+const SYSTEM_PROMPT = `You are an endurance coach reading what an athlete says about the days of one training week. VO2's planner lays the week out; you turn the athlete's words into day constraints and write a short note. Never invent sessions, races, or volume. Answer only with the requested JSON.`;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 type Planned = WeekTargetData & { plan: TrainingPlan };
 
-/** The coach model, or null without an API key: the algorithm's layout then stands. */
+/** The coach model, or null without an API key: quick choices still plan the week. */
 function adapter() {
   const apiKey = env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
@@ -46,16 +52,28 @@ function adapter() {
   });
 }
 
-/** What a plan is made from; when it changes, the stored plan is stale. */
-function inputKeyOf(data: Planned, notes: CoachNote[]) {
+/**
+ * What the days after today are planned from. Today itself is not part of it: the plan stays
+ * put day to day, and changes only when a key session is done or missed, a note arrives, the
+ * week's shape or goals change.
+ */
+function inputKeyOf(
+  data: Planned,
+  summary: WeekSummary,
+  notes: CoachNote[],
+  plan: WeekPlan | null,
+) {
+  const { plan: training } = data;
   const parts = {
-    today: data.today,
-    activities: data.activities.map((activity) => [activity.id, activity.minutes]),
-    notes: notes.map((note) => [note.id, note.parsed]),
-    phase: [data.season.kind, data.season.lighter, data.season.anchor.map((goal) => goal.id)],
-    pinned: data.plan.keySessionSports,
-    mix: data.plan.weekMix,
-    mode: [data.plan.targetMode, data.plan.targetWeeklyHours, data.plan.preferredRestWeekday],
+    weekStart: data.weekStart,
+    shape: [training.restWeekdays, training.longWeekday, training.doubleDays, training.sports],
+    goals: [data.season.kind, data.season.lighter, data.nearbyGoals.map((goal) => goal.id)],
+    anchor: data.season.anchor.map((goal) => [goal.id, goal.date, goal.objective]),
+    target: summary.target.minutes,
+    pinned: training.keySessionSports,
+    paused: summary.paused,
+    notes: notes.map((note) => [note.id, note.parsed, note.constraints.length]),
+    ...replanSignals(plan, data, summary),
   };
   return createHash("sha1").update(JSON.stringify(parts)).digest("hex");
 }
@@ -66,12 +84,9 @@ async function readRow(userId: string, weekStart: string) {
     .from(weekCoach)
     .where(and(eq(weekCoach.userId, userId), eq(weekCoach.weekStart, weekStart)))
     .limit(1);
+  const plan = row && isWeekPlan(row.plan, weekStart) ? row.plan : null;
   return row
-    ? {
-        notes: (row.notes as CoachNote[]) ?? [],
-        plan: (row.plan as WeekPlan | null) ?? null,
-        inputKey: row.inputKey,
-      }
+    ? { notes: (row.notes as CoachNote[]) ?? [], plan, inputKey: row.inputKey }
     : { notes: [] as CoachNote[], plan: null, inputKey: null };
 }
 
@@ -89,20 +104,24 @@ async function saveRow(
     });
 }
 
-function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], base: WeekPlan) {
+/** Drops this week's stored plan so the next load plans the rest of the week again. */
+export async function forgetWeekPlan(userId: string, weekStart: string) {
+  await db
+    .update(weekCoach)
+    .set({ inputKey: null, updatedAt: new Date() })
+    .where(and(eq(weekCoach.userId, userId), eq(weekCoach.weekStart, weekStart)));
+}
+
+function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], plan: WeekPlan) {
   const phase = data.season;
   const dayName = (date: string) => WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
   return {
     task: [
-      "Rearrange the rest of this week around what the athlete says and what their goal needs.",
       "1. Read every athlete note into constraints: off (cannot train that day), short (minutes = time they have), indoor (trainer or treadmill only), easy (tired, sore, sick or stressed). Resolve words like 'today', 'tomorrow', 'this weekend' with the dates given. Return every constraint you read, also those already listed.",
-      "2. Return one entry per date in algorithmPlan, keeping race days and the opener as they are. You may move key sessions between days, swap sports, shorten or lengthen easy days, and turn a day to rest.",
-      "Rules: use each open key session id at most once and only those ids; never put two hard key sessions on consecutive days (nor the day after a hard day already done); a day with an 'off' constraint is rest; an 'easy' day has no key session; a 'short' day fits its minutes; indoor days set indoor true; keep the week's total time within the remaining minutes (10% leeway); easy days are at least 45 min riding or 30 min running.",
-      "Use the time the athlete has: while the week still has minutes left, put them on days the athlete can train (a 40-minute trainer ride beats a rest day). Prefer the long session on the day with the most time, keep sessions on the goal's sport when the phase calls for it, and if a key session no longer fits anywhere leave it out rather than squeezing it; turn its time into easy time on the days that are left.",
-      "note: 2 to 3 sentences to the athlete in plain words: what changed and why, tied to their goal. No numbers they can already see, no medical advice.",
+      "2. note: 2 to 3 sentences to the athlete in plain words about how the week bends around what they said, tied to their goal. No numbers they can already see, no medical advice.",
     ],
     today: `${data.today} (${dayName(data.today)})`,
-    dates: base.days.map((day) => `${day.date} (${dayName(day.date)})`),
+    dates: weekDates(data.weekStart).map((date) => `${date} (${dayName(date)})`),
     phase: {
       kind: PHASES[phase.kind].label,
       lighterWeek: phase.lighter,
@@ -112,41 +131,23 @@ function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], base
             date: phase.anchor[0]!.date,
             priority: phase.anchor[0]!.priority,
             objective: phase.objective,
-            distanceKm: phase.anchor.map((goal) =>
-              goal.distanceM == null ? null : Math.round(goal.distanceM / 100) / 10,
-            ),
-            elevationGainM: phase.anchor.map((goal) => goal.elevationGainM),
           }
         : null,
-      goalSport: phase.sessions?.keySport ?? null,
     },
     week: {
       targetMinutes: summary.target.minutes,
       doneMinutes: summary.doneMinutes,
       remainingMinutes: summary.remainingMinutes,
       form: Math.round(summary.form),
-      keySessionsPaused: summary.paused,
-      leftBySport: {
-        riding: summary.bySport.cycling.left,
-        running: summary.bySport.running.left,
-        other: summary.bySport.other.left,
-      },
     },
-    openKeySessions: summary.keySessions
-      .filter((status) => !status.done && !status.skipped)
-      .map((status) => ({
-        id: status.session.id,
-        name: keySessionName(status.session),
-        minutes: status.minutes,
-        sport: status.session.sport,
-        hard: status.session.kind !== "long" && status.session.zone !== "z2",
-      })),
-    doneThisWeek: data.activities.map((activity) => ({
-      date: activity.date,
-      title: activity.title,
-      sportType: activity.sportType,
-      minutes: activity.minutes,
-      hardMinutes: activity.hardMinutes,
+    keySessions: summary.keySessions.map((status) => ({
+      name: keySessionName(status.session),
+      done: status.done != null,
+    })),
+    plannedDays: plan.days.map((day) => ({
+      date: day.date,
+      rest: day.rest,
+      sessions: day.sessions.map((item) => `${item.kind} ${item.sport} ${item.minutes} min`),
     })),
     athleteNotes: notes.map((note) => ({
       writtenOn: note.createdAt.slice(0, 10),
@@ -154,11 +155,10 @@ function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], base
       text: note.text,
       constraints: note.constraints,
     })),
-    algorithmPlan: base.days,
   };
 }
 
-async function askCoach(prompt: unknown): Promise<ProposedPlan | null> {
+async function askCoach(prompt: unknown): Promise<CoachReading | null> {
   const model = adapter();
   if (!model) return null;
   try {
@@ -166,8 +166,8 @@ async function askCoach(prompt: unknown): Promise<ProposedPlan | null> {
       adapter: model,
       systemPrompts: [SYSTEM_PROMPT],
       messages: [{ role: "user", content: JSON.stringify(prompt) }],
-      outputSchema: proposedPlanSchema,
-    })) as ProposedPlan;
+      outputSchema: coachReadingSchema,
+    })) as CoachReading;
   } catch (error) {
     logger.warn("week_coach.failed", { error: String(error) });
     return null;
@@ -175,50 +175,25 @@ async function askCoach(prompt: unknown): Promise<ProposedPlan | null> {
 }
 
 /**
- * Lays the week out with the algorithm, then lets the model rearrange it around the athlete's
- * notes. Constraints the model reads are kept on the notes; a layout breaking any rule is
- * dropped for the algorithm's layout with those constraints.
+ * Plans the days after today with the algorithm. Free-text notes still waiting are read by the
+ * model first, into the same constraints quick choices give; its note goes on the week.
  */
-async function makePlan(data: Planned, notes: CoachNote[]) {
+async function makePlan(data: Planned, notes: CoachNote[], previous: WeekPlan | null) {
   const summary = summarizeWeek(data);
-  const dates = planDates(data);
   const constraintsOf = (list: CoachNote[]) => list.flatMap((note) => note.constraints);
-  const first = planWeek(data, summary, constraintsOf(notes));
-  const raw = await askCoach(promptFor(data, summary, notes, first));
-  if (!raw) return { plan: first, notes };
-
-  const updated = withParsedConstraints(notes, acceptConstraints(raw.constraints, dates));
-  const constraints = constraintsOf(updated);
-  const base = planWeek(data, summary, constraints);
-  const openKeys = new Map(
-    summary.keySessions
-      .filter((status) => !status.done && !status.skipped && !summary.paused)
-      .map((status) => [status.session.id, status.session]),
+  const draft = planWeek({ data, summary, constraints: constraintsOf(notes), previous });
+  if (!notes.some((note) => !note.parsed)) {
+    return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  }
+  const reading = await askCoach(promptFor(data, summary, notes, draft));
+  if (!reading) return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  const updated = withParsedConstraints(
+    notes,
+    acceptConstraints(reading.constraints, weekDates(data.weekStart)),
   );
-  const firstDate = base.days[0]?.date;
-  const hardBefore = data.activities.some(
-    (activity) =>
-      firstDate != null && activity.date === addDayKey(firstDate, -1) && activity.hardMinutes >= 15,
-  );
-  const { plan, problems } = acceptProposedPlan(raw, {
-    base,
-    constraints,
-    openKeys,
-    remainingMinutes: summary.remainingMinutes,
-    hardBefore,
-  });
-  logger.info("week_coach.planned", {
-    accepted: plan != null,
-    problems: problems.slice(0, 5),
-    constraints: constraints.length,
-  });
-  // A rejected layout keeps the model's reading of the notes, not its words about a layout
-  // the athlete won't see.
-  return { plan: plan ?? base, notes: updated };
-}
-
-function emptyState(weekStart: string): WeekCoachState {
-  return { weekStart, notes: [], plan: null, stale: false, aiAvailable: adapter() != null };
+  const plan = planWeek({ data, summary, constraints: constraintsOf(updated), previous });
+  logger.info("week_coach.planned", { constraints: constraintsOf(updated).length });
+  return { plan: { ...plan, note: reading.note }, notes: updated, summary };
 }
 
 async function plannedWeek() {
@@ -227,57 +202,90 @@ async function plannedWeek() {
   return data as Planned;
 }
 
-/** The stored plan, or the algorithm's while none is stored. Never calls the model. */
+/**
+ * Season against the plan's own goals. A change that reshapes no week of the current block goes
+ * into the plan at once, with a note saying so; one that does waits for the athlete.
+ */
+export async function reconcileSeason(
+  userId: string,
+  plan: TrainingPlan,
+  weekStart: string,
+): Promise<{ impact: PlanImpact | null; adopted: string | null }> {
+  if (!plan.goals) return { impact: null, adopted: null };
+  const season = await goalsFor(userId);
+  const impact = planImpact(plan.goals as Goal[], season, weekStart, trainingDayCount(plan));
+  if (!impact.differs) return { impact: null, adopted: null };
+  if (impact.changes.length) return { impact, adopted: null };
+  await saveTrainingPlanForUser(userId, { ...plan, goals: planGoalsFrom(season) });
+  logger.info("plan.season_adopted", { goals: season.length });
+  return { impact: null, adopted: adoptedNote(season, weekStart) };
+}
+
+async function seasonChangeFor(userId: string, data: Planned) {
+  return (await reconcileSeason(userId, data.plan, data.weekStart)).impact;
+}
+
+function emptyState(weekStart: string): WeekCoachState {
+  return {
+    weekStart,
+    notes: [],
+    plan: null,
+    stale: false,
+    aiAvailable: adapter() != null,
+    seasonChange: null,
+    needsReview: false,
+  };
+}
+
+/** The stored week plan, or one planned now while none is stored. Never calls the model. */
 export async function loadWeekCoachImpl(): Promise<WeekCoachState> {
   const data = await plannedWeek();
   if (!data) return emptyState("");
   const session = await getRequiredSession();
   const row = await readRow(session.user.id, data.weekStart);
-  const key = inputKeyOf(data, row.notes);
-  const aiAvailable = adapter() != null;
+  const summary = summarizeWeek(data);
   const plan =
     row.plan ??
-    planWeek(
+    planWeek({
       data,
-      summarizeWeek(data),
-      row.notes.flatMap((n) => n.constraints),
-    );
+      summary,
+      constraints: row.notes.flatMap((note) => note.constraints),
+      previous: null,
+    });
   return {
     weekStart: data.weekStart,
     notes: row.notes,
     plan,
-    stale: row.inputKey !== key && (aiAvailable || row.plan != null),
-    aiAvailable,
+    stale: row.plan == null || row.inputKey !== inputKeyOf(data, summary, row.notes, row.plan),
+    aiAvailable: adapter() != null,
+    seasonChange: await seasonChangeFor(session.user.id, data),
+    needsReview: data.plan.goals == null,
   };
 }
 
-/** Re-plans when a sync or a note changed the inputs; otherwise returns what is stored. */
+/** Plans the rest of the week again when its inputs changed; otherwise returns what is stored. */
 export async function replanWeekImpl(): Promise<WeekCoachState> {
   const data = await plannedWeek();
   if (!data) return emptyState("");
   const session = await getRequiredSession();
   const userId = session.user.id;
   const row = await readRow(userId, data.weekStart);
-  const key = inputKeyOf(data, row.notes);
-  if (row.plan && row.inputKey === key) {
-    return {
-      weekStart: data.weekStart,
-      notes: row.notes,
-      plan: row.plan,
-      stale: false,
-      aiAvailable: adapter() != null,
-    };
-  }
-  const made = await makePlan(data, row.notes);
-  const inputKey = inputKeyOf(data, made.notes);
-  await saveRow(userId, data.weekStart, { notes: made.notes, plan: made.plan, inputKey });
-  return {
+  const seasonChange = await seasonChangeFor(userId, data);
+  const summary = summarizeWeek(data);
+  const base = {
     weekStart: data.weekStart,
-    notes: made.notes,
-    plan: made.plan,
     stale: false,
     aiAvailable: adapter() != null,
+    seasonChange,
+    needsReview: data.plan.goals == null,
   };
+  if (row.plan && row.inputKey === inputKeyOf(data, summary, row.notes, row.plan)) {
+    return { ...base, notes: row.notes, plan: row.plan };
+  }
+  const made = await makePlan(data, row.notes, row.plan);
+  const inputKey = inputKeyOf(data, made.summary, made.notes, made.plan);
+  await saveRow(userId, data.weekStart, { notes: made.notes, plan: made.plan, inputKey });
+  return { ...base, notes: made.notes, plan: made.plan };
 }
 
 export async function addCoachNoteImpl(input: CoachNoteInput): Promise<WeekCoachState> {

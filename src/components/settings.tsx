@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBlocker, useNavigate } from "@tanstack/react-router";
+import { useBlocker } from "@tanstack/react-router";
 import { CheckIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 
@@ -23,7 +23,7 @@ import {
 } from "@/lib/settings-sections.ts";
 import { saveAthleteSettings } from "@/services/athlete-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import { recentAverageWeeklyHours, recentSessionHistory } from "@/services/training-plan.ts";
+import { dayKey } from "@/services/training-plan.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -39,13 +39,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
+  PlanSummary,
   ProfileFields,
-  SeasonGoalsNote,
-  TrainingWeekFields,
+  TrainingShapeField,
 } from "@/components/settings-fields.tsx";
 import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
-import { WeekMixFields } from "@/components/week-mix-fields.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
@@ -68,13 +67,8 @@ export function SettingsForm({
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { data } = useQuery(settingsSnapshotQueryOptions);
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  const avgHours = useMemo(
-    () => (data ? recentAverageWeeklyHours(data.fitnessLoads, timeZone) : 0),
-    [data?.fitnessLoads, timeZone],
-  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -87,7 +81,6 @@ export function SettingsForm({
         training: null,
         sportTypes: {},
         sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
-        avgHours: 5,
         timeZone,
       }),
     [timeZone],
@@ -106,10 +99,6 @@ export function SettingsForm({
   const sectionLabel =
     SETTINGS_SECTIONS.find((item) => item.id === section)?.label ?? SETTINGS_SECTIONS[0].label;
 
-  function setSection(next: SettingsSection) {
-    void navigate({ to: "/settings/$section", params: { section: next } });
-  }
-
   useEffect(() => {
     if (!data) return;
     // Saved values come back while the athlete may still be editing; keep what they changed.
@@ -121,12 +110,11 @@ export function SettingsForm({
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
-        avgHours,
         timeZone,
       }),
       { keepDirtyValues: true, keepErrors: true },
     );
-  }, [data?.profile, data?.training, data?.settings, data?.heartRate, avgHours, timeZone, form]);
+  }, [data?.profile, data?.training, data?.settings, data?.heartRate, timeZone, form]);
 
   // One save at a time, each sending the form as it is when it starts, so the latest edit wins.
   // A plain promise rather than a mutation keeps saving after the form unmounts.
@@ -253,20 +241,16 @@ export function SettingsForm({
               </>
             ) : section === "training" ? (
               <FieldGroup>
-                <SeasonGoalsNote />
-                <FieldSeparator />
-                <TrainingWeekFields
-                  idPrefix="settings"
-                  control={form.control}
-                  avgHours={avgHours}
+                <PlanSummary
+                  plan={data.training}
+                  today={dayKey(new Date(), data.training?.timeZone ?? timeZone)}
                 />
-                <FieldSeparator />
-                <WeekMixFields
-                  idPrefix="settings"
-                  control={form.control}
-                  history={data.fitnessLoads ? recentSessionHistory(data.fitnessLoads) : null}
-                  onOpenSports={() => setSection("sports")}
-                />
+                {data.training ? (
+                  <>
+                    <FieldSeparator />
+                    <TrainingShapeField control={form.control} />
+                  </>
+                ) : null}
               </FieldGroup>
             ) : section === "calendar" ? (
               <CalendarPeriodField idPrefix="settings" control={form.control} />

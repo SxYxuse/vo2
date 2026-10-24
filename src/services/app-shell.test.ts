@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import type { TrainingPlan } from "@/services/training-plan.types.ts";
+
 import { isSetUp } from "./app-shell.ts";
 
-const training = {
-  targetMode: "auto",
-  weekMix: { minSessions: 5, maxSessions: 5, keyShare: 20, doubleDays: 0 },
+const training: TrainingPlan = {
+  restWeekdays: [1],
+  longWeekday: 6,
+  doubleDays: 0,
+  sports: ["cycling", "running"],
+  goals: [],
+  startWeek: "2026-10-19",
+  baselineMinutes: null,
   keySessionSports: {},
-  targetWeeklyHours: 6,
-  preferredRestWeekday: 0,
   timeZone: "Europe/Paris",
-} as const;
+};
 
 describe("isSetUp", () => {
   it("opens the app once the plan and profile are both set", () => {

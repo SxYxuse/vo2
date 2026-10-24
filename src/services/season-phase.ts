@@ -16,6 +16,7 @@ import {
   seasonEvents,
   type Goal,
   type GoalObjective,
+  type GoalPriority,
 } from "./season.types.ts";
 
 export const PHASES = {
@@ -262,12 +263,15 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     anchor,
     daysToAnchor,
     objective,
+    tuneUp,
     trainThrough,
     goalShares: early ? seasonShares : anchorShares,
     goalWeight: phase.kind === "recovery" ? 0 : early ? 0.5 : 0.7,
   };
-  if (tuneUp.length && phase.kind !== "race" && phase.kind !== "recovery") {
-    // A B goal gets a few lighter days before it, not a full taper.
+  // A B goal raced to perform takes its whole week down a notch (ADR 0026); to finish or
+  // finish well, only the days around it go easy (goalDay).
+  const performTuneUp = tuneUp.some((goal) => goal.objective === "perform");
+  if (performTuneUp && phase.kind !== "race" && phase.kind !== "recovery") {
     phase = {
       ...phase,
       tuneUp,
@@ -558,4 +562,56 @@ export function projectRaceDay(
     atl += (dailyLoad - atl) / ATL_DAYS;
   }
   return { ctl, atl, form: ctl - atl };
+}
+
+/** Days the plan keeps easy before and after a goal, and whether the day before is an opener. */
+type AroundGoal = { easyBefore: number; opener: boolean; easyAfter: number };
+
+/**
+ * How each goal shapes the days around it, by priority and objective (ADR 0026). An A goal's
+ * build, taper, and recovery week come from its phases; here it adds the opener and two easy
+ * days after. Easy days before an opener are counted beyond it.
+ */
+export const AROUND_GOAL: Record<GoalPriority, Record<GoalObjective, AroundGoal>> = {
+  A: {
+    finish: { easyBefore: 0, opener: true, easyAfter: 2 },
+    finishWell: { easyBefore: 0, opener: true, easyAfter: 2 },
+    perform: { easyBefore: 0, opener: true, easyAfter: 2 },
+  },
+  B: {
+    finish: { easyBefore: 1, opener: false, easyAfter: 0 },
+    finishWell: { easyBefore: 2, opener: true, easyAfter: 1 },
+    perform: { easyBefore: 3, opener: true, easyAfter: 2 },
+  },
+  C: {
+    finish: { easyBefore: 0, opener: false, easyAfter: 0 },
+    finishWell: { easyBefore: 1, opener: false, easyAfter: 0 },
+    perform: { easyBefore: 1, opener: false, easyAfter: 1 },
+  },
+};
+
+export type GoalDay = {
+  /** Goals raced on this day. */
+  race: Goal[];
+  /** The goal tomorrow that calls for an opener today. */
+  opener: Goal | null;
+  /** The goal that keeps this day easy: no key session, a lighter session. */
+  easy: Goal | null;
+};
+
+/** What the goals around a date make of it: a race, an opener, an easy day, or nothing. */
+export function goalDay(goals: Goal[], date: string): GoalDay {
+  const day: GoalDay = { race: [], opener: null, easy: null };
+  for (const goal of goals) {
+    const days = daysBetween(date, goal.date);
+    if (days === 0) {
+      day.race.push(goal);
+      continue;
+    }
+    const around = AROUND_GOAL[goal.priority][goal.objective];
+    if (days === 1 && around.opener) day.opener ??= goal;
+    else if (days > 0 && days <= around.easyBefore + (around.opener ? 1 : 0)) day.easy ??= goal;
+    else if (days < 0 && -days <= around.easyAfter) day.easy ??= goal;
+  }
+  return day;
 }

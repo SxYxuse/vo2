@@ -17,6 +17,7 @@ import {
 import { cn } from "cn";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
+import { SeasonChangePrompt, notifySeasonCheck } from "@/components/plan-adapt.tsx";
 import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { createEvent, createGoal, deleteGoal, pasteSeason, updateGoal } from "@/services/season.ts";
@@ -218,10 +219,10 @@ export function SeasonView({ data }: { data: SeasonData }) {
           </section>
           <p className="text-muted-foreground text-xs">
             <span className="text-foreground font-medium">A</span> races get the full build, peak,
-            and taper. <span className="text-foreground font-medium">B</span> races get a few
-            lighter days and no recovery week.{" "}
-            <span className="text-foreground font-medium">C</span> races are trained through. Tap a
-            goal to change it.
+            and taper. <span className="text-foreground font-medium">B</span> races get lighter days
+            before them, more when you race to perform.{" "}
+            <span className="text-foreground font-medium">C</span> races are trained through, with
+            easy days around them to finish well or perform. Tap a goal to change it.
           </p>
         </>
       )}
@@ -235,6 +236,7 @@ export function SeasonView({ data }: { data: SeasonData }) {
         onClose={() => setEditing(null)}
       />
       <PasteSeasonDialog open={pasting} onClose={() => setPasting(false)} />
+      <SeasonChangePrompt />
     </>
   );
 }
@@ -267,7 +269,7 @@ function PasteSeasonBody({ onDone }: { onDone: () => void }) {
       return pasteSeason({ data: parsed.data });
     },
     onSuccess: async ({ added, skipped }) => {
-      await afterGoalsChanged(queryClient);
+      notifySeasonCheck(await afterGoalsChanged(queryClient));
       toast.add({
         type: "success",
         title: added ? `${added} goals added` : "Nothing new to add",
@@ -607,14 +609,14 @@ function GoalFormBody({
       } else await createGoal({ data });
     },
     onSuccess: async () => {
-      await afterGoalsChanged(queryClient);
+      notifySeasonCheck(await afterGoalsChanged(queryClient));
       onDone();
     },
   });
   const remove = useMutation({
     mutationFn: () => deleteGoal({ data: { id: goal!.id } }),
     onSuccess: async () => {
-      await afterGoalsChanged(queryClient);
+      notifySeasonCheck(await afterGoalsChanged(queryClient));
       onDone();
     },
   });

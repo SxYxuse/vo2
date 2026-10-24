@@ -19,6 +19,7 @@ import {
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { goalsFor } from "./season.server.ts";
+import type { Goal } from "./season.types.ts";
 import {
   goalSessions,
   recentPaces,
@@ -30,7 +31,13 @@ import type { SportGroupId } from "./sport-groups.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
-import { addDayKey, dayKey, sportFamilyOf, weekStartKey } from "./training-plan.types.ts";
+import {
+  addDayKey,
+  dayKey,
+  sportFamilyOf,
+  weekStartKey,
+  type TrainingPlan,
+} from "./training-plan.types.ts";
 import {
   HISTORY_WEEKS,
   estimatedHardMinutes,
@@ -70,7 +77,16 @@ function emptyWeek(signedIn: boolean, timeZone: string): WeekTargetData {
     },
     anchors: NO_ANCHORS,
     season: seasonPhase([], weekStartKey(now, timeZone)),
+    nearbyGoals: [],
   };
+}
+
+/** Days around the week whose goals still shape it: a B goal's lighter days and the days after. */
+const NEARBY_GOAL_DAYS = 5;
+
+/** The goals the plan reads: its own copy once built (ADR 0026), the season's before that. */
+export function planGoals(plan: { goals: Goal[] | unknown[] | null }, season: Goal[]): Goal[] {
+  return (plan.goals as Goal[] | null) ?? season;
 }
 
 /** Minutes in each heart-rate zone from the stream, using that sport's zones. */
@@ -94,14 +110,15 @@ function withGoalSessions(
   return { ...phase, sessions: goalSessions(phase, paces) };
 }
 
-export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
+/** This week for the signed-in athlete, on their saved plan or on `draft` for a preview. */
+export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekTargetData> {
   const session = await getOptionalSession();
   if (!session) {
     logger.debug("week_target.anonymous");
     return emptyWeek(false, "UTC");
   }
   const userId = session.user.id;
-  const plan = await getTrainingPlanForUser(userId);
+  const plan = draft ?? (await getTrainingPlanForUser(userId));
   if (!plan) return emptyWeek(true, "UTC");
   const timeZone = plan.timeZone;
 
@@ -112,7 +129,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
   const weekEnd = addDayKey(weekStart, 6);
   const historyStart = addDayKey(weekStart, -7 * HISTORY_WEEKS);
 
-  const [rows, settings, metricsRows, goals] = await Promise.all([
+  const [rows, settings, metricsRows, seasonGoals] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -248,6 +265,9 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
     });
 
   const { sportTypes } = settings;
+  const goals = planGoals(plan, seasonGoals);
+  const nearFrom = addDayKey(weekStart, -NEARBY_GOAL_DAYS);
+  const nearTo = addDayKey(weekEnd, NEARBY_GOAL_DAYS);
   logger.debug("week_target.loaded", {
     weekStart,
     activityCount: weekActivities.length,
@@ -260,6 +280,7 @@ export async function loadWeekTargetImpl(): Promise<WeekTargetData> {
     today,
     weekStart,
     season: withGoalSessions(seasonPhase(goals, weekStart), recentPaces(rows, now)),
+    nearbyGoals: goals.filter((goal) => goal.date >= nearFrom && goal.date <= nearTo),
     activities: weekActivities,
     history: [...history.values()],
     weekStartFitness: beforeWeek

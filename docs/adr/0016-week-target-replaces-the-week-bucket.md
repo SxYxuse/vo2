@@ -1,6 +1,6 @@
 # A week target replaces the bucket of planned sessions
 
-Build pace and hours intent superseded by [0023](0023-season-goals-drive-the-week-target.md). Not pinning sessions to days superseded by the day plan in [0024](0024-goal-priority-guardrails-and-week-coach.md).
+Build pace and hours intent superseded by [0023](0023-season-goals-drive-the-week-target.md). Not pinning sessions to days superseded by the day plan in [0024](0024-goal-priority-guardrails-and-week-coach.md). The week mix, fixed hours, and today's choice superseded by the week plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md).
 
 VO2 no longer stores planned sessions or matches activities to them. The training plan sets a week target in hours (with training load as the second number), derived from fitness and build pace unless the athlete fixes the hours. The athlete sets a week mix (sessions per week and the share that are key sessions); VO2 generates the key sessions (intervals, time in zone, or a long Z2) from build pace and fitness, and spreads the rest of the target over easy sessions. The Week target page shows time left, ticks key sessions off, picks one session for the time the athlete has today, and projects fitness and form if they finish the week. Everything is worked out from copied activities each time the page loads.
 
