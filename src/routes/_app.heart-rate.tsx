@@ -13,7 +13,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PanelSkeleton,
+  RouteError,
+  StatGridSkeleton,
+  ToolbarSkeleton,
+} from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/heart-rate")({
   loader: ({ context }) => context.queryClient.query(loaderQuery(heartRateQueryOptions)),
@@ -73,19 +78,13 @@ function HeartRatePending() {
           per sport.
         </p>
       </div>
-      <Skeleton className="h-80 w-full rounded-xl" />
+      <ToolbarSkeleton widths={["w-44", "w-48"]} />
+      <StatGridSkeleton cells={4} className="lg:grid-cols-4" />
+      <PanelSkeleton bodyClassName="h-56" />
     </>
   );
 }
 
 function HeartRateError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load heart rate</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load heart rate" error={error} />;
 }

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
+import { ListSkeleton, RouteError, ToolbarSkeleton } from "@/components/route-states.tsx";
 
 type HomeSearch = DiarySearch & {
   activity?: string;
@@ -99,19 +100,20 @@ function CalendarPending() {
           Completed Strava activities. Time left lives on the This week page.
         </p>
       </div>
-      <Skeleton className="h-[40rem] w-full rounded-xl" />
+      <ToolbarSkeleton widths={["w-60"]} />
+      <ListSkeleton rows={7} className="md:hidden" />
+      <div className="ring-foreground/10 hidden grid-cols-7 gap-px overflow-hidden rounded-lg ring-1 md:grid">
+        {Array.from({ length: 35 }, (_, index) => (
+          <div key={index} className="bg-card flex h-28 flex-col justify-between p-2">
+            <Skeleton className="h-5 w-full rounded-sm" />
+            <Skeleton className="size-4 self-end rounded-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function CalendarError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load calendar</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load calendar" error={error} />;
 }

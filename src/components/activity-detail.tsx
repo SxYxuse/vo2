@@ -21,7 +21,8 @@ import { ActivityDetailMap } from "@/components/activity-detail-map.tsx";
 import { SERIES_META } from "@/components/activity-detail-series.ts";
 import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
-import { StatCard } from "@/components/stat-card.tsx";
+import { StatGridSkeleton } from "@/components/route-states.tsx";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
 import type { BestsReturn } from "@/services/personal-bests.ts";
@@ -69,7 +70,7 @@ function ActivityDetailBody({
         open={mapOpen}
         onOpenChange={onMapOpenChange}
       />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+      <StatGrid className="sm:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Distance"
           value={formatDistanceKm(detail.distance)}
@@ -114,7 +115,7 @@ function ActivityDetailBody({
           value={formatLocomotion(detail.kpis.avgSpeed, detail.sportType)}
           color={SERIES_META.speed.color}
         />
-      </div>
+      </StatGrid>
 
       {detail.hasStreams ? (
         <Suspense fallback={<Skeleton className="h-52 w-full rounded-lg sm:h-72" />}>
@@ -194,11 +195,8 @@ export function ActivityDetailPending({ diary }: { diary?: ActivitySearch }) {
         <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-4 w-80 max-w-full" />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <Skeleton key={index} className="h-20 rounded-lg" />
-        ))}
-      </div>
+      <Skeleton className="h-48 w-full rounded-lg sm:h-64" />
+      <StatGridSkeleton cells={6} className="sm:grid-cols-3 xl:grid-cols-6" />
       <Skeleton className="h-8 w-full max-w-80 rounded-md" />
       <Skeleton className="h-52 w-full rounded-lg sm:h-72" />
     </div>

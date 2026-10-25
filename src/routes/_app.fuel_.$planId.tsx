@@ -13,12 +13,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, RouteError, StatGridSkeleton } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/fuel_/$planId")({
   loader: ({ context, params }) =>
     context.queryClient.query(loaderQuery(routePlanQueryOptions(params.planId))),
   pendingMs: 200,
-  pendingComponent: () => <Skeleton className="h-96 w-full rounded-xl" />,
+  pendingComponent: RoutePlanPending,
   errorComponent: RoutePlanError,
   component: RoutePlanPage,
 });
@@ -63,17 +64,24 @@ function RoutePlanPage() {
   );
 }
 
-function RoutePlanError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
+function RoutePlanPending() {
   return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load this route</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        <BackToRoutes />
-      </EmptyContent>
-    </Empty>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-8 w-56 max-w-full" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
+      <StatGridSkeleton cells={4} className="lg:grid-cols-4" />
+      <Skeleton className="h-52 w-full rounded-lg" />
+      <PanelSkeleton />
+    </div>
+  );
+}
+
+function RoutePlanError({ error }: ErrorComponentProps) {
+  return (
+    <RouteError title="Could not load this route" error={error}>
+      <BackToRoutes />
+    </RouteError>
   );
 }

@@ -1,5 +1,5 @@
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
-import { StatCard, type StatCardProps } from "@/components/stat-card.tsx";
+import { StatCard, StatGrid, type StatCardProps } from "@/components/stat-card.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import {
@@ -91,11 +91,11 @@ export function ActivityRideAnalysis({ ride }: { ride: RideSummary }) {
       description="Moving time split by gradient: what you pushed and how fast you spun on each slope."
     >
       {stats.length ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatGrid className="sm:grid-cols-4">
           {stats.map((stat) => (
             <StatCard key={stat.label} {...stat} />
           ))}
-        </div>
+        </StatGrid>
       ) : null}
 
       {ride.bands.length ? (

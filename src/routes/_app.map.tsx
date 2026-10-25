@@ -14,6 +14,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RouteError } from "@/components/route-states.tsx";
 
 if (typeof window !== "undefined") {
   void import("@/components/activity-map-view.tsx");
@@ -86,13 +87,5 @@ function MapPending() {
 }
 
 function MapError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load map</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load map" error={error} />;
 }

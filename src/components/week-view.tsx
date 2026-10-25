@@ -56,10 +56,11 @@ import {
 } from "@/components/responsive-dialog.tsx";
 import { PhaseBadge, PriorityBadge } from "@/components/season-map.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
+import { ListSkeleton, StatGridSkeleton } from "@/components/route-states.tsx";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
@@ -152,6 +153,21 @@ function weekReasons(data: PlannedWeek, summary: WeekSummary, coach: WeekCoachSt
   return reasons;
 }
 
+/** Same layout as the loaded week: badges, the stat panel, then the seven days. */
+export function WeekViewSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 sm:gap-4">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-5 w-14 rounded-full" />
+        <Skeleton className="h-5 w-40 rounded-full" />
+        <Skeleton className="ms-auto h-4 w-24" />
+      </div>
+      <StatGridSkeleton cells={3} className="grid-cols-3" />
+      <ListSkeleton rows={7} />
+    </div>
+  );
+}
+
 export function WeekView({ data }: { data: PlannedWeek }) {
   const summary = useMemo(() => summarizeWeek(data), [data]);
   const { data: coach } = useQuery(weekCoachQueryOptions);
@@ -171,7 +187,7 @@ export function WeekView({ data }: { data: PlannedWeek }) {
   );
 
   if (!coach || !views) {
-    return <Skeleton className="h-96 w-full rounded-xl" />;
+    return <WeekViewSkeleton />;
   }
   const projection = projectPlan(views, data, summary);
   const minutes = weekMinutes(views);
@@ -182,43 +198,46 @@ export function WeekView({ data }: { data: PlannedWeek }) {
     <div className="flex flex-col gap-3 sm:gap-4">
       <WeekHeading data={data} replanning={replanning} />
       <Banners coach={coach} data={data} onAdapt={() => setAdapting(true)} />
-      <Card className="py-3">
-        <CardContent className="flex flex-col gap-3 px-3 sm:px-4">
-          <div className="grid grid-cols-3 gap-3">
-            <Stat
-              label="Fitness"
-              value={Math.round(projection.fitnessNow)}
-              hint={`${signed(projection.fitnessSunday - projection.fitnessNow)} by Sunday`}
-            />
-            <Stat
-              label="Form"
-              value={signed(summary.form)}
-              hint={
-                projection.formMondayLabel
-                  ? `${signed(projection.formMonday)} on Monday`
-                  : undefined
-              }
-              tone={
-                summary.form < -30
-                  ? "text-destructive"
-                  : summary.form < -10
-                    ? "text-warning"
-                    : undefined
-              }
-            />
-            <Stat
-              label="Week"
-              value={minutesLabel(minutes.done)}
-              hint={`of ${minutesLabel(minutes.total)} planned`}
-            />
-          </div>
+      <StatGrid
+        className="grid-cols-3"
+        footer={
           <WeekBar
             done={minutes.done}
             missed={minutes.missed}
             total={minutes.total + minutes.missed}
           />
-        </CardContent>
-      </Card>
+        }
+      >
+        <StatCard
+          label="Fitness"
+          value={Math.round(projection.fitnessNow)}
+          trend={{
+            label: `${signed(projection.fitnessSunday - projection.fitnessNow)} by Sunday`,
+            tone: projection.fitnessSunday > projection.fitnessNow ? "success" : "secondary",
+          }}
+        />
+        <StatCard
+          label="Form"
+          value={signed(summary.form)}
+          trend={
+            projection.formMondayLabel
+              ? { label: `${signed(projection.formMonday)} on Monday` }
+              : undefined
+          }
+          valueClassName={
+            summary.form < -30
+              ? "text-destructive"
+              : summary.form < -10
+                ? "text-warning"
+                : undefined
+          }
+        />
+        <StatCard
+          label="Week"
+          value={minutesLabel(minutes.done)}
+          hint={`of ${minutesLabel(minutes.total)} planned`}
+        />
+      </StatGrid>
 
       <ol className="grid grid-cols-1 overflow-hidden rounded-xl border md:grid-cols-7 md:gap-2 md:overflow-visible md:rounded-none md:border-0">
         {views.map((view) => (
@@ -348,26 +367,6 @@ function Banners({
     );
   }
   return null;
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  hint?: React.ReactNode;
-  tone?: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className={cn("font-mono text-lg font-semibold tabular-nums", tone)}>{value}</span>
-      {hint ? <span className="text-muted-foreground truncate text-xs">{hint}</span> : null}
-    </div>
-  );
 }
 
 function WeekBar({ done, missed, total }: { done: number; missed: number; total: number }) {
