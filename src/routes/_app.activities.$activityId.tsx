@@ -15,7 +15,7 @@ import {
 import { sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
 import { parseBestsReturn, type BestsReturn } from "@/services/personal-bests.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { RouteError } from "@/components/route-states.tsx";
 
 type ActivitySearch = DiarySearch & BestsReturn & { map?: true };
 
@@ -90,13 +90,5 @@ function ActivityPending() {
 }
 
 function ActivityError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load activity</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load activity" error={error} />;
 }

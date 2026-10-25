@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
 import { CalendarIcon, RefreshCwIcon, SparklesIcon, WeightIcon } from "lucide-react";
@@ -84,6 +85,7 @@ export function BirthDateField<T extends ProfileFormValues>({
   const birthDate = useWatch({ control, name: "birthDate" as FieldPath<T> }) as string | null;
   const age = ageFromBirthDate(birthDate);
   const birth = birthDate ? parseBirthDate(birthDate) : null;
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <Controller
@@ -93,7 +95,7 @@ export function BirthDateField<T extends ProfileFormValues>({
         <Field data-invalid={fieldState.invalid}>
           <FieldLabel htmlFor={`${idPrefix}-birth`}>Birthday</FieldLabel>
           <div className="flex flex-wrap items-center gap-2">
-            <Popover>
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger
                 render={
                   <Button
@@ -118,7 +120,11 @@ export function BirthDateField<T extends ProfileFormValues>({
                   endMonth={new Date()}
                   disabled={{ after: new Date() }}
                   onSelect={(next) => {
-                    if (next) field.onChange(formatBirthDate(next));
+                    if (!next) return;
+                    field.onChange(formatBirthDate(next));
+                    // Picking the day finishes the field; on a phone the open calendar would
+                    // otherwise cover the step's Continue button.
+                    setPickerOpen(false);
                   }}
                 />
               </PopoverContent>

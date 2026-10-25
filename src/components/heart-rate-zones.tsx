@@ -25,12 +25,15 @@ import { FITNESS_PERIODS, periodStartMs } from "@/services/training-load.ts";
 import { EfficiencyTrendCard } from "@/components/heart-rate-efficiency.tsx";
 import { HeartRateReportCard } from "@/components/heart-rate-report.tsx";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
-import { StatCard } from "@/components/stat-card.tsx";
-import { InfoTooltip } from "@/components/tap-tooltip.tsx";
-import { Badge } from "@/components/ui/badge";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
+import {
+  InfoTooltip,
+  TapTooltip,
+  TapTooltipContent,
+  TapTooltipTrigger,
+} from "@/components/tap-tooltip.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const DATE_MED = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
@@ -147,7 +150,7 @@ export function HeartRateZones({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <StatGrid className="lg:grid-cols-4">
         <StatCard
           hintClassName="line-clamp-2"
           label="Max HR"
@@ -180,7 +183,7 @@ export function HeartRateZones({
           info={TIME_INFO}
           color="var(--color-ds-teal-700)"
         />
-      </div>
+      </StatGrid>
       <Card>
         <CardHeader className="gap-2">
           <div className="flex items-center gap-1">
@@ -224,42 +227,63 @@ export function HeartRateZones({
                   ) : null,
                 )}
               </div>
-              <ItemGroup className="gap-3">
-                {zoneShare.map((zone) => (
-                  <Item key={zone.id} size="sm" className="flex-col items-stretch gap-1.5 px-0">
-                    <ItemContent className="gap-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
+              <ul className="flex flex-col">
+                {zoneShare.map((zone) => {
+                  const bpm = formatZoneBpm(zone, zone.id === "z5");
+                  return (
+                    <li
+                      key={zone.id}
+                      className="grid min-h-11 grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_3rem_2.25rem] items-center gap-x-3 py-1"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
+                          aria-hidden
                           className="size-2 shrink-0 rounded-full"
                           style={{ backgroundColor: zone.def.color }}
                         />
-                        <ItemTitle>
-                          {zone.def.label} · {zone.def.name}
-                        </ItemTitle>
-                        <Badge variant="outline">{formatZoneBpm(zone, zone.id === "z5")}</Badge>
-                        <InfoTooltip label={`About ${zone.def.label}`}>{zone.def.info}</InfoTooltip>
+                        <div className="flex min-w-0 flex-col">
+                          <TapTooltip>
+                            <TapTooltipTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  aria-label={`${zone.def.label} · ${zone.def.name}`}
+                                  className="decoration-muted-foreground/50 truncate text-left text-sm font-medium underline decoration-dotted underline-offset-4"
+                                />
+                              }
+                            >
+                              {zone.def.label.replace("Zone ", "Z")} {zone.def.name}
+                            </TapTooltipTrigger>
+                            <TapTooltipContent className="max-w-72">
+                              {zone.def.info}
+                            </TapTooltipContent>
+                          </TapTooltip>
+                          {bpm === "per sport" ? null : (
+                            <span className="text-muted-foreground truncate text-xs tabular-nums">
+                              {bpm}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <ItemDescription className="w-14 shrink-0 font-mono tabular-nums">
-                          {formatHmm(zone.seconds)}
-                        </ItemDescription>
-                        <span className="bg-muted h-1 min-w-0 flex-1 overflow-hidden rounded-md">
-                          <span
-                            className="block h-full rounded-md"
-                            style={{
-                              width: `${Math.max(zone.pct, zone.seconds > 0 ? 0.5 : 0)}%`,
-                              backgroundColor: zone.def.color,
-                            }}
-                          />
-                        </span>
-                        <ItemDescription className="w-8 shrink-0 text-right font-mono tabular-nums">
-                          {Math.round(zone.pct)}%
-                        </ItemDescription>
-                      </div>
-                    </ItemContent>
-                  </Item>
-                ))}
-              </ItemGroup>
+                      <span className="bg-muted h-1.5 overflow-hidden rounded-full">
+                        <span
+                          className="block h-full rounded-full"
+                          style={{
+                            width: `${Math.max(zone.pct, zone.seconds > 0 ? 0.5 : 0)}%`,
+                            backgroundColor: zone.def.color,
+                          }}
+                        />
+                      </span>
+                      <span className="text-right text-sm tabular-nums">
+                        {formatHmm(zone.seconds)}
+                      </span>
+                      <span className="text-muted-foreground text-right text-xs tabular-nums">
+                        {Math.round(zone.pct)}%
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
             </>
           )}
         </CardContent>

@@ -15,6 +15,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/bests")({
   validateSearch: (search: Record<string, unknown>): BestsSearch => parseBestsSearch(search),
@@ -94,13 +95,5 @@ function BestsPending() {
 }
 
 function BestsError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load bests</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load bests" error={error} />;
 }

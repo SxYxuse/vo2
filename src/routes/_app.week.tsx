@@ -4,7 +4,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sync-panel.tsx";
-import { WeekView } from "@/components/week-view.tsx";
+import { WeekView, WeekViewSkeleton } from "@/components/week-view.tsx";
 import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -16,7 +16,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/week")({
   loader: ({ context }) => {
@@ -95,19 +95,11 @@ function WeekTargetPending() {
   return (
     <>
       <WeekTargetHeading />
-      <Skeleton className="h-80 w-full rounded-xl" />
+      <WeekViewSkeleton />
     </>
   );
 }
 
 function WeekTargetError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load this week</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load this week" error={error} />;
 }

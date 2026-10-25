@@ -313,7 +313,7 @@ function PasteSeasonBody({ onDone }: { onDone: () => void }) {
         </FieldGroup>
       </div>
       <ResponsiveDialogFooter>
-        <Button type="submit" disabled={!text.trim() || paste.isPending} className="h-10 sm:h-7">
+        <Button type="submit" disabled={!text.trim() || paste.isPending}>
           {paste.isPending ? <Spinner data-icon="inline-start" /> : null}
           Add goals
         </Button>
@@ -455,7 +455,7 @@ function GoalDatePicker({
             type="button"
             variant="outline"
             aria-invalid={invalid}
-            className="h-10 w-full justify-start font-normal sm:h-7"
+            className="w-full justify-start font-normal"
           />
         }
       >
@@ -649,7 +649,7 @@ function GoalFormBody({
                   id="goal-name"
                   autoComplete="off"
                   placeholder="Trail des Fagnes"
-                  className="h-10 sm:h-7"
+
                   value={form.name}
                   onChange={(event) => set({ name: event.target.value })}
                 />
@@ -664,10 +664,7 @@ function GoalFormBody({
                       if (next != null) set({ sportType: String(next) });
                     }}
                   >
-                    <SelectTrigger
-                      id="goal-sport"
-                      className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
-                    >
+                    <SelectTrigger id="goal-sport" className="w-full">
                       <SelectValue>{formatSportType(form.sportType)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
@@ -697,7 +694,7 @@ function GoalFormBody({
               <div className="grid grid-cols-2 gap-3">
                 <Field data-invalid={errorFor("distanceM") != null}>
                   <FieldLabel htmlFor="goal-distance">Distance</FieldLabel>
-                  <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                  <InputGroup className="[&_input]:h-full">
                     <InputGroupInput
                       id="goal-distance"
                       type="text"
@@ -715,7 +712,7 @@ function GoalFormBody({
                 </Field>
                 <Field data-invalid={errorFor("elevationGainM") != null}>
                   <FieldLabel htmlFor="goal-elevation">Elevation gain</FieldLabel>
-                  <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                  <InputGroup className="[&_input]:h-full">
                     <InputGroupInput
                       id="goal-elevation"
                       type="text"
@@ -757,10 +754,7 @@ function GoalFormBody({
                             if (next != null) setLeg(index, { sportType: String(next) });
                           }}
                         >
-                          <SelectTrigger
-                            aria-label={`Sport ${index + 2}`}
-                            className="w-full data-[size=default]:h-10 sm:data-[size=default]:h-7"
-                          >
+                          <SelectTrigger aria-label={`Sport ${index + 2}`} className="w-full">
                             <SelectValue>{formatSportType(leg.sportType)}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
@@ -773,7 +767,7 @@ function GoalFormBody({
                             </SelectGroup>
                           </SelectContent>
                         </Select>
-                        <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                        <InputGroup className="[&_input]:h-full">
                           <InputGroupInput
                             aria-label={`Distance ${index + 2}`}
                             type="text"
@@ -787,7 +781,7 @@ function GoalFormBody({
                             <InputGroupText>km</InputGroupText>
                           </InputGroupAddon>
                         </InputGroup>
-                        <InputGroup className="h-10 sm:h-7 [&_input]:h-full">
+                        <InputGroup className="[&_input]:h-full">
                           <InputGroupInput
                             aria-label={`Elevation gain ${index + 2}`}
                             type="text"
@@ -811,7 +805,7 @@ function GoalFormBody({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-10 self-start sm:h-7"
+                      className="self-start"
                       onClick={() =>
                         set({
                           legs: [
@@ -892,7 +886,7 @@ function GoalFormBody({
         </FieldGroup>
       </div>
       <ResponsiveDialogFooter>
-        <Button type="submit" disabled={save.isPending} className="h-10 sm:h-7">
+        <Button type="submit" disabled={save.isPending}>
           {save.isPending ? <Spinner data-icon="inline-start" /> : null}
           {step === "details" ? "Next" : goal ? "Save" : "Add goal"}
         </Button>
@@ -902,7 +896,7 @@ function GoalFormBody({
             variant="outline"
             disabled={save.isPending}
             onClick={() => setStep("details")}
-            className="h-10 sm:order-first sm:h-7"
+            className="sm:order-first"
           >
             Back
           </Button>
@@ -913,7 +907,7 @@ function GoalFormBody({
               variant="destructive"
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
-              className="h-10 sm:order-first sm:mr-auto sm:h-7"
+              className="sm:order-first sm:mr-auto"
             >
               {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
               Delete for good
@@ -923,7 +917,7 @@ function GoalFormBody({
               type="button"
               variant="destructive"
               onClick={() => setConfirmingDelete(true)}
-              className="h-10 sm:order-first sm:mr-auto sm:h-7"
+              className="sm:order-first sm:mr-auto"
             >
               Delete
             </Button>

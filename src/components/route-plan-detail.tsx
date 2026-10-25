@@ -36,7 +36,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog.tsx";
-import { StatCard } from "@/components/stat-card.tsx";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -102,7 +102,7 @@ export function RoutePlanDetail({ plan }: { plan: RoutePlanView }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <StatGrid className="lg:grid-cols-4">
         <StatCard
           label="Time"
           value={`~${formatAroundTime(prediction.elapsedSec)}`}
@@ -111,7 +111,7 @@ export function RoutePlanDetail({ plan }: { plan: RoutePlanView }) {
         <StatCard label="Moving" value={`~${formatAroundTime(prediction.movingSec)}`} />
         <StatCard label="Distance" value={formatDistanceKm(prediction.distanceM)} />
         <StatCard label="Climbing" value={formatElevation(prediction.gainM)} />
-      </div>
+      </StatGrid>
 
       {prediction.basis.warnings.length > 0 || plan.catalogChanged ? (
         <Alert>

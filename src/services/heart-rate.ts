@@ -20,7 +20,8 @@ export const HR_ZONES = [
     id: "z1",
     label: "Zone 1",
     name: "Recovery",
-    color: "var(--color-ds-teal-700)",
+    // Gray to red, cool to hot, so the zone order reads from the color alone.
+    color: "var(--color-ds-gray-700)",
     info: "Easy effort. Breathing is light and you can talk in full sentences. Used for recovery and long aerobic time.",
   },
   {

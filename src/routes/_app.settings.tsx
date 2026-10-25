@@ -1,20 +1,12 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useParams, type ErrorComponentProps } from "@tanstack/react-router";
 
-import { Settings2Icon } from "lucide-react";
-
 import { SettingsForm } from "@/components/settings.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { isSettingsSection } from "@/lib/settings-sections.ts";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/settings")({
   loader: ({ context }) => context.queryClient.query(loaderQuery(settingsSnapshotQueryOptions)),
@@ -37,22 +29,11 @@ function SettingsPending() {
   return (
     <>
       <Skeleton className="h-8 w-40" />
-      <Skeleton className="h-80 w-full rounded-xl" />
+      <PanelSkeleton bodyClassName="h-64" />
     </>
   );
 }
 
 function SettingsError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Settings2Icon />
-        </EmptyMedia>
-        <EmptyTitle>Could not load settings</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load settings" error={error} />;
 }

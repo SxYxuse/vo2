@@ -13,6 +13,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/season")({
   loader: ({ context }) => context.queryClient.query(loaderQuery(seasonQueryOptions)),
@@ -71,22 +72,17 @@ function SeasonPending() {
   return (
     <>
       <SeasonHeader />
-      <Skeleton className="h-64 w-full rounded-xl" />
+      <PanelSkeleton bodyClassName="h-32" />
+      <Skeleton className="h-28 w-full rounded-lg" />
     </>
   );
 }
 
 function SeasonError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
   return (
     <>
       <SeasonHeader />
-      <Empty className="min-h-64 border">
-        <EmptyHeader>
-          <EmptyTitle>Could not load your season</EmptyTitle>
-          <EmptyDescription>{message}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <RouteError title="Could not load your season" error={error} />
     </>
   );
 }

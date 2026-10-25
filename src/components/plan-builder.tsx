@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
@@ -42,7 +42,10 @@ import {
   signed,
   weekdayShort,
 } from "@/components/planned-session.ts";
+import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
+import { ListSkeleton, PanelSkeleton } from "@/components/route-states.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { WeekShapeFields } from "@/components/week-shape-fields.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -124,7 +127,7 @@ export function PlanBuilder({
       </Alert>
     );
   }
-  if (!data) return <Skeleton className="h-96 w-full rounded-xl" />;
+  if (!data) return <PanelSkeleton bodyClassName="h-56" />;
   return (
     <BuilderSteps
       data={data}
@@ -161,11 +164,17 @@ function BuilderSteps({
   const last = index === STEPS.length - 1;
 
   return (
-    <Card>
+    <Card className={SETUP_CARD}>
       <CardHeader className="gap-2 border-b">
-        <CardDescription>
-          Build your plan · {index + 1} of {STEPS.length}
-        </CardDescription>
+        {onboarding ? (
+          <div className="col-span-full">
+            <SetupProgress step={3} substep={{ index, count: STEPS.length }} />
+          </div>
+        ) : (
+          <CardDescription>
+            Build your plan · {index + 1} of {STEPS.length}
+          </CardDescription>
+        )}
         <CardTitle>
           <h1 className="text-xl font-semibold tracking-tight">{titleFor(step.id, data)}</h1>
         </CardTitle>
@@ -176,14 +185,16 @@ function BuilderSteps({
             </Button>
           </CardAction>
         ) : null}
-        <div className="col-span-full flex gap-1" aria-hidden>
-          {STEPS.map((item, at) => (
-            <span
-              key={item.id}
-              className={cn("h-1 flex-1 rounded-full", at <= index ? "bg-primary" : "bg-muted")}
-            />
-          ))}
-        </div>
+        {onboarding ? null : (
+          <div className="col-span-full flex gap-1" aria-hidden>
+            {STEPS.map((item, at) => (
+              <span
+                key={item.id}
+                className={cn("h-1 flex-1 rounded-full", at <= index ? "bg-primary" : "bg-muted")}
+              />
+            ))}
+          </div>
+        )}
       </CardHeader>
       <CardContent
         key={step.id}
@@ -217,20 +228,25 @@ function BuilderSteps({
           </Alert>
         ) : null}
       </CardContent>
-      <CardFooter className="flex gap-2 border-t">
+      <CardFooter className={SETUP_FOOTER}>
         {index > 0 ? (
-          <Button variant="outline" onClick={() => setIndex(index - 1)} disabled={starting}>
+          <Button
+            variant="outline"
+            className="max-sm:flex-1"
+            onClick={() => setIndex(index - 1)}
+            disabled={starting}
+          >
             <ChevronLeftIcon data-icon="inline-start" />
             Back
           </Button>
         ) : onExit && exitLabel === "Back" ? (
-          <Button variant="outline" onClick={onExit}>
+          <Button variant="outline" className="max-sm:flex-1" onClick={onExit}>
             <ChevronLeftIcon data-icon="inline-start" />
             Back
           </Button>
         ) : null}
         <Button
-          className="ms-auto"
+          className="ms-auto max-sm:flex-1"
           disabled={starting}
           onClick={() => (last ? onStart(draft) : setIndex(index + 1))}
         >
@@ -400,16 +416,6 @@ function GoalRow({
   );
 }
 
-function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="font-mono text-lg font-semibold tabular-nums">{value}</span>
-      {hint ? <span className="text-muted-foreground text-xs">{hint}</span> : null}
-    </div>
-  );
-}
-
 function SportSplit({ stats }: { stats: HistoryStats }) {
   const shown = KEY_SPORTS.filter((sport) => stats.sportShare[sport] >= 0.01);
   if (!shown.length) return null;
@@ -459,37 +465,34 @@ function StartStep({
           : "Not enough history yet: VO2 starts at 45 minutes per training day and learns from what you do."}
       </p>
       {hasHistory ? (
-        <div className="flex flex-col gap-4 rounded-lg border p-3">
-          <div className="grid grid-cols-2 gap-4">
-            <StatTile
-              label="Weekly time"
-              value={minutesLabel(stats.weeklyMinutes.average)}
-              hint={`usually ${minutesLabel(stats.weeklyMinutes.low)} – ${minutesLabel(stats.weeklyMinutes.high)}`}
+        <StatGrid footer={<SportSplit stats={stats} />}>
+          <StatCard
+            label="Weekly time"
+            value={minutesLabel(stats.weeklyMinutes.average)}
+            hint={`usually ${minutesLabel(stats.weeklyMinutes.low)} – ${minutesLabel(stats.weeklyMinutes.high)}`}
+          />
+          <StatCard
+            label="Sessions"
+            value={`${Math.round(stats.sessionsPerWeek * 10) / 10} / week`}
+            hint={
+              stats.doubleDaysPerWeek >= 0.5
+                ? `2 sessions on ${Math.round(stats.doubleDaysPerWeek)} day a week`
+                : undefined
+            }
+          />
+          <StatCard
+            label="Fitness"
+            value={Math.round(data.fitness.ctl)}
+            hint={`Form ${signed(data.fitness.form)}`}
+          />
+          {stats.longest ? (
+            <StatCard
+              label="Longest session"
+              value={minutesLabel(stats.longest.minutes)}
+              hint={format(parseISO(`${stats.longest.date}T12:00:00`), "EEE d MMM")}
             />
-            <StatTile
-              label="Sessions"
-              value={`${Math.round(stats.sessionsPerWeek * 10) / 10} / week`}
-              hint={
-                stats.doubleDaysPerWeek >= 0.5
-                  ? `2 sessions on ${Math.round(stats.doubleDaysPerWeek)} day a week`
-                  : undefined
-              }
-            />
-            <StatTile
-              label="Fitness"
-              value={Math.round(data.fitness.ctl)}
-              hint={`Form ${signed(data.fitness.form)}`}
-            />
-            {stats.longest ? (
-              <StatTile
-                label="Longest session"
-                value={minutesLabel(stats.longest.minutes)}
-                hint={format(parseISO(`${stats.longest.date}T12:00:00`), "EEE d MMM")}
-              />
-            ) : null}
-          </div>
-          <SportSplit stats={stats} />
-        </div>
+          ) : null}
+        </StatGrid>
       ) : null}
       <div className="flex flex-col gap-3 rounded-lg border p-3">
         <div className="flex items-center justify-between gap-3">
@@ -553,7 +556,16 @@ function PreviewStep({ data, draft }: { data: BuilderData; draft: PlanDraft }) {
       </Alert>
     );
   }
-  if (isPending || !preview) return <Skeleton className="h-72 w-full rounded-lg" />;
+  if (isPending || !preview) {
+    // Shaped like the preview below (season bars, then a short day list) so nothing jumps.
+    return (
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-10 w-full rounded-md" />
+        <Skeleton className="h-3 w-40" />
+        <ListSkeleton rows={2} />
+      </div>
+    );
+  }
   const thisWeek = preview.days.filter((day) => !day.beforePlan);
   const weekMinutes = thisWeek.reduce(
     (sum, day) => sum + day.sessions.reduce((total, item) => total + item.minutes, 0),

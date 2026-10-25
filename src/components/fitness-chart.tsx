@@ -18,7 +18,7 @@ import {
 
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
-import { StatCard } from "@/components/stat-card.tsx";
+import { StatCard, StatGrid, type StatTrend } from "@/components/stat-card.tsx";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
 
 import {
@@ -132,6 +132,12 @@ function formTone(tsb: number) {
   if (tsb >= 5) return "text-success";
   if (tsb >= -30) return "text-muted-foreground";
   return "text-destructive";
+}
+
+function formBadgeTone(tsb: number): StatTrend["tone"] {
+  if (tsb >= 5) return "success";
+  if (tsb >= -30) return "secondary";
+  return "destructive";
 }
 
 // Same tints as the success and warning badges.
@@ -323,7 +329,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
               </p>
             </div>
             <NextGoal goals={goals} pmc={pmc} timeZone={timeZone} />
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <StatGrid className="sm:grid-cols-3 lg:grid-cols-5">
               <StatCard
                 label="Fitness (CTL)"
                 value={roundLoad(latest.ctl).toFixed(1)}
@@ -345,10 +351,9 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
               <StatCard
                 label="Form (TSB)"
                 value={roundLoad(latest.tsb).toFixed(1)}
-                hint={formLabel(latest.tsb)}
+                trend={{ label: formLabel(latest.tsb), tone: formBadgeTone(latest.tsb) }}
                 info={SERIES_INFO.tsb}
                 color={CHART_CONFIG.tsb.color}
-                hintClassName={formTone(latest.tsb)}
                 sparkline={
                   isDesktop === true ? undefined : <Sparkline data={series} dataKey="tsb" />
                 }
@@ -366,7 +371,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
                 info={AVG_WEEK_INFO}
                 color="var(--color-ds-teal-700)"
               />
-            </div>
+            </StatGrid>
             {estimatedShare > 0.05 ? (
               <Badge variant="info" className="w-fit gap-1">
                 {Math.round(estimatedShare * 100)}% of load in this period is estimated
