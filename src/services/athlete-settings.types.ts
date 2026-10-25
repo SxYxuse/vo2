@@ -72,6 +72,8 @@ const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
   calendarPeriod: calendarPeriodSchema.default("month"),
+  /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
+  topEffortsSince: z.iso.datetime().nullable().default(null),
 });
 
 export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
@@ -143,10 +145,25 @@ export function familyCollectors(
   };
 }
 
+/**
+ * Turning top 10 effort celebrations on starts the clock, so nothing found before counts; a save
+ * that leaves the switch alone keeps it (ADR 0027).
+ */
+export function nextTopEffortsSince(
+  stored: string | null,
+  celebrate: boolean | undefined,
+  now: Date,
+) {
+  if (celebrate === undefined) return stored;
+  if (!celebrate) return null;
+  return stored ?? now.toISOString();
+}
+
 export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
   calendarPeriod: "month",
+  topEffortsSince: null,
 };
 
 export function formatSportType(sportType: string) {

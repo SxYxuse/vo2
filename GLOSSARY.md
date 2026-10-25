@@ -13,7 +13,7 @@ Permanently removing an athlete and their whole local copy, training plan, route
 _Avoid_: Account deletion, deactivation, closing an account
 
 **Athlete settings**:
-The athlete's own choices that shape what VO2 shows: per sport type whether it is shown, its colour, and its heart-rate and power sensors; sport-group sharing; and the calendar period. Saved together with the birthday and body weight.
+The athlete's own choices that shape what VO2 shows: per sport type whether it is shown, its colour, and its heart-rate and power sensors; sport-group sharing; the calendar period; and whether to celebrate top 10 efforts. Saved together with the birthday and body weight.
 _Avoid_: Calendar settings, preferences, app settings
 
 **Body weight**:
@@ -189,6 +189,10 @@ _Avoid_: Mean-max curve, power duration curve, critical power
 **Personal best**:
 The top best effort for one distance or duration across the local copy, or within a chosen period. "All time" means everything copied so far, which may not yet be the athlete's whole Strava history.
 _Avoid_: PR, record, all-time best
+
+**Top 10 effort**:
+A best effort or biggest day that ranks in the top 10 of its distance, duration, or kind, either all time or within its calendar year. The first place is the personal best.
+_Avoid_: Top 10 performance, PR, record
 
 **Biggest day**:
 A single-activity best that is not a pace or power: the longest activity, the most climbing in one activity, or the biggest single climb.

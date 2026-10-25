@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, athleteMetrics, athleteSettings } from "@/db/schema.ts";
+import { activities, athleteMetrics, athleteSettings, topEffortCelebrations } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import {
@@ -9,6 +9,7 @@ import {
   DEFAULT_ATHLETE_SETTINGS,
   DEFAULT_PROFILE_SETTINGS,
   mergeAthleteSettings,
+  nextTopEffortsSince,
   parseAthleteSettings,
   type AthleteSettings,
   type ProfileSave,
@@ -193,6 +194,11 @@ export async function saveAthleteSettingsImpl(
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
     sportGroupShares: value.sportGroupShares,
     calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
+    topEffortsSince: nextTopEffortsSince(
+      stored?.topEffortsSince ?? null,
+      value.celebrateTopEfforts,
+      new Date(),
+    ),
   });
   if (!parsed) throw new Error("Invalid athlete settings");
   const settings = mergeAthleteSettings(parsed, [...sportTypes, ...Object.keys(value.sportTypes)]);
@@ -241,6 +247,13 @@ export async function saveAthleteSettingsImpl(
         target: athleteSettings.userId,
         set: { value: settings, updatedAt },
       });
+    // Turning celebrations off drops the ones not yet seen, so turning them on again later
+    // shows no backlog (ADR 0027).
+    if (!settings.topEffortsSince) {
+      await tx
+        .delete(topEffortCelebrations)
+        .where(and(eq(topEffortCelebrations.userId, userId), isNull(topEffortCelebrations.seenAt)));
+    }
   });
 
   // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load; set anchors

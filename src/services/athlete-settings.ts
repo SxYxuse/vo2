@@ -21,6 +21,7 @@ export const athleteSettingsSaveSchema = z.object({
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
   calendarPeriod: calendarPeriodSchema.optional(),
+  celebrateTopEfforts: z.boolean().optional(),
   training: trainingPlanSchema.optional(),
   heartRate: heartRateSettingsSchema.optional(),
 });

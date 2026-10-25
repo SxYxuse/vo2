@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
+  CelebrateTopEffortsField,
   PlanSummary,
   ProfileFields,
   TrainingShapeField,
@@ -110,6 +111,7 @@ export function SettingsForm({
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
+        celebrateTopEfforts: data.settings.topEffortsSince != null,
         timeZone,
       }),
       { keepDirtyValues: true, keepErrors: true },
@@ -254,6 +256,8 @@ export function SettingsForm({
               </FieldGroup>
             ) : section === "calendar" ? (
               <CalendarPeriodField idPrefix="settings" control={form.control} />
+            ) : section === "bests" ? (
+              <CelebrateTopEffortsField idPrefix="settings" control={form.control} />
             ) : section === "sync" ? (
               <SettingsSyncSection enabled />
             ) : section === "heart-rate" ? (
