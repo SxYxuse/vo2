@@ -45,43 +45,41 @@ const requestLogger = createMiddleware().server(async ({ next, request, pathname
   const { errorFields, logger } = await import("@/lib/logger.server.ts");
   const { withoutWebhookSecret } = await import("@/services/strava-webhook.ts");
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const path = withoutWebhookSecret(pathname);
 
-  return runWithLogContext(
-    { requestId, method: request.method, path: withoutWebhookSecret(pathname) },
-    async () => {
-      if (isNoisyPath(pathname)) return next();
+  return runWithLogContext({ requestId, method: request.method, path }, async () => {
+    if (isNoisyPath(pathname)) return next();
 
-      if (pathname.startsWith("/_serverFn")) {
-        // Bun.serve defaults to a 10s idleTimeout, which kills long Strava copies.
-        extendBunIdleTimeout(request, 120);
-      }
+    if (pathname.startsWith("/_serverFn")) {
+      // Bun.serve defaults to a 10s idleTimeout, which kills long Strava copies.
+      extendBunIdleTimeout(request, 120);
+    }
 
-      const started = Date.now();
-      logger.info("request.start");
-      try {
-        const result = await next();
-        const response = result instanceof Response ? result : result.response;
-        logger.info("request.end", {
-          status: response.status,
-          durationMs: Date.now() - started,
-        });
-        return result;
-      } catch (error) {
-        if (isAbortError(error)) {
-          logger.warn("request.aborted", {
-            ...errorFields(error),
-            durationMs: Date.now() - started,
-          });
-          throw error;
-        }
-        logger.error("request.failed", {
+    const started = Date.now();
+    logger.info("request.start");
+    try {
+      const result = await next();
+      const response = result instanceof Response ? result : result.response;
+      logger.info("request.end", {
+        status: response.status,
+        durationMs: Date.now() - started,
+      });
+      return result;
+    } catch (error) {
+      if (isAbortError(error)) {
+        logger.warn("request.aborted", {
           ...errorFields(error),
           durationMs: Date.now() - started,
         });
         throw error;
       }
-    },
-  );
+      logger.error("request.failed", {
+        ...errorFields(error),
+        durationMs: Date.now() - started,
+      });
+      throw error;
+    }
+  });
 });
 
 export const startInstance = createStart(() => ({
