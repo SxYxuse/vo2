@@ -34,6 +34,7 @@ import {
   type ConstraintKind,
   type DayView,
   type SessionView,
+  type WeekAhead,
   type WeekCoachState,
 } from "@/services/week-plan.ts";
 import { summarizeWeek, type WeekSummary, type WeekTargetData } from "@/services/week-target.ts";
@@ -390,11 +391,72 @@ function DayCell({
   today: string;
   keyNames: Map<string, string>;
   notes: number;
-  onOpen: () => void;
+  /** Without it the day is only shown, as in the weeks ahead. */
+  onOpen?: () => void;
 }) {
   const { day } = view;
   const isToday = day.date === today;
   const empty = !view.sessions.length && !view.extras.length;
+  const body = (
+    <>
+      <span
+        className={cn(
+          "flex w-10 shrink-0 flex-col items-center md:w-auto md:flex-row md:gap-1.5",
+          isToday ? "text-info" : "text-muted-foreground",
+        )}
+      >
+        <span className="text-[11px] font-semibold uppercase">
+          {isToday ? "Today" : weekdayShort(day.date)}
+        </span>
+        <span className="text-foreground text-lg font-semibold tabular-nums md:text-sm">
+          {dayOfMonth(day.date)}
+        </span>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch">
+        {day.rest && empty ? (
+          <span className="text-muted-foreground flex items-center gap-1.5 py-1 text-sm font-medium">
+            <MoonIcon aria-hidden className="size-4" />
+            Rest day
+          </span>
+        ) : day.beforePlan && empty ? (
+          <span className="text-muted-foreground py-1 text-xs">Before this week's plan</span>
+        ) : empty ? (
+          <span className="text-muted-foreground py-1 text-xs">{day.note ?? "Free"}</span>
+        ) : null}
+        {view.sessions.map((item) => (
+          <SessionChip key={item.session.id} item={item} view={view} keyNames={keyNames} />
+        ))}
+        {view.extras.map(({ activity, keySessionId }) => (
+          <span
+            key={activity.id}
+            className="text-muted-foreground flex items-center gap-1.5 py-0.5 text-xs"
+          >
+            <CheckIcon aria-hidden className="text-success size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {activity.title}
+              {keySessionId && keyNames.get(keySessionId)
+                ? ` · ticked off ${keyNames.get(keySessionId)}`
+                : " · extra"}
+            </span>
+            <span className="tabular-nums">{minutesLabel(activity.minutes)}</span>
+          </span>
+        ))}
+        {notes ? (
+          <span className="text-muted-foreground text-[11px]">
+            {notes === 1 ? "1 note" : `${notes} notes`} to the coach
+          </span>
+        ) : null}
+      </span>
+      {onOpen ? (
+        <ChevronRightIcon
+          aria-hidden
+          className="text-muted-foreground mt-2 size-4 shrink-0 md:hidden"
+        />
+      ) : null}
+    </>
+  );
+  const layout =
+    "flex min-h-14 w-full items-start gap-3 px-3 py-2.5 text-left md:min-h-32 md:flex-col md:gap-2 md:px-2.5";
   return (
     <li
       className={cn(
@@ -403,66 +465,71 @@ function DayCell({
         day.rest && empty && "bg-muted/40",
       )}
     >
-      <button
-        type="button"
-        onClick={onOpen}
-        className="hover:bg-muted/40 flex min-h-14 w-full items-start gap-3 px-3 py-2.5 text-left md:min-h-32 md:flex-col md:gap-2 md:px-2.5"
-        aria-label={`${dayLabel(day.date, today)}: open the day`}
-      >
-        <span
-          className={cn(
-            "flex w-10 shrink-0 flex-col items-center md:w-auto md:flex-row md:gap-1.5",
-            isToday ? "text-info" : "text-muted-foreground",
-          )}
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn("hover:bg-muted/40", layout)}
+          aria-label={`${dayLabel(day.date, today)}: open the day`}
         >
-          <span className="text-[11px] font-semibold uppercase">
-            {isToday ? "Today" : weekdayShort(day.date)}
-          </span>
-          <span className="text-foreground text-lg font-semibold tabular-nums md:text-sm">
-            {dayOfMonth(day.date)}
-          </span>
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col gap-1.5 self-stretch">
-          {day.rest && empty ? (
-            <span className="text-muted-foreground flex items-center gap-1.5 py-1 text-sm font-medium">
-              <MoonIcon aria-hidden className="size-4" />
-              Rest day
-            </span>
-          ) : day.beforePlan && empty ? (
-            <span className="text-muted-foreground py-1 text-xs">Before this week's plan</span>
-          ) : empty ? (
-            <span className="text-muted-foreground py-1 text-xs">{day.note ?? "Free"}</span>
-          ) : null}
-          {view.sessions.map((item) => (
-            <SessionChip key={item.session.id} item={item} view={view} keyNames={keyNames} />
-          ))}
-          {view.extras.map(({ activity, keySessionId }) => (
-            <span
-              key={activity.id}
-              className="text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1 text-xs"
-            >
-              <CheckIcon aria-hidden className="text-success size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                {activity.title}
-                {keySessionId && keyNames.get(keySessionId)
-                  ? ` · ticked off ${keyNames.get(keySessionId)}`
-                  : " · extra"}
-              </span>
-              <span className="tabular-nums">{minutesLabel(activity.minutes)}</span>
-            </span>
-          ))}
-          {notes ? (
-            <span className="text-muted-foreground text-[11px]">
-              {notes === 1 ? "1 note" : `${notes} notes`} to the coach
-            </span>
-          ) : null}
-        </span>
-        <ChevronRightIcon
-          aria-hidden
-          className="text-muted-foreground mt-2 size-4 shrink-0 md:hidden"
-        />
-      </button>
+          {body}
+        </button>
+      ) : (
+        <div className={layout}>{body}</div>
+      )}
     </li>
+  );
+}
+
+/** The weeks after this one as the plan lays them out today: a look ahead, nothing to act on. */
+export function WeeksAhead({ weeks, today }: { weeks: WeekAhead[]; today: string }) {
+  if (!weeks.length) return null;
+  return (
+    <section className="flex flex-col gap-3 sm:gap-4" aria-labelledby="weeks-ahead">
+      <div className="flex flex-col gap-0.5">
+        <h2 id="weeks-ahead" className="text-base font-semibold tracking-tight">
+          Coming up
+        </h2>
+        <p className="text-muted-foreground text-xs">
+          A preview if this week goes to plan. Each week is planned for real when it starts.
+        </p>
+      </div>
+      {weeks.map((week, index) => {
+        const views: DayView[] = week.days.map((day) => ({
+          day,
+          sessions: day.sessions.map((session) => ({ session, state: "planned", activity: null })),
+          extras: [],
+        }));
+        const keyNames = new Map(Object.entries(week.keyNames));
+        const minutes = week.days
+          .flatMap((day) => day.sessions)
+          .reduce((sum, session) => sum + session.minutes, 0);
+        return (
+          <div key={week.weekStart} className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">
+                {index === 0 ? "Next week" : "Week after"}
+              </span>
+              <PhaseBadge kind={week.phase.kind} lighter={week.phase.lighter} />
+              <span className="text-muted-foreground ms-auto text-xs">
+                {weekRangeLabel(week.weekStart)} · {minutesLabel(minutes)}
+              </span>
+            </div>
+            <ol className="grid grid-cols-1 overflow-hidden rounded-xl border md:grid-cols-7 md:gap-2 md:overflow-visible md:rounded-none md:border-0">
+              {views.map((view) => (
+                <DayCell
+                  key={view.day.date}
+                  view={view}
+                  today={today}
+                  keyNames={keyNames}
+                  notes={0}
+                />
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -482,10 +549,8 @@ function SessionChip({
   return (
     <span
       className={cn(
-        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-        state === "done" && "bg-success/10",
-        state === "planned" && "bg-muted/60",
-        (state === "missed" || state === "moved") && "border border-dashed opacity-70",
+        "flex items-center gap-2 py-0.5 text-sm",
+        (state === "missed" || state === "moved") && "opacity-60",
       )}
     >
       <span
