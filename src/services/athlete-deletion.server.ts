@@ -19,13 +19,15 @@ export async function deleteCurrentAthleteImpl() {
         throw error;
       }
     },
-    // Every athlete table cascades from the user row, sessions and the Strava link included.
-    removeAthlete: async (userId) => {
-      await db.delete(user).where(eq(user.id, userId));
-    },
+    removeAthlete,
   });
   logger.info("athlete.deleted", result);
   return result;
+}
+
+/** Every athlete table cascades from the user row, sessions and the Strava link included. */
+export async function removeAthlete(userId: string) {
+  await db.delete(user).where(eq(user.id, userId));
 }
 
 /** False once the athlete was deleted mid-request, so long-running work can stop quietly. */

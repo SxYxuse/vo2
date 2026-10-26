@@ -1,4 +1,5 @@
 import { env } from "@/configs/env.ts";
+import { STRAVA_WEBHOOK_PATH } from "@/services/strava-webhook.ts";
 
 import type { StreamSet, SummaryActivity } from "./client.ts";
 
@@ -6,6 +7,9 @@ import type { StreamSet, SummaryActivity } from "./client.ts";
  * Local stand-in for www.strava.com, mounted at MOCK_STRAVA_PATH when STRAVA_MOCK=1.
  * It speaks the same OAuth and v3 HTTP surface the app uses, so sign-in, token
  * refresh and sync run unchanged; only the base URL differs.
+ *
+ * Two mock-only endpoints stand in for what an athlete does on strava.com, and push the event
+ * Strava would send: `POST /dev/deauthorize` and `POST /dev/activities/<id>/delete`.
  */
 export const MOCK_STRAVA_PATH = "/api/mock-strava";
 
@@ -52,6 +56,10 @@ const TOKEN_TTL_SEC = 10 * 60;
 let lastIssuedAt = 0;
 let revokedAt = 0;
 
+/** Activities the athlete deleted "on Strava" since the server started. */
+const deletedActivityIds = new Set<number>();
+let subscriptionCallback: string | null = null;
+
 export async function handleMockStravaRequest(request: Request): Promise<Response> {
   if (!env.STRAVA_MOCK) return new Response("Not found", { status: 404 });
 
@@ -62,6 +70,34 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
   if (path === "/oauth/authorize") return authorize(query);
   if (path === "/oauth/token" && request.method === "POST") return token(await request.formData());
   if (path === "/oauth/deauthorize" && request.method === "POST") return deauthorize(request);
+  if (path === "/api/v3/push_subscriptions" && request.method === "POST") {
+    return createSubscription(await request.formData());
+  }
+  if (path === "/api/v3/push_subscriptions" && request.method === "GET") {
+    return json(subscriptionCallback ? [{ id: 1, callback_url: subscriptionCallback }] : []);
+  }
+  if (/^\/api\/v3\/push_subscriptions\/\d+$/.test(path) && request.method === "DELETE") {
+    subscriptionCallback = null;
+    return new Response(null, { status: 204 });
+  }
+  if (path === "/dev/deauthorize" && request.method === "POST") {
+    revokedAt = lastIssuedAt;
+    return pushEvent({
+      object_type: "athlete",
+      aspect_type: "update",
+      object_id: ATHLETE.id,
+      updates: { authorized: "false" },
+    });
+  }
+  const deleted = /^\/dev\/activities\/(\d+)\/delete$/.exec(path);
+  if (deleted && request.method === "POST") {
+    deletedActivityIds.add(Number(deleted[1]));
+    return pushEvent({
+      object_type: "activity",
+      aspect_type: "delete",
+      object_id: Number(deleted[1]),
+    });
+  }
   if (!isLive(bearerToken(request), "access")) return unauthorized("access_token");
   if (path === "/api/v3/athlete") return json(ATHLETE);
   if (path === "/api/v3/athlete/zones") return json(ZONES);
@@ -77,7 +113,9 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
   }
   const streams = /^\/api\/v3\/activities\/(\d+)\/streams$/.exec(path);
   if (streams) {
-    const spec = buildCatalog(new Date()).find((item) => item.id === Number(streams[1]));
+    const spec = buildCatalog(new Date()).find(
+      (item) => item.id === Number(streams[1]) && !deletedActivityIds.has(item.id),
+    );
     return spec ? json(streamsFor(spec)) : json({ message: "Record Not Found" }, 404);
   }
   return json({ message: "Record Not Found" }, 404);
@@ -121,6 +159,47 @@ function deauthorize(request: Request) {
   if (!isLive(token, "access")) return unauthorized("access_token");
   revokedAt = lastIssuedAt;
   return json({ access_token: token });
+}
+
+/** Strava calls the callback with a challenge and only subscribes if it is echoed back. */
+async function createSubscription(form: FormData) {
+  const callbackUrl = form.get("callback_url");
+  const verifyToken = form.get("verify_token");
+  if (typeof callbackUrl !== "string" || typeof verifyToken !== "string") {
+    return json({ message: "Bad Request", field: "callback_url" }, 400);
+  }
+  const handshake = new URL(callbackUrl);
+  handshake.searchParams.set("hub.mode", "subscribe");
+  handshake.searchParams.set("hub.verify_token", verifyToken);
+  handshake.searchParams.set("hub.challenge", "mock-challenge");
+  const response = await fetch(handshake);
+  const body = response.ok ? ((await response.json()) as { "hub.challenge"?: string }) : {};
+  if (body["hub.challenge"] !== "mock-challenge") {
+    return json(
+      { message: "Bad Request", errors: [{ field: "callback url", code: "not verifiable" }] },
+      400,
+    );
+  }
+  subscriptionCallback = callbackUrl;
+  return json({ id: 1 }, 201);
+}
+
+/** Without a subscription, events go to this app's own webhook so the dev loop needs no setup. */
+async function pushEvent(event: Record<string, unknown>) {
+  const callback =
+    subscriptionCallback ??
+    `${env.BETTER_AUTH_URL}${STRAVA_WEBHOOK_PATH}/${env.STRAVA_WEBHOOK_SECRET}`;
+  const response = await fetch(callback, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...event,
+      owner_id: ATHLETE.id,
+      subscription_id: 1,
+      event_time: Math.floor(Date.now() / 1000),
+    }),
+  });
+  return json({ delivered: response.ok }, response.ok ? 200 : 502);
 }
 
 function bearerToken(request: Request) {
@@ -187,6 +266,7 @@ function listActivities(params: {
   before?: number;
 }): SummaryActivity[] {
   const items = buildCatalog(new Date())
+    .filter((spec) => !deletedActivityIds.has(spec.id))
     .filter((spec) => params.after == null || spec.start.getTime() / 1000 > params.after)
     .filter((spec) => params.before == null || spec.start.getTime() / 1000 < params.before)
     .map(toSummary);

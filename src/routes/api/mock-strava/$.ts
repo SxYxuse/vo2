@@ -6,6 +6,7 @@ export const Route = createFileRoute("/api/mock-strava/$")({
     handlers: {
       GET: ({ request }) => handleMockStravaRequest(request),
       POST: ({ request }) => handleMockStravaRequest(request),
+      DELETE: ({ request }) => handleMockStravaRequest(request),
     },
   },
 });

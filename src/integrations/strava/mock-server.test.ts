@@ -162,3 +162,77 @@ describe("StravaApi against mock Strava", () => {
     expect(await new StravaApi(accessToken).getActivityStreams(42)).toEqual({});
   });
 });
+
+describe("mock Strava push events", () => {
+  const callback = `${APP_URL}/api/strava-webhook/hook-secret`;
+  let received: Request[];
+
+  beforeEach(() => {
+    received = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (request.url.startsWith(MOCK_URL)) return handleMockStravaRequest(request);
+      if (!request.url.startsWith(callback)) {
+        throw new Error(`Unexpected network call to ${request.url}`);
+      }
+      received.push(request);
+      const challenge = new URL(request.url).searchParams.get("hub.challenge");
+      return Response.json(challenge ? { "hub.challenge": challenge } : {});
+    });
+  });
+
+  async function subscribe(verifyToken = "hook-secret") {
+    return mockRequest("/api/v3/push_subscriptions", {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: "mock",
+        client_secret: "mock",
+        callback_url: callback,
+        verify_token: verifyToken,
+      }),
+    });
+  }
+
+  it("verifies the callback before creating a push subscription", async () => {
+    const response = await subscribe();
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ id: expect.any(Number) });
+    const handshake = new URL(received[0]!.url);
+    expect(handshake.searchParams.get("hub.mode")).toBe("subscribe");
+    expect(handshake.searchParams.get("hub.verify_token")).toBe("hook-secret");
+  });
+
+  it("deleting an activity on Strava hides it and pushes a delete event", async () => {
+    await subscribe();
+    const { access_token } = await signIn();
+    const api = new StravaApi(access_token);
+    const [newest] = await api.listAthleteActivities({ page: 1, perPage: 1 });
+
+    const response = await mockRequest(`/dev/activities/${newest!.id}/delete`, { method: "POST" });
+
+    expect(response.status).toBe(200);
+    expect((await api.listAthleteActivities()).map((item) => item.id)).not.toContain(newest!.id);
+    expect(await received.at(-1)!.json()).toMatchObject({
+      object_type: "activity",
+      aspect_type: "delete",
+      object_id: newest!.id,
+      owner_id: 1,
+    });
+  });
+
+  it("revoking VO2 on Strava kills its tokens and pushes a deauthorize event", async () => {
+    await subscribe();
+    const { access_token } = await signIn();
+
+    await mockRequest("/dev/deauthorize", { method: "POST" });
+
+    expect(await athleteStatus(access_token)).toBe(401);
+    expect(await received.at(-1)!.json()).toMatchObject({
+      object_type: "athlete",
+      object_id: 1,
+      owner_id: 1,
+      updates: { authorized: "false" },
+    });
+  });
+});
