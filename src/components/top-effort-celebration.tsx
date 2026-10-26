@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { cn } from "cn";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
@@ -10,7 +10,6 @@ import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogDescription,
-  ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
   useIsDesktop,
@@ -19,7 +18,16 @@ import { boardLabel, formatValue } from "@/components/personal-bests.tsx";
 import { Button } from "@/components/ui/button";
 import { topEffortCelebrationsQueryOptions } from "@/lib/queries.ts";
 import {
+  formatBpm,
+  formatDistanceKm,
+  formatDuration,
+  formatElevation,
+  formatWatts,
+} from "@/services/activity-detail.types.ts";
+import { formatLocomotion, locomotionFor } from "@/services/locomotion.ts";
+import {
   markTopEffortsSeen,
+  type CelebratedActivity,
   type TopEffortCelebrations,
   type TopEffortPlacement,
 } from "@/services/top-efforts.ts";
@@ -91,6 +99,20 @@ export function TopEffortCelebration() {
   const { data } = useQuery(topEffortCelebrationsQueryOptions);
   // What is on screen stays put while a later sync refetches the query underneath.
   const [shown, setShown] = useState<TopEffortCelebrations | null>(null);
+  const [index, setIndex] = useState(0);
+  // Opening an activity steps the deck aside; it comes back, on the same card, once the
+  // athlete leaves that activity, so the other cards aren't lost.
+  const [away, setAway] = useState<{ path: string; arrived: boolean } | null>(null);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+
+  useEffect(() => {
+    if (!away) return;
+    if (pathname === away.path) {
+      if (!away.arrived) setAway({ ...away, arrived: true });
+    } else if (away.arrived) {
+      setAway(null);
+    }
+  }, [pathname, away]);
 
   useEffect(() => {
     if (shown || !data?.placements.length) return;
@@ -112,12 +134,15 @@ export function TopEffortCelebration() {
     queryClient.setQueryData(topEffortCelebrationsQueryOptions.queryKey, (current) =>
       current
         ? {
+            ...current,
             activityIds: current.activityIds.filter((id) => !seen.has(id)),
             placements: current.placements.filter((placement) => !seen.has(placement.activity.id)),
           }
         : current,
     );
     setShown(null);
+    setIndex(0);
+    setAway(null);
     void markTopEffortsSeen({ data: { activityIds: shown.activityIds } }).finally(() =>
       queryClient.invalidateQueries({ queryKey: topEffortCelebrationsQueryOptions.queryKey }),
     );
@@ -125,29 +150,46 @@ export function TopEffortCelebration() {
 
   return (
     <ResponsiveDialog
-      open={shown != null}
+      open={shown != null && away == null}
       onOpenChange={(open) => {
         if (!open) dismiss();
       }}
     >
-      {shown ? <CelebrationContent placements={shown.placements} onDone={dismiss} /> : null}
+      {shown ? (
+        <CelebrationContent
+          placements={shown.placements}
+          activities={shown.activities}
+          index={index}
+          onIndex={setIndex}
+          onAway={(path) => setAway({ path, arrived: false })}
+        />
+      ) : null}
     </ResponsiveDialog>
   );
 }
 
 function CelebrationContent({
   placements,
-  onDone,
+  activities,
+  index,
+  onIndex,
+  onAway,
 }: {
   placements: TopEffortPlacement[];
-  onDone: () => void;
+  activities: TopEffortCelebrations["activities"];
+  index: number;
+  onIndex: (index: number) => void;
+  onAway: (path: string) => void;
 }) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const [index, setIndex] = useState(0);
+  const [flipped, setFlipped] = useState(false);
   const count = placements.length;
-  const current = placements[index]!;
-  const go = (step: number) => setIndex((at) => Math.min(Math.max(at + step, 0), count - 1));
+  // Past the last card the deck starts over, and back from the first goes to the last.
+  const go = (step: number) => {
+    setFlipped(false);
+    onIndex((index + step + count) % count);
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -156,22 +198,14 @@ function CelebrationContent({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [count]);
+  });
 
   function openActivity(placement: TopEffortPlacement) {
-    onDone();
+    onAway(`/activities/${placement.activity.id}`);
     void navigate({
       to: "/activities/$activityId",
       params: { activityId: placement.activity.id },
       search: { from: "bests", best: placement.boardId, period: periodOf(placement) },
-    });
-  }
-
-  function viewBests() {
-    onDone();
-    void navigate({
-      to: "/bests",
-      search: { sport: current.sport, best: current.boardId, period: periodOf(current) },
     });
   }
 
@@ -183,32 +217,28 @@ function CelebrationContent({
         </ResponsiveDialogTitle>
         <ResponsiveDialogDescription className="text-center">
           {count === 1
-            ? "Tap the card to open the activity."
-            : "Swipe through them. Tap a card to open its activity."}
+            ? "Tap the card to turn it over."
+            : "Swipe through them. Tap a card to turn it over."}
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
 
       <div className="flex items-center justify-center gap-2 px-4 py-3">
         {isDesktop && count > 1 ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Previous"
-            disabled={index === 0}
-            onClick={() => go(-1)}
-          >
+          <Button variant="ghost" size="icon" aria-label="Previous" onClick={() => go(-1)}>
             <ChevronLeftIcon />
           </Button>
         ) : null}
-        <Deck placements={placements} index={index} onStep={go} onOpen={openActivity} />
+        <Deck
+          placements={placements}
+          activities={activities}
+          index={index}
+          flipped={flipped}
+          onFlip={() => setFlipped((at) => !at)}
+          onStep={go}
+          onOpen={openActivity}
+        />
         {isDesktop && count > 1 ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Next"
-            disabled={index === count - 1}
-            onClick={() => go(1)}
-          >
+          <Button variant="ghost" size="icon" aria-label="Next" onClick={() => go(1)}>
             <ChevronRightIcon />
           </Button>
         ) : null}
@@ -233,15 +263,6 @@ function CelebrationContent({
           </p>
         )
       ) : null}
-
-      <ResponsiveDialogFooter className="flex-row">
-        <Button className="flex-1" onClick={viewBests}>
-          View bests
-        </Button>
-        <Button className="flex-1" variant="outline" onClick={onDone}>
-          Close
-        </Button>
-      </ResponsiveDialogFooter>
     </ResponsiveDialogContent>
   );
 }
@@ -253,7 +274,7 @@ function periodOf(placement: TopEffortPlacement) {
 
 /** Where a card sits relative to the front one: turned away, in front, or fanned behind. */
 function stackStyle(offset: number, dragX: number): CSSProperties {
-  if (offset < 0) return { transform: "translateX(-130%) rotate(-14deg)", opacity: 0 };
+  if (offset === -1) return { transform: "translateX(-130%) rotate(-14deg)", opacity: 0 };
   if (offset === 0) {
     return dragX
       ? { transform: `translateX(${dragX}px) rotate(${dragX / 18}deg)`, transition: "none" }
@@ -264,14 +285,29 @@ function stackStyle(offset: number, dragX: number): CSSProperties {
   return { transform: "scale(0.9)", opacity: 0 };
 }
 
+/**
+ * A card's place in the deck going round: 0 in front, 1 and 2 fanned behind, -1 the card just
+ * turned away. With three cards or fewer every other card is behind, so none is turned away.
+ */
+function deckOffset(at: number, index: number, count: number) {
+  const behind = (at - index + count) % count;
+  return count > 3 && behind === count - 1 ? -1 : behind;
+}
+
 function Deck({
   placements,
+  activities,
   index,
+  flipped,
+  onFlip,
   onStep,
   onOpen,
 }: {
   placements: TopEffortPlacement[];
+  activities: TopEffortCelebrations["activities"];
   index: number;
+  flipped: boolean;
+  onFlip: () => void;
   onStep: (step: number) => void;
   onOpen: (placement: TopEffortPlacement) => void;
 }) {
@@ -316,28 +352,28 @@ function Deck({
       onPointerCancel={onPointerEnd}
     >
       {placements.map((placement, at) => {
-        const offset = at - index;
+        const offset = deckOffset(at, index, placements.length);
         // Cards far from the front are neither seen nor animated.
-        if (offset < -1 || offset > 3) return null;
+        if (offset > 3) return null;
+        const front = offset === 0;
+        const turned = front && flipped;
+        const flip = () => {
+          if (!dragged.current) onFlip();
+        };
         return (
           <div
             key={cardKey(placement)}
+            inert={!front}
             className="absolute inset-0 transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none"
             style={{
-              zIndex: placements.length - at,
-              ...stackStyle(offset, offset === 0 ? dragX : 0),
+              // The card turned away stays on top, so it leaves over the deck, not under it.
+              zIndex: offset === -1 ? placements.length + 1 : placements.length - offset,
+              ...stackStyle(offset, front ? dragX : 0),
             }}
           >
-            <button
-              type="button"
-              tabIndex={offset === 0 ? 0 : -1}
-              aria-hidden={offset !== 0}
-              aria-label={`${cardTitle(placement)}, ${rankBadge(placement)}, ${rankText(placement)}. Open ${placement.activity.name}`}
-              onClick={() => {
-                if (!dragged.current && offset === 0) onOpen(placement);
-              }}
+            <div
               className={cn(
-                "size-full",
+                "size-full perspective-[800px]",
                 dealing &&
                   "animate-[top-effort-deal_0.55s_cubic-bezier(0.2,0.9,0.3,1.15)_both] motion-reduce:animate-none",
               )}
@@ -345,8 +381,31 @@ function Deck({
                 dealing ? { animationDelay: `${0.15 + Math.max(2 - at, 0) * 0.12}s` } : undefined
               }
             >
-              <EffortCard placement={placement} />
-            </button>
+              <div
+                className={cn(
+                  "relative size-full transition-transform duration-500 ease-out transform-3d motion-reduce:transition-none",
+                  turned && "rotate-y-180",
+                )}
+              >
+                <button
+                  type="button"
+                  inert={turned}
+                  aria-label={`${cardTitle(placement)}, ${rankBadge(placement)}, ${rankText(placement)}. Turn over`}
+                  onClick={flip}
+                  className="absolute inset-0 backface-hidden"
+                >
+                  <EffortCard placement={placement} />
+                </button>
+                <div inert={!turned} className="absolute inset-0 rotate-y-180 backface-hidden">
+                  <EffortCardBack
+                    placement={placement}
+                    summary={activities[placement.activity.id]}
+                    onFlip={flip}
+                    onOpen={onOpen}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         );
       })}
@@ -354,16 +413,21 @@ function Deck({
   );
 }
 
+function medalOf(placement: TopEffortPlacement) {
+  return placement.allTimeRank ? MEDAL[placement.allTimeRank] : undefined;
+}
+
+function cardFace(medal: CSSProperties | undefined) {
+  return cn(
+    "relative flex size-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left shadow-lg",
+    medal ? "text-[oklch(0.25_0.03_70)]" : "border bg-card text-card-foreground",
+  );
+}
+
 function EffortCard({ placement }: { placement: TopEffortPlacement }) {
-  const medal = placement.allTimeRank ? MEDAL[placement.allTimeRank] : undefined;
+  const medal = medalOf(placement);
   return (
-    <div
-      className={cn(
-        "relative flex size-full flex-col justify-between overflow-hidden rounded-2xl p-4 text-left shadow-lg",
-        medal ? "text-[oklch(0.25_0.03_70)]" : "border bg-card text-card-foreground",
-      )}
-      style={medal}
-    >
+    <div className={cardFace(medal)} style={medal}>
       {placement.allTimeRank === 1 ? (
         <span
           aria-hidden
@@ -385,6 +449,63 @@ function EffortCard({ placement }: { placement: TopEffortPlacement }) {
           {placement.activity.name} · {CARD_DATE.format(new Date(placement.activity.start))}
         </p>
       </div>
+    </div>
+  );
+}
+
+/** The activity's own numbers, the whole of it rather than the effort. */
+function activityStats(sportType: string, summary: CelebratedActivity) {
+  const { distance, movingTime } = summary;
+  const kmh = distance && movingTime ? (distance / movingTime) * 3.6 : null;
+  const stats: [string, string][] = [
+    ["Distance", formatDistanceKm(distance)],
+    ["Moving time", formatDuration(movingTime)],
+    [locomotionFor(sportType).kpiLabel, formatLocomotion(kmh, sportType)],
+  ];
+  if (summary.totalElevationGain) {
+    stats.push(["Elevation", formatElevation(summary.totalElevationGain)]);
+  }
+  if (summary.averageHeartrate) stats.push(["Avg HR", formatBpm(summary.averageHeartrate)]);
+  if (summary.averageWatts) stats.push(["Avg power", formatWatts(summary.averageWatts)]);
+  return stats;
+}
+
+function EffortCardBack({
+  placement,
+  summary,
+  onFlip,
+  onOpen,
+}: {
+  placement: TopEffortPlacement;
+  summary: CelebratedActivity | undefined;
+  onFlip: () => void;
+  onOpen: (placement: TopEffortPlacement) => void;
+}) {
+  const medal = medalOf(placement);
+  const { activity } = placement;
+  return (
+    <div className={cardFace(medal)} style={medal}>
+      {/* Tapping anywhere but the button turns the card back. */}
+      <button type="button" aria-label="Turn back" onClick={onFlip} className="absolute inset-0" />
+      <div className="pointer-events-none relative">
+        <p className="text-[0.65rem] font-semibold tracking-widest uppercase opacity-70">
+          {CARD_DATE.format(new Date(activity.start))}
+        </p>
+        <p className="mt-1 line-clamp-2 text-sm leading-snug font-bold">{activity.name}</p>
+        {summary ? (
+          <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 text-xs">
+            {activityStats(activity.sportType, summary).map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="opacity-70">{label}</dt>
+                <dd className="font-semibold tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+      <Button size="sm" className="relative w-full" onClick={() => onOpen(placement)}>
+        Open activity
+      </Button>
     </div>
   );
 }

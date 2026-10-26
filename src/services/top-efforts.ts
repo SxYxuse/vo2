@@ -86,8 +86,21 @@ function rankOf(ranked: { rank: number; activity: BestsActivity }[], activityId:
   return ranked.find((effort) => effort.activity.id === activityId)?.rank ?? null;
 }
 
+/** The whole activity a top 10 effort came from, shown on the back of its card. */
+export type CelebratedActivity = {
+  distance: number | null;
+  movingTime: number;
+  totalElevationGain: number | null;
+  averageHeartrate: number | null;
+  averageWatts: number | null;
+};
+
 /** Top 10 efforts found but not yet seen, and the activities they came from. */
-export type TopEffortCelebrations = { activityIds: string[]; placements: TopEffortPlacement[] };
+export type TopEffortCelebrations = {
+  activityIds: string[];
+  placements: TopEffortPlacement[];
+  activities: Record<string, CelebratedActivity>;
+};
 
 export const loadTopEffortCelebrations = createServerFn({ method: "GET" }).handler(
   async (): Promise<TopEffortCelebrations> => {
