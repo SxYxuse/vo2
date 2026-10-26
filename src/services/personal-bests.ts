@@ -143,10 +143,10 @@ export function isNewBest(start: string, now = new Date()) {
   return now.getTime() - new Date(start).getTime() < NEW_BEST_DAYS * DAY_MS;
 }
 
-/** Calendar years with at least one activity, newest first, for the period picker. */
-export function periodYears(activities: BestsActivity[]) {
-  const years = new Set(activities.map((activity) => new Date(activity.start).getFullYear()));
-  return [...years].sort((a, b) => b - a).map((year) => String(year) as `${number}`);
+/** This year and last year, for the period picker. */
+export function periodYears(now = new Date()) {
+  const year = now.getFullYear();
+  return [String(year), String(year - 1)] as [`${number}`, `${number}`];
 }
 
 export type PowerCurvePoint = { seconds: number; period: number | null; allTime: number | null };

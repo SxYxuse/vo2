@@ -114,6 +114,7 @@ export function WeekShapeFields({
         </FieldLegend>
         <FieldDescription>Where the week's long session goes, when it has one.</FieldDescription>
         <ToggleGroup
+          size="sm"
           variant="outline"
           spacing={0}
           className="flex-wrap"
@@ -177,6 +178,7 @@ export function WeekShapeFields({
         </FieldDescription>
         <ToggleGroup
           multiple
+          size="sm"
           variant="outline"
           className="flex-wrap"
           value={value.sports}

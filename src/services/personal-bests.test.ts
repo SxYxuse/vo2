@@ -3,6 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   isNewBest,
   parseBestsSearch,
+  periodYears,
   powerCurve,
   previousBest,
   progression,
@@ -111,6 +112,12 @@ describe("new bests", () => {
   test("a best from the last 30 days is new", () => {
     expect(isNewBest(daysAgo(29), NOW)).toBe(true);
     expect(isNewBest(daysAgo(31), NOW)).toBe(false);
+  });
+});
+
+describe("period picker years", () => {
+  test("offers this year and last year", () => {
+    expect(periodYears(NOW)).toEqual(["2026", "2025"]);
   });
 });
 
