@@ -167,7 +167,7 @@ A single score of how costly an activity was. Power first, then heart rate, then
 _Avoid_: TSS, relative effort, stress score
 
 **Fitness**:
-The slow picture of training load: about six weeks of exponentially weighted load. It rises with consistent work and fades slowly at rest. It measures load absorbed, not ability (ADR 0020).
+The slow picture of training load: about six weeks of exponentially weighted load. It rises with consistent work and fades slowly at rest. It measures load absorbed, not ability (ADR 0033).
 _Avoid_: CTL used alone
 
 **Fatigue**:
@@ -183,7 +183,7 @@ Where the athlete is in the cycle of building, consolidating, recovering, and fr
 _Avoid_: Block, periodization, status
 
 **Best effort**:
-One activity's best over a fixed duration or distance: the best average power on a ride with a power meter, or the fastest time over a distance inside a road run, an outdoor ride, or a swim. Progress compares the last six weeks with the six before and the best of the year (ADR 0020, ADR 0025).
+One activity's best over a fixed duration or distance: the best average power on a ride with a power meter, or the fastest time over a distance inside a road run, an outdoor ride, or a swim. Progress compares the last six weeks with the six before and the best of the year (ADR 0033, ADR 0025).
 _Avoid_: PR, record, mean-max
 
 **Power curve**:

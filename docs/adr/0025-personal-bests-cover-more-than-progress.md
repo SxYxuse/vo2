@@ -1,6 +1,6 @@
 # Personal bests cover more than progress
 
-Progress (ADR 0020) compares only power-meter rides and road runs, because it answers "am I getting better?" across two blocks of training, and wind, terrain, and pool length would make any other comparison misleading. The bests page answers a different question: what is the best you have done? A personal best is a fact about one effort, not a comparison between blocks, so it can cover more:
+Progress (ADR 0033) compares only power-meter rides and road runs, because it answers "am I getting better?" across two blocks of training, and wind, terrain, and pool length would make any other comparison misleading. The bests page answers a different question: what is the best you have done? A personal best is a fact about one effort, not a comparison between blocks, so it can cover more:
 
 - **Rides by distance** (10 to 200 km) on outdoor rides without a motor: Ride, GravelRide, and MountainBikeRide. Virtual rides are left out because their speed and climbing are simulated, and e-bikes because the motor does part of the work. The power curve still reads every power-meter ride, virtual ones included, because trainer watts are real.
 - **Swims by distance** (100 to 3800 m) on swims, pool and open water alike (Strava calls both Swim). In a swim, rest at the wall keeps the clock running; on runs and rides a pause still stops it. Otherwise a 1500 m best could be stitched from 100 m repeats with the rests taken out.

@@ -27,6 +27,8 @@ jobs:
           node-version: "22"
           cache: true
 
+      - name: Generated route tree is up to date
+        run: vp run generate-routes && git diff --exit-code -- src/routeTree.gen.ts
       - run: vp check
       - run: vp run db:check
         env:
