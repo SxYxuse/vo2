@@ -388,7 +388,7 @@ function BestCard({
       <span className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
         {boardLabel(board)}
         {fresh ? (
-          <Badge variant="secondary" className="h-4 bg-success/15 px-1.5 text-[10px] text-success">
+          <Badge variant="success" className="h-4 px-1.5 text-[10px]">
             New
           </Badge>
         ) : (
