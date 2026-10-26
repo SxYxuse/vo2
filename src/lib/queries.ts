@@ -18,9 +18,12 @@ import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
 
-/** Loader/preload read: use cached data if present, otherwise fetch once. */
+/**
+ * Loader/preload read: use cached data if present, otherwise fetch once. Offline with nothing
+ * saved, it fails to the route's error state instead of pausing on a skeleton until reconnect.
+ */
 export function loaderQuery<T extends Record<string, unknown>>(options: T) {
-  return { ...options, staleTime: "static" as const, retry: 1 };
+  return { ...options, staleTime: "static" as const, retry: 1, networkMode: "always" as const };
 }
 
 export const appShellQueryOptions = queryOptions({

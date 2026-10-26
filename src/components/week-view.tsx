@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 
+import { useOnline } from "@/hooks/use-online.ts";
 import { weekCoachQueryOptions } from "@/lib/queries.ts";
 import { LIGHTER_HINT, PHASES } from "@/services/season-phase.ts";
 import { daysBetween, formatDaysLeft, seasonEvents, eventTitle } from "@/services/season.types.ts";
@@ -77,21 +78,6 @@ const CONSTRAINT_ICON: Record<ConstraintKind, typeof BanIcon> = {
 };
 
 const SHORT_WINDOWS = [30, 45, 60, 90] as const;
-
-function useOnline() {
-  const [online, setOnline] = useState(true);
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
-  }, []);
-  return online;
-}
 
 /**
  * Plans the rest of the week again when the stored plan predates a sync, a note, or a settings

@@ -20,6 +20,7 @@ import {
 } from "@/components/responsive-dialog.tsx";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useOnline } from "@/hooks/use-online.ts";
 import { toast } from "@/components/ui/toast";
 
 /** The goals behind a season change, in words: "Gravel des Monts (B)". */
@@ -55,6 +56,7 @@ export function AdaptPlanDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const online = useOnline();
   const adapt = useMutation({
     mutationFn: () => adaptPlan(),
     onSuccess: async () => {
@@ -108,7 +110,7 @@ export function AdaptPlanDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={adapt.isPending}>
             Keep current plan
           </Button>
-          <Button onClick={() => adapt.mutate()} disabled={adapt.isPending}>
+          <Button onClick={() => adapt.mutate()} disabled={adapt.isPending || !online}>
             {adapt.isPending ? <Spinner data-icon="inline-start" /> : null}
             Adapt plan
           </Button>

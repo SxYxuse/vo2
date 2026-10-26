@@ -8,6 +8,7 @@ import { SparklesIcon } from "lucide-react";
 import { activityAnalysisQueryOptions, analysisStatusQueryOptions } from "@/lib/queries.ts";
 import { CoachWriteup } from "@/components/activity-analysis-writeup.tsx";
 import { Badge } from "@/components/ui/badge";
+import { useOnline } from "@/hooks/use-online.ts";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,6 +44,7 @@ export function ActivityAnalysisCard({
   activityId: string;
   hasStreams: boolean;
 }) {
+  const online = useOnline();
   const statusQuery = useQuery(analysisStatusQueryOptions);
   const savedQuery = useQuery({
     ...activityAnalysisQueryOptions(activityId),
@@ -73,7 +75,7 @@ export function ActivityAnalysisCard({
           {mocked ? <Badge variant="warning">Mocked</Badge> : null}
           {isLoading ? null : (
             <Button
-              disabled={!hasStreams}
+              disabled={!hasStreams || !online}
               onMouseEnter={preloadActivityAnalysis}
               onFocus={preloadActivityAnalysis}
               onClick={() => setRunId((current) => (current ?? 0) + 1)}

@@ -1,0 +1,7 @@
+# Offline is read-only and shows what was last loaded
+
+The installed app opens with no signal and shows the views the athlete last loaded on that device: the calendar, This week and its sessions, the season, fitness, bests, heart rate, and settings. A banner says it is offline and how old the data is. Nothing that changes data works offline; Sync, re-planning, saving goals, and AI analysis are disabled or fail at once with "Nothing was saved", and nothing is queued to send later.
+
+Two copies make this work. A service worker (`public/sw.js`) keeps each page the server rendered and the build files it loaded, so a cold start offline has something to open; pages go to the network first and fall back to the saved copy after a few seconds, so a slow train connection opens too. The query cache is saved to IndexedDB, so the views loaded later in the app are there as well. Activity details, the map, AI analysis, and top-effort celebrations are not saved: they are large, need map tiles or the model, or are marked seen on the server. The saved copy is dropped after seven days, when another build is deployed, and when the athlete signs out or is deleted.
+
+Athletes open This week just before training, often where signal is worst, and before this an installed app with no network showed the phone's error page. Reading the last loaded week answers that. Making changes offline would mean replaying them later against a week that may have been planned again in the meantime, which is far more than the occasional offline edit is worth.

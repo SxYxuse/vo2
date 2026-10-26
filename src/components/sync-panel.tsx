@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { RefreshCwIcon } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client.ts";
+import { useOnline } from "@/hooks/use-online.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { syncStatusQueryOptions } from "@/lib/queries.ts";
 import { summarizeSyncStatus, type SyncTone } from "@/services/strava-sync.types.ts";
@@ -40,6 +41,7 @@ function useMinuteClock() {
 export function SyncPanel() {
   const { data: session } = authClient.useSession();
   const sync = useStravaSync();
+  const online = useOnline();
   const { data: status } = useQuery({ ...syncStatusQueryOptions, enabled: !!session?.user });
   const now = useMinuteClock();
 
@@ -53,7 +55,7 @@ export function SyncPanel() {
       size="sm"
       className="text-muted-foreground ms-auto min-w-0"
       onClick={() => sync.mutate()}
-      disabled={sync.isPending}
+      disabled={sync.isPending || !online}
       aria-busy={sync.isPending}
       aria-label={sync.isPending ? "Syncing from Strava" : summary.description}
     >
