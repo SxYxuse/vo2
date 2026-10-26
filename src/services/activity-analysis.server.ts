@@ -17,6 +17,7 @@ import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { analysisMessages, persistAnalysisOnce } from "./activity-analysis-run.ts";
+import { isOtherSportType } from "./sport-groups.ts";
 import {
   correlateStreamsDef,
   detectElevationSegmentsDef,
@@ -204,13 +205,14 @@ async function saveActivityAnalysis(input: {
   logger.info("analysis.saved", { activityId, mocked, model, chars: body.length });
 }
 
-async function ownsActivity(activityId: string, userId: string) {
+/** Other sport types have no activity page, so they get no analysis either (ADR 0029). */
+async function canAnalyseActivity(activityId: string, userId: string) {
   const [row] = await db
-    .select({ id: activities.id })
+    .select({ sportType: activities.sportType })
     .from(activities)
     .where(and(eq(activities.id, activityId), eq(activities.userId, userId)))
     .limit(1);
-  return Boolean(row);
+  return row != null && !isOtherSportType(row.sportType);
 }
 
 export async function handleActivityAnalysis(request: Request) {
@@ -226,7 +228,7 @@ export async function handleActivityAnalysis(request: Request) {
     return new Response("Missing activityId", { status: 400 });
   }
 
-  if (!(await ownsActivity(activityId, session.user.id))) {
+  if (!(await canAnalyseActivity(activityId, session.user.id))) {
     logger.warn("analysis.activity_not_found", { activityId });
     return new Response("Activity not found", { status: 404 });
   }

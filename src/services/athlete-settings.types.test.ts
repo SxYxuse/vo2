@@ -54,6 +54,20 @@ describe("mergeAthleteSettings", () => {
     expect(settings.sportTypes.Swim?.color).toBe("var(--color-ds-teal-700)");
   });
 
+  it("lists only sport-group types, never an other sport type", () => {
+    const settings = mergeAthleteSettings(
+      {
+        sportTypes: { Yoga: sport(true) },
+        sportGroupShares: {},
+        calendarPeriod: "month",
+        topEffortsSince: null,
+      },
+      ["Run", "WeightTraining", "Yoga", "Hike"],
+    );
+
+    expect(Object.keys(settings.sportTypes)).toEqual(["Hike", "Run"]);
+  });
+
   it("keeps stored visibility and color for a type that still appears on activities", () => {
     const settings = mergeAthleteSettings(
       {
@@ -82,9 +96,14 @@ describe("isSportTypeShown", () => {
     expect(isSportTypeShown(sportTypes, "Walk")).toBe(false);
   });
 
-  it("shows a shown sport type and one the settings don't know yet", () => {
+  it("shows a shown sport type and a sport-group type the settings don't know yet", () => {
     expect(isSportTypeShown(sportTypes, "Run")).toBe(true);
-    expect(isSportTypeShown(sportTypes, "Rowing")).toBe(true);
+    expect(isSportTypeShown(sportTypes, "GravelRide")).toBe(true);
+  });
+
+  it("never shows an other sport type, even one stored as shown", () => {
+    expect(isSportTypeShown({ Yoga: sport(true) }, "Yoga")).toBe(false);
+    expect(isSportTypeShown(sportTypes, "Rowing")).toBe(false);
   });
 });
 

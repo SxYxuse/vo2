@@ -1,6 +1,6 @@
 # Season goals drive the week target
 
-The cluster and main-goal rules are superseded by goal priority in [0024](0024-goal-priority-guardrails-and-week-coach.md). Fixed hours are superseded by the training plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md).
+The cluster and main-goal rules are superseded by goal priority in [0024](0024-goal-priority-guardrails-and-week-coach.md). Fixed hours are superseded by the training plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md). Any sport type as a goal is superseded by [0029](0029-vo2-shows-only-the-four-sport-groups.md): only sport-group types can be goals.
 
 The athlete plans a season as a list of goals: races or events, each with a name, sport type, date, distance, elevation gain, and an objective (finish, finish well, or perform). Any sport type can be a goal. Build pace and hours intent go away; the week target is set by the goals instead. Fixed hours stay, as the time the athlete has each week, a cap rather than a lever for progression.
 

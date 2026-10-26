@@ -39,11 +39,15 @@ Strava's specific classification of an activity, such as Run, TrailRun, Ride, or
 _Avoid_: Sport, discipline
 
 **Sport group**:
-A display grouping of related sport types: cycling, running, swimming, or walking.
+A display grouping of related sport types: cycling, running, swimming, or walking. These are the only sports VO2 shows.
 _Avoid_: Sport family (that term is reserved for the week split)
 
+**Other sport type**:
+A sport type outside the sport groups, such as WeightTraining, Yoga, or Rowing. Its activities are never shown, except as extras in the week plan, and it can't be a goal, but they still count toward training load and the week target's hours (ADR 0029).
+_Avoid_: Unsupported sport, hidden sport type (that is the athlete's choice)
+
 **Hidden sport type**:
-A sport type the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form, the week target, and planning's sensor detection (ADR 0015, ADR 0018).
+A sport type in a sport group that the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form, the week target, and planning's sensor detection (ADR 0015, ADR 0018).
 _Avoid_: Disabled sport, filtered sport, sport selection
 
 **Pace**:
@@ -125,11 +129,11 @@ A training day the plan may put two sessions on. The athlete sets how many a wee
 _Avoid_: Brick (a brick is one specific double: a run straight after a ride), double day
 
 **Key session**:
-A precise session VO2 generates each week: intervals, time in zone, or a long Z2. How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one activity of any sport spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
+A precise session VO2 generates each week: intervals, time in zone, or a long Z2. How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
-A planned session in zone 2 that is not a key session, at least 45 minutes on a bike or 30 on foot. Easy time is the week target minus key sessions and races, shared over the training days left. Any activity of 20 minutes or more on its day fills one.
+A planned session in zone 2 that is not a key session, at least 45 minutes on a bike or 30 on foot. Easy time is the week target minus key sessions and races, shared over the training days left. Any ride, run, swim, or walk of 20 minutes or more on its day fills one.
 _Avoid_: Filler, recovery (recovery is a shorter, zone 1 session when the athlete asks to take it easy while tired)
 
 **Week plan**:

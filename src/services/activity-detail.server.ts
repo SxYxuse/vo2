@@ -41,6 +41,7 @@ import {
   summarizeRide,
   type RideAnalysis,
 } from "./ride-analysis.ts";
+import { isOtherSportType } from "./sport-groups.ts";
 import { isCyclingSport } from "./training-load.ts";
 
 function isChartPreview(value: unknown): value is ActivityChartPreview {
@@ -91,6 +92,8 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     logger.warn("activity_detail.not_found", { activityId: id });
     return null;
   }
+  // Other sport types are never shown, so their page is missing like any other (ADR 0029).
+  if (isOtherSportType(row.sportType)) return null;
 
   const hasStreamsRow = Boolean(row.streamsSyncedAt);
   const cycling = isCyclingSport(row.sportType);

@@ -312,6 +312,30 @@ describe("matchWeek", () => {
     expect(views[3]!.sessions.every((item) => item.state === "planned")).toBe(true);
   });
 
+  it("an other sport never fills a planned session and shows as an extra (ADR 0029)", () => {
+    const first = plan();
+    const easy = sessions(first).find((item) => item.kind === "easy")!;
+    const data = week({
+      today: addDayKey(easy.date, 1),
+      activities: [
+        activity({
+          id: "gym",
+          date: easy.date,
+          sportType: "WeightTraining",
+          family: "other",
+          minutes: easy.minutes,
+        }),
+      ],
+    });
+    const view = matchWeek(first, data, summarizeWeek(data)).find(
+      (day) => day.day.date === easy.date,
+    )!;
+    expect(view.sessions.find((item) => item.session.id === easy.id)?.state).toBe("missed");
+    expect(view.extras).toEqual([
+      { activity: expect.objectContaining({ id: "gym" }), keySessionId: null },
+    ]);
+  });
+
   it("a missed key session planned again later is moved", () => {
     const first = plan();
     const missedDate = keyDates(first)[0]!;

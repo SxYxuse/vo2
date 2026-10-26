@@ -570,4 +570,23 @@ describe("guardrails (ADR 0024)", () => {
     expect(matchKeySessions([long], [ride], "running")[0]!.done).toBeNull();
     expect(matchKeySessions([long], [ride, run], "running")[0]!.done?.id).toBe("run");
   });
+
+  it("an other sport never ticks off a key session, however hard it was (ADR 0029)", () => {
+    const [intervals] = assignKeySports(
+      generateKeySessions({
+        count: 1,
+        season: { rotation: "fast" },
+        weekStart: WEEK_START,
+        ctl: 50,
+        targetMinutes: 600,
+      }),
+      { cycling: 1, running: 0, other: 0 },
+      {},
+    );
+    const hard = { minutes: 90, zoneMinutes: [0, 0, 0, 45, 45] };
+    const workout = activity({ id: "workout", sportType: "Workout", family: "other", ...hard });
+    const ride = activity({ id: "ride", ...hard });
+    expect(matchKeySessions([intervals!], [workout])[0]!.done).toBeNull();
+    expect(matchKeySessions([intervals!], [ride])[0]!.done?.id).toBe("ride");
+  });
 });

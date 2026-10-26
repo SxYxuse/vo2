@@ -7,56 +7,8 @@ import { SPORT_GROUPS, sportGroupFor } from "./sport-groups.ts";
 
 type StravaSportType = components["schemas"]["SportType"];
 
-const OTHER_SPORT_TYPES = [
-  "AlpineSki",
-  "BackcountrySki",
-  "Badminton",
-  "Basketball",
-  "Canoeing",
-  "Cricket",
-  "Crossfit",
-  "Dance",
-  "Elliptical",
-  "Golf",
-  "HighIntensityIntervalTraining",
-  "IceSkate",
-  "InlineSkate",
-  "Kayaking",
-  "Kitesurf",
-  "NordicSki",
-  "Padel",
-  "PhysicalTherapy",
-  "Pickleball",
-  "Pilates",
-  "Racquetball",
-  "RockClimbing",
-  "RollerSki",
-  "Rowing",
-  "Sail",
-  "Skateboard",
-  "Snowboard",
-  "Snowshoe",
-  "Soccer",
-  "Squash",
-  "StairStepper",
-  "StandUpPaddling",
-  "Surfing",
-  "TableTennis",
-  "Tennis",
-  "VirtualRow",
-  "Volleyball",
-  "WeightTraining",
-  "Wheelchair",
-  "Windsurf",
-  "Workout",
-  "Yoga",
-] as const satisfies readonly StravaSportType[];
-
-/** Every Strava sport type can be a goal; the sport groups come first in pickers. */
-export const GOAL_SPORT_TYPES = [
-  ...SPORT_GROUPS.flatMap((group) => group.members),
-  ...OTHER_SPORT_TYPES,
-] as StravaSportType[];
+/** Only sport-group types can be a goal: other sport types are never shown (ADR 0029). */
+export const GOAL_SPORT_TYPES = SPORT_GROUPS.flatMap((group) => group.members) as StravaSportType[];
 
 export const GOAL_OBJECTIVES = [
   { id: "finish", label: "Finish", hint: "Reach the line in good shape." },

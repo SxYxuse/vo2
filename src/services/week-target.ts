@@ -10,7 +10,7 @@ import {
   type GoalSessions,
   type SeasonPhase,
 } from "./season-phase.ts";
-import { sportGroupFor } from "./sport-groups.ts";
+import { isOtherSportType, sportGroupFor } from "./sport-groups.ts";
 import {
   DEFAULT_LOAD_PER_HOUR,
   KEY_SESSION_PRESETS,
@@ -306,11 +306,6 @@ export type StepZone = "z1" | TargetZone;
 
 const ZONE_INDEX: Record<StepZone, number> = { z1: 0, z2: 1, z3: 2, z4: 3, z5: 4 };
 
-/** Any ride, run, swim, or walk can tick off intervals: the stimulus counts, not the sport. */
-function sportFits(activity: WeekActivity) {
-  return sportGroupFor(activity.sportType) != null;
-}
-
 /** Minutes an activity spent at or above the session's zone. */
 function minutesAtZone(activity: WeekActivity, zone: TargetZone) {
   const index = ZONE_INDEX[zone];
@@ -326,7 +321,9 @@ function keySessionDoneBy(
   activity: WeekActivity,
   ownSport: KeySport | null = null,
 ) {
-  if (!sportFits(activity)) return false;
+  // Any ride, run, swim, or walk can tick off intervals: the stimulus counts, not the sport. Other
+  // sport types never do (ADR 0029).
+  if (isOtherSportType(activity.sportType)) return false;
   // A goal's long session trains the goal's sport: a long ride is not a long run (ADR 0024).
   if (ownSport && sportGroupFor(activity.sportType)?.id !== ownSport) return false;
   const needed = keySessionWorkMinutes(session) * KEY_SESSION_DONE_SHARE;
