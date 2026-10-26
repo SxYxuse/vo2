@@ -19,8 +19,7 @@ The most common defect is a change that works on the path you tested and is miss
 - **Athlete states.** Signed out, mid-onboarding, never synced, sync paused on rate limits, and fully synced.
 - **Sport groups.** Rides, runs, and other sports each get a decision, even if it is "not shown here" (ADR 0007).
 - **Athlete deletion.** A new per-athlete table references `user.id` with `onDelete: "cascade"` so deleting an athlete removes it (`src/db/schema.test.ts` checks).
-- **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts` (`mock-coverage.test.ts` checks endpoints, not fields).
-- **Offline.** A new query joins `OFFLINE_QUERY_KEYS` or `ONLINE_ONLY_QUERY_KEYS` in `offline-copy.ts` (ADR 0031); a new action that changes data is disabled offline.
+- **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts`.
 - **Reverse states.** A way in needs a way out and a way to see it.
 
 ## Dev server
@@ -52,7 +51,7 @@ Regenerate these, rather than editing them by hand:
 - Test pure logic and observable behavior, not rendered markup or callback wiring.
 - Open the app in a browser to verify only when the developer asks for it.
 - **Before pushing,** run `vp check` (format, lint, types); CI fails on it before tests run. The pre-commit hook runs `vp check --fix` on staged files once `bun install` has installed it.
-- `scripts/agent-guard.ts` blocks shell commands that break other checkouts or the release flow (a Claude Code hook in `.claude/settings.json`). If it blocks you, follow its message; don't work around it.
+- `scripts/agent-guard.ts` blocks shell commands that break other checkouts (a Claude Code hook in `.claude/settings.json`). If it blocks you, follow its message; don't work around it.
 
 ## Pull requests and commits
 

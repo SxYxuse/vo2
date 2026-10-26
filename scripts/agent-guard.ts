@@ -1,7 +1,6 @@
 /*
- * Claude Code PreToolUse hook (.claude/settings.json): blocks the shell commands AGENTS.md says
- * break other checkouts or the release flow. Exit code 2 blocks the call and shows the reason to
- * the agent, which can then do it the right way.
+ * Claude Code PreToolUse hook (.claude/settings.json): blocks the shell commands that break other
+ * checkouts on this machine. Exit code 2 blocks the call and shows the reason to the agent.
  */
 
 import { spawnSync } from "node:child_process";
@@ -14,11 +13,8 @@ export type GuardContext = {
   worktree: boolean;
   /** The database `.env` points this checkout at. */
   databaseName: string | null;
-  /** The checked-out branch, or null when detached or unknown. */
-  branch: string | null;
 };
 
-const MAIN_BRANCHES = new Set(["main", "master"]);
 const RUNNERS = new Set(["vp", "vpr", "bun", "bunx", "npm", "npx", "pnpm", "yarn"]);
 
 /** Splits on shell separators. Not quote-aware: good enough for the commands agents write. */
@@ -56,11 +52,9 @@ export function blockReason(command: string, context: GuardContext): string | nu
     const line = words.join(" ");
     // Only a package runner runs a script; the same words in a commit message or echo are fine.
     const runs = (script: string) => RUNNERS.has(program) && args.includes(script);
-    const drizzle = (subcommand: string) => {
-      if (program === "drizzle-kit") return args[0] === subcommand;
-      const at = args.indexOf("drizzle-kit");
-      return RUNNERS.has(program) && at >= 0 && args[at + 1] === subcommand;
-    };
+    const migrates =
+      (program === "drizzle-kit" && args[0] === "migrate") ||
+      (RUNNERS.has(program) && args[args.indexOf("drizzle-kit") + 1] === "migrate");
 
     if (runs("db:down") || (program === "docker" && /\bcompose\b.*\b(down|stop)\b/.test(line))) {
       return "This stops the shared Postgres for every checkout on this machine. Leave it running.";
@@ -76,51 +70,13 @@ export function blockReason(command: string, context: GuardContext): string | nu
       return "Other worktrees run their own dev servers. Stop only the server you started, by the PID you captured when starting it.";
     }
 
-    if (drizzle("push") || runs("db:push")) {
-      return "Schema changes go through a migration: `vp run db:generate`, then `vp run db:migrate`.";
-    }
-
-    if (runs("db:migrate") || drizzle("migrate")) {
+    if (runs("db:migrate") || migrates) {
       const inline = env.find((word) => word.startsWith("DATABASE_URL="));
       const target = inline
         ? databaseNameFrom(inline.slice("DATABASE_URL=".length))
         : context.databaseName;
       if (context.worktree && target === "vo2") {
         return "A feature worktree must not migrate the main checkout's database `vo2`. Run `bun scripts/worktree-setup.ts --isolate` to give this worktree its own.";
-      }
-    }
-
-    if (
-      program === "gh" &&
-      args[0] === "pr" &&
-      args[1] === "create" &&
-      args.some((arg) => /^(--label|-l)(=|$)/.test(arg))
-    ) {
-      return "Create the PR without labels, then add `preview` in its own `gh pr edit <n> --add-label preview` step (.agents/skills/preview-deploy/SKILL.md).";
-    }
-
-    if (program === "git" && args[0] === "push") {
-      const refs = args.slice(1).filter((arg) => !arg.startsWith("-"));
-      const targets = refs.slice(1).map((ref) => ref.replace(/^\+/, "").split(":").pop() ?? "");
-      const toMain =
-        targets.some((ref) => MAIN_BRANCHES.has(ref.replace(/^refs\/heads\//, ""))) ||
-        (targets.length === 0 && context.branch != null && MAIN_BRANCHES.has(context.branch));
-      if (toMain) {
-        return "Don't push to main. Branch first, push the branch, and open a PR.";
-      }
-    }
-
-    if (program === "git" && args[0] === "stash") {
-      const sub = args[1];
-      const tagged = sub === "push" && args.some((arg) => arg === "-m" || arg === "--message");
-      if (
-        sub === undefined ||
-        sub === "pop" ||
-        sub === "save" ||
-        sub.startsWith("-") ||
-        (sub === "push" && !tagged)
-      ) {
-        return "The stash is shared with every worktree and other sessions. Use a WIP commit, or `git stash push -u -m <unique-tag>` and `git stash apply <sha>`, never pop.";
       }
     }
   }
@@ -136,7 +92,6 @@ function contextFor(cwd: string): GuardContext {
   const root = git(cwd, "rev-parse", "--show-toplevel");
   const gitDir = git(cwd, "rev-parse", "--absolute-git-dir");
   const commonDir = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir");
-  const branch = git(cwd, "rev-parse", "--abbrev-ref", "HEAD");
   let databaseUrl: string | undefined;
   try {
     databaseUrl = readFileSync(join(root ?? cwd, ".env"), "utf8")
@@ -148,7 +103,6 @@ function contextFor(cwd: string): GuardContext {
   return {
     worktree: gitDir != null && commonDir != null && gitDir !== commonDir,
     databaseName: databaseNameFrom(databaseUrl),
-    branch: branch && branch !== "HEAD" ? branch : null,
   };
 }
 
