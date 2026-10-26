@@ -4,7 +4,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sync-panel.tsx";
-import { WeekView } from "@/components/week-view.tsx";
+import { WeekView, WeeksAhead } from "@/components/week-view.tsx";
 import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -67,7 +67,10 @@ function WeekTargetPage() {
           <SignInPanel />
         </>
       ) : plan ? (
-        <WeekView data={{ ...data, plan }} />
+        <>
+          <WeekView data={{ ...data, plan }} />
+          <WeeksAhead weeks={data.ahead} today={data.today} />
+        </>
       ) : (
         <Empty className="min-h-64 border">
           <EmptyHeader>

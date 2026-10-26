@@ -7,6 +7,7 @@ import {
   matchWeek,
   noteFrom,
   planWeek,
+  planWeeksAhead,
   projectPlan,
   replanSignals,
   sessionRecommendation,
@@ -369,5 +370,29 @@ describe("coach notes", () => {
     ];
     const read = withParsedConstraints(notes, [{ date: WEDNESDAY, kind: "indoor", minutes: null }]);
     expect(read[0]).toMatchObject({ parsed: true, constraints: [{ kind: "indoor" }] });
+  });
+});
+
+describe("planWeeksAhead", () => {
+  it("lays out the next weeks Monday to Sunday on the athlete's days, from today", () => {
+    const ahead = planWeeksAhead(week({ today: WEDNESDAY }), [LEADING], {}, 2);
+    expect(ahead.map((item) => item.weekStart)).toEqual(["2026-10-26", "2026-11-02"]);
+    for (const item of ahead) {
+      expect(item.days).toHaveLength(7);
+      expect(item.days.every((day) => !day.beforePlan)).toBe(true);
+      // Monday and Friday are rest days.
+      expect(item.days[0]!.rest).toBe(true);
+      expect(item.days[4]!.rest).toBe(true);
+      const keys = item.days.flatMap((day) => day.sessions).filter((s) => s.kind === "key");
+      expect(keys.length).toBeGreaterThan(0);
+      for (const key of keys) expect(item.keyNames[key.keySessionId!]).toBeTruthy();
+    }
+  });
+
+  it("puts a goal raced in a week ahead on its day", () => {
+    const race = goal("2026-11-07", { id: "b-race", priority: "B" });
+    const ahead = planWeeksAhead(week(), [race, LEADING], {}, 2);
+    const day = ahead[1]!.days.find((item) => item.date === race.date)!;
+    expect(day.sessions.map((item) => item.kind)).toEqual(["race"]);
   });
 });

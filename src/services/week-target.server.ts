@@ -38,6 +38,7 @@ import {
   weekStartKey,
   type TrainingPlan,
 } from "./training-plan.types.ts";
+import { goalsNear, planWeeksAhead, type WeekAhead } from "./week-plan.ts";
 import {
   HISTORY_WEEKS,
   estimatedHardMinutes,
@@ -58,7 +59,13 @@ const NO_ANCHORS = {
   },
 };
 
-function emptyWeek(signedIn: boolean, timeZone: string): WeekTargetData {
+/** Weeks after this one the week page previews. */
+const WEEKS_AHEAD = 2;
+
+/** This week, and the weeks after it as the plan would lay them out today. */
+export type WeekPageData = WeekTargetData & { ahead: WeekAhead[] };
+
+function emptyWeek(signedIn: boolean, timeZone: string): WeekPageData {
   const now = new Date();
   return {
     signedIn,
@@ -78,11 +85,9 @@ function emptyWeek(signedIn: boolean, timeZone: string): WeekTargetData {
     anchors: NO_ANCHORS,
     season: seasonPhase([], weekStartKey(now, timeZone)),
     nearbyGoals: [],
+    ahead: [],
   };
 }
-
-/** Days around the week whose goals still shape it: a B goal's lighter days and the days after. */
-const NEARBY_GOAL_DAYS = 5;
 
 /** The goals the plan reads: its own copy once built (ADR 0026), the season's before that. */
 export function planGoals(plan: { goals: Goal[] | unknown[] | null }, season: Goal[]): Goal[] {
@@ -111,7 +116,7 @@ function withGoalSessions(
 }
 
 /** This week for the signed-in athlete, on their saved plan or on `draft` for a preview. */
-export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekTargetData> {
+export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekPageData> {
   const session = await getOptionalSession();
   if (!session) {
     logger.debug("week_target.anonymous");
@@ -266,21 +271,20 @@ export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekTarg
 
   const { sportTypes } = settings;
   const goals = planGoals(plan, seasonGoals);
-  const nearFrom = addDayKey(weekStart, -NEARBY_GOAL_DAYS);
-  const nearTo = addDayKey(weekEnd, NEARBY_GOAL_DAYS);
+  const paces = recentPaces(rows, now);
   logger.debug("week_target.loaded", {
     weekStart,
     activityCount: weekActivities.length,
     streamCount: streams.length,
   });
 
-  return {
+  const data: WeekTargetData & { plan: TrainingPlan } = {
     signedIn: true,
     plan,
     today,
     weekStart,
-    season: withGoalSessions(seasonPhase(goals, weekStart), recentPaces(rows, now)),
-    nearbyGoals: goals.filter((goal) => goal.date >= nearFrom && goal.date <= nearTo),
+    season: withGoalSessions(seasonPhase(goals, weekStart), paces),
+    nearbyGoals: goalsNear(goals, weekStart),
     activities: weekActivities,
     history: [...history.values()],
     weekStartFitness: beforeWeek
@@ -303,4 +307,6 @@ export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekTarg
       },
     },
   };
+  // A draft only previews this week; the weeks ahead are for the week page.
+  return { ...data, ahead: draft ? [] : planWeeksAhead(data, goals, paces, WEEKS_AHEAD) };
 }

@@ -36,6 +36,7 @@ import {
   trainingDayCount,
 } from "./training-plan.types.ts";
 import type { Goal } from "./season.types.ts";
+import type { WeekAhead } from "./week-plan.ts";
 
 /** Complete weeks before this one used for the usual pace, sport split, and ramp check. */
 export const HISTORY_WEEKS = 8;
@@ -570,7 +571,14 @@ export function planShares(
   return next;
 }
 
-export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): WeekSummary {
+/**
+ * `recentWeekLoads` stands in for the loads of the weeks before when they are projected rather
+ * than copied from Strava, as for a week ahead.
+ */
+export function summarizeWeek(
+  data: WeekTargetData & { plan: TrainingPlan },
+  recentWeekLoads?: number[],
+): WeekSummary {
   const { plan, activities, weekStart } = data;
   const loadPerHour = recentLoadPerHour(data.history);
   const target = weeklyTarget({
@@ -579,7 +587,7 @@ export function summarizeWeek(data: WeekTargetData & { plan: TrainingPlan }): We
     weekStartFitness: data.weekStartFitness,
     loadPerHour,
     weekStart,
-    recentAverageLoad: rampBaseLoad(weekLoadsBefore(data.history, weekStart)),
+    recentAverageLoad: rampBaseLoad(recentWeekLoads ?? weekLoadsBefore(data.history, weekStart)),
   });
   const form = data.fitness.ctl - data.fitness.atl;
   const trainingDays = trainingDayCount(plan);
@@ -1029,7 +1037,7 @@ export function minutesByZone(steps: SessionStep[]) {
 }
 
 export const loadWeekTarget = createServerFn({ method: "GET" }).handler(
-  async (): Promise<WeekTargetData> => {
+  async (): Promise<WeekTargetData & { ahead: WeekAhead[] }> => {
     const { loadWeekTargetImpl } = await import("./week-target.server.ts");
     return loadWeekTargetImpl();
   },

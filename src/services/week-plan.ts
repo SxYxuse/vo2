@@ -1,15 +1,23 @@
 import { z } from "zod";
 
 import type { PlanImpact } from "./plan-impact.ts";
-import { goalDay } from "./season-phase.ts";
+import {
+  goalDay,
+  goalSessions,
+  projectSeason,
+  weekLoadsBefore,
+  type GroupPace,
+  type SeasonPhase,
+} from "./season-phase.ts";
 import { roughGoalHours, type Goal } from "./season.types.ts";
-import { sportGroupFor } from "./sport-groups.ts";
+import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 import { ATL_DAYS, CTL_DAYS, formLabel } from "./training-load.ts";
 import {
   addDayKey,
   isKeySport,
   isRestWeekday,
   keySessionMinutes,
+  keySessionName,
   type KeySession,
   type KeySport,
   type SportFamily,
@@ -24,6 +32,7 @@ import {
   buildRecommendation,
   fitKeySession,
   isTodayComplete,
+  summarizeWeek,
   type Recommendation,
   type WeekActivity,
   type WeekProjection,
@@ -543,6 +552,69 @@ export function planWeek(input: {
     note: null,
     createdAt: (input.now ?? new Date()).toISOString(),
   };
+}
+
+/** Days around a week whose goals still shape it: a B goal's lighter days and the days after. */
+const NEARBY_GOAL_DAYS = 5;
+
+/** The goals whose days shape the week starting `weekStart`. */
+export function goalsNear(goals: Goal[], weekStart: string) {
+  const from = addDayKey(weekStart, -NEARBY_GOAL_DAYS);
+  const to = addDayKey(weekStart, 6 + NEARBY_GOAL_DAYS);
+  return goals.filter((goal) => goal.date >= from && goal.date <= to);
+}
+
+/** A week after this one, as the plan would lay it out today. */
+export type WeekAhead = {
+  weekStart: string;
+  phase: Pick<SeasonPhase, "kind" | "lighter">;
+  days: PlannedDay[];
+  /** Key session names by id, for the session titles. */
+  keyNames: Record<string, string>;
+};
+
+/**
+ * The `count` weeks after this one, laid out by the same planner if every week until then hits
+ * its target: fitness projected from this week's start, no activities, no notes. Only a preview;
+ * each week is planned for real once it starts (ADR 0026), from what was actually done.
+ */
+export function planWeeksAhead(
+  data: WeekTargetData & { plan: TrainingPlan },
+  goals: Goal[],
+  paces: Partial<Record<SportGroupId, GroupPace>>,
+  count: number,
+): WeekAhead[] {
+  const recent = weekLoadsBefore(data.history, data.weekStart);
+  const projected = projectSeason(
+    data.weekStartFitness,
+    goals,
+    data.weekStart,
+    addDayKey(data.weekStart, 7 * count),
+    recent,
+  );
+  return projected.slice(1).map((week, index) => {
+    const fitness = { ctl: week.ctl, atl: week.atl };
+    const weekData = {
+      ...data,
+      weekStart: week.weekStart,
+      activities: [],
+      weekStartFitness: fitness,
+      fitness,
+      season: { ...week.phase, sessions: goalSessions(week.phase, paces) },
+      nearbyGoals: goalsNear(goals, week.weekStart),
+    };
+    const loads = [...recent, ...projected.slice(0, index + 1).map((item) => item.load)];
+    const summary = summarizeWeek(weekData, loads);
+    const planned = planWeek({ data: weekData, summary, constraints: [], previous: null });
+    return {
+      weekStart: week.weekStart,
+      phase: { kind: week.phase.kind, lighter: week.phase.lighter },
+      days: planned.days,
+      keyNames: Object.fromEntries(
+        summary.keySessions.map((status) => [status.session.id, keySessionName(status.session)]),
+      ),
+    };
+  });
 }
 
 export type SessionState = "done" | "missed" | "moved" | "planned";
