@@ -5,6 +5,7 @@ import {
   eventPriority,
   eventTitle,
   formatDaysLeft,
+  goalInputSchema,
   goalSportTypes,
   legLabel,
   newGoals,
@@ -94,7 +95,15 @@ test("formatDaysLeft", () => {
 test("goal sports are the ones shown in Settings, in picker order", () => {
   const shown = { Hike: { visible: true }, Run: { visible: true }, Ride: { visible: false } };
   expect(goalSportTypes(shown)).toEqual(["Run", "Hike"]);
-  expect(goalSportTypes({}).length).toBeGreaterThan(40);
+  expect(goalSportTypes({})).toContain("OpenWaterSwim");
+});
+
+test("a goal can only be on a ride, run, swim, or walk sport type (ADR 0029)", () => {
+  expect(goalSportTypes({ Rowing: { visible: true } })).not.toContain("Rowing");
+  const rowing = { name: "Head of the River", sportType: "Rowing", date: "2027-03-20" };
+  const input = { distanceM: null, elevationGainM: null, objective: "finish", ...rowing };
+  expect(goalInputSchema.safeParse(input).success).toBe(false);
+  expect(goalInputSchema.safeParse({ ...input, sportType: "TrailRun" }).success).toBe(true);
 });
 
 describe("season copy", () => {

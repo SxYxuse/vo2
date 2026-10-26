@@ -1,0 +1,9 @@
+# VO2 shows only the four sport groups
+
+VO2 is for riding, running, swimming, and walking, and the sport types in those groups. Every other Strava sport type (WeightTraining, Yoga, Rowing, NordicSki, Workout, and the rest) is an other sport type: never shown, and the athlete has no way to show it. Settings and onboarding list only sport-group types, so the athlete can still hide one of those (ADR 0018), and the goal picker offers only them. An other activity's page answers "not found".
+
+Other activities still count. Sync copies them with their streams, and they add training load and move fitness, fatigue, and form (ADR 0015), feed the load anchors and sensor detection, and add to the week target's hours. In the week plan an other activity appears on its day as an extra, with its title and minutes. It never fills an easy session or ticks off a key session, because the plan only plans the four sports, and a hard strength session is not the run intervals it happened to match in heart rate.
+
+Showing every sport type made the app read as a general activity log, which it is not. Leaving the choice to the athlete kept surfaces like bests, goals, and the activity page half-built for sports VO2 cannot coach. Dropping other activities altogether would have made form read fresher than the athlete is, the trade-off ADR 0015 already rejected. The week plan is the one exception because it is where the athlete checks what they did against the plan, and a missing strength day there would look like a gap. Suggesting strength as an extra is left for later.
+
+This supersedes, in [0018](0018-hiding-a-sport-type-affects-views-only.md), the rule that Settings list every sport type, and, in [0023](0023-season-goals-drive-the-week-target.md), that any sport type can be a goal. Hiding a sport-group type still affects views only, as 0018 describes.

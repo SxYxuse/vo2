@@ -10,7 +10,7 @@ import {
   type SeasonPhase,
 } from "./season-phase.ts";
 import { roughGoalHours, type Goal } from "./season.types.ts";
-import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
+import { isOtherSportType, sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 import { ATL_DAYS, CTL_DAYS, formLabel } from "./training-load.ts";
 import {
   addDayKey,
@@ -644,8 +644,8 @@ function sameSport(activity: WeekActivity, sport: SessionSport) {
 
 /**
  * Each planned session against the copied activities: a key session is done by the activity
- * that ticked it off, a race by an activity of its sport that day, any other session by an
- * activity of 20 minutes or more that day. A key session missed and planned again later is
+ * that ticked it off, a race by an activity of its sport that day, any other session by a ride,
+ * run, swim, or walk of 20 minutes or more that day. A key session missed and planned again later is
  * moved. Activities left over are extra.
  */
 export function matchWeek(
@@ -693,7 +693,10 @@ export function matchWeek(
     for (const { date, item } of entries) {
       const candidates = data.activities.filter(
         (activity) =>
-          activity.date === date && !used.has(activity.id) && activity.minutes >= minMinutes,
+          activity.date === date &&
+          !used.has(activity.id) &&
+          activity.minutes >= minMinutes &&
+          !isOtherSportType(activity.sportType),
       );
       const match =
         candidates.find((activity) => sameSport(activity, item.sport)) ??

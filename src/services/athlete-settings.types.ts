@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   DEFAULT_SPORT_GROUP_SHARES,
+  isOtherSportType,
   mergeSportGroupShares,
   sportGroupFor,
   SPORT_GROUPS,
@@ -94,9 +95,12 @@ type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type AthleteSettings = z.infer<typeof athleteSettingsSchema>;
 export type SportTypeSettings = AthleteSettings["sportTypes"];
 
-/** Hidden sport types stay out of the calendar, map, and heart-rate views only (ADR 0018). */
+/**
+ * Hidden sport types stay out of the calendar, map, and heart-rate views only (ADR 0018); other
+ * sport types are never shown (ADR 0029).
+ */
 export function isSportTypeShown(sportTypes: SportTypeSettings, sportType: string) {
-  return sportTypes[sportType]?.visible !== false;
+  return !isOtherSportType(sportType) && sportTypes[sportType]?.visible !== false;
 }
 
 /** Falls back to the sport type's default for a type the settings don't know yet. */
@@ -183,9 +187,10 @@ function defaultColorForSport(sportType: string) {
   return coerceToGeist700(DEFAULT_SPORT_COLORS[sportType] ?? "var(--color-ds-gray-700)");
 }
 
+/** Only sport-group types are listed: other sport types are never shown (ADR 0029). */
 function detectedSportTypes(sportTypes: string[]) {
-  return Array.from(new Set(sportTypes)).sort((a, b) =>
-    formatSportType(a).localeCompare(formatSportType(b)),
+  return Array.from(new Set(sportTypes.filter((sportType) => !isOtherSportType(sportType)))).sort(
+    (a, b) => formatSportType(a).localeCompare(formatSportType(b)),
   );
 }
 
@@ -219,7 +224,7 @@ export function parseAthleteSettings(value: unknown): AthleteSettings | null {
   };
 }
 
-/** Keeps exactly the sport types in the local copy, adding defaults for new ones. */
+/** Keeps the sport-group types in the local copy, adding defaults for new ones. */
 export function mergeAthleteSettings(
   stored: AthleteSettings | null,
   sportTypeNames: string[],
