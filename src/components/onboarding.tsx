@@ -57,7 +57,7 @@ const STEPS = [
     id: "about",
     title: "About you",
     description:
-      "Your birthday, to check heart-rate peaks against your age, and your weight, to cap caffeine in fuel plans.",
+      "Your birthday, to check heart-rate peaks against your age, and your weight, for watts per kilogram on personal bests.",
   },
   {
     id: "sports",
@@ -355,8 +355,8 @@ export function ProfilePrompt() {
       <div className="flex flex-col gap-2 border-b px-4 pt-4 pb-3 text-center">
         <h1 className="text-xl font-semibold tracking-tight">About you</h1>
         <p className="text-muted-foreground text-sm">
-          VO2 checks heart-rate peaks against your age and caps caffeine in fuel plans by your
-          weight. Add both to continue.
+          VO2 checks heart-rate peaks against your age and uses your weight for watts per kilogram
+          on personal bests. Add both to continue.
         </p>
       </div>
       <div className="flex flex-col gap-4 p-4 pb-6">

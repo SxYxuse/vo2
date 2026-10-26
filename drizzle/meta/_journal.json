@@ -204,6 +204,13 @@
       "when": 1792788770059,
       "tag": "0028_top_effort_celebrations",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793009997348,
+      "tag": "0029_drop_fuel",
+      "breakpoints": true
     }
   ]
 }

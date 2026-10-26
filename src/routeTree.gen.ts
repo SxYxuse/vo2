@@ -14,7 +14,6 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppBestsRouteImport } from './routes/_app.bests'
 import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
-import { Route as AppFuelRouteImport } from './routes/_app.fuel'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
 import { Route as AppPlanRouteImport } from './routes/_app.plan'
@@ -24,7 +23,6 @@ import { Route as AppWeekRouteImport } from './routes/_app.week'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
-import { Route as AppFuelPlanIdRouteImport } from './routes/_app.fuel_.$planId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
 import { Route as AppWeekSessionRouteImport } from './routes/_app.week_.session'
@@ -53,11 +51,6 @@ const AppBestsRoute = AppBestsRouteImport.update({
 const AppFitnessRoute = AppFitnessRouteImport.update({
   id: '/fitness',
   path: '/fitness',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppFuelRoute = AppFuelRouteImport.update({
-  id: '/fuel',
-  path: '/fuel',
   getParentRoute: () => AppRoute,
 } as any)
 const AppHeartRateRoute = AppHeartRateRouteImport.update({
@@ -105,11 +98,6 @@ const AppActivitiesActivityIdRoute = AppActivitiesActivityIdRouteImport.update({
   path: '/activities/$activityId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppFuelPlanIdRoute = AppFuelPlanIdRouteImport.update({
-  id: '/fuel_/$planId',
-  path: '/fuel/$planId',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -141,7 +129,6 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/bests': typeof AppBestsRoute
   '/fitness': typeof AppFitnessRoute
-  '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
   '/plan': typeof AppPlanRoute
@@ -151,7 +138,6 @@ export interface FileRoutesByFullPath {
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
-  '/fuel/$planId': typeof AppFuelPlanIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -162,7 +148,6 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/bests': typeof AppBestsRoute
   '/fitness': typeof AppFitnessRoute
-  '/fuel': typeof AppFuelRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
   '/plan': typeof AppPlanRoute
@@ -172,7 +157,6 @@ export interface FileRoutesByTo {
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
-  '/fuel/$planId': typeof AppFuelPlanIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -185,7 +169,6 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/_app/bests': typeof AppBestsRoute
   '/_app/fitness': typeof AppFitnessRoute
-  '/_app/fuel': typeof AppFuelRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
   '/_app/plan': typeof AppPlanRoute
@@ -196,7 +179,6 @@ export interface FileRoutesById {
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
-  '/_app/fuel_/$planId': typeof AppFuelPlanIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
   '/_app/week_/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -210,7 +192,6 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/bests'
     | '/fitness'
-    | '/fuel'
     | '/heart-rate'
     | '/map'
     | '/plan'
@@ -220,7 +201,6 @@ export interface FileRouteTypes {
     | '/week-bucket'
     | '/api/activity-analysis'
     | '/activities/$activityId'
-    | '/fuel/$planId'
     | '/settings/$section'
     | '/week/session'
     | '/api/auth/$'
@@ -231,7 +211,6 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/bests'
     | '/fitness'
-    | '/fuel'
     | '/heart-rate'
     | '/map'
     | '/plan'
@@ -241,7 +220,6 @@ export interface FileRouteTypes {
     | '/api/activity-analysis'
     | '/'
     | '/activities/$activityId'
-    | '/fuel/$planId'
     | '/settings/$section'
     | '/week/session'
     | '/api/auth/$'
@@ -253,7 +231,6 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/_app/bests'
     | '/_app/fitness'
-    | '/_app/fuel'
     | '/_app/heart-rate'
     | '/_app/map'
     | '/_app/plan'
@@ -264,7 +241,6 @@ export interface FileRouteTypes {
     | '/api/activity-analysis'
     | '/_app/'
     | '/_app/activities/$activityId'
-    | '/_app/fuel_/$planId'
     | '/_app/settings/$section'
     | '/_app/week_/session'
     | '/api/auth/$'
@@ -315,13 +291,6 @@ declare module '@tanstack/react-router' {
       path: '/fitness'
       fullPath: '/fitness'
       preLoaderRoute: typeof AppFitnessRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/fuel': {
-      id: '/_app/fuel'
-      path: '/fuel'
-      fullPath: '/fuel'
-      preLoaderRoute: typeof AppFuelRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/heart-rate': {
@@ -387,13 +356,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppActivitiesActivityIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/fuel_/$planId': {
-      id: '/_app/fuel_/$planId'
-      path: '/fuel/$planId'
-      fullPath: '/fuel/$planId'
-      preLoaderRoute: typeof AppFuelPlanIdRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
@@ -449,7 +411,6 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 interface AppRouteChildren {
   AppBestsRoute: typeof AppBestsRoute
   AppFitnessRoute: typeof AppFitnessRoute
-  AppFuelRoute: typeof AppFuelRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
   AppPlanRoute: typeof AppPlanRoute
@@ -459,14 +420,12 @@ interface AppRouteChildren {
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
   AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
-  AppFuelPlanIdRoute: typeof AppFuelPlanIdRoute
   AppWeekSessionRoute: typeof AppWeekSessionRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppBestsRoute: AppBestsRoute,
   AppFitnessRoute: AppFitnessRoute,
-  AppFuelRoute: AppFuelRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
   AppPlanRoute: AppPlanRoute,
@@ -476,7 +435,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
   AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,
-  AppFuelPlanIdRoute: AppFuelPlanIdRoute,
   AppWeekSessionRoute: AppWeekSessionRoute,
 }
 
@@ -492,13 +450,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -178,7 +178,7 @@ export function WeightField<T extends ProfileFormValues>({
               </InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          <FieldDescription>Caps the caffeine in your fuel plans.</FieldDescription>
+          <FieldDescription>Used for watts per kilogram on your personal bests.</FieldDescription>
           {fieldState.invalid ? <FieldError errors={[fieldState.error]} /> : null}
         </Field>
       )}

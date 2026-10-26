@@ -514,7 +514,7 @@ function indexedElevationClimbs(samples: ActivitySample[], sportType?: string) {
     .sort((a, b) => b.elevationDeltaM - a.elevationDeltaM);
 }
 
-/** Every sustained climb, in route order: fuel planning colours and times all of them. */
+/** Every sustained climb, in chronological order. */
 export function allElevationClimbs(
   samples: ActivitySample[],
   sportType?: string,

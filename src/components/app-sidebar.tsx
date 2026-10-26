@@ -10,7 +10,6 @@ import {
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
-  RouteIcon,
   Settings2Icon,
   TrendingUpIcon,
   TrophyIcon,
@@ -52,7 +51,6 @@ const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
   { title: "This week", to: "/week", icon: TargetIcon },
   { title: "Season", to: "/season", icon: FlagIcon },
-  { title: "Fuel", to: "/fuel", icon: RouteIcon },
 ] as const;
 
 /**

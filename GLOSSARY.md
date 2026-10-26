@@ -9,7 +9,7 @@ The person whose training VO2 tracks. One athlete is one Strava account.
 _Avoid_: User, account, client
 
 **Athlete deletion**:
-Permanently removing an athlete and their whole local copy, training plan, routes and fuel plans, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
+Permanently removing an athlete and their whole local copy, training plan, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
 _Avoid_: Account deletion, deactivation, closing an account
 
 **Athlete settings**:
@@ -17,7 +17,7 @@ The athlete's own choices that shape what VO2 shows: per sport type whether it i
 _Avoid_: Calendar settings, preferences, app settings
 
 **Body weight**:
-The athlete's weight in kilograms, asked during onboarding with the birthday. It caps caffeine in fuel plans.
+The athlete's weight in kilograms, asked during onboarding with the birthday. It is used for watts per kilogram on personal bests.
 _Avoid_: Mass, BMI
 
 ## Completed work
@@ -32,7 +32,7 @@ _Avoid_: Telemetry, samples, GPS track
 
 **Activity map**:
 The map of one activity, showing where it happened, drawn from Strava's outline of its path. Activities without an outline, such as most indoor sessions, have none. Not the map of all activities.
-_Avoid_: Route (that is an uploaded GPX), GPS track
+_Avoid_: GPS track, course
 
 **Sport type**:
 Strava's specific classification of an activity, such as Run, TrailRun, Ride, or VirtualRide.
@@ -241,33 +241,3 @@ _Avoid_: Polar zone, Coggan zone, power zone
 **Zone method**:
 How a sport's five heart-rate zones are cut from its anchors: % of LTHR, % of max heart rate, heart-rate reserve, or custom boundaries. Cycling, running, and swimming each have their own, chosen by the athlete; walking and other sports always use % of max heart rate.
 _Avoid_: Zone model, zone system, zone preset
-
-## Fuelling
-
-**Route**:
-A GPX file the athlete uploads for a session they plan to do, with its predicted time along the way. It is not an activity and does not count toward the week target.
-_Avoid_: Planned session, course, track
-
-**Climb**:
-A sustained uphill on a route, found with the same detection as climbs in activity analysis. Fuel plans treat every climb, not only the biggest ones.
-_Avoid_: Major climb, hard effort, key climb
-
-**Carb target**:
-Grams of carbohydrate per hour the athlete wants on a route. Defaults to 80 g/h for rides, 60 for runs, and 40 for hikes.
-_Avoid_: Fuel rate, CHO rate
-
-**Fuel plan**:
-The products chosen for one route and the intakes that take them, reaching the carb target within the bottles carried.
-_Avoid_: Nutrition plan, fuelling strategy
-
-**Intake**:
-One entry in a fuel plan: what to take, how much, around which time from the start and kilometre, and why.
-_Avoid_: Feed, dose
-
-**Fuel product**:
-A gel, chew, drink mix, or bar from the stored MNSTRY catalog. Its carbs, glucose:fructose ratio, and caffeine come only from what the store states; a value the store doesn't state stays missing.
-_Avoid_: Supplement, nutrition item, SKU
-
-**Your products**:
-The fuel products the athlete has ticked as theirs. Fuel plans and swaps use only these.
-_Avoid_: Pantry, inventory, stock

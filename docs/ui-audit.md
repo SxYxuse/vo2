@@ -1,6 +1,6 @@
 # VO2 UI audit and ReUI opportunities
 
-Audit date: 24 October 2026. Scope: every route, drawer, dialog and visible state of the app, rendered against the mock Strava server, plus a review of [ReUI components](https://reui.io/components) and [ReUI blocks](https://reui.io/blocks).
+Audit date: 24 October 2026. Scope: every route, drawer, dialog and visible state of the app, rendered against the mock Strava server, plus a review of [ReUI components](https://reui.io/components) and [ReUI blocks](https://reui.io/blocks). Fuel screens in this audit were removed in [0030](adr/0030-fuel-plans-are-removed.md).
 
 ## Method and coverage
 
