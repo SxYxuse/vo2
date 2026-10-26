@@ -429,7 +429,7 @@ function DayCell({
         {view.extras.map(({ activity, keySessionId }) => (
           <span
             key={activity.id}
-            className="text-muted-foreground flex items-center gap-1.5 rounded-md border border-dashed px-2 py-1 text-xs"
+            className="text-muted-foreground flex items-center gap-1.5 py-0.5 text-xs"
           >
             <CheckIcon aria-hidden className="text-success size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">
@@ -549,10 +549,8 @@ function SessionChip({
   return (
     <span
       className={cn(
-        "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
-        state === "done" && "bg-success/10",
-        state === "planned" && "bg-muted/60",
-        (state === "missed" || state === "moved") && "border border-dashed opacity-70",
+        "flex items-center gap-2 py-0.5 text-sm",
+        (state === "missed" || state === "moved") && "opacity-60",
       )}
     >
       <span
