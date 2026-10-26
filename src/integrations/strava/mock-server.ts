@@ -8,6 +8,7 @@ import type { StreamSet, SummaryActivity } from "./client.ts";
  * refresh and sync run unchanged; only the base URL differs.
  */
 export const MOCK_STRAVA_PATH = "/api/mock-strava";
+export const MOCK_UNHANDLED_HEADER = "x-mock-strava-unhandled";
 
 const ATHLETE = {
   id: 1,
@@ -80,7 +81,10 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
     const spec = buildCatalog(new Date()).find((item) => item.id === Number(streams[1]));
     return spec ? json(streamsFor(spec)) : json({ message: "Record Not Found" }, 404);
   }
-  return json({ message: "Record Not Found" }, 404);
+  // Marks a path the mock does not implement, as opposed to a missing record (mock-coverage test).
+  const unhandled = json({ message: "Record Not Found" }, 404);
+  unhandled.headers.set(MOCK_UNHANDLED_HEADER, "1");
+  return unhandled;
 }
 
 function authorize(query: URLSearchParams) {

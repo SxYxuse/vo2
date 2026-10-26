@@ -6,7 +6,14 @@ import {
   type PersistedClient,
 } from "@tanstack/query-persist-client-core";
 
-import { isOfflineQuery, throttledPersister, type OfflineStorage } from "./offline-copy.ts";
+import * as queries from "@/lib/queries.ts";
+import {
+  OFFLINE_QUERY_KEYS,
+  ONLINE_ONLY_QUERY_KEYS,
+  isOfflineQuery,
+  throttledPersister,
+  type OfflineStorage,
+} from "./offline-copy.ts";
 
 function memoryStorage() {
   const saved = new Map<string, PersistedClient>();
@@ -81,5 +88,22 @@ describe("offline copy", () => {
     expect(week?.days.get("mon")).toBe(45);
     expect(restored.getQueryData(["activity", "42"])).toBeUndefined();
     expect(restored.getQueryData(["activity-analysis", "42"])).toBeUndefined();
+  });
+});
+
+describe("every query decides whether it works offline", () => {
+  const keys = Object.values(queries).flatMap((value) => {
+    const options = typeof value === "function" ? (value as (arg: string) => unknown)("x") : value;
+    const queryKey = (options as { queryKey?: unknown[] } | null)?.queryKey;
+    return Array.isArray(queryKey) ? [String(queryKey[0])] : [];
+  });
+
+  it("finds the queries", () => {
+    expect(keys).toContain("week-target");
+  });
+
+  it.each(keys)("%s is saved for offline or listed as online-only", (key) => {
+    const decided = [...OFFLINE_QUERY_KEYS, ...ONLINE_ONLY_QUERY_KEYS] as string[];
+    expect(decided).toContain(key);
   });
 });

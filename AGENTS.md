@@ -18,8 +18,9 @@ The most common defect is a change that works on the path you tested and is miss
 - **Installed PWA.** Standalone mode, safe areas, pull-to-refresh, and resuming after the app was backgrounded.
 - **Athlete states.** Signed out, mid-onboarding, never synced, sync paused on rate limits, and fully synced.
 - **Sport groups.** Rides, runs, and other sports each get a decision, even if it is "not shown here" (ADR 0007).
-- **Athlete deletion.** A new per-athlete table references `user.id` with `onDelete: "cascade"` so deleting an athlete removes it.
-- **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts`.
+- **Athlete deletion.** A new per-athlete table references `user.id` with `onDelete: "cascade"` so deleting an athlete removes it (`src/db/schema.test.ts` checks).
+- **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts` (`mock-coverage.test.ts` checks endpoints, not fields).
+- **Offline.** A new query joins `OFFLINE_QUERY_KEYS` or `ONLINE_ONLY_QUERY_KEYS` in `offline-copy.ts` (ADR 0031); a new action that changes data is disabled offline.
 - **Reverse states.** A way in needs a way out and a way to see it.
 
 ## Dev server
@@ -27,7 +28,8 @@ The most common defect is a change that works on the path you tested and is miss
 1. `vp run db:up`, then `vp run dev:mock`. Always use the mock: you have no access to strava.com.
 2. The port is `PORT` in this checkout's `.env` (3000 in the main checkout). The dev server binds it strictly and fails if it is taken, because `BETTER_AUTH_URL` names the same port.
 3. In the app: **Connect Strava** (the mock redirects straight back), finish the onboarding dialog, then **Sync from Strava** to load about eight weeks of mock rides and runs.
-4. Stop the server you started by the PID you captured when starting it. Other worktrees run their own dev servers on this machine, so never kill by name or pattern.
+4. Stop the server you started by the PID you captured when starting it. Other worktrees run their own dev servers on this machine, so never kill by name or pattern. `vp run` does not pass the signal on: if the port still answers, stop the process `ss -ltnp` shows on your `PORT`.
+5. To check production-only behavior, such as the service worker, `vp run start:mock` builds and serves a production build against the mock on the same port.
 
 ### Databases
 
@@ -50,6 +52,7 @@ Regenerate these, rather than editing them by hand:
 - Test pure logic and observable behavior, not rendered markup or callback wiring.
 - Open the app in a browser to verify only when the developer asks for it.
 - **Before pushing,** run `vp check` (format, lint, types); CI fails on it before tests run. The pre-commit hook runs `vp check --fix` on staged files once `bun install` has installed it.
+- `scripts/agent-guard.ts` blocks shell commands that break other checkouts or the release flow (a Claude Code hook in `.claude/settings.json`). If it blocks you, follow its message; don't work around it.
 
 ## Pull requests and commits
 

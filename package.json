@@ -11,6 +11,7 @@
     "preview": "vp preview",
     "test": "vp test",
     "start": "bun run db:migrate && bun run .output/server/index.mjs",
+    "start:mock": "vp build && APP_ENV=development STRAVA_MOCK=1 bun run .output/server/index.mjs",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:setup": "bun scripts/worktree-setup.ts",

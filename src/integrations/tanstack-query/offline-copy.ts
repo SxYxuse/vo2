@@ -13,7 +13,8 @@ import { del, get, set } from "idb-keyval";
 
 /**
  * Views worth reading with no signal. Activity details (streams), the map (needs tiles), AI
- * analysis (needs the model), and top-effort celebrations (marked seen on the server) stay out.
+ * analysis (needs the model), top-effort celebrations (marked seen on the server), and live
+ * state such as sync status stay out.
  */
 export const OFFLINE_QUERY_KEYS = [
   "app-shell",
@@ -26,6 +27,18 @@ export const OFFLINE_QUERY_KEYS = [
   "bests",
   "heart-rate",
   "settings-snapshot",
+] as const;
+
+/** Never saved for offline, each for the reason above; a new query must join one of the two lists. */
+export const ONLINE_ONLY_QUERY_KEYS = [
+  "activity",
+  "activity-analysis",
+  "activity-map",
+  "analysis-status",
+  "plan-builder",
+  "season-change",
+  "sync-status",
+  "top-effort-celebrations",
 ] as const;
 
 /** A week plan older than this is no use to read offline. */
