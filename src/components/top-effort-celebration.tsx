@@ -14,12 +14,20 @@ import {
   ResponsiveDialogTitle,
   useIsDesktop,
 } from "@/components/responsive-dialog.tsx";
-import { boardLabel, formatDetail, formatGain, formatValue } from "@/components/personal-bests.tsx";
+import { boardLabel, formatValue } from "@/components/personal-bests.tsx";
 import { Button } from "@/components/ui/button";
 import { topEffortCelebrationsQueryOptions } from "@/lib/queries.ts";
-import { formatDuration } from "@/services/activity-detail.types.ts";
+import {
+  formatBpm,
+  formatDistanceKm,
+  formatDuration,
+  formatElevation,
+  formatWatts,
+} from "@/services/activity-detail.types.ts";
+import { formatLocomotion, locomotionFor } from "@/services/locomotion.ts";
 import {
   markTopEffortsSeen,
+  type CelebratedActivity,
   type TopEffortCelebrations,
   type TopEffortPlacement,
 } from "@/services/top-efforts.ts";
@@ -29,12 +37,6 @@ const CARD_DATE = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
   day: "numeric",
-});
-const BACK_DATE = new Intl.DateTimeFormat("en-US", {
-  weekday: "long",
-  month: "long",
-  day: "numeric",
-  year: "numeric",
 });
 /** Past this many cards, dots give way to a "3 / 12" counter. */
 const MAX_DOTS = 5;
@@ -75,16 +77,6 @@ function rankText({ allTimeRank, yearRank, year }: TopEffortPlacement) {
 /** "PB", "#4": the place the card leads with, all time when it has one. */
 function rankBadge({ allTimeRank, yearRank }: TopEffortPlacement) {
   return allTimeRank === 1 ? "PB" : `#${allTimeRank ?? yearRank}`;
-}
-
-/** How this effort compares with the board's best before it, on the back of the card. */
-function gainText(placement: TopEffortPlacement) {
-  const { bestBefore, value } = placement;
-  if (bestBefore === undefined) return null;
-  if (bestBefore === null) return `Your first ${cardTitle(placement)}`;
-  if (placement.allTimeRank === 1) return formatGain(placement, bestBefore, value);
-  const gap = Math.abs(value - bestBefore);
-  return `${placement.kind === "time" ? formatDuration(gap) : formatValue(placement, gap)} off your best`;
 }
 
 function cardKey(placement: TopEffortPlacement) {
@@ -142,6 +134,7 @@ export function TopEffortCelebration() {
     queryClient.setQueryData(topEffortCelebrationsQueryOptions.queryKey, (current) =>
       current
         ? {
+            ...current,
             activityIds: current.activityIds.filter((id) => !seen.has(id)),
             placements: current.placements.filter((placement) => !seen.has(placement.activity.id)),
           }
@@ -165,6 +158,7 @@ export function TopEffortCelebration() {
       {shown ? (
         <CelebrationContent
           placements={shown.placements}
+          activities={shown.activities}
           index={index}
           onIndex={setIndex}
           onAway={(path) => setAway({ path, arrived: false })}
@@ -176,11 +170,13 @@ export function TopEffortCelebration() {
 
 function CelebrationContent({
   placements,
+  activities,
   index,
   onIndex,
   onAway,
 }: {
   placements: TopEffortPlacement[];
+  activities: TopEffortCelebrations["activities"];
   index: number;
   onIndex: (index: number) => void;
   onAway: (path: string) => void;
@@ -234,6 +230,7 @@ function CelebrationContent({
         ) : null}
         <Deck
           placements={placements}
+          activities={activities}
           index={index}
           flipped={flipped}
           onFlip={() => setFlipped((at) => !at)}
@@ -299,6 +296,7 @@ function deckOffset(at: number, index: number, count: number) {
 
 function Deck({
   placements,
+  activities,
   index,
   flipped,
   onFlip,
@@ -306,6 +304,7 @@ function Deck({
   onOpen,
 }: {
   placements: TopEffortPlacement[];
+  activities: TopEffortCelebrations["activities"];
   index: number;
   flipped: boolean;
   onFlip: () => void;
@@ -398,7 +397,12 @@ function Deck({
                   <EffortCard placement={placement} />
                 </button>
                 <div inert={!turned} className="absolute inset-0 rotate-y-180 backface-hidden">
-                  <EffortCardBack placement={placement} onFlip={flip} onOpen={onOpen} />
+                  <EffortCardBack
+                    placement={placement}
+                    summary={activities[placement.activity.id]}
+                    onFlip={flip}
+                    onOpen={onOpen}
+                  />
                 </div>
               </div>
             </div>
@@ -449,52 +453,59 @@ function EffortCard({ placement }: { placement: TopEffortPlacement }) {
   );
 }
 
+/** The activity's own numbers, the whole of it rather than the effort. */
+function activityStats(sportType: string, summary: CelebratedActivity) {
+  const { distance, movingTime } = summary;
+  const kmh = distance && movingTime ? (distance / movingTime) * 3.6 : null;
+  const stats: [string, string][] = [
+    ["Distance", formatDistanceKm(distance)],
+    ["Moving time", formatDuration(movingTime)],
+    [locomotionFor(sportType).kpiLabel, formatLocomotion(kmh, sportType)],
+  ];
+  if (summary.totalElevationGain) {
+    stats.push(["Elevation", formatElevation(summary.totalElevationGain)]);
+  }
+  if (summary.averageHeartrate) stats.push(["Avg HR", formatBpm(summary.averageHeartrate)]);
+  if (summary.averageWatts) stats.push(["Avg power", formatWatts(summary.averageWatts)]);
+  return stats;
+}
+
 function EffortCardBack({
   placement,
+  summary,
   onFlip,
   onOpen,
 }: {
   placement: TopEffortPlacement;
+  summary: CelebratedActivity | undefined;
   onFlip: () => void;
   onOpen: (placement: TopEffortPlacement) => void;
 }) {
   const medal = medalOf(placement);
-  const detail = formatDetail(placement, placement, null);
-  const gain = gainText(placement);
-  const ranks = [
-    ["All time", placement.allTimeRank],
-    [`${placement.year}`, placement.yearRank],
-  ] as const;
+  const { activity } = placement;
   return (
     <div className={cardFace(medal)} style={medal}>
       {/* Tapping anywhere but the button turns the card back. */}
       <button type="button" aria-label="Turn back" onClick={onFlip} className="absolute inset-0" />
       <div className="pointer-events-none relative">
         <p className="text-[0.65rem] font-semibold tracking-widest uppercase opacity-70">
-          {cardTitle(placement)}
+          {CARD_DATE.format(new Date(activity.start))}
         </p>
-        <p className="mt-1 text-2xl font-bold tabular-nums">
-          {formatValue(placement, placement.value)}
-        </p>
-        {detail ? <p className="text-xs font-medium opacity-80 tabular-nums">{detail}</p> : null}
-        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 text-xs">
-          {ranks.map(([label, rank]) => (
-            <div key={label} className="contents">
-              <dt className="opacity-70">{label}</dt>
-              <dd className="font-semibold tabular-nums">{rank ? `#${rank}` : "—"}</dd>
-            </div>
-          ))}
-        </dl>
-        {gain ? <p className="mt-2 text-xs leading-snug font-medium">{gain}</p> : null}
+        <p className="mt-1 line-clamp-2 text-sm leading-snug font-bold">{activity.name}</p>
+        {summary ? (
+          <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 text-xs">
+            {activityStats(activity.sportType, summary).map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="opacity-70">{label}</dt>
+                <dd className="font-semibold tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </div>
-      <div className="relative">
-        <p className="pointer-events-none mb-2 line-clamp-2 text-[0.65rem] leading-snug font-semibold opacity-80">
-          {placement.activity.name} · {BACK_DATE.format(new Date(placement.activity.start))}
-        </p>
-        <Button size="sm" className="w-full" onClick={() => onOpen(placement)}>
-          Open activity
-        </Button>
-      </div>
+      <Button size="sm" className="relative w-full" onClick={() => onOpen(placement)}>
+        Open activity
+      </Button>
     </div>
   );
 }

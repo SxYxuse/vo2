@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import {
-  lowerIsBetter,
   TOP_EFFORTS,
   topEfforts,
   type BestsActivity,
@@ -28,8 +27,6 @@ export type TopEffortPlacement = {
   /** Place within the activity's calendar year, or null outside its top 10. */
   yearRank: number | null;
   year: number;
-  /** The board's best before this effort, or null for the first. Missing on older rows. */
-  bestBefore?: number | null;
   activity: BestsActivity;
 };
 
@@ -50,17 +47,10 @@ export function findTopEfforts(
       const activity = activities[effort.activity];
       if (!activity || !activityIds.has(activity.id)) continue;
       const year = new Date(activity.start).getFullYear();
-      const earlier = board.efforts.filter((other) => {
+      const earlierThisYear = board.efforts.filter((other) => {
         const at = activities[other.activity]?.start;
-        return at != null && at < activity.start;
-      });
-      const earlierThisYear = earlier.filter(
-        (other) => new Date(activities[other.activity]!.start).getFullYear() === year,
-      ).length;
-      const earlierValues = earlier.map((other) => other.value);
-      const bestBefore = earlierValues.length
-        ? (lowerIsBetter(board.kind) ? Math.min : Math.max)(...earlierValues)
-        : null;
+        return at != null && at < activity.start && new Date(at).getFullYear() === year;
+      }).length;
       const yearTop =
         earlierThisYear >= TOP_EFFORTS
           ? topEfforts(board, activities, `${year}` as `${number}`, now)
@@ -79,7 +69,6 @@ export function findTopEfforts(
         allTimeRank,
         yearRank,
         year,
-        bestBefore,
         activity,
       });
     }
@@ -97,8 +86,21 @@ function rankOf(ranked: { rank: number; activity: BestsActivity }[], activityId:
   return ranked.find((effort) => effort.activity.id === activityId)?.rank ?? null;
 }
 
+/** The whole activity a top 10 effort came from, shown on the back of its card. */
+export type CelebratedActivity = {
+  distance: number | null;
+  movingTime: number;
+  totalElevationGain: number | null;
+  averageHeartrate: number | null;
+  averageWatts: number | null;
+};
+
 /** Top 10 efforts found but not yet seen, and the activities they came from. */
-export type TopEffortCelebrations = { activityIds: string[]; placements: TopEffortPlacement[] };
+export type TopEffortCelebrations = {
+  activityIds: string[];
+  placements: TopEffortPlacement[];
+  activities: Record<string, CelebratedActivity>;
+};
 
 export const loadTopEffortCelebrations = createServerFn({ method: "GET" }).handler(
   async (): Promise<TopEffortCelebrations> => {

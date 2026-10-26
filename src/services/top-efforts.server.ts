@@ -10,6 +10,7 @@ import {
   byBestPlacement,
   CELEBRATE_WITHIN_DAYS,
   findTopEfforts,
+  type CelebratedActivity,
   type TopEffortCelebrations,
   type TopEffortPlacement,
 } from "./top-efforts.ts";
@@ -69,19 +70,31 @@ export async function findTopEffortCelebrations(userId: string, now = new Date()
 
 export async function loadTopEffortCelebrationsImpl(): Promise<TopEffortCelebrations> {
   const session = await getOptionalSession();
-  if (!session) return { activityIds: [], placements: [] };
+  if (!session) return { activityIds: [], placements: [], activities: {} };
+  // The activity is read fresh, so a renamed activity shows its new name on the card's back.
   const rows = await db
     .select({
       activityId: topEffortCelebrations.activityId,
       placements: topEffortCelebrations.placements,
+      activity: {
+        distance: activities.distance,
+        movingTime: activities.movingTime,
+        totalElevationGain: activities.totalElevationGain,
+        averageHeartrate: activities.averageHeartrate,
+        averageWatts: activities.averageWatts,
+      },
     })
     .from(topEffortCelebrations)
+    .innerJoin(activities, eq(activities.id, topEffortCelebrations.activityId))
     .where(
       and(eq(topEffortCelebrations.userId, session.user.id), isNull(topEffortCelebrations.seenAt)),
     );
   return {
     activityIds: rows.map((row) => row.activityId),
     placements: rows.flatMap((row) => row.placements as TopEffortPlacement[]).sort(byBestPlacement),
+    activities: Object.fromEntries(
+      rows.map((row): [string, CelebratedActivity] => [row.activityId, row.activity]),
+    ),
   };
 }
 

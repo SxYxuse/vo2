@@ -40,12 +40,7 @@ describe("top efforts", () => {
       { id: "new", start: "2026-10-20T07:00:00Z", value: 1200 },
     ]);
     const [placement] = findTopEfforts([board], activities, new Set(["new"]), NOW);
-    expect(placement).toMatchObject({
-      boardId: "running-time-5000",
-      allTimeRank: 1,
-      value: 1200,
-      bestBefore: 1300,
-    });
+    expect(placement).toMatchObject({ boardId: "running-time-5000", allTimeRank: 1, value: 1200 });
     expect(placement?.activity.id).toBe("new");
   });
 
@@ -92,7 +87,7 @@ describe("top efforts", () => {
       1200,
     );
     const [placement] = findTopEfforts([board], activities, new Set(["new"]), NOW);
-    expect(placement).toMatchObject({ allTimeRank: 1, bestBefore: 250 });
+    expect(placement?.allTimeRank).toBe(1);
   });
 
   test("only the given activities are celebrated", () => {
@@ -104,8 +99,6 @@ describe("top efforts", () => {
     expect(placements.map((placement) => [placement.activity.id, placement.allTimeRank])).toEqual([
       ["a", 2],
     ]);
-    // The later, faster run is not a best before "a".
-    expect(placements[0]?.bestBefore).toBeNull();
   });
 
   test("the best placement comes first: all-time rank, then year rank", () => {
