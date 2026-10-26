@@ -10,6 +10,13 @@ export function stravaWebhookUrl(appUrl: string, secret: string) {
   return `${appUrl}${STRAVA_WEBHOOK_PATH}/${secret}`;
 }
 
+/** Request logs ship to Loki, so the secret in the webhook path must never reach them. */
+export function withoutWebhookSecret(pathname: string) {
+  return pathname.startsWith(`${STRAVA_WEBHOOK_PATH}/`)
+    ? `${STRAVA_WEBHOOK_PATH}/:secret`
+    : pathname;
+}
+
 export type StravaWebhookPorts = {
   removeAthlete: (stravaAthleteId: string) => Promise<void>;
   removeActivity: (stravaAthleteId: string, activityId: string) => Promise<void>;

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { STRAVA_WEBHOOK_PATH, handleStravaWebhook } from "./strava-webhook.ts";
+import {
+  STRAVA_WEBHOOK_PATH,
+  handleStravaWebhook,
+  withoutWebhookSecret,
+} from "./strava-webhook.ts";
 
 const SECRET = "s3cret";
 
@@ -124,5 +128,12 @@ describe("handleStravaWebhook", () => {
     expect(wrong.status).toBe(404);
     expect(unconfigured.status).toBe(404);
     expect(calls).toEqual([]);
+  });
+});
+
+describe("withoutWebhookSecret", () => {
+  it("hides the secret from logged webhook paths and leaves other paths alone", () => {
+    expect(withoutWebhookSecret("/api/strava-webhook/s3cret")).toBe("/api/strava-webhook/:secret");
+    expect(withoutWebhookSecret("/api/activity-analysis")).toBe("/api/activity-analysis");
   });
 });
