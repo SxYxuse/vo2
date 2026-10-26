@@ -1,3 +1,5 @@
+import { format, formatDistanceStrict } from "date-fns";
+
 export type SyncKind = "never" | "complete" | "incomplete" | "paused" | "failed";
 
 export type SyncStatus = {
@@ -176,4 +178,46 @@ export function isTransientSyncError(error: unknown) {
   if (!(error instanceof Error)) return false;
   if (error.message === "The connection was closed.") return true;
   return error.message === "Invariant failed" || error.message.startsWith("Invariant failed:");
+}
+
+/** Dot color for the header sync button: fine, needs a look, broken, or nothing yet. */
+export type SyncTone = "ok" | "attention" | "error" | "idle";
+
+/** What the header says about the local copy: a short label, a dot tone, and a fuller name. */
+export function summarizeSyncStatus(
+  status: SyncStatus | null,
+  now: number,
+): { label: string; tone: SyncTone; description: string } {
+  if (!status) return { label: "Sync", tone: "idle", description: "Sync from Strava" };
+  const last = status.lastAttemptAt ? new Date(status.lastAttemptAt) : null;
+  // Under a minute, or a server clock slightly ahead of the device, both read as just now.
+  const ago = last
+    ? now - last.getTime() < 60_000
+      ? "just now"
+      : formatDistanceStrict(last, now, { addSuffix: true })
+    : null;
+  const pausedUntil = status.pausedUntil ? new Date(status.pausedUntil) : null;
+  if (status.status === "paused" && pausedUntil && pausedUntil.getTime() > now) {
+    const until = format(pausedUntil, "HH:mm");
+    return {
+      label: `Paused until ${until}`,
+      tone: "attention",
+      description: `Strava asked VO2 to pause until ${until}. Sync from Strava`,
+    };
+  }
+  if (status.status === "failed") {
+    return { label: "Sync failed", tone: "error", description: "Last sync failed. Sync again" };
+  }
+  if (status.status === "never") {
+    return { label: "Not synced", tone: "idle", description: "Never synced. Sync from Strava" };
+  }
+  const label = ago ? `Synced ${ago}` : "Synced";
+  if (status.status === "incomplete") {
+    return {
+      label,
+      tone: "attention",
+      description: `${label}, older history still copying. Sync from Strava`,
+    };
+  }
+  return { label, tone: "ok", description: `${label}. Sync from Strava` };
 }

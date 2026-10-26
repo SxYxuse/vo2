@@ -26,7 +26,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
-import { StatCard, type StatCardProps } from "@/components/stat-card.tsx";
+import { StatCard, StatGrid, type StatCardProps } from "@/components/stat-card.tsx";
 
 const STAT_INFO = {
   efficiency:
@@ -229,19 +229,19 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
       ) : null}
 
       {peaks.length ? (
-        <div className="grid grid-cols-3 gap-2">
+        <StatGrid className="grid-cols-3">
           {peaks.map((stat) => (
             <StatCard key={stat.label} {...stat} />
           ))}
-        </div>
+        </StatGrid>
       ) : null}
 
       {stats.length ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <StatGrid className="sm:grid-cols-3">
           {stats.map((stat) => (
             <StatCard key={stat.label} {...stat} />
           ))}
-        </div>
+        </StatGrid>
       ) : null}
     </ActivityDetailSection>
   );

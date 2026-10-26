@@ -4,6 +4,7 @@ import {
   familyCollectors,
   isSportTypeShown,
   mergeAthleteSettings,
+  nextTopEffortsSince,
   parseAthleteSettings,
   sportTypeColor,
 } from "./athlete-settings.types.ts";
@@ -61,6 +62,7 @@ describe("mergeAthleteSettings", () => {
         },
         sportGroupShares: {},
         calendarPeriod: "month",
+        topEffortsSince: null,
       },
       ["Run", "Ride"],
     );
@@ -106,5 +108,27 @@ describe("familyCollectors", () => {
     );
 
     expect(collectors).toEqual({ heartRate: true, power: true, powerPartial: true });
+  });
+});
+
+describe("top 10 effort celebrations switch", () => {
+  const now = new Date("2026-10-22T12:00:00Z");
+  const earlier = "2026-09-01T08:00:00.000Z";
+
+  it("turning it on starts counting from now", () => {
+    expect(nextTopEffortsSince(null, true, now)).toBe("2026-10-22T12:00:00.000Z");
+  });
+
+  it("staying on keeps the original start", () => {
+    expect(nextTopEffortsSince(earlier, true, now)).toBe(earlier);
+  });
+
+  it("turning it off clears the start", () => {
+    expect(nextTopEffortsSince(earlier, false, now)).toBeNull();
+  });
+
+  it("a save without the switch leaves it as it was", () => {
+    expect(nextTopEffortsSince(earlier, undefined, now)).toBe(earlier);
+    expect(nextTopEffortsSince(null, undefined, now)).toBeNull();
   });
 });

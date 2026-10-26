@@ -11,6 +11,7 @@ import { loadHomeData } from "@/services/home-data.ts";
 import { loadBests } from "@/services/personal-bests.ts";
 import { loadProgress } from "@/services/progress.ts";
 import { loadSeason } from "@/services/season.ts";
+import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
 import { loadWeekCoach } from "@/services/week-coach.ts";
 import { loadPlanBuilder } from "@/services/plan-builder.ts";
 import type { PlanImpact } from "@/services/plan-impact.ts";
@@ -68,6 +69,12 @@ export const progressQueryOptions = queryOptions({
 export const bestsQueryOptions = queryOptions({
   queryKey: ["bests"],
   queryFn: () => loadBests(),
+  staleTime: 60_000,
+});
+
+export const topEffortCelebrationsQueryOptions = queryOptions({
+  queryKey: ["top-effort-celebrations"],
+  queryFn: () => loadTopEffortCelebrations(),
   staleTime: 60_000,
 });
 

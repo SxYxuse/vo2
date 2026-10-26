@@ -11,6 +11,8 @@ import {
   stopsAfterNewestPage,
   storedPauseResult,
   SYNC_REQUEST_BUDGET_MS,
+  summarizeSyncStatus,
+  type SyncStatus,
 } from "./strava-sync.types.ts";
 
 describe("deriveSyncKind", () => {
@@ -201,5 +203,61 @@ describe("storedPauseResult", () => {
   it("lets the sync run without a stored pause or run", () => {
     expect(storedPauseResult({ ...run, pausedUntil: null }, 12, now)).toBeNull();
     expect(storedPauseResult(null, 0, now)).toBeNull();
+  });
+});
+
+describe("summarizeSyncStatus", () => {
+  const now = Date.parse("2026-10-24T08:30:00Z");
+  const status: SyncStatus = {
+    activityCount: 44,
+    streamsPending: 0,
+    streamsCopied: 44,
+    status: "complete",
+    historyComplete: true,
+    pausedUntil: null,
+    lastError: null,
+    lastAttemptAt: "2026-10-24T08:21:00Z",
+    shortLimitRemaining: null,
+    dailyLimitRemaining: null,
+  };
+
+  it("says how long ago a full copy ran", () => {
+    expect(summarizeSyncStatus(status, now)).toMatchObject({
+      label: "Synced 9 minutes ago",
+      tone: "ok",
+    });
+  });
+
+  it("reads a copy from the last minute, or a server clock ahead of the device, as just now", () => {
+    expect(
+      summarizeSyncStatus({ ...status, lastAttemptAt: "2026-10-24T08:29:30Z" }, now).label,
+    ).toBe("Synced just now");
+    expect(
+      summarizeSyncStatus({ ...status, lastAttemptAt: "2026-10-24T08:30:02Z" }, now).label,
+    ).toBe("Synced just now");
+  });
+
+  it("flags a copy that still has history to fetch", () => {
+    expect(summarizeSyncStatus({ ...status, status: "incomplete" }, now).tone).toBe("attention");
+  });
+
+  it("shows a rate-limit pause only while it lasts", () => {
+    const paused = { ...status, status: "paused" as const, pausedUntil: "2026-10-24T09:00:00Z" };
+    expect(summarizeSyncStatus(paused, now)).toMatchObject({ tone: "attention" });
+    expect(summarizeSyncStatus(paused, now).label).toMatch(/^Paused until /);
+    expect(summarizeSyncStatus(paused, Date.parse("2026-10-24T09:05:00Z")).label).toMatch(
+      /^Synced /,
+    );
+  });
+
+  it("calls out failures and copies that never ran", () => {
+    expect(summarizeSyncStatus({ ...status, status: "failed" }, now).tone).toBe("error");
+    expect(
+      summarizeSyncStatus({ ...status, status: "never", lastAttemptAt: null }, now),
+    ).toMatchObject({
+      label: "Not synced",
+      tone: "idle",
+    });
+    expect(summarizeSyncStatus(null, now).label).toBe("Sync");
   });
 });

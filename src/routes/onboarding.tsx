@@ -12,8 +12,8 @@ import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions, loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { isSetUp } from "@/services/app-shell.ts";
 import { isTrainingPlanComplete } from "@/services/training-plan.ts";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/onboarding")({
   loader: async ({ context }) => {
@@ -61,15 +61,9 @@ function OnboardingPending() {
 }
 
 function OnboardingError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
   return (
     <OnboardingShell>
-      <Empty className="min-h-64 border">
-        <EmptyHeader>
-          <EmptyTitle>Could not load setup</EmptyTitle>
-          <EmptyDescription>{message}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <RouteError title="Could not load setup" error={error} />
     </OnboardingShell>
   );
 }

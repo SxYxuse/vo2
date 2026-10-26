@@ -27,7 +27,7 @@ import {
 } from "./personal-bests.ts";
 
 /** Every sport type any board reads; the rest of the local copy is never loaded here. */
-const BESTS_SPORT_TYPES = [
+export const BESTS_SPORT_TYPES = [
   "Run",
   "TrailRun",
   "Ride",
@@ -60,8 +60,10 @@ function daysSport(sportType: string): BestsSport | null {
 export async function loadBestsImpl(): Promise<BestsData> {
   const session = await getOptionalSession();
   if (!session) return { signedIn: false, weightKg: null, activities: [], boards: [] };
-  const userId = session.user.id;
+  return loadBestsForUser(session.user.id);
+}
 
+export async function loadBestsForUser(userId: string): Promise<BestsData> {
   const [rows, settings, metricsRows] = await Promise.all([
     db
       .select({

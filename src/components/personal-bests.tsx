@@ -126,7 +126,7 @@ function formatMetres(metres: number) {
 }
 
 /** The headline number of an effort: a time, watts, or metres. */
-function formatValue(board: Board, value: number) {
+export function formatValue(board: Pick<Board, "sport" | "kind">, value: number) {
   if (board.kind === "time") return formatDuration(value);
   if (board.kind === "power") return `${value} W`;
   if (board.kind === "longest") {

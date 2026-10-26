@@ -19,6 +19,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/fuel")({
   loader: ({ context }) => context.queryClient.query(loaderQuery(routePlansQueryOptions)),
@@ -128,22 +129,17 @@ function FuelPending() {
   return (
     <>
       <FuelHeader />
-      <Skeleton className="h-96 w-full rounded-xl" />
+      <Skeleton className="h-20 w-full rounded-lg" />
+      <PanelSkeleton bodyClassName="h-64" />
     </>
   );
 }
 
 function FuelError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
   return (
     <>
       <FuelHeader />
-      <Empty className="min-h-64 border">
-        <EmptyHeader>
-          <EmptyTitle>Could not load your routes</EmptyTitle>
-          <EmptyDescription>{message}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <RouteError title="Could not load your routes" error={error} />
     </>
   );
 }

@@ -12,6 +12,7 @@ import { athleteExists } from "./athlete-deletion.server.ts";
 import { syncAthlete, type SyncStore } from "./strava-sync-run.ts";
 import type { SyncResult, SyncStatus } from "./strava-sync.types.ts";
 import { deriveSyncKind, historyCompleteFromRun } from "./strava-sync.types.ts";
+import { findTopEffortCelebrations } from "./top-efforts.server.ts";
 import { refreshTrainingLoadsIfNeeded } from "./training-load.server.ts";
 
 export async function loadSyncStatusImpl(): Promise<SyncStatus> {
@@ -97,12 +98,17 @@ export async function syncStravaImpl(): Promise<SyncResult> {
   const userId = session.user.id;
   // The stored pause is read inside the lock: a sync that just finished on another device may
   // have set it.
-  const result = await withAthleteSyncLock(userId, () =>
-    syncAthlete({
+  const result = await withAthleteSyncLock(userId, async () => {
+    const synced = await syncAthlete({
       store: postgresSyncStore(userId),
       openStrava: async () => new StravaApi(await getStravaAccessToken(userId)),
-    }),
-  );
+    });
+    // A failed check must not fail the sync; the next sync checks again.
+    await findTopEffortCelebrations(userId).catch((error: unknown) =>
+      logger.warn("top_efforts.find_failed", errorFields(error)),
+    );
+    return synced;
+  });
   if (result) return result;
   logger.info("sync.already_running");
   return {

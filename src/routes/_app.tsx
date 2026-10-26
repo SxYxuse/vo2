@@ -12,6 +12,7 @@ import {
 import { AppSidebar } from "@/components/app-sidebar.tsx";
 import { SignedOutPage } from "@/components/signed-out-page.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
+import { TopEffortCelebration } from "@/components/top-effort-celebration.tsx";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
@@ -65,6 +66,7 @@ function AppLayout() {
     <SidebarProvider>
       <SignedInPrefetch />
       <SyncAutoResume />
+      <TopEffortCelebration />
       <AppSidebar />
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 pt-[max(0px,env(safe-area-inset-top))] md:pt-0">

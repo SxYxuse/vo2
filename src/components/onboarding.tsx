@@ -28,7 +28,6 @@ import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/athlete-
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { startPlan } from "@/services/plan-builder.ts";
 import type { PlanDraft } from "@/services/plan-builder.types.ts";
-import { cn } from "cn";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
@@ -46,6 +45,7 @@ import {
 } from "@/components/ui/empty";
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
 
 const STEPS = [
   {
@@ -212,33 +212,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
         void continueStep();
       }}
     >
-      <Card>
-        <CardHeader className="justify-items-center border-b text-center">
-          <div
-            className="flex items-center justify-center gap-1.5"
-            role="tablist"
-            aria-label="Setup steps"
-          >
-            {STEPS.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-label={item.title}
-                aria-current={index === stepIndex ? "step" : undefined}
-                disabled={isReady || index > stepIndex}
-                className={cn(
-                  "size-2.5 rounded-full transition-colors",
-                  index === stepIndex
-                    ? "bg-primary"
-                    : index < stepIndex
-                      ? "bg-primary/50"
-                      : "bg-muted",
-                )}
-                onClick={() => goToStep(index)}
-              />
-            ))}
-          </div>
+      <Card className={SETUP_CARD}>
+        <CardHeader className="gap-2 border-b">
+          <SetupProgress step={stepIndex} onSelect={goToStep} locked={isReady} />
           <h1 className="text-xl font-semibold tracking-tight">
             {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
           </h1>
@@ -302,7 +278,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
             )}
           </div>
         </CardContent>
-        <CardFooter className="flex-wrap justify-end gap-2 border-t">
+        <CardFooter className={SETUP_FOOTER}>
           {saveError ? (
             <Alert variant="destructive" className="me-auto w-full sm:w-auto">
               <AlertTitle>Could not save</AlertTitle>
@@ -326,7 +302,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="me-auto"
+                  className="me-auto max-sm:flex-1"
                   onClick={() => setStepIndex((current) => current - 1)}
                 >
                   <ChevronLeftIcon data-icon="inline-start" />
@@ -335,6 +311,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
               ) : null}
               <Button
                 type="submit"
+                className="max-sm:flex-1"
                 disabled={
                   save.isPending ||
                   (step.id === "sync" && !syncStep.canContinue) ||

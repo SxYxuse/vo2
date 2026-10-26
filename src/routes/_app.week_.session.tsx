@@ -15,6 +15,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelSkeleton, RouteError } from "@/components/route-states.tsx";
 
 type SessionSearch = {
   /** The day of this week the session is planned on. */
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/_app/week_/session")({
     return context.queryClient.query(loaderQuery(weekTargetQueryOptions));
   },
   pendingMs: 200,
-  pendingComponent: () => <Skeleton className="h-96 w-full rounded-xl" />,
+  pendingComponent: SessionPending,
   errorComponent: SessionError,
   component: SessionPage,
 });
@@ -88,14 +89,20 @@ function SessionPage() {
   );
 }
 
-function SessionError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
+function SessionPending() {
   return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load the session</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-8 w-56 max-w-full" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </div>
+      <PanelSkeleton bodyClassName="h-48" />
+      <PanelSkeleton bodyClassName="h-32" />
+    </div>
   );
+}
+
+function SessionError({ error }: ErrorComponentProps) {
+  return <RouteError title="Could not load the session" error={error} />;
 }

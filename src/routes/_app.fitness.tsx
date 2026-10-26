@@ -15,6 +15,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  PanelSkeleton,
+  RouteError,
+  StatGridSkeleton,
+  ToolbarSkeleton,
+} from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/fitness")({
   loader: ({ context }) => {
@@ -80,19 +86,14 @@ function FitnessPending() {
           Dose your training with fitness, fatigue, and form, and see whether it makes you better.
         </p>
       </div>
-      <Skeleton className="h-80 w-full rounded-xl" />
+      <ToolbarSkeleton />
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <StatGridSkeleton cells={5} className="sm:grid-cols-3 lg:grid-cols-5" />
+      <PanelSkeleton bodyClassName="h-56" />
     </>
   );
 }
 
 function FitnessError({ error }: ErrorComponentProps) {
-  const message = error instanceof Error ? error.message : "Something went wrong.";
-  return (
-    <Empty className="min-h-64 border">
-      <EmptyHeader>
-        <EmptyTitle>Could not load fitness</EmptyTitle>
-        <EmptyDescription>{message}</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  );
+  return <RouteError title="Could not load fitness" error={error} />;
 }
