@@ -272,6 +272,10 @@ function periodOf(placement: TopEffortPlacement) {
   return placement.allTimeRank ? ("all" as const) : (`${placement.year}` as `${number}`);
 }
 
+/** One side of a card; it turns invisible when the card is edge-on, half way into the turn. */
+const FACE =
+  "absolute inset-0 backface-hidden transition-[visibility] delay-250 duration-0 motion-reduce:delay-0";
+
 /** Where a card sits relative to the front one: turned away, in front, or fanned behind. */
 function stackStyle(offset: number, dragX: number): CSSProperties {
   if (offset === -1) return { transform: "translateX(-130%) rotate(-14deg)", opacity: 0 };
@@ -381,9 +385,15 @@ function Deck({
                 dealing ? { animationDelay: `${0.15 + Math.max(2 - at, 0) * 0.12}s` } : undefined
               }
             >
+              {/*
+               * The face turned away is hidden outright, not only by backface culling: the frame a
+               * transition ends on can drop the culling (WebKit, and the sheen's own layer) and
+               * flash the front. The swap waits for the card to be edge-on, half way through the
+               * symmetric ease-in-out turn.
+               */}
               <div
                 className={cn(
-                  "relative size-full transition-transform duration-500 ease-out transform-3d motion-reduce:transition-none",
+                  "relative size-full transition-transform duration-500 ease-in-out transform-3d motion-reduce:transition-none",
                   turned && "rotate-y-180",
                 )}
               >
@@ -392,11 +402,11 @@ function Deck({
                   inert={turned}
                   aria-label={`${cardTitle(placement)}, ${rankBadge(placement)}, ${rankText(placement)}. Turn over`}
                   onClick={flip}
-                  className="absolute inset-0 backface-hidden"
+                  className={cn(FACE, turned && "invisible")}
                 >
                   <EffortCard placement={placement} />
                 </button>
-                <div inert={!turned} className="absolute inset-0 rotate-y-180 backface-hidden">
+                <div inert={!turned} className={cn(FACE, "rotate-y-180", !turned && "invisible")}>
                   <EffortCardBack
                     placement={placement}
                     summary={activities[placement.activity.id]}
