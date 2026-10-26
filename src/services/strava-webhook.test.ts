@@ -91,6 +91,19 @@ describe("handleStravaWebhook", () => {
     expect(calls).toEqual([]);
   });
 
+  it("rejects a body that is not an event", async () => {
+    const { calls, ports } = recorder();
+
+    const response = await handleStravaWebhook(
+      webhookRequest(SECRET, { method: "POST", body: "not json" }),
+      ports,
+      SECRET,
+    );
+
+    expect(response.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
   it("ignores requests without the secret, so nobody else can delete athletes", async () => {
     const { calls, ports } = recorder();
     const deauthorize = {

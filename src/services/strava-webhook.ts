@@ -6,6 +6,10 @@ import { timingSafeEqual } from "node:crypto";
  */
 export const STRAVA_WEBHOOK_PATH = "/api/strava-webhook";
 
+export function stravaWebhookUrl(appUrl: string, secret: string) {
+  return `${appUrl}${STRAVA_WEBHOOK_PATH}/${secret}`;
+}
+
 export type StravaWebhookPorts = {
   removeAthlete: (stravaAthleteId: string) => Promise<void>;
   removeActivity: (stravaAthleteId: string, activityId: string) => Promise<void>;
@@ -41,7 +45,12 @@ export async function handleStravaWebhook(
     return Response.json({ "hub.challenge": url.searchParams.get("hub.challenge") });
   }
 
-  const event = (await request.json()) as StravaEvent;
+  let event: StravaEvent;
+  try {
+    event = (await request.json()) as StravaEvent;
+  } catch {
+    return new Response("Bad request", { status: 400 });
+  }
   const athleteId = String(event.owner_id);
   if (event.object_type === "athlete" && event.updates?.authorized === "false") {
     await ports.removeAthlete(athleteId);

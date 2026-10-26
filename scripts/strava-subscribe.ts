@@ -1,5 +1,5 @@
 import { parseEnv } from "../src/configs/env-schema.ts";
-import { STRAVA_WEBHOOK_PATH } from "../src/services/strava-webhook.ts";
+import { stravaWebhookUrl } from "../src/services/strava-webhook.ts";
 
 // Run once per Strava app with `vp run strava:subscribe`, from a machine whose .env names the
 // deployment Strava should push to. The app must be running: Strava calls it back to verify.
@@ -10,11 +10,11 @@ if (!env.STRAVA_WEBHOOK_SECRET) throw new Error("Set STRAVA_WEBHOOK_SECRET first
 
 const endpoint = `${env.STRAVA_BASE_URL}/api/v3/push_subscriptions`;
 const credentials = { client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET };
-const callbackUrl = `${env.BETTER_AUTH_URL}${STRAVA_WEBHOOK_PATH}/${env.STRAVA_WEBHOOK_SECRET}`;
+const callbackUrl = stravaWebhookUrl(env.BETTER_AUTH_URL, env.STRAVA_WEBHOOK_SECRET);
 
-const existing = (await (
-  await fetch(`${endpoint}?${new URLSearchParams(credentials)}`)
-).json()) as Array<{ id: number; callback_url: string }>;
+const listed = await fetch(`${endpoint}?${new URLSearchParams(credentials)}`);
+if (!listed.ok) await fail("Strava refused to list subscriptions", listed);
+const existing = (await listed.json()) as Array<{ id: number; callback_url: string }>;
 
 for (const subscription of existing) {
   if (!process.argv.includes("--replace")) {
@@ -24,9 +24,11 @@ for (const subscription of existing) {
     );
     process.exit(1);
   }
-  await fetch(`${endpoint}/${subscription.id}?${new URLSearchParams(credentials)}`, {
-    method: "DELETE",
-  });
+  const removed = await fetch(
+    `${endpoint}/${subscription.id}?${new URLSearchParams(credentials)}`,
+    { method: "DELETE" },
+  );
+  if (!removed.ok) await fail(`Strava refused to delete subscription ${subscription.id}`, removed);
 }
 
 const response = await fetch(endpoint, {
@@ -37,8 +39,10 @@ const response = await fetch(endpoint, {
     verify_token: env.STRAVA_WEBHOOK_SECRET,
   }),
 });
-if (!response.ok) {
-  console.error(`Strava refused the subscription (${response.status}): ${await response.text()}`);
+if (!response.ok) await fail("Strava refused the subscription", response);
+console.log(`Subscribed: ${JSON.stringify(await response.json())}`);
+
+async function fail(message: string, response: Response): Promise<never> {
+  console.error(`${message} (${response.status}): ${await response.text()}`);
   process.exit(1);
 }
-console.log(`Subscribed: ${JSON.stringify(await response.json())}`);

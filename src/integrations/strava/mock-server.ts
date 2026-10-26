@@ -1,5 +1,5 @@
 import { env } from "@/configs/env.ts";
-import { STRAVA_WEBHOOK_PATH } from "@/services/strava-webhook.ts";
+import { stravaWebhookUrl } from "@/services/strava-webhook.ts";
 
 import type { StreamSet, SummaryActivity } from "./client.ts";
 
@@ -187,8 +187,7 @@ async function createSubscription(form: FormData) {
 /** Without a subscription, events go to this app's own webhook so the dev loop needs no setup. */
 async function pushEvent(event: Record<string, unknown>) {
   const callback =
-    subscriptionCallback ??
-    `${env.BETTER_AUTH_URL}${STRAVA_WEBHOOK_PATH}/${env.STRAVA_WEBHOOK_SECRET}`;
+    subscriptionCallback ?? stravaWebhookUrl(env.BETTER_AUTH_URL, env.STRAVA_WEBHOOK_SECRET ?? "");
   const response = await fetch(callback, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
