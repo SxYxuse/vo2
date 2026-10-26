@@ -164,6 +164,9 @@ function EventCalendarEvent<TData = unknown>({
   const resizeOn = useEventCalendarSelector<TData, boolean>((state) => state.interactions.resize, {
     calendar: instance,
   });
+  const dragOn = useEventCalendarSelector<TData, boolean>((state) => state.interactions.drag, {
+    calendar: instance,
+  });
   // A preview clone must never inherit the source's selected/dragging state
   // (the drag key matches, which would dim the clone itself).
   const isSelected = preview ? false : isSelectedRaw;
@@ -326,6 +329,10 @@ function EventCalendarEvent<TData = unknown>({
   const tooltipOn = Boolean(tooltipContent);
 
   const showResize = interactive && resizeOn && !event.readOnly && event.resizable !== false;
+  // touch-action: none lets a long press become a drag, but it also stops a
+  // swipe that lands on the chip from scrolling the list, so only chips that
+  // can actually move claim the touch
+  const movable = interactive && dragOn && !event.readOnly && event.draggable !== false;
   // Hover grip pill (mirrors the gantt bars) marking the resize direction.
   // Shown on compact sub-compactEventMinutes blocks too: the 1.5rem chip
   // min-height leaves edge room without colliding with the centered title.
@@ -448,7 +455,8 @@ function EventCalendarEvent<TData = unknown>({
       settings.onEventDoubleClick?.(occurrence, e);
     },
     className: cn(
-      "group/ec-event text-foreground relative flex w-full min-w-0 cursor-pointer touch-none items-center overflow-hidden text-start select-none",
+      "group/ec-event text-foreground relative flex w-full min-w-0 cursor-pointer items-center overflow-hidden text-start select-none",
+      movable && "touch-none",
       "focus-visible:ring-ring/50 outline-none focus-visible:ring-2",
       preview && "pointer-events-none",
       view === "agenda"
