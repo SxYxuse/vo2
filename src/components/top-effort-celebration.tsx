@@ -394,7 +394,7 @@ function Deck({
                   onClick={flip}
                   className="absolute inset-0 backface-hidden"
                 >
-                  <EffortCard placement={placement} />
+                  <EffortCard placement={placement} shine={!turned} />
                 </button>
                 <div inert={!turned} className="absolute inset-0 rotate-y-180 backface-hidden">
                   <EffortCardBack
@@ -424,11 +424,16 @@ function cardFace(medal: CSSProperties | undefined) {
   );
 }
 
-function EffortCard({ placement }: { placement: TopEffortPlacement }) {
+/**
+ * `shine` is off while the card is turned over: the sheen's running animation gets its own layer,
+ * and iOS Safari drops that layer's backface culling for a few frames as a turn ends, flashing
+ * the front, mirrored, over the back.
+ */
+function EffortCard({ placement, shine }: { placement: TopEffortPlacement; shine: boolean }) {
   const medal = medalOf(placement);
   return (
     <div className={cardFace(medal)} style={medal}>
-      {placement.allTimeRank === 1 ? (
+      {shine && placement.allTimeRank === 1 ? (
         <span
           aria-hidden
           className="pointer-events-none absolute -inset-1/2 animate-[top-effort-sheen_3s_linear_0.8s_infinite] bg-[conic-gradient(from_0deg,transparent,rgb(255_255_255/0.55),transparent_30%,oklch(0.9_0.12_200/0.35),transparent_60%,oklch(0.9_0.12_330/0.35),transparent)] mix-blend-overlay motion-reduce:animate-none"
