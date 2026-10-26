@@ -20,8 +20,7 @@
     "db:check": "drizzle-kit check && j=$(shasum drizzle/meta/_journal.json) && drizzle-kit generate && test \"$j\" = \"$(shasum drizzle/meta/_journal.json)\"",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
-    "generate:strava-sdk": "openapi-typescript src/integrations/strava/openapi.json -o src/integrations/strava/strava.types.ts",
-    "catalog:mnstry": "bun scripts/import-mnstry-catalog.ts"
+    "generate:strava-sdk": "openapi-typescript src/integrations/strava/openapi.json -o src/integrations/strava/strava.types.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

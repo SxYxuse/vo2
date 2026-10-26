@@ -31,8 +31,8 @@ import {
 } from "@/services/training-plan.types.ts";
 import { NO_HISTORY_REST_WEEKDAYS } from "@/services/plan-builder.types.ts";
 
-// Age checks the max-HR anchor against spikes, and weight caps caffeine in fuel plans,
-// so every athlete gives both.
+// Age checks the max-HR anchor against spikes, and weight is used for watts per
+// kilogram on personal bests, so every athlete gives both.
 export const profileFormSchema = z.object({
   birthDate: z
     .string()
