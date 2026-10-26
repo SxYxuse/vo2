@@ -284,8 +284,10 @@ function ActivityDayListView() {
   const index = instance.internals.getIndex();
   const native = viewConfig.scrollbars === "native";
 
+  // pan-y: the browser scrolls the days, but a sideways swipe stays the week change (useWeekSwipe)
+  // instead of becoming back navigation.
   const body = (
-    <div className="isolate flex flex-col [&>*:last-child>*:last-child]:border-b-0">
+    <div className="isolate flex touch-pan-y flex-col [&>*:last-child>*:last-child]:border-b-0">
       {days.map((day) => {
         const bucket = index.byDay.get(getDayKey(day, settings.timeZone));
         const items = [...(bucket?.allDay ?? []), ...(bucket?.timed ?? [])];
