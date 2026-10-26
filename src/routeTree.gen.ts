@@ -28,6 +28,7 @@ import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$
 import { Route as AppWeekSessionRouteImport } from './routes/_app.week_.session'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
+import { Route as ApiStravaWebhookSecretRouteImport } from './routes/api/strava-webhook/$secret'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -123,6 +124,11 @@ const ApiMockStravaSplatRoute = ApiMockStravaSplatRouteImport.update({
   path: '/api/mock-strava/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiStravaWebhookSecretRoute = ApiStravaWebhookSecretRouteImport.update({
+  id: '/api/strava-webhook/$secret',
+  path: '/api/strava-webhook/$secret',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -183,6 +191,7 @@ export interface FileRoutesById {
   '/_app/week_/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
+  '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/api/strava-webhook/$secret'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/api/strava-webhook/$secret'
     | '/settings'
   id:
     | '__root__'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/_app/week_/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
+    | '/api/strava-webhook/$secret'
     | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   ApiActivityAnalysisRoute: typeof ApiActivityAnalysisRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMockStravaSplatRoute: typeof ApiMockStravaSplatRoute
+  ApiStravaWebhookSecretRoute: typeof ApiStravaWebhookSecretRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -391,6 +404,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMockStravaSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/strava-webhook/$secret': {
+      id: '/api/strava-webhook/$secret'
+      path: '/api/strava-webhook/$secret'
+      fullPath: '/api/strava-webhook/$secret'
+      preLoaderRoute: typeof ApiStravaWebhookSecretRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -446,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiActivityAnalysisRoute: ApiActivityAnalysisRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMockStravaSplatRoute: ApiMockStravaSplatRoute,
+  ApiStravaWebhookSecretRoute: ApiStravaWebhookSecretRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

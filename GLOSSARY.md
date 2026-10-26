@@ -9,7 +9,7 @@ The person whose training VO2 tracks. One athlete is one Strava account.
 _Avoid_: User, account, client
 
 **Athlete deletion**:
-Permanently removing an athlete and their whole local copy, training plan, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone.
+Permanently removing an athlete and their whole local copy, training plan, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone. Revoking VO2 from Strava's side deletes the athlete too.
 _Avoid_: Account deletion, deactivation, closing an account
 
 **Athlete settings**:

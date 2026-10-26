@@ -21,6 +21,7 @@
     "db:check": "drizzle-kit check && j=$(shasum drizzle/meta/_journal.json) && drizzle-kit generate && test \"$j\" = \"$(shasum drizzle/meta/_journal.json)\"",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
+    "strava:subscribe": "bun scripts/strava-subscribe.ts",
     "generate:strava-sdk": "openapi-typescript src/integrations/strava/openapi.json -o src/integrations/strava/strava.types.ts"
   },
   "dependencies": {

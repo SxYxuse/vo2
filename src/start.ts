@@ -43,9 +43,11 @@ function isAbortError(error: unknown) {
 const requestLogger = createMiddleware().server(async ({ next, request, pathname }) => {
   const { runWithLogContext } = await import("@/lib/log-context.server.ts");
   const { errorFields, logger } = await import("@/lib/logger.server.ts");
+  const { withoutWebhookSecret } = await import("@/services/strava-webhook.ts");
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const path = withoutWebhookSecret(pathname);
 
-  return runWithLogContext({ requestId, method: request.method, path: pathname }, async () => {
+  return runWithLogContext({ requestId, method: request.method, path }, async () => {
     if (isNoisyPath(pathname)) return next();
 
     if (pathname.startsWith("/_serverFn")) {
