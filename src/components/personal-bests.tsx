@@ -136,8 +136,8 @@ export function formatValue(board: Pick<Board, "sport" | "kind">, value: number)
 }
 
 /** The line under the headline: pace, speed, W/kg, or the climb's shape. */
-function formatDetail(
-  board: Board,
+export function formatDetail(
+  board: Pick<Board, "sport" | "kind" | "key">,
   effort: { value: number } & Partial<RankedEffort>,
   weightKg: number | null,
 ) {
@@ -158,7 +158,7 @@ function formatDetail(
 }
 
 /** "0:19 faster" or "12 W more" than the best before it. */
-function formatGain(board: Board, from: number, to: number) {
+export function formatGain(board: Pick<Board, "sport" | "kind">, from: number, to: number) {
   const gain = Math.abs(to - from);
   if (board.kind === "time") return `${formatDuration(gain)} faster than your previous best`;
   return `${formatValue(board, gain)} more than your previous best`;

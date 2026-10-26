@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import {
+  lowerIsBetter,
   TOP_EFFORTS,
   topEfforts,
   type BestsActivity,
@@ -27,6 +28,8 @@ export type TopEffortPlacement = {
   /** Place within the activity's calendar year, or null outside its top 10. */
   yearRank: number | null;
   year: number;
+  /** The board's best before this effort, or null for the first. Missing on older rows. */
+  bestBefore?: number | null;
   activity: BestsActivity;
 };
 
@@ -47,10 +50,17 @@ export function findTopEfforts(
       const activity = activities[effort.activity];
       if (!activity || !activityIds.has(activity.id)) continue;
       const year = new Date(activity.start).getFullYear();
-      const earlierThisYear = board.efforts.filter((other) => {
+      const earlier = board.efforts.filter((other) => {
         const at = activities[other.activity]?.start;
-        return at != null && at < activity.start && new Date(at).getFullYear() === year;
-      }).length;
+        return at != null && at < activity.start;
+      });
+      const earlierThisYear = earlier.filter(
+        (other) => new Date(activities[other.activity]!.start).getFullYear() === year,
+      ).length;
+      const earlierValues = earlier.map((other) => other.value);
+      const bestBefore = earlierValues.length
+        ? (lowerIsBetter(board.kind) ? Math.min : Math.max)(...earlierValues)
+        : null;
       const yearTop =
         earlierThisYear >= TOP_EFFORTS
           ? topEfforts(board, activities, `${year}` as `${number}`, now)
@@ -69,6 +79,7 @@ export function findTopEfforts(
         allTimeRank,
         yearRank,
         year,
+        bestBefore,
         activity,
       });
     }
