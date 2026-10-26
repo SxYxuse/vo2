@@ -6,17 +6,24 @@ import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
 import type { HeartRateSettings } from "./heart-rate-settings.ts";
 import type { Goal } from "./season.types.ts";
 import {
-  estimateLthrFromMax,
   heartRateFamily,
   isPlausibleBpm,
   isZonedFamily,
   type HeartRateFamily,
+  type ZonedFamily,
 } from "./heart-rate.ts";
+import {
+  LTHR_MIN_SECONDS,
+  LTHR_WINDOW_DAYS,
+  estimateLthr,
+  thresholdEffort,
+} from "./lthr-estimate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
 export const DEFAULT_REST_HR = 60;
+const DAY_MS = 86_400_000;
 
 export type LoadSource = "power" | "heartRate" | "similarHeartRate" | "duration";
 
@@ -44,6 +51,8 @@ export type LoadInputs = {
   weightedAverageWatts: number | null;
   deviceWatts: boolean;
   wattsStream?: number[] | null;
+  /** Attached only to recent activities that could hold a threshold effort. */
+  heartrateStream?: number[] | null;
   timeStream?: number[] | null;
 };
 
@@ -256,6 +265,43 @@ function estimateFtp(activities: LoadInputs[]) {
   return ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null;
 }
 
+/** Whether an activity's heart-rate stream can feed the LTHR estimate. */
+export function couldHoldThreshold(
+  activity: Pick<LoadInputs, "sportType" | "movingTime" | "startDate">,
+  now = new Date(),
+) {
+  if (activity.movingTime < LTHR_MIN_SECONDS) return false;
+  if (!isZonedFamily(heartRateFamily(activity.sportType))) return false;
+  const start = activity.startDate ? new Date(activity.startDate).getTime() : now.getTime();
+  return start >= now.getTime() - LTHR_WINDOW_DAYS * DAY_MS;
+}
+
+function lthrByFamily(
+  activities: LoadInputs[],
+  peaks: ReturnType<typeof peakByFamily>,
+  options: AnchorOptions,
+) {
+  const maxHr: Record<ZonedFamily, number | null> = {
+    cycling: peaks.cyclingMaxHr,
+    running: peaks.runMaxHr,
+    swimming: peaks.swimMaxHr,
+  };
+  const efforts: Record<ZonedFamily, number[]> = { cycling: [], running: [], swimming: [] };
+  for (const activity of activities) {
+    if (!activity.heartrateStream || !couldHoldThreshold(activity, options.now)) continue;
+    const family = heartRateFamily(activity.sportType) as ZonedFamily;
+    const familyMax = maxHr[family];
+    if (familyMax == null) continue;
+    const bpm = thresholdEffort(activity.heartrateStream, activity.timeStream, familyMax);
+    if (bpm != null) efforts[family].push(bpm);
+  }
+  return {
+    cyclingLthr: estimateLthr(efforts.cycling, maxHr.cycling, "cycling"),
+    runLthr: estimateLthr(efforts.running, maxHr.running, "running"),
+    swimLthr: estimateLthr(efforts.swimming, maxHr.swimming, "swimming"),
+  };
+}
+
 export function estimateLoadAnchors(
   activities: LoadInputs[],
   options: AnchorOptions = {},
@@ -263,9 +309,7 @@ export function estimateLoadAnchors(
   const peaks = peakByFamily(activities, options);
   return {
     ftp: estimateFtp(activities),
-    cyclingLthr: estimateLthrFromMax(peaks.cyclingMaxHr, "cycling"),
-    runLthr: estimateLthrFromMax(peaks.runMaxHr, "running"),
-    swimLthr: estimateLthrFromMax(peaks.swimMaxHr, "swimming"),
+    ...lthrByFamily(activities, peaks, options),
     restHr: estimateRestHr(activities),
     ...peaks,
   };
@@ -304,7 +348,6 @@ const SIMILAR_HR_NEIGHBOURS = 5;
 const SIMILAR_HR_MIN_MATCHES = 3;
 /** Heart rate at a given effort drifts with fitness, so only sessions this close in time count. */
 export const SIMILAR_HR_WINDOW_DAYS = 60;
-const DAY_MS = 86_400_000;
 
 function averageSpeed(activity: LoadInputs) {
   if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;

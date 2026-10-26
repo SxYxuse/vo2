@@ -80,6 +80,13 @@ describe("resolveHeartRate", () => {
     expect(running.lthr).toBe(175);
   });
 
+  test("keeps a stored LTHR estimate under a set max, but not one at or above it", () => {
+    const estimates = { ...RUNNING, lthr: 175 };
+    expect(resolveHeartRate("running", withRunning({ maxHr: 200 }), estimates).lthr).toBe(175);
+    // 88 % of a set max of 175.
+    expect(resolveHeartRate("running", withRunning({ maxHr: 175 }), estimates).lthr).toBe(154);
+  });
+
   test("has no anchors before any sync", () => {
     const running = resolveHeartRate("running", undefined, { restHr: null, maxHr: null });
     expect(running).toMatchObject({ maxHr: null, maxSource: null, lthr: null, lthrSource: null });

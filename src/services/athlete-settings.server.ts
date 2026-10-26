@@ -86,7 +86,14 @@ async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
       .from(activities)
       .where(eq(activities.userId, userId)),
     db
-      .select({ restHr: athleteMetrics.restHr, birthDate: athleteMetrics.birthDate })
+      .select({
+        restHr: athleteMetrics.restHr,
+        birthDate: athleteMetrics.birthDate,
+        cyclingLthr: athleteMetrics.cyclingLthr,
+        lthr: athleteMetrics.lthr,
+        runLthr: athleteMetrics.runLthr,
+        swimLthr: athleteMetrics.swimLthr,
+      })
       .from(athleteMetrics)
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
@@ -109,6 +116,11 @@ async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
   return {
     restHr: metrics?.restHr ?? null,
     maxHr: { cycling: maxHr("cycling"), running: maxHr("running"), swimming: maxHr("swimming") },
+    lthr: {
+      cycling: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
+      running: metrics?.runLthr ?? null,
+      swimming: metrics?.swimLthr ?? null,
+    },
   };
 }
 

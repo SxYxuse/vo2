@@ -116,6 +116,8 @@ export function athleteHeartRateFrom(
 export type HeartRateEstimates = {
   restHr: number | null;
   maxHr: Record<ZonedFamily, number | null>;
+  /** Stored LTHR estimates from hard efforts; missing ones are a share of max. */
+  lthr?: Partial<Record<ZonedFamily, number | null>>;
 };
 
 export type HeartRateSettingsIssue = { path: string; message: string };
@@ -131,6 +133,7 @@ export function heartRateSettingsIssues(
     const resolved = resolveHeartRate(family, settings, {
       restHr: estimates.restHr,
       maxHr: estimates.maxHr[family],
+      lthr: estimates.lthr?.[family],
     });
     const label = ZONED_FAMILY_LABELS[family].toLowerCase();
     if (resolved.lthr != null && resolved.maxHr != null && resolved.lthr >= resolved.maxHr) {

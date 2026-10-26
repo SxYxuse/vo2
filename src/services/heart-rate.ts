@@ -243,7 +243,7 @@ export type AnchorSource = "athlete" | "estimated";
 export type FamilyEstimates = {
   restHr: number | null;
   maxHr: number | null;
-  /** A stored LTHR estimate; without one, LTHR is a share of max. */
+  /** A stored LTHR estimate from hard efforts; without one, LTHR is a share of max. */
   lthr?: number | null;
 };
 
@@ -270,9 +270,11 @@ export function resolveHeartRate(
   const setLthr = sport?.lthr ?? null;
   const setRest = settings?.restHr ?? null;
   const maxHr = setMax ?? estimates.maxHr;
-  // A stored estimate was built on the estimated max, so a set max re-derives it.
-  const estimatedLthr =
-    (setMax == null ? estimates.lthr : null) ?? estimateLthrFromMax(maxHr, family);
+  // The stored estimate comes from activities and is refreshed when settings change; until
+  // then, one at or above a newly set max can't stand.
+  const stored =
+    estimates.lthr != null && (maxHr == null || estimates.lthr < maxHr) ? estimates.lthr : null;
+  const estimatedLthr = stored ?? estimateLthrFromMax(maxHr, family);
   const lthr = setLthr ?? estimatedLthr;
   const restHr = setRest ?? estimates.restHr;
   return {
@@ -340,6 +342,11 @@ export function histogramMaxBpm(histogram: number[]) {
 
 function pctBpm(anchor: number, pct: number) {
   return Math.round(anchor * pct);
+}
+
+/** The usual LTHR as a share of max HR, used when there aren't enough hard efforts. */
+export function lthrShareOfMax(family: HeartRateFamily) {
+  return ZONE_MODELS[family].lthrFactor;
 }
 
 export function estimateLthrFromMax(maxHeartrate: number | null, family: HeartRateFamily) {
@@ -717,9 +724,8 @@ export function lthrHint(sport: HeartRateSport) {
   if (!sport.lthr) return undefined;
   if (sport.lthrSource === "athlete") return "Set by you";
   const model = ZONE_MODELS[sport.family];
-  const pct = Math.round(model.lthrFactor * 100);
-  if (model.anchor === "lthr") return `${pct}% of ${sport.family} max`;
-  return `${pct}% of max HR`;
+  if (model.anchor === "lthr") return "Estimated";
+  return `${Math.round(model.lthrFactor * 100)}% of max HR`;
 }
 
 export function lthrInfo(sport: HeartRateSport) {
@@ -732,7 +738,7 @@ export function lthrInfo(sport: HeartRateSport) {
     return "Lactate threshold you set in settings. It scores heart-rate training load, and cuts zones when this sport uses % of LTHR.";
   }
   if (model.anchor === "lthr") {
-    return `Estimated lactate threshold as ${pct}% of this sport's max heart rate. Cycling, running, and swimming use different % of LTHR cuts.`;
+    return `Estimated lactate threshold from your hardest 20 to 60 minute efforts in this sport over the last 6 months. Until there are two, it is ${pct}% of this sport's max heart rate. Cycling, running, and swimming use different % of LTHR cuts.`;
   }
   return `Walking and mixed sports use % of max HR for zones. LTHR is shown as ${pct}% of max for reference only.`;
 }

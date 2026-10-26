@@ -224,6 +224,26 @@ describe("anchors", () => {
     expect(estimated.runLthr).toBe(Math.round(200 * 0.88));
   });
 
+  test("estimates LTHR from recent hard efforts in that sport's heart-rate streams", () => {
+    const now = new Date("2026-06-01T12:00:00Z");
+    const hardRun = (daysAgo: number, bpm: number) => {
+      const heartrate = Array.from({ length: 40 * 60 }, (_, index) => (index < 600 ? 130 : bpm));
+      return run({
+        startDate: new Date(now.getTime() - daysAgo * 86_400_000),
+        movingTime: heartrate.length,
+        maxHeartrate: 190,
+        heartrateStream: heartrate,
+        timeStream: heartrate.map((_, index) => index),
+      });
+    };
+    // 95 % of the best 20 minutes: 171 and 175 bpm.
+    const recent = estimateLoadAnchors([hardRun(10, 180), hardRun(40, 184)], { now });
+    expect(recent.runLthr).toBe(Math.round((171 + 174.8) / 2));
+    // Efforts older than six months no longer count, so LTHR is 88 % of max again.
+    const old = estimateLoadAnchors([hardRun(200, 180), hardRun(240, 184)], { now });
+    expect(old.runLthr).toBe(Math.round(190 * 0.88));
+  });
+
   test("a set max heart rate replaces the peak and sets the LTHR estimate", () => {
     const estimated = estimateLoadAnchors([run({ maxHeartrate: 200 })], {
       heartRate: runningSettings({ maxHr: 190 }),

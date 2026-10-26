@@ -239,6 +239,7 @@ export function HeartRateFields({
     resolveHeartRate(family, value, {
       restHr: estimates.restHr,
       maxHr: estimates.maxHr[family],
+      lthr: estimates.lthr?.[family],
     });
 
   return (
@@ -371,7 +372,10 @@ export function HeartRateFields({
                 id={`${idPrefix}-${family}-lthr`}
                 name={`${base}.lthr`}
                 label="LTHR"
-                estimate={{ bpm: lthrEstimate, source: "from your max heart rate" }}
+                estimate={{
+                  bpm: lthrEstimate,
+                  source: "from your hardest efforts, or your max heart rate",
+                }}
                 setsZones={anchors.includes("lthr") ? "Sets these zones" : undefined}
                 onReset={onSave}
                 description="Lactate threshold: about the highest heart rate you can hold for an hour. Scores training load."

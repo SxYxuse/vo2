@@ -9,6 +9,7 @@ import { getOptionalSession } from "@/lib/session.server.ts";
 import { goalsFor } from "./season.server.ts";
 import {
   activityTrainingLoad,
+  couldHoldThreshold,
   estimateLoadAnchors,
   isPowerCyclingSport,
   toFitnessLoad,
@@ -22,6 +23,7 @@ import {
 type StoredLoadRow = LoadInputs & {
   id: string;
   startDate: Date;
+  hasHeartrate: boolean;
   trainingLoad: number | null;
   loadSource: LoadSource | null;
 };
@@ -34,6 +36,7 @@ async function loadActivityRows(userId: string): Promise<StoredLoadRow[]> {
       sportType: activities.sportType,
       movingTime: activities.movingTime,
       distance: activities.distance,
+      hasHeartrate: activities.hasHeartrate,
       averageHeartrate: activities.averageHeartrate,
       maxHeartrate: activities.maxHeartrate,
       averageWatts: activities.averageWatts,
@@ -52,17 +55,32 @@ async function loadActivityRows(userId: string): Promise<StoredLoadRow[]> {
   }));
 }
 
-async function attachPowerStreams(rows: StoredLoadRow[]) {
-  const missing = rows.filter(
-    (row) =>
-      isPowerCyclingSport(row.sportType) &&
-      row.deviceWatts &&
-      (row.weightedAverageWatts == null || row.weightedAverageWatts <= 0),
+function needsPowerStream(row: StoredLoadRow) {
+  return (
+    isPowerCyclingSport(row.sportType) &&
+    row.deviceWatts &&
+    (row.weightedAverageWatts == null || row.weightedAverageWatts <= 0)
   );
-  if (!missing.length) return rows;
+}
 
-  const ids = missing.map((row) => row.id);
-  const streams: Array<{ activityId: string; watts: number[] | null; time: number[] | null }> = [];
+/** Power for rides without a Strava NP, and heart rate for recent efforts that could set LTHR. */
+async function attachStreams(rows: StoredLoadRow[]) {
+  const now = new Date();
+  const wantsPower = new Set<string>();
+  const wantsHeart = new Set<string>();
+  for (const row of rows) {
+    if (needsPowerStream(row)) wantsPower.add(row.id);
+    if (row.hasHeartrate && couldHoldThreshold(row, now)) wantsHeart.add(row.id);
+  }
+  const ids = [...new Set([...wantsPower, ...wantsHeart])];
+  if (!ids.length) return rows;
+
+  const streams: Array<{
+    activityId: string;
+    watts: number[] | null;
+    heartrate: number[] | null;
+    time: number[] | null;
+  }> = [];
   const batchSize = 40;
   for (let index = 0; index < ids.length; index += batchSize) {
     const chunk = ids.slice(index, index + batchSize);
@@ -70,6 +88,7 @@ async function attachPowerStreams(rows: StoredLoadRow[]) {
       .select({
         activityId: activityStreams.activityId,
         watts: activityStreams.watts,
+        heartrate: activityStreams.heartrate,
         time: activityStreams.time,
       })
       .from(activityStreams)
@@ -81,7 +100,12 @@ async function attachPowerStreams(rows: StoredLoadRow[]) {
   return rows.map((row) => {
     const stream = byId.get(row.id);
     if (!stream) return row;
-    return { ...row, wattsStream: stream.watts, timeStream: stream.time };
+    return {
+      ...row,
+      wattsStream: wantsPower.has(row.id) ? stream.watts : null,
+      heartrateStream: wantsHeart.has(row.id) ? stream.heartrate : null,
+      timeStream: stream.time,
+    };
   });
 }
 
@@ -122,7 +146,7 @@ async function refreshTrainingLoads(userId: string) {
   const rows = await loadActivityRows(userId);
   if (!rows.length) return;
 
-  const withStreams = await attachPowerStreams(rows);
+  const withStreams = await attachStreams(rows);
   const [profile] = await db
     .select({ birthDate: athleteMetrics.birthDate, heartRate: athleteMetrics.heartRate })
     .from(athleteMetrics)
