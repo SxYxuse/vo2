@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 
 import { AppSidebar } from "@/components/app-sidebar.tsx";
+import { OfflineBanner } from "@/components/offline-banner.tsx";
 import { SignedOutPage } from "@/components/signed-out-page.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
 import { TopEffortCelebration } from "@/components/top-effort-celebration.tsx";
@@ -21,6 +22,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 
 export const Route = createFileRoute("/_app")({
   loader: async ({ context, location }) => {
+    // Offline, the views saved on this device are all there is to show.
+    await context.offlineCopyRestored;
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn) {
       if (location.pathname !== "/") {
@@ -50,7 +53,7 @@ function SyncAutoResume() {
 }
 
 function AppLayout() {
-  const { data } = useSuspenseQuery(appShellQueryOptions);
+  const { data, dataUpdatedAt } = useSuspenseQuery(appShellQueryOptions);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (!data.signedIn) {
     if (pathname !== "/") {
@@ -73,6 +76,7 @@ function AppLayout() {
           <SidebarTrigger />
           <SyncPanel />
         </header>
+        <OfflineBanner updatedAt={dataUpdatedAt} />
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-6 sm:p-6">
           <Outlet />
         </div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { cn } from "cn";
 import { RotateCwIcon, TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 
+import { useOnline } from "@/hooks/use-online.ts";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -16,24 +17,6 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-
-function subscribeOnline(onChange: () => void) {
-  window.addEventListener("online", onChange);
-  window.addEventListener("offline", onChange);
-  return () => {
-    window.removeEventListener("online", onChange);
-    window.removeEventListener("offline", onChange);
-  };
-}
-
-/** False only when the browser knows it has no network; the server render assumes online. */
-export function useOnline() {
-  return useSyncExternalStore(
-    subscribeOnline,
-    () => navigator.onLine,
-    () => true,
-  );
-}
 
 /**
  * A route that failed to load: says why in plain words, and offers a retry that reruns the
@@ -64,7 +47,7 @@ export function RouteError({
         <EmptyDescription>
           {online
             ? "Something went wrong while loading. Your data is safe; try again."
-            : "You're offline. Reconnect, then try again."}
+            : "You're offline, and this page isn't saved on this device yet. Reconnect, then try again."}
         </EmptyDescription>
         {online && message ? (
           <p className="text-muted-foreground/80 max-w-sm text-xs break-words">{message}</p>
@@ -72,7 +55,7 @@ export function RouteError({
       </EmptyHeader>
       <EmptyContent className="flex-row flex-wrap justify-center">
         <Button
-          disabled={retrying}
+          disabled={retrying || !online}
           onClick={() => {
             setRetrying(true);
             void router.invalidate().finally(() => setRetrying(false));

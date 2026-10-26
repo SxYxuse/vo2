@@ -21,7 +21,13 @@ const IGNORED_SERVER_WARNINGS = new Set([
   "MODULE_LEVEL_DIRECTIVE",
 ]);
 
+/** Busts the offline copy saved by another build, whose data shapes may differ (ADR 0031). */
+const BUILD_ID = Date.now().toString(36);
+
 const config = defineConfig({
+  define: {
+    "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID),
+  },
   ssr: {
     external: ["winston", "winston-loki"],
   },

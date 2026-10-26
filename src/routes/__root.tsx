@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
@@ -7,6 +7,7 @@ import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { PullToRefresh } from "@/components/pull-to-refresh.tsx";
 import { ThemeProvider } from "@/components/theme-provider.tsx";
 import { loadAppEnv } from "@/lib/app-env.ts";
+import { registerServiceWorker } from "@/lib/service-worker.ts";
 import { APP_NAME, appChrome } from "@/lib/brand.ts";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,10 +18,13 @@ import type { QueryClient } from "@tanstack/react-query";
 
 interface MyRouterContext {
   queryClient: QueryClient;
+  offlineCopyRestored: Promise<void>;
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   loader: () => loadAppEnv(),
+  // The environment never changes while the app runs; reloading it on navigation fails offline.
+  staleTime: Number.POSITIVE_INFINITY,
   head: ({ loaderData }) => {
     const chrome = appChrome(loaderData?.appEnv ?? "development");
     return {
@@ -51,6 +55,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
+  useEffect(registerServiceWorker, []);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
