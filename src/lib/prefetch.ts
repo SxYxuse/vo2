@@ -12,7 +12,16 @@ import {
 const PREFETCH_BATCH = 4;
 const PREFETCH_VISIBLE_CAP = 40;
 
-const APP_ROUTES = ["/", "/week", "/season", "/coach", "/map", "/fitness", "/heart-rate"] as const;
+const APP_ROUTES = [
+  "/",
+  "/week",
+  "/season",
+  "/coach",
+  "/map",
+  "/merge-gpx",
+  "/fitness",
+  "/heart-rate",
+] as const;
 
 // On a slow connection, other pages' chunks and data would compete with the page the athlete
 // just opened, its map tiles included; warm them once it has had time to settle.
