@@ -9,7 +9,8 @@
     "src/integrations/strava/openapi.json"
   ],
   "format": ["typescript", "tsx", "css"],
-  "reporters": ["console"],
+  "reporters": ["console", "json"],
   "threshold": 1,
-  "gitignore": true
+  "gitignore": true,
+  "output": "jscpd-report"
 }

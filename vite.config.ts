@@ -7,6 +7,8 @@ import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+import { COVERAGE_FLOORS } from "./scripts/coverage-floors.ts";
+
 const isTest = process.env.VITEST === "true";
 
 /**
@@ -68,10 +70,10 @@ const config = defineConfig({
       // Every module counts, not only those a test imports, so an untested new file lowers the
       // numbers. Components stay out: tests cover logic, not rendered markup.
       include: ["src/**/*.ts", "scripts/**/*.ts"],
-      reporter: ["text-summary"],
+      // json-summary feeds the PR quality report (scripts/quality-report.ts).
+      reporter: ["text-summary", "json-summary"],
       exclude: ["src/routeTree.gen.ts", "src/integrations/strava/strava.types.ts"],
-      // Floors at the coverage measured when the gate landed; raise them as coverage grows.
-      thresholds: { statements: 54, branches: 51, functions: 53, lines: 56 },
+      thresholds: COVERAGE_FLOORS,
     },
   },
   plugins: isTest

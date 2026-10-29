@@ -45,8 +45,20 @@ jobs:
       - run: vp run coverage
       - run: vp build
 
+      - name: Upload reports for the quality comment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality
+          path: |
+            coverage/coverage-summary.json
+            jscpd-report/jscpd-report.json
+          if-no-files-found: ignore
+
   lighthouse:
     runs-on: ubuntu-latest
+    outputs:
+      report-url: ${{ steps.upload.outputs.artifact-url }}
     env:
       DATABASE_URL: postgresql://vo2:vo2@localhost:5432/vo2
       BETTER_AUTH_SECRET: ci-placeholder-secret
@@ -78,3 +90,47 @@ jobs:
       - run: vp build
       - run: vp run db:migrate
       - run: vp run lighthouse
+
+      - name: Upload Lighthouse reports
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: lighthouse-report/
+          if-no-files-found: ignore
+
+  # One comment per PR, edited on every push, with the numbers behind the checks.
+  report:
+    if: always() && github.event_name == 'pull_request'
+    needs: [ci, lighthouse]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          node-version: "22"
+          cache: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: reports
+
+      - name: Write the quality report
+        run: |
+          bun scripts/quality-report.ts reports > quality-report.md
+          cat quality-report.md >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+          CI_RESULT: ${{ needs.ci.result }}
+          LIGHTHOUSE_RESULT: ${{ needs.lighthouse.result }}
+          LIGHTHOUSE_REPORT_URL: ${{ needs.lighthouse.outputs.report-url }}
+
+      - uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: quality-report
+          path: quality-report.md

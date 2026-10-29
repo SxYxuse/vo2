@@ -19,5 +19,7 @@ todos.json
 # Test coverage reports
 coverage
 
-# Lighthouse CI reports
+# Quality reports (CI uploads them for the PR comment)
 .lighthouseci
+lighthouse-report
+jscpd-report
