@@ -13,7 +13,9 @@ export function activityLink(activity: ActivityMention) {
 export function withActivityLinks(text: string, mentions: readonly ActivityMention[]) {
   let message = text;
   const unplaced: ActivityMention[] = [];
-  for (const mention of mentions) {
+  // Longest names first, so "@Morning Run" can't claim the start of "@Morning Run 2".
+  const longestFirst = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  for (const mention of longestFirst) {
     const token = `@${mention.name}`;
     const at = message.indexOf(token);
     if (at === -1) {

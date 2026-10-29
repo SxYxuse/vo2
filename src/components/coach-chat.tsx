@@ -162,8 +162,19 @@ function failedCalls(parts: readonly Part[]) {
   );
 }
 
-function ToolTrace({ calls, failed }: { calls: ToolCall[]; failed: Set<string> }) {
-  const running = calls.some((call) => call.state !== "complete" && call.output === undefined);
+function ToolTrace({
+  calls,
+  failed,
+  live,
+}: {
+  calls: ToolCall[];
+  failed: Set<string>;
+  live: boolean;
+}) {
+  // A stopped or failed run leaves calls without output; only the reply streaming now runs.
+  const finished = (call: ToolCall) =>
+    !live || call.state === "complete" || call.output !== undefined;
+  const running = !calls.every(finished);
   // Open while the coach works, folded once it's done, unless the athlete toggled it.
   const [toggled, setToggled] = useState<boolean | null>(null);
   return (
@@ -185,7 +196,7 @@ function ToolTrace({ calls, failed }: { calls: ToolCall[]; failed: Set<string> }
                 done: call.name,
                 icon: SparklesIcon,
               };
-              const done = call.state === "complete" || call.output !== undefined;
+              const done = finished(call);
               const error = failed.has(call.id);
               return (
                 <TraceLine key={call.id} status={error ? "error" : done ? undefined : "running"}>
@@ -220,7 +231,7 @@ function ThinkingTrace({ text }: { text: string }) {
   );
 }
 
-function VisualBlock({ call }: { call: ToolCall }) {
+function VisualBlock({ call, live }: { call: ToolCall; live: boolean }) {
   const input = call.input as { title?: unknown; html?: unknown } | undefined;
   const ready =
     call.state !== "awaiting-input" &&
@@ -229,11 +240,11 @@ function VisualBlock({ call }: { call: ToolCall }) {
   if (!ready) {
     return (
       <Trace>
-        <TraceLine status="running">
+        <TraceLine status={live ? "running" : "error"}>
           <TraceIcon>
             <ChartLineIcon />
           </TraceIcon>
-          <TraceTitle>Drawing a visual</TraceTitle>
+          <TraceTitle>{live ? "Drawing a visual" : "Visual not finished"}</TraceTitle>
         </TraceLine>
       </Trace>
     );
@@ -246,7 +257,15 @@ function VisualBlock({ call }: { call: ToolCall }) {
   );
 }
 
-function CoachMessage({ message, lookup }: { message: UIMessage; lookup: ActivityLookup }) {
+function CoachMessage({
+  message,
+  lookup,
+  live,
+}: {
+  message: UIMessage;
+  lookup: ActivityLookup;
+  live: boolean;
+}) {
   if (message.role === "user") {
     const text = message.parts
       .flatMap((part) => (part.type === "text" ? [part.content] : []))
@@ -271,8 +290,10 @@ function CoachMessage({ message, lookup }: { message: UIMessage; lookup: Activit
           <Fragment key={index}>
             {block.kind === "text" ? <CoachMarkdown markdown={block.text} lookup={lookup} /> : null}
             {block.kind === "thinking" ? <ThinkingTrace text={block.text} /> : null}
-            {block.kind === "tools" ? <ToolTrace calls={block.calls} failed={failed} /> : null}
-            {block.kind === "visual" ? <VisualBlock call={block.call} /> : null}
+            {block.kind === "tools" ? (
+              <ToolTrace calls={block.calls} failed={failed} live={live} />
+            ) : null}
+            {block.kind === "visual" ? <VisualBlock call={block.call} live={live} /> : null}
           </Fragment>
         ))}
       </MessageContent>
@@ -391,26 +412,29 @@ export function CoachChat({
                 Ask about any activity, your form, or your plan. Type @ to point at an activity.
               </EmptyDescription>
             </EmptyHeader>
-            <EmptyContent className="flex-col">
-              {STARTERS.map((starter) => (
-                <Button
-                  key={starter}
-                  variant="outline"
-                  className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
-                  disabled={!online}
-                  onClick={() => send(starter)}
-                >
-                  {starter}
-                </Button>
-              ))}
-            </EmptyContent>
+            {/* A starter would send without the activity "Ask about this activity" brought in. */}
+            {initialMentions.length ? null : (
+              <EmptyContent className="flex-col">
+                {STARTERS.map((starter) => (
+                  <Button
+                    key={starter}
+                    variant="outline"
+                    className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
+                    disabled={!online}
+                    onClick={() => send(starter)}
+                  >
+                    {starter}
+                  </Button>
+                ))}
+              </EmptyContent>
+            )}
           </Empty>
         ) : (
           <MessageScrollerProvider>
             <MessageScroller className="flex-1">
               <MessageScrollerViewport>
                 <MessageScrollerContent className="mx-auto w-full max-w-3xl pb-4">
-                  {messages.map((message) => (
+                  {messages.map((message, index) => (
                     <MessageScrollerItem
                       key={message.id}
                       messageId={message.id}
@@ -421,7 +445,11 @@ export function CoachChat({
                       // jump as estimated heights turn real while scrolling back.
                       className="[content-visibility:visible]"
                     >
-                      <CoachMessage message={message} lookup={lookup} />
+                      <CoachMessage
+                        message={message}
+                        lookup={lookup}
+                        live={isLoading && index === messages.length - 1}
+                      />
                     </MessageScrollerItem>
                   ))}
                   {error && !isLoading ? (

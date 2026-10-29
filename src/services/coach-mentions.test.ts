@@ -12,6 +12,13 @@ describe("activity mentions", () => {
     );
   });
 
+  test("a name that starts another mentioned name links the right one", () => {
+    const second = { id: "102", name: "Morning Run 2" };
+    expect(withActivityLinks("Compare @Morning Run 2 with @Morning Run", [morning, second])).toBe(
+      "Compare [Morning Run 2](/activities/102) with [Morning Run](/activities/101)",
+    );
+  });
+
   test("a mention whose text was edited away still reaches the coach", () => {
     expect(withActivityLinks("How did it go?", [morning])).toBe(
       "How did it go?\n\n[Morning Run](/activities/101)",

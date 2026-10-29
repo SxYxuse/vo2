@@ -43,6 +43,10 @@ function makeComponents(lookup: ActivityLookup): MarkdownComponents {
         </a>
       );
     },
+    // An image would load any URL the model wrote, carrying data out in it; show its text.
+    img({ alt }: ComponentProps<"img">) {
+      return alt ? <span>{alt}</span> : null;
+    },
     table({ children, ...props }: ComponentProps<"table">) {
       return (
         <div className="typeset-scroll">
