@@ -66,6 +66,11 @@ function finalText(activities: MockActivity[]) {
   ].join("\n");
 }
 
+// Paced like a real model, so the chat's scrolling and loading states show as they would live.
+const TOOL_PAUSE_MS = 600;
+const TEXT_PAUSE_MS = 40;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 type Step =
   | { kind: "tools"; calls: { name: string; input: Record<string, unknown> }[] }
   | { kind: "text"; text: string };
@@ -109,6 +114,36 @@ export function mockCoachText(): AnyTextAdapter {
       const timestamp = Date.now();
       yield { type: EventType.RUN_STARTED, runId, threadId, timestamp };
 
+      // Like a reasoning model, think a little before each step.
+      const reasoningId = crypto.randomUUID();
+      const stepId = crypto.randomUUID();
+      yield { type: EventType.REASONING_START, messageId: reasoningId, timestamp };
+      yield {
+        type: EventType.REASONING_MESSAGE_START,
+        messageId: reasoningId,
+        role: "reasoning",
+        timestamp,
+      };
+      yield {
+        type: EventType.STEP_STARTED,
+        stepName: stepId,
+        stepId,
+        stepType: "thinking",
+        timestamp,
+      };
+      for (const delta of ["Looking at ", "what the athlete ", "asked."]) {
+        await pause(TEXT_PAUSE_MS);
+        yield {
+          type: EventType.REASONING_MESSAGE_CONTENT,
+          messageId: reasoningId,
+          delta,
+          timestamp,
+        };
+      }
+      yield { type: EventType.REASONING_MESSAGE_END, messageId: reasoningId, timestamp };
+      yield { type: EventType.REASONING_END, messageId: reasoningId, timestamp };
+      yield { type: EventType.STEP_FINISHED, stepName: stepId, stepId, timestamp };
+
       const step = nextStep(options.messages as ModelMessage[]);
       if (step.kind === "tools") {
         for (const [index, call] of step.calls.entries()) {
@@ -120,12 +155,12 @@ export function mockCoachText(): AnyTextAdapter {
             parentMessageId: messageId,
             index,
           };
-          yield {
-            type: EventType.TOOL_CALL_ARGS,
-            toolCallId,
-            delta: JSON.stringify(call.input),
-            timestamp,
-          };
+          // Arguments stream in pieces, so a visual's HTML arrives over a few seconds.
+          for (const delta of JSON.stringify(call.input).match(/[\s\S]{1,200}/g) ?? []) {
+            await pause(TEXT_PAUSE_MS);
+            yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta, timestamp };
+          }
+          await pause(TOOL_PAUSE_MS);
           yield { type: EventType.TOOL_CALL_END, ...base, input: call.input };
         }
         yield {
@@ -139,7 +174,8 @@ export function mockCoachText(): AnyTextAdapter {
       }
 
       yield { type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant", timestamp };
-      for (const delta of step.text.match(/[\s\S]{1,40}/g) ?? []) {
+      for (const delta of step.text.match(/[\s\S]{1,12}/g) ?? []) {
+        await pause(TEXT_PAUSE_MS);
         yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, timestamp };
       }
       yield { type: EventType.TEXT_MESSAGE_END, messageId, timestamp };

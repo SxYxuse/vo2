@@ -361,6 +361,8 @@ export function CoachChat({
     return activity ? [activity] : [];
   }, [byId, initialActivityId]);
 
+  const lastQuestionId = messages.filter((message) => message.role === "user").at(-1)?.id;
+
   const send = (message: string) => {
     void sendMessage(message);
     if (initialActivityId) onInitialActivitySent();
@@ -412,7 +414,9 @@ export function CoachChat({
                     <MessageScrollerItem
                       key={message.id}
                       messageId={message.id}
-                      scrollAnchor={message.role === "user"}
+                      // Only the latest question anchors: the scroller snaps to any anchor it
+                      // hasn't scrolled to itself, so older ones pulled the view back up mid-reply.
+                      scrollAnchor={message.id === lastQuestionId}
                       // Skipped offscreen rendering would size visuals at 0 and make the list
                       // jump as estimated heights turn real while scrolling back.
                       className="[content-visibility:visible]"
