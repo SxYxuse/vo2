@@ -1,0 +1,15 @@
+{
+  "path": ["src", "scripts"],
+  "ignore": [
+    "**/*.test.ts",
+    "src/components/ui/**",
+    "src/components/reui/**",
+    "src/routeTree.gen.ts",
+    "src/integrations/strava/strava.types.ts",
+    "src/integrations/strava/openapi.json"
+  ],
+  "format": ["typescript", "tsx", "css"],
+  "reporters": ["console"],
+  "threshold": 1,
+  "gitignore": true
+}

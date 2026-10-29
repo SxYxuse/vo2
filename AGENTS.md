@@ -50,7 +50,7 @@ Regenerate these, rather than editing them by hand:
 - Prove the change with the smallest check: `vp test run <files>` for the tests you touched or added.
 - Test pure logic and observable behavior, not rendered markup or callback wiring.
 - Open the app in a browser to verify only when the developer asks for it.
-- **Before pushing,** run `vp check` (format, lint, types); CI fails on it before tests run. The pre-commit hook runs `vp check --fix` on staged files once `bun install` has installed it.
+- **Before pushing,** run `vp run gate`: `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and tests with coverage floors. CI runs each step, plus Lighthouse on the signed-out page. The pre-commit hook runs `vp check --fix` on staged files once `bun install` has installed it.
 - `scripts/agent-guard.ts` blocks shell commands that break other checkouts (a Claude Code hook in `.claude/settings.json`). If it blocks you, follow its message; don't work around it.
 
 ## Pull requests and commits

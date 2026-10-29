@@ -1,0 +1,3 @@
+[install]
+# Skip versions published in the last 3 days, when hijacked releases are usually caught and pulled.
+minimumReleaseAge = 259200

@@ -15,3 +15,9 @@ todos.json
 # dotenv environment variable files
 .env.*
 !.env.example
+
+# Test coverage reports
+coverage
+
+# Lighthouse CI reports
+.lighthouseci
