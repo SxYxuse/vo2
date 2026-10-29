@@ -33,7 +33,10 @@ jobs:
       - name: Generated route tree is up to date
         run: vp run generate-routes && git diff --exit-code -- src/routeTree.gen.ts
       - run: vp check
+      # Knip loads drizzle.config.ts, which validates the environment like db:check does.
       - run: vp run knip
+        env:
+          STRAVA_MOCK: "1"
       - run: vp run jscpd
       - run: vp run audit
       - run: vp run db:check
