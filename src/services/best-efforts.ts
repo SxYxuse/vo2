@@ -146,6 +146,20 @@ function fastestPossible(metres: number, sport: DistanceSport) {
   return metres / MAX_RIDE_SPEED_MS;
 }
 
+/** Seconds on the move at each sample: a long, slow gap on a ride or run stops the clock. */
+export function movingClock(distance: number[], time: number[], sport: DistanceSport) {
+  const clock: number[] = [0];
+  for (let index = 1; index < time.length; index += 1) {
+    const delta = time[index] - time[index - 1];
+    const paused =
+      sport !== "swim" &&
+      delta > MAX_INTERVAL_SEC &&
+      (distance[index] - distance[index - 1]) / delta < PAUSED_SPEED_MS;
+    clock.push(clock[index - 1] + (delta > 0 && !paused ? delta : 0));
+  }
+  return clock;
+}
+
 /**
  * Fastest time over each distance, from the distance and time streams. The window's time is
  * scaled to the exact distance. On runs and rides paused time is left out; in a swim, rest at
@@ -159,15 +173,7 @@ export function distanceBests(
   sport: DistanceSport,
 ): DistanceBest[] {
   if (!distance?.length || !time || time.length !== distance.length) return [];
-  const clock: number[] = [0];
-  for (let index = 1; index < time.length; index += 1) {
-    const delta = time[index] - time[index - 1];
-    const paused =
-      sport !== "swim" &&
-      delta > MAX_INTERVAL_SEC &&
-      (distance[index] - distance[index - 1]) / delta < PAUSED_SPEED_MS;
-    clock.push(clock[index - 1] + (delta > 0 && !paused ? delta : 0));
-  }
+  const clock = movingClock(distance, time, sport);
 
   const results: DistanceBest[] = [];
   for (const metres of distances) {
