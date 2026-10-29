@@ -1,4 +1,4 @@
-/** The browser database the coach chat is kept in, one conversation per athlete. */
+/** The browser database the coach chat is kept in. */
 export const COACH_DATABASE = "vo2-coach";
 
 /** Deletes every coach chat on this device, so the next athlete on it never sees one. */

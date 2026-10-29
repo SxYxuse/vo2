@@ -146,12 +146,6 @@ function fastestPossible(metres: number, sport: DistanceSport) {
   return metres / MAX_RIDE_SPEED_MS;
 }
 
-/**
- * Fastest time over each distance, from the distance and time streams. The window's time is
- * scaled to the exact distance. On runs and rides paused time is left out; in a swim, rest at
- * the wall keeps the clock running, or a 1500 m best could be stitched from 100 m repeats.
- * A time faster than humanly possible is a GPS jump and is dropped.
- */
 /** Seconds on the move at each sample: a long, slow gap on a ride or run stops the clock. */
 export function movingClock(distance: number[], time: number[], sport: DistanceSport) {
   const clock: number[] = [0];
@@ -166,6 +160,12 @@ export function movingClock(distance: number[], time: number[], sport: DistanceS
   return clock;
 }
 
+/**
+ * Fastest time over each distance, from the distance and time streams. The window's time is
+ * scaled to the exact distance. On runs and rides paused time is left out; in a swim, rest at
+ * the wall keeps the clock running, or a 1500 m best could be stitched from 100 m repeats.
+ * A time faster than humanly possible is a GPS jump and is dropped.
+ */
 export function distanceBests(
   distance: number[] | null,
   time: number[] | null,

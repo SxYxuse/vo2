@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   VISUAL_HEIGHT_MESSAGE,
@@ -12,11 +11,25 @@ import {
 const MIN_HEIGHT = 48;
 const MAX_HEIGHT = 1600;
 
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class", "style"],
+  });
+  return () => observer.disconnect();
+}
+
+/** The app's colour scheme and theme variables, read again whenever the theme class flips. */
 function readTheme() {
-  const style = getComputedStyle(document.documentElement);
-  return Object.fromEntries(
-    VISUAL_THEME_VARIABLES.map((name) => [name, style.getPropertyValue(name).trim()]),
-  );
+  const root = document.documentElement;
+  const style = getComputedStyle(root);
+  return JSON.stringify({
+    scheme: root.classList.contains("dark") ? "dark" : "light",
+    variables: Object.fromEntries(
+      VISUAL_THEME_VARIABLES.map((name) => [name, style.getPropertyValue(name).trim()]),
+    ),
+  });
 }
 
 /**
@@ -26,10 +39,13 @@ function readTheme() {
 export function CoachVisual({ title, html }: { title: string; html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(240);
-  const { resolvedTheme } = useTheme();
-  const scheme = resolvedTheme === "dark" ? "dark" : "light";
-  // The theme variables change with the scheme, so read them again when it flips.
-  const srcDoc = useMemo(() => visualDocument(html, readTheme(), scheme), [html, scheme]);
+  // A string snapshot, so React sees no change until the theme really does change.
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "");
+  const { scheme, variables } = JSON.parse(theme || '{"scheme":"light","variables":{}}') as {
+    scheme: "light" | "dark";
+    variables: Record<string, string>;
+  };
+  const srcDoc = visualDocument(html, variables, scheme);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {

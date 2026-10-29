@@ -142,7 +142,15 @@ export function measureActivity(
     const from = positionOf(axis, axis[0] + request.start);
     const to = positionOf(axis, axis[0] + request.end);
     if (to <= from) return { measures: [], note: "The range is empty or past the end." };
-    return { measures: [measureBetween(withDistance, clock, from, to)] };
+    const measures = [measureBetween(withDistance, clock, from, to)];
+    // Without this, "time at 10 km" on a shorter run would quietly read as the whole run.
+    if (request.end > total) {
+      return {
+        measures,
+        note: `The activity ends at ${Math.round(total)} ${request.unit}; this is measured to the end.`,
+      };
+    }
+    return { measures };
   }
 
   if (!(request.length > 0) || request.length > total) {

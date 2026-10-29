@@ -74,6 +74,17 @@ describe("measure an activity", () => {
     expect(result.measures[0].seconds).toBe(400);
   });
 
+  test("a range past the end says how far the activity went", () => {
+    const result = measureActivity(negativeSplitRun(), "Run", {
+      kind: "range",
+      unit: "metres",
+      start: 0,
+      end: 10000,
+    });
+    expect(result.measures[0].endM).toBe(7000);
+    expect(result.note).toContain("7000 metres");
+  });
+
   test("says why when the activity has no distance stream", () => {
     const result = measureActivity(
       { time: [0, 1, 2], distance: null, heartrate: null, altitude: null, watts: null },

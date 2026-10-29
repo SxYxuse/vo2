@@ -234,7 +234,7 @@ export function ActivityDetailView({
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             <SparklesIcon />
-            Ask the coach
+            Ask about this activity
           </Link>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">

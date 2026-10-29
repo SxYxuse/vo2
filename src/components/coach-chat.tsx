@@ -333,15 +333,15 @@ function NewChatButton({ onConfirm, disabled }: { onConfirm: () => void; disable
 }
 
 /**
- * The coach chat: one conversation per athlete, kept in this browser so it reopens where it
- * was left and still reads offline.
+ * The coach chat: one conversation, kept in this browser so it reopens where it was left and
+ * still reads offline.
  */
 export function CoachChat({
-  userId,
   initialActivityId,
+  onInitialActivitySent,
 }: {
-  userId: string;
   initialActivityId?: string;
+  onInitialActivitySent: () => void;
 }) {
   const online = useOnline();
   const { shown, byId } = useMentionableActivities();
@@ -349,7 +349,8 @@ export function CoachChat({
   const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
   const { messages, sendMessage, isLoading, error, stop, reload, clear, isHydrating } = useChat({
     connection,
-    threadId: `coach-${userId}`,
+    // One chat per device: sign-out deletes it, so the next athlete starts fresh.
+    threadId: "coach",
     persistence,
     forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
   });
@@ -360,7 +361,10 @@ export function CoachChat({
     return activity ? [activity] : [];
   }, [byId, initialActivityId]);
 
-  const send = (message: string) => void sendMessage(message);
+  const send = (message: string) => {
+    void sendMessage(message);
+    if (initialActivityId) onInitialActivitySent();
+  };
   const empty = !messages.length && !isHydrating;
 
   return (

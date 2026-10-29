@@ -52,7 +52,7 @@ function cssValue(value: string) {
 /**
  * The page a coach visual runs as: the no-network policy first, then the theme, a height
  * reporter, and the coach's HTML. A meta refresh is dropped because it would navigate the
- * frame, which the policy can't stop.
+ * frame, which the policy can't stop; a script can still navigate it (ADR 0035).
  */
 export function visualDocument(
   html: string,

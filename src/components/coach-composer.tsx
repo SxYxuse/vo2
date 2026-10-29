@@ -297,7 +297,7 @@ export function CoachComposer({
               className={TOUCH_BUTTON}
               variant="default"
               aria-label="Send"
-              disabled={disabled || !text.trim()}
+              disabled={disabled || (!text.trim() && !mentions.length)}
               onClick={send}
             >
               <ArrowUpIcon />

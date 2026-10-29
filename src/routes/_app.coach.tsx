@@ -1,7 +1,6 @@
-import { ClientOnly, createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { CoachChat } from "@/components/coach-chat.tsx";
-import { authClient } from "@/lib/auth-client.ts";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type CoachSearch = { activity?: string };
@@ -28,15 +27,16 @@ function CoachSkeleton() {
 
 function CoachPage() {
   const { activity } = Route.useSearch();
-  const { data: session } = authClient.useSession();
-  // The chat lives in this browser's storage, so it renders on the client only.
+  const navigate = useNavigate({ from: Route.fullPath });
+  // The chat lives in this browser's storage, so it renders on the client only. It needs no
+  // session, so it still opens offline.
   return (
     <ClientOnly fallback={<CoachSkeleton />}>
-      {session ? (
-        <CoachChat userId={session.user.id} initialActivityId={activity} />
-      ) : (
-        <CoachSkeleton />
-      )}
+      <CoachChat
+        initialActivityId={activity}
+        // Once sent, the mention is in the chat; a reload must not offer it again.
+        onInitialActivitySent={() => void navigate({ search: {}, replace: true })}
+      />
     </ClientOnly>
   );
 }
