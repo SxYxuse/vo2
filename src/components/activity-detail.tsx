@@ -3,7 +3,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import { ActivityIcon, ChevronLeftIcon, HeartOffIcon } from "lucide-react";
+import { ActivityIcon, ChevronLeftIcon, HeartOffIcon, SparklesIcon } from "lucide-react";
 
 import {
   formatActivitySchedule,
@@ -226,7 +226,17 @@ export function ActivityDetailView({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <BackLink diary={diary} start={detail.start} />
+        <div className="flex items-center justify-between gap-2">
+          <BackLink diary={diary} start={detail.start} />
+          <Link
+            to="/coach"
+            search={{ activity: detail.id }}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <SparklesIcon />
+            Ask the coach
+          </Link>
+        </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">
             {detail.title}

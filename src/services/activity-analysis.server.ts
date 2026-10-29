@@ -46,7 +46,7 @@ export type AnalysisRuntime = {
   snapshot: () => Promise<ActivityAnalysisSnapshot>;
 };
 
-async function loadActivityAnalysisSnapshot(activityId: string, userId: string) {
+export async function loadActivityAnalysisSnapshot(activityId: string, userId: string) {
   const [activityRows, metricsRows] = await Promise.all([
     db
       .select({

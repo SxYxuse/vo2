@@ -152,13 +152,8 @@ function fastestPossible(metres: number, sport: DistanceSport) {
  * the wall keeps the clock running, or a 1500 m best could be stitched from 100 m repeats.
  * A time faster than humanly possible is a GPS jump and is dropped.
  */
-export function distanceBests(
-  distance: number[] | null,
-  time: number[] | null,
-  distances: readonly number[],
-  sport: DistanceSport,
-): DistanceBest[] {
-  if (!distance?.length || !time || time.length !== distance.length) return [];
+/** Seconds on the move at each sample: a long, slow gap on a ride or run stops the clock. */
+export function movingClock(distance: number[], time: number[], sport: DistanceSport) {
   const clock: number[] = [0];
   for (let index = 1; index < time.length; index += 1) {
     const delta = time[index] - time[index - 1];
@@ -168,6 +163,17 @@ export function distanceBests(
       (distance[index] - distance[index - 1]) / delta < PAUSED_SPEED_MS;
     clock.push(clock[index - 1] + (delta > 0 && !paused ? delta : 0));
   }
+  return clock;
+}
+
+export function distanceBests(
+  distance: number[] | null,
+  time: number[] | null,
+  distances: readonly number[],
+  sport: DistanceSport,
+): DistanceBest[] {
+  if (!distance?.length || !time || time.length !== distance.length) return [];
+  const clock = movingClock(distance, time, sport);
 
   const results: DistanceBest[] = [];
   for (const metres of distances) {

@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppBestsRouteImport } from './routes/_app.bests'
+import { Route as AppCoachRouteImport } from './routes/_app.coach'
 import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
@@ -22,6 +23,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppWeekRouteImport } from './routes/_app.week'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
+import { Route as ApiCoachRouteImport } from './routes/api/coach'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
@@ -47,6 +49,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppBestsRoute = AppBestsRouteImport.update({
   id: '/bests',
   path: '/bests',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCoachRoute = AppCoachRouteImport.update({
+  id: '/coach',
+  path: '/coach',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFitnessRoute = AppFitnessRouteImport.update({
@@ -94,6 +101,11 @@ const ApiActivityAnalysisRoute = ApiActivityAnalysisRouteImport.update({
   path: '/api/activity-analysis',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCoachRoute = ApiCoachRouteImport.update({
+  id: '/api/coach',
+  path: '/api/coach',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppActivitiesActivityIdRoute = AppActivitiesActivityIdRouteImport.update({
   id: '/activities/$activityId',
   path: '/activities/$activityId',
@@ -134,6 +146,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/onboarding': typeof OnboardingRoute
   '/bests': typeof AppBestsRoute
+  '/coach': typeof AppCoachRoute
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
@@ -143,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
+  '/api/coach': typeof ApiCoachRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/week/session': typeof AppWeekSessionRoute
@@ -154,6 +168,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/bests': typeof AppBestsRoute
+  '/coach': typeof AppCoachRoute
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
@@ -162,6 +177,7 @@ export interface FileRoutesByTo {
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
+  '/api/coach': typeof ApiCoachRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
@@ -176,6 +192,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/onboarding': typeof OnboardingRoute
   '/_app/bests': typeof AppBestsRoute
+  '/_app/coach': typeof AppCoachRoute
   '/_app/fitness': typeof AppFitnessRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
@@ -185,6 +202,7 @@ export interface FileRoutesById {
   '/_app/week': typeof AppWeekRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
   '/api/activity-analysis': typeof ApiActivityAnalysisRoute
+  '/api/coach': typeof ApiCoachRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
@@ -200,6 +218,7 @@ export interface FileRouteTypes {
     | '/'
     | '/onboarding'
     | '/bests'
+    | '/coach'
     | '/fitness'
     | '/heart-rate'
     | '/map'
@@ -209,6 +228,7 @@ export interface FileRouteTypes {
     | '/week'
     | '/week-bucket'
     | '/api/activity-analysis'
+    | '/api/coach'
     | '/activities/$activityId'
     | '/settings/$section'
     | '/week/session'
@@ -220,6 +240,7 @@ export interface FileRouteTypes {
   to:
     | '/onboarding'
     | '/bests'
+    | '/coach'
     | '/fitness'
     | '/heart-rate'
     | '/map'
@@ -228,6 +249,7 @@ export interface FileRouteTypes {
     | '/week'
     | '/week-bucket'
     | '/api/activity-analysis'
+    | '/api/coach'
     | '/'
     | '/activities/$activityId'
     | '/settings/$section'
@@ -241,6 +263,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/onboarding'
     | '/_app/bests'
+    | '/_app/coach'
     | '/_app/fitness'
     | '/_app/heart-rate'
     | '/_app/map'
@@ -250,6 +273,7 @@ export interface FileRouteTypes {
     | '/_app/week'
     | '/_app/week-bucket'
     | '/api/activity-analysis'
+    | '/api/coach'
     | '/_app/'
     | '/_app/activities/$activityId'
     | '/_app/settings/$section'
@@ -264,6 +288,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
   ApiActivityAnalysisRoute: typeof ApiActivityAnalysisRoute
+  ApiCoachRoute: typeof ApiCoachRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMockStravaSplatRoute: typeof ApiMockStravaSplatRoute
   ApiStravaWebhookSecretRoute: typeof ApiStravaWebhookSecretRoute
@@ -297,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/bests'
       fullPath: '/bests'
       preLoaderRoute: typeof AppBestsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/coach': {
+      id: '/_app/coach'
+      path: '/coach'
+      fullPath: '/coach'
+      preLoaderRoute: typeof AppCoachRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/fitness': {
@@ -360,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/api/activity-analysis'
       fullPath: '/api/activity-analysis'
       preLoaderRoute: typeof ApiActivityAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/coach': {
+      id: '/api/coach'
+      path: '/api/coach'
+      fullPath: '/api/coach'
+      preLoaderRoute: typeof ApiCoachRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/activities/$activityId': {
@@ -430,6 +469,7 @@ const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
 
 interface AppRouteChildren {
   AppBestsRoute: typeof AppBestsRoute
+  AppCoachRoute: typeof AppCoachRoute
   AppFitnessRoute: typeof AppFitnessRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
@@ -445,6 +485,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppBestsRoute: AppBestsRoute,
+  AppCoachRoute: AppCoachRoute,
   AppFitnessRoute: AppFitnessRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
@@ -464,6 +505,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
   ApiActivityAnalysisRoute: ApiActivityAnalysisRoute,
+  ApiCoachRoute: ApiCoachRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMockStravaSplatRoute: ApiMockStravaSplatRoute,
   ApiStravaWebhookSecretRoute: ApiStravaWebhookSecretRoute,
@@ -471,3 +513,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

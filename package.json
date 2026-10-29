@@ -35,6 +35,7 @@
     "@tanstack/ai": "^0.69.0",
     "@tanstack/ai-openrouter": "^0.22.0",
     "@tanstack/ai-react": "^0.30.4",
+    "@tanstack/markdown": "^0.0.13",
     "@tanstack/query-persist-client-core": "5.104.3",
     "@tanstack/react-devtools": "0.10.13",
     "@tanstack/react-query": "5.104.3",

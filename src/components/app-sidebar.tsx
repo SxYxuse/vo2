@@ -11,6 +11,7 @@ import {
   LogOutIcon,
   MapIcon,
   Settings2Icon,
+  SparklesIcon,
   TrendingUpIcon,
   TrophyIcon,
 } from "lucide-react";
@@ -51,6 +52,7 @@ const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
   { title: "This week", to: "/week", icon: TargetIcon },
   { title: "Season", to: "/season", icon: FlagIcon },
+  { title: "Coach", to: "/coach", icon: SparklesIcon },
 ] as const;
 
 /**

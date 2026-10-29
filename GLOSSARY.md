@@ -148,6 +148,14 @@ _Avoid_: Completed, compliance
 What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them.
 _Avoid_: Comment, feedback, journal
 
+**Coach**:
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season without changing any of them. It also reads coach notes into the week plan.
+_Avoid_: Assistant, agent, bot, AI
+
+**Coach chat**:
+The one ongoing conversation between the athlete and the coach. It is kept on the device it happened on and still reads offline; starting a new chat deletes it.
+_Avoid_: Thread, session (that is planned training), conversation history
+
 **Training week**:
 Monday through Sunday in the athlete's timezone. The week target is scoped to the current week, not a season.
 _Avoid_: Microcycle, calendar week
