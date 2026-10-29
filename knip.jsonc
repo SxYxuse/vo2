@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
+  // TanStack Start loads these by convention; nothing imports them.
+  "entry": ["src/router.tsx", "src/start.ts", "public/sw.js", "scripts/*.ts"],
+  "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.ts"],
+  "ignore": [
+    // Vendored component kits: unused components stay available for later screens.
+    "src/components/ui/**",
+    "src/components/reui/**",
+    "src/integrations/strava/strava.types.ts",
+  ],
+  "ignoreBinaries": ["shasum"],
+  "rules": {
+    // 248 unused exports when this gate landed; turn these on once they are cleaned up.
+    "exports": "off",
+    "types": "off",
+    "nsExports": "off",
+    "nsTypes": "off",
+    "enumMembers": "off",
+    "duplicates": "off",
+  },
+}

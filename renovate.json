@@ -1,0 +1,28 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "Minors and patches of stable packages arrive as one PR that merges itself once CI passes.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchCurrentVersion": "!/^0/",
+      "groupName": "minor and patch updates",
+      "automerge": true
+    },
+    {
+      "description": "The vite override and vite-plus ship together; one without the other breaks the toolchain.",
+      "matchPackageNames": ["vite-plus", "@voidzero-dev/vite-plus-core"],
+      "groupName": "vite-plus"
+    },
+    {
+      "description": "Must match the Vitest version vite-plus bundles; bump it by hand with vite-plus.",
+      "matchPackageNames": ["@vitest/coverage-v8"],
+      "enabled": false
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": null
+  }
+}
