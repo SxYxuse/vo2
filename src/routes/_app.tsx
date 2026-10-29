@@ -71,7 +71,9 @@ function AppLayout() {
       <SyncAutoResume />
       <TopEffortCelebration />
       <AppSidebar />
-      <SidebarInset>
+      {/* The coach chat scrolls inside itself, so its page is exactly one screen tall; other
+          pages grow and scroll the document. */}
+      <SidebarInset className={pathname === "/coach" ? "h-dvh overflow-hidden" : undefined}>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 pt-[max(0px,env(safe-area-inset-top))] md:pt-0">
           <SidebarTrigger />
           <SyncPanel />

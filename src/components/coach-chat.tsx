@@ -413,6 +413,9 @@ export function CoachChat({
                       key={message.id}
                       messageId={message.id}
                       scrollAnchor={message.role === "user"}
+                      // Skipped offscreen rendering would size visuals at 0 and make the list
+                      // jump as estimated heights turn real while scrolling back.
+                      className="[content-visibility:visible]"
                     >
                       <CoachMessage message={message} lookup={lookup} />
                     </MessageScrollerItem>
