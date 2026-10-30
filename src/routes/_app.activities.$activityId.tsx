@@ -14,7 +14,7 @@ import {
 } from "@/lib/queries.ts";
 import { sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { parseDiarySearch, type DiarySearch } from "@/services/diary-window.ts";
-import { parseBestsReturn, type BestsReturn } from "@/services/personal-bests.ts";
+import { parseBestsReturn, type BestsReturn } from "@/services/bests-search.ts";
 import { RouteError } from "@/components/route-states.tsx";
 
 type ActivitySearch = DiarySearch & BestsReturn & { map?: true };

@@ -5,7 +5,7 @@ import { TrendingUpIcon } from "lucide-react";
 
 import { FitnessChart } from "@/components/fitness-chart.tsx";
 import { ProgressCards } from "@/components/progress-cards.tsx";
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { fitnessQueryOptions, loaderQuery, progressQueryOptions } from "@/lib/queries.ts";
 import {
   Empty,

@@ -1,4 +1,4 @@
-import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
+import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 
 const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
   month: "long",

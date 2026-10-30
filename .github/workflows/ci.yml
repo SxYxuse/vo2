@@ -91,6 +91,17 @@ jobs:
       - run: vp run db:migrate
       - run: vp run lighthouse
 
+      # Lighthouse CI still bundles Lighthouse 12, which has no Agentic Browsing category, so
+      # Lighthouse 13 scores it separately: reported on the pull request, not asserted.
+      - name: Agentic Browsing (Lighthouse 13)
+        continue-on-error: true
+        run: |
+          bun run .output/server/index.mjs &
+          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000/sign-in; do sleep 1; done'
+          vp dlx lighthouse@13.6.0 http://localhost:3000/sign-in --only-categories=agentic-browsing \
+            --chrome-flags="--headless=new" --output=json \
+            --output-path=lighthouse-report/agentic-browsing.json --quiet
+
       - name: Upload Lighthouse reports
         id: upload
         if: always()

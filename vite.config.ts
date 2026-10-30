@@ -70,9 +70,23 @@ const config = defineConfig({
     : lazyPlugins(() => [
         devtools(),
         tailwindcss(),
-        tanstackStart(),
+        tanstackStart({
+          router: {
+            codeSplittingOptions: {
+              // TanStack keeps loaders and pending components in the entry by default, and with
+              // them every query, service and component file they import; ship each with its page.
+              defaultBehavior: [
+                ["loader", "component", "pendingComponent"],
+                ["errorComponent"],
+                ["notFoundComponent"],
+              ],
+            },
+          },
+        }),
         nitro({
           preset: "bun",
+          // Bun serves files raw; ship .br and .gz copies so phones download a fraction of the JS.
+          compressPublicAssets: { gzip: true, brotli: true },
           rolldownConfig: {
             onwarn(warning, warn) {
               if (!IGNORED_SERVER_WARNINGS.has(warning.code ?? "")) warn(warning);

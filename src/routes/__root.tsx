@@ -35,6 +35,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
           content: "width=device-width, initial-scale=1, viewport-fit=cover",
         },
         { title: APP_NAME },
+        {
+          name: "description",
+          content: `${APP_NAME} copies your Strava activities, scores fitness and form, and plans each training week toward your goals.`,
+        },
         { name: "theme-color", content: chrome.themeColor },
         { name: "apple-mobile-web-app-title", content: APP_NAME },
         { name: "apple-mobile-web-app-status-bar-style", content: "black" },

@@ -10,7 +10,7 @@ import { ProfilePrompt, OnboardingForm } from "@/components/onboarding.tsx";
 import { OnboardingShell } from "@/components/onboarding-shell.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions, loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
-import { isSetUp } from "@/services/app-shell.ts";
+import { isSetUp } from "@/services/app-setup.ts";
 import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteError } from "@/components/route-states.tsx";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/onboarding")({
   loader: async ({ context }) => {
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/sign-in" });
     }
     if (isSetUp(shell)) {
       throw redirect({ to: "/" });
@@ -38,7 +38,7 @@ function OnboardingPage() {
   const { data: session } = authClient.useSession();
 
   if (!shell.signedIn) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/sign-in" replace />;
   }
 
   return (

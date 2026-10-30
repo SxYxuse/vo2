@@ -25,7 +25,7 @@
     "knip": "knip",
     "jscpd": "jscpd",
     "audit": "bun audit --audit-level=high",
-    "lighthouse": "vp dlx @lhci/cli@0.15.1 autorun",
+    "lighthouse": "bun scripts/lighthouse.ts",
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
     "gate": "vp check && knip && jscpd && bun audit --audit-level=high && vp test run"

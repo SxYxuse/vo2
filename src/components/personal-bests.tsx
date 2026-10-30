@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/services/activity-detail.types.ts";
-import { RUN_DISTANCES } from "@/services/best-efforts.ts";
+import { boardLabel, durationLabel, formatKm, formatValue } from "@/components/best-labels.ts";
 import { formatPaceClock } from "@/services/locomotion.ts";
 import {
   BESTS_SPORTS,
@@ -55,27 +55,6 @@ const SPORT_COLOR = {
 /** Power durations shown as cards; the curve above them carries every other duration. */
 const POWER_CARDS = [5, 60, 300, 1200, 3600];
 
-/** Run distances are named the way runners say them; the rest read as plain km or m. */
-const RUN_LABEL = new Map<number, string>(
-  RUN_DISTANCES.map((metres, index) => [
-    metres,
-    [
-      "400 m",
-      "1 km",
-      "1 mile",
-      "2 miles",
-      "5 km",
-      "5 miles",
-      "10 km",
-      "10 miles",
-      "Half marathon",
-      "Marathon",
-    ][index],
-  ]),
-);
-
-const DAYS_LABEL = { longest: "Longest", climbing: "Most climbing", climb: "Biggest climb" };
-
 const PERIOD_LABEL = { all: "All time", "12m": "12 months", "6w": "6 weeks" };
 
 // A four-digit year: "Sep 26" read as the 26th, not September 2026.
@@ -93,49 +72,12 @@ const FULL_DATE = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-function durationLabel(seconds: number) {
-  if (seconds < 60) return `${seconds} s`;
-  if (seconds < 3600) return `${seconds / 60} min`;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = (seconds % 3600) / 60;
-  return minutes ? `${hours} h ${minutes}` : `${hours} h`;
-}
-
 function shortDuration(seconds: number) {
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${seconds / 60}m`;
   return `${seconds / 3600}h`;
 }
 
-export function boardLabel(board: Pick<Board, "sport" | "kind" | "key">) {
-  if (board.kind === "power") return durationLabel(board.key);
-  if (board.kind !== "time") return DAYS_LABEL[board.kind];
-  const known = board.sport === "running" ? RUN_LABEL.get(board.key) : undefined;
-  if (known) return known;
-  return board.key >= 1000 && board.sport !== "swimming"
-    ? `${board.key / 1000} km`
-    : `${board.key} m`;
-}
-
-function formatKm(metres: number) {
-  return `${(metres / 1000).toFixed(1)} km`;
-}
-
-function formatMetres(metres: number) {
-  return `${Math.round(metres).toLocaleString("en-US")} m`;
-}
-
-/** The headline number of an effort: a time, watts, or metres. */
-export function formatValue(board: Pick<Board, "sport" | "kind">, value: number) {
-  if (board.kind === "time") return formatDuration(value);
-  if (board.kind === "power") return `${value} W`;
-  if (board.kind === "longest") {
-    return board.sport === "swimming" ? formatMetres(value) : formatKm(value);
-  }
-  return formatMetres(value);
-}
-
-/** The line under the headline: pace, speed, W/kg, or the climb's shape. */
 function formatDetail(
   board: Board,
   effort: { value: number } & Partial<RankedEffort>,

@@ -4,9 +4,9 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { TrophyIcon } from "lucide-react";
 
 import { BestsView } from "@/components/personal-bests.tsx";
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { bestsQueryOptions, loaderQuery, syncStatusQueryOptions } from "@/lib/queries.ts";
-import { parseBestsSearch, type BestsSearch } from "@/services/personal-bests.ts";
+import { parseBestsSearch, type BestsSearch } from "@/services/bests-search.ts";
 import {
   Empty,
   EmptyDescription,

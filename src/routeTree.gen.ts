@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppBestsRouteImport } from './routes/_app.bests'
 import { Route as AppCoachRouteImport } from './routes/_app.coach'
@@ -39,6 +40,11 @@ const AppRoute = AppRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -145,6 +151,7 @@ const ApiStravaWebhookSecretRoute = ApiStravaWebhookSecretRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/onboarding': typeof OnboardingRoute
+  '/sign-in': typeof SignInRoute
   '/bests': typeof AppBestsRoute
   '/coach': typeof AppCoachRoute
   '/fitness': typeof AppFitnessRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
+  '/sign-in': typeof SignInRoute
   '/bests': typeof AppBestsRoute
   '/coach': typeof AppCoachRoute
   '/fitness': typeof AppFitnessRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/onboarding': typeof OnboardingRoute
+  '/sign-in': typeof SignInRoute
   '/_app/bests': typeof AppBestsRoute
   '/_app/coach': typeof AppCoachRoute
   '/_app/fitness': typeof AppFitnessRoute
@@ -217,6 +226,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/onboarding'
+    | '/sign-in'
     | '/bests'
     | '/coach'
     | '/fitness'
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/onboarding'
+    | '/sign-in'
     | '/bests'
     | '/coach'
     | '/fitness'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/onboarding'
+    | '/sign-in'
     | '/_app/bests'
     | '/_app/coach'
     | '/_app/fitness'
@@ -287,6 +299,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
+  SignInRoute: typeof SignInRoute
   ApiActivityAnalysisRoute: typeof ApiActivityAnalysisRoute
   ApiCoachRoute: typeof ApiCoachRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -308,6 +321,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -504,6 +524,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
+  SignInRoute: SignInRoute,
   ApiActivityAnalysisRoute: ApiActivityAnalysisRoute,
   ApiCoachRoute: ApiCoachRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
