@@ -47,10 +47,12 @@ Regenerate these, rather than editing them by hand:
 
 ## Verifying
 
-- Prove the change with the smallest check: `vp test run <files>` for the tests you touched or added.
-- Test pure logic and observable behavior, not rendered markup or callback wiring.
+- Prove behavior end to end, not function by function. Vitest keeps only guards: tests that hold a rule over the whole repository (every athlete table cascades on delete, ADR numbers are unique, mock Strava stays off in production), not tests of one function.
 - Open the app in a browser to verify only when the developer asks for it.
-- **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and tests with coverage floors. CI runs the same steps, plus Lighthouse on the signed-out page.
+- **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps, plus Lighthouse on the signed-out page and the end-to-end suite.
+- **Before a pull request that changes what the athlete sees or does,** run `vp run e2e` (needs Docker and `vp run db:up`). It drives a production build against mock Strava, at phone and desktop size, and compares a screenshot of every screen.
+  - A screenshot diff you did not intend is a bug. For an intended one, run `vp run e2e:update` and commit the new images in `e2e/screenshots/`, so the reviewer sees before and after in the pull request.
+  - A new screen gets a line in `e2e/screens.spec.ts`; a new flow, or a way out of one, gets a journey in `e2e/`.
 
 ## Pull requests and commits
 

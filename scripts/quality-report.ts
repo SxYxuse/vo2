@@ -9,8 +9,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { COVERAGE_FLOORS } from "./coverage-floors.ts";
-
 const LIGHTHOUSE_CATEGORIES = [
   ["accessibility", "Accessibility"],
   ["best-practices", "Best practices"],
@@ -18,22 +16,16 @@ const LIGHTHOUSE_CATEGORIES = [
   ["performance", "Performance"],
 ] as const;
 
-const COVERAGE_METRICS = ["statements", "branches", "functions", "lines"] as const;
-
-type CoverageMetric = (typeof COVERAGE_METRICS)[number];
-
 /** A Lighthouse CI assertion, such as `["error", { "minScore": 0.9 }]`. */
 type Assertion = [level: "error" | "warn" | "off", options?: { minScore?: number }];
 
 export type QualityInput = {
   sha: string;
-  jobs: { ci: string; lighthouse: string };
+  jobs: { ci: string; lighthouse: string; e2e: string };
   /** Category scores from 0 to 1, from the median Lighthouse run. */
   lighthouse: Record<string, number> | null;
   lighthouseAssertions: Record<string, Assertion>;
   lighthouseReportUrl: string | null;
-  coverage: Record<CoverageMetric, number> | null;
-  coverageFloors: Record<CoverageMetric, number>;
   duplication: { percentage: number; clones: number } | null;
   duplicationLimit: number;
 };
@@ -67,18 +59,6 @@ function lighthouseSection(input: QualityInput) {
   );
 }
 
-function coverageSection(input: QualityInput) {
-  if (!input.coverage) return "**Coverage:** no report; the `ci` job failed before the tests ran.";
-  const coverage = input.coverage;
-  const rows = COVERAGE_METRICS.map((metric) => {
-    const pct = coverage[metric];
-    const floor = input.coverageFloors[metric];
-    const label = metric[0].toUpperCase() + metric.slice(1);
-    return `| ${label} | ${pct.toFixed(2)}% ${pct >= floor ? "✅" : "❌"} | ${floor}% |`;
-  });
-  return ["| Coverage | This PR | Floor |", "|---|---|---|", ...rows].join("\n");
-}
-
 function duplicationSection(input: QualityInput) {
   if (!input.duplication)
     return "**Duplication:** no report; the `ci` job failed before jscpd ran.";
@@ -90,9 +70,12 @@ function duplicationSection(input: QualityInput) {
 export function formatQualityReport(input: QualityInput) {
   return [
     `### Quality report for ${input.sha.slice(0, 7)}`,
-    `${jobLine("ci", input.jobs.ci)} · ${jobLine("lighthouse", input.jobs.lighthouse)}`,
+    [
+      jobLine("ci", input.jobs.ci),
+      jobLine("lighthouse", input.jobs.lighthouse),
+      jobLine("e2e", input.jobs.e2e),
+    ].join(" · "),
     lighthouseSection(input),
-    coverageSection(input),
     duplicationSection(input),
   ].join("\n\n");
 }
@@ -106,9 +89,6 @@ function main(reportsDir: string) {
   const manifest = readJson<{ isRepresentativeRun: boolean; summary: Record<string, number> }[]>(
     join(reportsDir, "lighthouse/manifest.json"),
   );
-  const coverage = readJson<{ total: Record<CoverageMetric, { pct: number }> }>(
-    join(reportsDir, "quality/coverage/coverage-summary.json"),
-  );
   const jscpd = readJson<{ statistics: { total: { percentage: number; clones: number } } }>(
     join(reportsDir, "quality/jscpd-report/jscpd-report.json"),
   );
@@ -121,16 +101,14 @@ function main(reportsDir: string) {
   process.stdout.write(
     formatQualityReport({
       sha: env.SHA ?? "",
-      jobs: { ci: env.CI_RESULT ?? "unknown", lighthouse: env.LIGHTHOUSE_RESULT ?? "unknown" },
+      jobs: {
+        ci: env.CI_RESULT ?? "unknown",
+        lighthouse: env.LIGHTHOUSE_RESULT ?? "unknown",
+        e2e: env.E2E_RESULT ?? "unknown",
+      },
       lighthouse: manifest?.find((run) => run.isRepresentativeRun)?.summary ?? null,
       lighthouseAssertions: lighthouserc?.ci.assert.assertions ?? {},
       lighthouseReportUrl: env.LIGHTHOUSE_REPORT_URL || null,
-      coverage: coverage
-        ? (Object.fromEntries(
-            COVERAGE_METRICS.map((metric) => [metric, coverage.total[metric].pct]),
-          ) as Record<CoverageMetric, number>)
-        : null,
-      coverageFloors: COVERAGE_FLOORS,
       duplication: jscpd?.statistics.total ?? null,
       duplicationLimit: jscpdConfig?.threshold ?? 0,
     }) + "\n",

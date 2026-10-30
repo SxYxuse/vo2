@@ -16,10 +16,12 @@ todos.json
 .env.*
 !.env.example
 
-# Test coverage reports
-coverage
-
 # Quality reports (CI uploads them for the PR comment)
 .lighthouseci
 lighthouse-report
 jscpd-report
+
+# Playwright: signed-in state, run reports, and failure artifacts (baselines live in e2e/screenshots)
+e2e/.auth
+playwright-report
+test-results

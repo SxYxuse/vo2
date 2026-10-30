@@ -42,7 +42,7 @@ jobs:
       - run: vp run db:check
         env:
           STRAVA_MOCK: "1"
-      - run: vp run coverage
+      - run: vp test run
       - run: vp build
 
       - name: Upload reports for the quality comment
@@ -50,9 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quality
-          path: |
-            coverage/coverage-summary.json
-            jscpd-report/jscpd-report.json
+          path: jscpd-report/jscpd-report.json
           if-no-files-found: ignore
 
   lighthouse:
@@ -100,10 +98,49 @@ jobs:
           path: lighthouse-report/
           if-no-files-found: ignore
 
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://vo2:vo2@localhost:5432/vo2
+      BETTER_AUTH_SECRET: ci-placeholder-secret
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: vo2
+          POSTGRES_PASSWORD: vo2
+          POSTGRES_DB: vo2
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vo2 -d vo2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          node-version: "22"
+          cache: true
+
+      # The browser runs in Playwright's Docker image (playwright.config.ts), so nothing to install.
+      - run: vp run e2e
+
+      # Expected, actual, and diff images for every failed screenshot, plus traces.
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+
   # One comment per PR, edited on every push, with the numbers behind the checks.
   report:
     if: always() && github.event_name == 'pull_request'
-    needs: [ci, lighthouse]
+    needs: [ci, lighthouse, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -128,6 +165,7 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           CI_RESULT: ${{ needs.ci.result }}
           LIGHTHOUSE_RESULT: ${{ needs.lighthouse.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
           LIGHTHOUSE_REPORT_URL: ${{ needs.lighthouse.outputs.report-url }}
 
       - uses: marocchino/sticky-pull-request-comment@v2
