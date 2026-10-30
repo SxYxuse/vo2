@@ -14,14 +14,22 @@ const PREFETCH_VISIBLE_CAP = 40;
 
 const APP_ROUTES = ["/", "/week", "/season", "/coach", "/map", "/fitness", "/heart-rate"] as const;
 
-export function scheduleIdle(work: () => void) {
+// On a slow connection, other pages' chunks and data would compete with the page the athlete
+// just opened, its map tiles included; warm them once it has had time to settle.
+const SETTLE_MS = 5000;
+
+/** Runs `work` when the browser is idle, a few seconds after the page opened. */
+export function afterPageSettles(work: () => void) {
   if (typeof window === "undefined") return () => undefined;
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(() => work(), { timeout: 1200 });
-    return () => window.cancelIdleCallback(id);
-  }
-  const timer = window.setTimeout(work, 1);
-  return () => window.clearTimeout(timer);
+  let idle: number | undefined;
+  const timer = window.setTimeout(() => {
+    if (typeof window.requestIdleCallback !== "function") return work();
+    idle = window.requestIdleCallback(() => work(), { timeout: 1200 });
+  }, SETTLE_MS);
+  return () => {
+    window.clearTimeout(timer);
+    if (idle !== undefined) window.cancelIdleCallback(idle);
+  };
 }
 
 /** Run each signed-in route loader (and its query). */
