@@ -850,6 +850,8 @@ export type WeekCoachState = {
   seasonChange: PlanImpact | null;
   /** A plan saved before the plan builder: it follows Season and asks to be reviewed. */
   needsReview: boolean;
+  /** Why the coach could not read the notes still waiting, from the request that tried. */
+  notesError: string | null;
 };
 
 export const coachNoteInputSchema = z

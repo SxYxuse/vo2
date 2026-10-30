@@ -50,9 +50,12 @@ const OPENROUTER_KEYS_URL = "https://openrouter.ai/settings/keys";
 export function useCoachAvailable() {
   const key = useCoachKey();
   const { data: status } = useQuery(analysisStatusQueryOptions);
+  const decided = key.ready && status != null;
+  const available = key.hasKey || status?.mocked === true;
   return {
-    decided: key.ready && status != null,
-    available: key.hasKey || status?.mocked === true,
+    available,
+    /** Known to have no key: show the way in rather than the feature. */
+    needsKey: decided && !available,
     mocked: !key.hasKey && status?.mocked === true,
   };
 }
@@ -82,7 +85,7 @@ export function CoachKeyPrompt({ children }: { children: string }) {
 }
 
 /** Adds, replaces, or removes the OpenRouter key on this device. */
-export function CoachKeyField({ idPrefix, onSaved }: { idPrefix: string; onSaved?: () => void }) {
+export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
   const key = useCoachKey();
   const [value, setValue] = useState("");
   const [replacing, setReplacing] = useState(false);
@@ -91,7 +94,6 @@ export function CoachKeyField({ idPrefix, onSaved }: { idPrefix: string; onSaved
     onSuccess: () => {
       setValue("");
       setReplacing(false);
-      onSaved?.();
     },
   });
   const remove = useMutation({ mutationFn: removeCoachKey });
@@ -159,11 +161,6 @@ export function CoachKeyField({ idPrefix, onSaved }: { idPrefix: string; onSaved
               </Button>
             </div>
           </div>
-          {key.remembered ? null : (
-            <FieldDescription>
-              This device can't lock the key with a passkey, so it's kept only until the app closes.
-            </FieldDescription>
-          )}
           {save.error ? (
             <Alert variant="destructive">
               <AlertDescription>
@@ -175,16 +172,30 @@ export function CoachKeyField({ idPrefix, onSaved }: { idPrefix: string; onSaved
       ) : (
         <Field orientation="horizontal" className="flex-wrap items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">{key.masked}</code>
-          <Badge variant={key.state === "set" ? "success" : "outline"}>
-            {key.state === "set" ? "Unlocked" : "Locked until first use"}
+          <Badge
+            variant={
+              key.state === "set" ? "success" : key.state === "error" ? "destructive" : "outline"
+            }
+          >
+            {key.state === "set"
+              ? "Unlocked"
+              : key.state === "error"
+                ? "Could not unlock"
+                : "Locked until first use"}
           </Badge>
           <div className="ms-auto flex gap-2">
-            <Button type="button" variant="outline" onClick={() => setReplacing(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-10 sm:min-h-8"
+              onClick={() => setReplacing(true)}
+            >
               Replace
             </Button>
             <Button
               type="button"
               variant="destructive"
+              className="min-h-10 sm:min-h-8"
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
             >
@@ -193,6 +204,11 @@ export function CoachKeyField({ idPrefix, onSaved }: { idPrefix: string; onSaved
           </div>
         </Field>
       )}
+      {key.ready && !key.remembered ? (
+        <FieldDescription>
+          This device can't lock the key with a passkey, so it's kept only until the app closes.
+        </FieldDescription>
+      ) : null}
     </FieldSet>
   );
 }

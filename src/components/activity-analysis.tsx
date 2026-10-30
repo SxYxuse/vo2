@@ -60,7 +60,7 @@ export function ActivityAnalysisCard({
   const mocked = saved?.mocked ?? coach.mocked;
   const isLoading = liveBusy;
   // Saved analyses stay readable without a key; only a new one needs it (ADR 0036).
-  const needsKey = coach.decided && !coach.available;
+  const { needsKey } = coach;
 
   return (
     <Card aria-busy={isLoading}>

@@ -157,8 +157,9 @@ function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], plan
   };
 }
 
-async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReading | null> {
-  if (coach.kind === "missing") return null;
+/** The coach's reading, or why there is none, said so the athlete can act on it. */
+async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReading | string> {
+  if (coach.kind === "missing") return "Missing openrouter API key";
   if (coach.kind === "mock") return MOCK_READING;
   try {
     return (await chat({
@@ -169,7 +170,7 @@ async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReadin
     })) as CoachReading;
   } catch (error) {
     logger.warn("week_coach.failed", { model: coach.model, error: String(error) });
-    return null;
+    return error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -187,18 +188,17 @@ async function makePlan(
   const summary = summarizeWeek(data);
   const constraintsOf = (list: CoachNote[]) => list.flatMap((note) => note.constraints);
   const draft = planWeek({ data, summary, constraints: constraintsOf(notes), previous });
-  if (!coach || !notes.some((note) => !note.parsed)) {
-    return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
-  }
+  const unchanged = { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  if (!coach || !notes.some((note) => !note.parsed)) return { ...unchanged, error: null };
   const reading = await askCoach(coach, promptFor(data, summary, notes, draft));
-  if (!reading) return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  if (typeof reading === "string") return { ...unchanged, error: reading };
   const updated = withParsedConstraints(
     notes,
     acceptConstraints(reading.constraints, weekDates(data.weekStart)),
   );
   const plan = planWeek({ data, summary, constraints: constraintsOf(updated), previous });
   logger.info("week_coach.planned", { constraints: constraintsOf(updated).length });
-  return { plan: { ...plan, note: reading.note }, notes: updated, summary };
+  return { plan: { ...plan, note: reading.note }, notes: updated, summary, error: null };
 }
 
 async function plannedWeek() {
@@ -238,6 +238,7 @@ function emptyState(weekStart: string): WeekCoachState {
     stale: false,
     seasonChange: null,
     needsReview: false,
+    notesError: null,
   };
 }
 
@@ -263,6 +264,7 @@ export async function loadWeekCoachImpl(): Promise<WeekCoachState> {
     stale: row.plan == null || row.inputKey !== inputKeyOf(data, summary, row.notes, row.plan),
     seasonChange: await seasonChangeFor(session.user.id, data),
     needsReview: data.plan.goals == null,
+    notesError: null,
   };
 }
 
@@ -283,6 +285,7 @@ async function replanWeekWith(coach: CoachModel | null): Promise<WeekCoachState>
     stale: false,
     seasonChange,
     needsReview: data.plan.goals == null,
+    notesError: null,
   };
   const unread = coach != null && row.notes.some((note) => !note.parsed);
   if (!unread && row.plan && row.inputKey === inputKeyOf(data, summary, row.notes, row.plan)) {
@@ -291,7 +294,7 @@ async function replanWeekWith(coach: CoachModel | null): Promise<WeekCoachState>
   const made = await makePlan(data, row.notes, row.plan, coach);
   const inputKey = inputKeyOf(data, made.summary, made.notes, made.plan);
   await saveRow(userId, data.weekStart, { notes: made.notes, plan: made.plan, inputKey });
-  return { ...base, notes: made.notes, plan: made.plan };
+  return { ...base, notes: made.notes, plan: made.plan, notesError: made.error };
 }
 
 /** Never calls the model, so a page load or sync never asks for the passkey (ADR 0036). */

@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ByokMissingError } from "@tanstack/ai/byok";
+import { ByokBlockedError, ByokMissingError } from "@tanstack/ai/byok";
 import {
   defaultByokStorage,
   defineByok,
@@ -9,9 +9,7 @@ import {
 } from "@tanstack/ai-react/byok";
 
 import { APP_NAME } from "@/lib/brand.ts";
-
-/** The BYOK slug the server reads the key from (`x-byok-openrouter`). */
-const PROVIDER = "openrouter";
+import { OPENROUTER as PROVIDER } from "@/services/coach-models.ts";
 
 /** The browser database the passkey-encrypted key is kept in. */
 const KEY_DATABASE = "vo2-coach-key";
@@ -44,7 +42,6 @@ export type CoachKey = {
   hasKey: boolean;
   masked: string | null;
   state: "none" | "locked" | "set" | "error";
-  error: string | null;
   /** Without passkeys the key is kept in memory and lost when the app closes. */
   remembered: boolean;
 };
@@ -73,7 +70,6 @@ export function useCoachKey(): CoachKey {
     hasKey: state === "set" || state === "locked",
     masked: status && "masked" in status ? status.masked : null,
     state,
-    error: status?.state === "error" ? status.message : snapshot.storageError,
     remembered: client != null && isPasskeyStorageSupported() && window.isSecureContext,
   };
 }
@@ -111,19 +107,33 @@ export async function coachKeyHeaders(): Promise<Record<string, string>> {
 /** The reason a coach request failed, in the athlete's words, without switching model or key. */
 export function coachErrorMessage(error: Error) {
   const text = error.message.toLowerCase();
-  if (error instanceof ByokMissingError || error.name === "ByokMissingError") {
+  if (
+    error instanceof ByokMissingError ||
+    error.name === "ByokMissingError" ||
+    text.includes("missing openrouter")
+  ) {
     return "Add your OpenRouter key in Settings → Coach to use the coach.";
   }
-  if (error.name === "NotAllowedError" || text.includes("not allowed")) {
-    return "The passkey was cancelled, so your OpenRouter key stayed locked. Try again to unlock it.";
+  // A cancelled passkey leaves the key locked; so does an unlock the browser no longer ties to a tap.
+  if (
+    error instanceof ByokBlockedError ||
+    error.name === "ByokBlockedError" ||
+    error.name === "NotAllowedError" ||
+    text.includes("user action")
+  ) {
+    return "Your OpenRouter key is still locked. Try again and confirm with your passkey.";
   }
-  if (text.includes("402") || text.includes("credit")) {
+  if (text.includes("402") || text.includes("insufficient credits")) {
     return "Your OpenRouter account is out of credit. Top it up on openrouter.ai, then try again.";
   }
-  if (text.includes("401") || text.includes("auth") || text.includes("user not found")) {
+  if (
+    text.includes("401") ||
+    text.includes("no auth credentials") ||
+    text.includes("user not found")
+  ) {
     return "OpenRouter rejected your key. Check it in Settings → Coach.";
   }
-  if (text.includes("model") || text.includes("no endpoints")) {
+  if (text.includes("no endpoints found") || text.includes("is not a valid model")) {
     return "This model isn't available on OpenRouter right now. Pick another in Settings → Coach.";
   }
   return error.message;

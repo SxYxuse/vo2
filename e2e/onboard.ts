@@ -36,7 +36,7 @@ export async function onboardNewAthlete(page: Page) {
   await next.click();
   await page.getByRole("button", { name: "Start my plan" }).click();
   // The OpenRouter key is optional: mock Strava's mock coach answers without one.
-  await expect(page.getByRole("heading", { name: "Your coach" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
   await page.getByRole("button", { name: "Open This week" }).click();
 

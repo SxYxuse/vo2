@@ -5,10 +5,7 @@ import { createOpenRouterText } from "@tanstack/ai-openrouter";
 import { env } from "@/configs/env.ts";
 import { APP_NAME } from "@/lib/brand.ts";
 import { coachModelsFor } from "./athlete-settings.server.ts";
-import type { CoachFeature, CoachModelId } from "./coach-models.ts";
-
-/** The BYOK slug: the client sends the key as `x-byok-openrouter`. */
-export const OPENROUTER = "openrouter";
+import { OPENROUTER, type CoachFeature, type CoachModelId } from "./coach-models.ts";
 
 export type CoachModel =
   | { kind: "openrouter"; model: string; adapter: ReturnType<typeof createOpenRouterText> }

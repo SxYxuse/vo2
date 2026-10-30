@@ -74,7 +74,7 @@ const STEPS = [
   },
   {
     id: "coach",
-    title: "Your coach",
+    title: "Add your OpenRouter key",
     description:
       "The coach analyzes activities, reads your notes on the week, and answers questions, on your own OpenRouter key. Skip it to train without the coach and add it later in Settings.",
   },

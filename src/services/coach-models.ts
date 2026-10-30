@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** The BYOK slug: the client sends the athlete's key as the `x-byok-openrouter` header. */
+export const OPENROUTER = "openrouter";
+
 /** The three things the coach does that need a model (ADR 0036). */
 export const COACH_FEATURES = [
   {

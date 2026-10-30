@@ -395,7 +395,7 @@ export function CoachChat({
   };
   const empty = !messages.length && !isHydrating;
   // The chat stays readable without a key; only asking needs one (ADR 0036).
-  const needsKey = coach.decided && !coach.available;
+  const { needsKey } = coach;
   const canAsk = online && !needsKey;
 
   return (

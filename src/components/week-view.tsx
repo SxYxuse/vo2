@@ -652,7 +652,7 @@ function DaySheetBody({
   const [minutes, setMinutes] = useState<number>(45);
   const [text, setText] = useState("");
   const editable = day.date >= data.today;
-  const model = useCoachAvailable();
+  const coachReady = useCoachAvailable();
   const settle = (state: WeekCoachState) =>
     queryClient.setQueryData(weekCoachQueryOptions.queryKey, state);
   const add = useMutation({
@@ -665,7 +665,8 @@ function DaySheetBody({
           minutes: kind === "short" ? minutes : null,
           text: text.trim(),
         },
-        headers: text.trim() ? await coachKeyHeaders() : undefined,
+        // A cancelled passkey still saves the note; it waits, not read yet, for a Retry.
+        headers: text.trim() ? await coachKeyHeaders().catch(() => undefined) : undefined,
       }),
     onSuccess: (state) => {
       settle(state);
@@ -685,7 +686,7 @@ function DaySheetBody({
     notes.flatMap((note) => note.constraints),
     day.date,
   );
-  const canSend = online && (kind != null || (model.available && text.trim().length > 0));
+  const canSend = online && (kind != null || (coachReady.available && text.trim().length > 0));
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -780,11 +781,11 @@ function DaySheetBody({
             <Textarea
               aria-label="Note for your coach"
               placeholder={
-                model.available || !model.decided
+                !coachReady.needsKey
                   ? "Storm all afternoon, I'll have 40 min on the trainer…"
                   : "Your own words need your OpenRouter key (Settings → Coach). The quick choices above work now."
               }
-              disabled={!model.available}
+              disabled={!coachReady.available}
               maxLength={500}
               value={text}
               onChange={(event) => setText(event.target.value)}
@@ -807,6 +808,15 @@ function DaySheetBody({
                   Offline: the week shown is the last one saved.
                 </span>
               ) : null}
+              {coachReady.needsKey ? (
+                <Link
+                  to="/settings/$section"
+                  params={{ section: "coach" }}
+                  className="text-xs underline"
+                >
+                  Add your OpenRouter key
+                </Link>
+              ) : null}
               {add.error ? (
                 <span className="text-destructive text-xs">
                   Could not re-plan. {coachErrorMessage(add.error)}
@@ -825,11 +835,12 @@ function DaySheetBody({
                   {!note.parsed ? (
                     <span className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
                       Not read yet: the plan ignores it until the coach reads it.
-                      {model.available ? (
+                      {coachReady.available ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
+                          className="min-h-10 sm:min-h-7"
                           disabled={read.isPending || !online}
                           onClick={() => read.mutate()}
                         >
@@ -837,8 +848,10 @@ function DaySheetBody({
                           Retry
                         </Button>
                       ) : null}
-                      {read.error ? (
-                        <span className="text-destructive">{coachErrorMessage(read.error)}</span>
+                      {read.error || coach.notesError ? (
+                        <span className="text-destructive">
+                          {coachErrorMessage(read.error ?? new Error(coach.notesError ?? ""))}
+                        </span>
                       ) : null}
                     </span>
                   ) : null}
