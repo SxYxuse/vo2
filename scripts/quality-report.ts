@@ -23,8 +23,8 @@ type Assertion = [level: "error" | "warn" | "off", options?: { minScore?: number
 export type QualityInput = {
   sha: string;
   jobs: { ci: string; lighthouse: string; e2e: string };
-  /** Category scores from 0 to 1, from the median Lighthouse run. */
-  lighthouse: Record<string, number> | null;
+  /** Each page's category scores from 0 to 1, from its median Lighthouse run. */
+  lighthouse: { path: string; scores: Record<string, number> }[] | null;
   lighthouseAssertions: Record<string, Assertion>;
   lighthouseReportUrl: string | null;
   duplication: { percentage: number; clones: number } | null;
@@ -37,27 +37,38 @@ function jobLine(name: string, result: string) {
   return `${JOB_ICONS[result] ?? "⏭️"} \`${name}\` ${result}`;
 }
 
+function scoreCell(score: number | undefined, [level, options]: Assertion) {
+  if (score === undefined) return "not run";
+  const value = Math.round(score * 100);
+  if (level === "off" || !options?.minScore) return `${value}`;
+  const icon = value >= Math.round(options.minScore * 100) ? "✅" : level === "error" ? "❌" : "⚠️";
+  return `${value} ${icon}`;
+}
+
+function ruleCell([level, options]: Assertion) {
+  if (level === "off" || !options?.minScore) return "none";
+  const min = Math.round(options.minScore * 100);
+  return level === "error" ? `≥ ${min}` : `≥ ${min} (warn)`;
+}
+
 function lighthouseSection(input: QualityInput) {
-  if (!input.lighthouse)
+  if (!input.lighthouse?.length)
     return "**Lighthouse:** no report; the `lighthouse` job failed before it ran.";
-  const scores = input.lighthouse;
+  const pages = input.lighthouse;
   const rows = LIGHTHOUSE_CATEGORIES.map(([key, label]) => {
-    if (scores[key] === undefined) return `| ${label} | not run | none |`;
-    const score = Math.round(scores[key] * 100);
-    const [level, options] = input.lighthouseAssertions[`categories:${key}`] ?? ["off"];
-    const min = Math.round((options?.minScore ?? 0) * 100);
-    if (level === "off" || !options?.minScore) return `| ${label} | ${score} | none |`;
-    const icon = score >= min ? "✅" : level === "error" ? "❌" : "⚠️";
-    const rule = level === "error" ? `≥ ${min}` : `≥ ${min} (warn)`;
-    return `| ${label} | ${score} ${icon} | ${rule} |`;
+    const assertion = input.lighthouseAssertions[`categories:${key}`] ?? ["off"];
+    const cells = pages.map((page) => scoreCell(page.scores[key], assertion));
+    return `| ${label} | ${cells.join(" | ")} | ${ruleCell(assertion)} |`;
   });
   const link = input.lighthouseReportUrl
     ? `\n\n[Full Lighthouse reports](${input.lighthouseReportUrl}) (zip of the HTML reports)`
     : "";
   return (
-    ["| Lighthouse (signed-out page, mobile) | Score | Required |", "|---|---|---|", ...rows].join(
-      "\n",
-    ) + link
+    [
+      `| Lighthouse (mobile) | ${pages.map((page) => `\`${page.path}\``).join(" | ")} | Required |`,
+      `|---|${pages.map(() => "---|").join("")}---|`,
+      ...rows,
+    ].join("\n") + link
   );
 }
 
@@ -86,17 +97,30 @@ function readJson<T>(path: string): T | null {
   return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : null;
 }
 
-/** Agentic Browsing comes from a separate Lighthouse 13 run (ci.yml), when it ran. */
-function lighthouseScores(summary: Record<string, number> | undefined, agentic?: number | null) {
-  if (!summary) return null;
-  return agentic == null ? summary : { ...summary, "agentic-browsing": agentic };
+type ManifestRun = { url: string; isRepresentativeRun: boolean; summary: Record<string, number> };
+
+/**
+ * One column per page, in the order scripts/lighthouse.ts ran them. Agentic Browsing comes from
+ * a separate Lighthouse 13 run of the sign-in page (ci.yml), when it ran.
+ */
+function lighthousePages(manifest: ManifestRun[] | null, agentic?: number | null) {
+  if (!manifest) return null;
+  return manifest
+    .filter((run) => run.isRepresentativeRun)
+    .map((run) => {
+      const path = new URL(run.url).pathname;
+      const withAgentic = path === "/sign-in" && agentic != null;
+      return {
+        // An activity id says nothing in a table header.
+        path: path.replace(/^\/activities\/[^/]+$/, "/activities/…"),
+        scores: withAgentic ? { ...run.summary, "agentic-browsing": agentic } : run.summary,
+      };
+    });
 }
 
 function main(reportsDir: string) {
   const root = join(fileURLToPath(import.meta.url), "../..");
-  const manifest = readJson<{ isRepresentativeRun: boolean; summary: Record<string, number> }[]>(
-    join(reportsDir, "lighthouse/manifest.json"),
-  );
+  const manifest = readJson<ManifestRun[]>(join(reportsDir, "lighthouse/manifest.json"));
   const agentic = readJson<{ categories: Record<string, { score: number | null }> }>(
     join(reportsDir, "lighthouse/agentic-browsing.json"),
   );
@@ -117,10 +141,7 @@ function main(reportsDir: string) {
         lighthouse: env.LIGHTHOUSE_RESULT ?? "unknown",
         e2e: env.E2E_RESULT ?? "unknown",
       },
-      lighthouse: lighthouseScores(
-        manifest?.find((run) => run.isRepresentativeRun)?.summary,
-        agentic?.categories["agentic-browsing"]?.score,
-      ),
+      lighthouse: lighthousePages(manifest, agentic?.categories["agentic-browsing"]?.score),
       lighthouseAssertions: lighthouserc?.ci.assert.assertions ?? {},
       lighthouseReportUrl: env.LIGHTHOUSE_REPORT_URL || null,
       duplication: jscpd?.statistics.total ?? null,
