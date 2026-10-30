@@ -164,6 +164,8 @@ async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReadin
   try {
     return (await chat({
       adapter: coach.adapter,
+      // Each reading stands alone: no conversation carries over between notes.
+      threadId: crypto.randomUUID(),
       systemPrompts: [SYSTEM_PROMPT],
       messages: [{ role: "user", content: JSON.stringify(prompt) }],
       outputSchema: coachReadingSchema,

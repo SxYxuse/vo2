@@ -7,7 +7,7 @@ import { APP_NAME } from "@/lib/brand.ts";
 import { coachModelsFor } from "./athlete-settings.server.ts";
 import { OPENROUTER, type CoachFeature } from "./coach-models.ts";
 
-/** The ids the adapter's types list; it accepts any OpenRouter id at runtime. */
+/** The ids the adapter's types list; it sends any OpenRouter id as given. */
 type ListedModel = Parameters<typeof createOpenRouterText>[0];
 
 export type CoachModel =
@@ -28,9 +28,8 @@ export async function coachModelFor(
   const key = getByokKey(request, OPENROUTER);
   if (!key) return env.STRAVA_MOCK ? { kind: "mock", model: "mock" } : { kind: "missing" };
   const model = (await coachModelsFor(userId))[feature];
-  // Any OpenRouter id runs: a model dropped from the curated list keeps running until the athlete
-  // picks another, and the adapter passes ids it doesn't list yet (GPT-6.1 Terra, Claude Haiku
-  // 5.5 in 0.22) straight through. Its types only name the ids it lists, hence the cast.
+  // The stored id is a plain string: a model dropped from the curated list keeps running until
+  // the athlete picks another. The adapter's types name only the ids it lists, hence the cast.
   const adapter = createOpenRouterText(model as ListedModel, key, {
     httpReferer: env.BETTER_AUTH_URL,
     appTitle: APP_NAME,
