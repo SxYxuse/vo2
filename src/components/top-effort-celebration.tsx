@@ -14,7 +14,7 @@ import {
   ResponsiveDialogTitle,
   useIsDesktop,
 } from "@/components/responsive-dialog.tsx";
-import { boardLabel, formatValue } from "@/components/personal-bests.tsx";
+import { boardLabel, formatValue } from "@/components/best-labels.ts";
 import { Button } from "@/components/ui/button";
 import { topEffortCelebrationsQueryOptions } from "@/lib/queries.ts";
 import {

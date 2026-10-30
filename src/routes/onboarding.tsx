@@ -19,7 +19,7 @@ export const Route = createFileRoute("/onboarding")({
   loader: async ({ context }) => {
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/sign-in" });
     }
     if (isSetUp(shell)) {
       throw redirect({ to: "/" });
@@ -38,7 +38,7 @@ function OnboardingPage() {
   const { data: session } = authClient.useSession();
 
   if (!shell.signedIn) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/sign-in" replace />;
   }
 
   return (

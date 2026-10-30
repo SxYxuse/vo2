@@ -23,7 +23,7 @@ export function useSignOut() {
       afterSignOut(queryClient);
       await Promise.all([removeOfflineCopy(), removeSavedPages(), removeCoachChats()]);
       await router.invalidate();
-      await router.navigate({ to: "/", replace: true, ignoreBlocker });
+      await router.navigate({ to: "/sign-in", replace: true, ignoreBlocker });
     },
     [queryClient, router],
   );

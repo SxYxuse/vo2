@@ -14,6 +14,7 @@ const LIGHTHOUSE_CATEGORIES = [
   ["best-practices", "Best practices"],
   ["seo", "SEO"],
   ["performance", "Performance"],
+  ["agentic-browsing", "Agentic browsing"],
 ] as const;
 
 /** A Lighthouse CI assertion, such as `["error", { "minScore": 0.9 }]`. */
@@ -41,7 +42,8 @@ function lighthouseSection(input: QualityInput) {
     return "**Lighthouse:** no report; the `lighthouse` job failed before it ran.";
   const scores = input.lighthouse;
   const rows = LIGHTHOUSE_CATEGORIES.map(([key, label]) => {
-    const score = Math.round((scores[key] ?? 0) * 100);
+    if (scores[key] === undefined) return `| ${label} | not run | none |`;
+    const score = Math.round(scores[key] * 100);
     const [level, options] = input.lighthouseAssertions[`categories:${key}`] ?? ["off"];
     const min = Math.round((options?.minScore ?? 0) * 100);
     if (level === "off" || !options?.minScore) return `| ${label} | ${score} | none |`;
@@ -84,10 +86,19 @@ function readJson<T>(path: string): T | null {
   return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : null;
 }
 
+/** Agentic Browsing comes from a separate Lighthouse 13 run (ci.yml), when it ran. */
+function lighthouseScores(summary: Record<string, number> | undefined, agentic?: number | null) {
+  if (!summary) return null;
+  return agentic == null ? summary : { ...summary, "agentic-browsing": agentic };
+}
+
 function main(reportsDir: string) {
   const root = join(fileURLToPath(import.meta.url), "../..");
   const manifest = readJson<{ isRepresentativeRun: boolean; summary: Record<string, number> }[]>(
     join(reportsDir, "lighthouse/manifest.json"),
+  );
+  const agentic = readJson<{ categories: Record<string, { score: number | null }> }>(
+    join(reportsDir, "lighthouse/agentic-browsing.json"),
   );
   const jscpd = readJson<{ statistics: { total: { percentage: number; clones: number } } }>(
     join(reportsDir, "quality/jscpd-report/jscpd-report.json"),
@@ -106,7 +117,10 @@ function main(reportsDir: string) {
         lighthouse: env.LIGHTHOUSE_RESULT ?? "unknown",
         e2e: env.E2E_RESULT ?? "unknown",
       },
-      lighthouse: manifest?.find((run) => run.isRepresentativeRun)?.summary ?? null,
+      lighthouse: lighthouseScores(
+        manifest?.find((run) => run.isRepresentativeRun)?.summary,
+        agentic?.categories["agentic-browsing"]?.score,
+      ),
       lighthouseAssertions: lighthouserc?.ci.assert.assertions ?? {},
       lighthouseReportUrl: env.LIGHTHOUSE_REPORT_URL || null,
       duplication: jscpd?.statistics.total ?? null,

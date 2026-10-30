@@ -11,7 +11,6 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar.tsx";
 import { OfflineBanner } from "@/components/offline-banner.tsx";
-import { SignedOutPage } from "@/components/signed-out-page.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
 import { TopEffortCelebration } from "@/components/top-effort-celebration.tsx";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
@@ -21,15 +20,12 @@ import { isSetUp } from "@/services/app-shell.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({
-  loader: async ({ context, location }) => {
+  loader: async ({ context }) => {
     // Offline, the views saved on this device are all there is to show.
     await context.offlineCopyRestored;
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn) {
-      if (location.pathname !== "/") {
-        throw redirect({ to: "/" });
-      }
-      return;
+      throw redirect({ to: "/sign-in" });
     }
     if (!isSetUp(shell)) {
       throw redirect({ to: "/onboarding" });
@@ -56,10 +52,7 @@ function AppLayout() {
   const { data, dataUpdatedAt } = useSuspenseQuery(appShellQueryOptions);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   if (!data.signedIn) {
-    if (pathname !== "/") {
-      return <Navigate to="/" replace />;
-    }
-    return <SignedOutPage />;
+    return <Navigate to="/sign-in" replace />;
   }
   if (!isSetUp(data)) {
     return <Navigate to="/onboarding" replace />;
