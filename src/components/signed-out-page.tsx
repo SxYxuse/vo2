@@ -5,17 +5,15 @@ import { useEffect } from "react";
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
-import { removeCoachKey } from "@/lib/coach-key.ts";
 import { removeCoachChats } from "@/lib/coach-storage.ts";
 import { Button } from "@/components/ui/button";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 
 export function SignedOutPage() {
-  // Sign-out clears the coach chat and the OpenRouter key, but an athlete deleted from Strava's side lands here
+  // Sign-out clears the coach chat, but an athlete deleted from Strava's side lands here
   // without signing out.
   useEffect(() => {
     void removeCoachChats();
-    void removeCoachKey();
   }, []);
   return (
     <div className="flex min-h-dvh flex-col bg-background">

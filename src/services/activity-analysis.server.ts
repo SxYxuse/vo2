@@ -225,7 +225,7 @@ export async function handleActivityAnalysis(request: Request) {
     return new Response("Activity not found", { status: 404 });
   }
 
-  const coach = await coachModelFor(request, session.user.id, "analysis");
+  const coach = await coachModelFor(session.user.id, "analysis");
   if (coach.kind === "missing") return coachKeyMissing();
   // Only the run ids come from the request; the messages are built here.
   const params = await chatParamsFromRequest(request);

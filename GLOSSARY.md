@@ -161,7 +161,7 @@ The coach's written reading of one activity, saved with the model that wrote it.
 _Avoid_: Summary, insight, AI analysis
 
 **OpenRouter key**:
-The athlete's own OpenRouter key, which every coach feature runs on. It is kept on the device it was added on and cleared on sign-out; without it, no coach feature runs.
+The athlete's own OpenRouter key, which every coach feature runs on. It is saved with the athlete's account, so it works on every device, and is never shown again once saved; without it, no coach feature runs.
 _Avoid_: API key, token, BYOK key
 
 **Coach chat**:

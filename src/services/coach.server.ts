@@ -309,7 +309,7 @@ export async function handleCoachChat(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const coach = await coachModelFor(request, session.user.id, "chat");
+  const coach = await coachModelFor(session.user.id, "chat");
   if (coach.kind === "missing") return coachKeyMissing();
   const params = await chatParamsFromRequest(request);
   const timeZone = validTimeZone(params.forwardedProps.timeZone);

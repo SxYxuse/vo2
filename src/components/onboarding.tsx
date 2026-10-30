@@ -46,8 +46,7 @@ import {
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
-import { CoachKeyField } from "@/components/coach-key.tsx";
-import { useCoachKey } from "@/lib/coach-key.ts";
+import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
 
 const STEPS = [
   {
@@ -197,7 +196,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const isReady = step.id === "ready";
   // The plan is saved by now, so the steps before it stay closed.
   const planSaved = step.id === "coach" || isReady;
-  const coachKey = useCoachKey();
+  const coachKey = useCoachAvailable();
   const copyUnfinished = syncStatus?.status !== "complete";
 
   if (step.id === "plan") {

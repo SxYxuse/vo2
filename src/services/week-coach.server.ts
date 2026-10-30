@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { chat } from "@tanstack/ai";
-import { getRequest } from "@tanstack/react-start/server";
+import { scrubSecrets } from "@tanstack/ai/byok";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
@@ -46,9 +46,9 @@ const MOCK_READING: CoachReading = {
   note: "This is the mock coach: no model key is set, so your note was read without changing the week.",
 };
 
-/** The athlete's key comes with the request that adds or retries a note, never with a page load. */
+/** Only adding or retrying a note reads it, so opening the week never spends the athlete's credit. */
 async function notesModel(userId: string) {
-  return coachModelFor(getRequest(), userId, "notes");
+  return coachModelFor(userId, "notes");
 }
 
 /**
@@ -171,8 +171,12 @@ async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReadin
       outputSchema: coachReadingSchema,
     })) as CoachReading;
   } catch (error) {
-    logger.warn("week_coach.failed", { model: coach.model, error: String(error) });
-    return error instanceof Error ? error.message : String(error);
+    // The athlete's key must never reach a log or the screen, even inside a provider's error.
+    const message = scrubSecrets(error instanceof Error ? error.message : String(error), [
+      coach.key,
+    ]);
+    logger.warn("week_coach.failed", { model: coach.model, error: message });
+    return message;
   }
 }
 
@@ -299,7 +303,7 @@ async function replanWeekWith(coach: CoachModel | null): Promise<WeekCoachState>
   return { ...base, notes: made.notes, plan: made.plan, notesError: made.error };
 }
 
-/** Never calls the model, so a page load or sync never asks for the passkey (ADR 0036). */
+/** Never calls the model, so a page load or sync never spends the athlete's credit (ADR 0036). */
 export async function replanWeekImpl(): Promise<WeekCoachState> {
   return replanWeekWith(null);
 }

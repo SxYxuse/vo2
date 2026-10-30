@@ -117,7 +117,7 @@ export function ActivityAnalysisCard({
           <CoachWriteup markdown={saved.body} />
         ) : needsKey ? (
           <CoachKeyPrompt>
-            The coach analyzes activities on your own OpenRouter key. Add it once on this device.
+            The coach analyzes activities on your own OpenRouter key. Add it once to use it.
           </CoachKeyPrompt>
         ) : (
           <Empty className="min-h-36 border-0 py-6">

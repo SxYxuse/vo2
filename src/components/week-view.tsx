@@ -31,7 +31,7 @@ import {
   removeCoachNote,
   replanWeek,
 } from "@/services/week-coach.ts";
-import { coachErrorMessage, coachKeyHeaders } from "@/lib/coach-key.ts";
+import { coachErrorMessage } from "@/lib/coach-errors.ts";
 import { useCoachAvailable } from "@/components/coach-key.tsx";
 import {
   CONSTRAINT_KINDS,
@@ -655,51 +655,27 @@ function DaySheetBody({
   const coachReady = useCoachAvailable();
   const settle = (state: WeekCoachState) =>
     queryClient.setQueryData(weekCoachQueryOptions.queryKey, state);
-  // A key left locked says so, rather than the server's "missing key" for a request sent without it.
-  const [unlockError, setUnlockError] = useState<Error | null>(null);
   const add = useMutation({
-    // Only a note in the athlete's own words needs the key, so only it may ask for the passkey.
-    mutationFn: async () => {
-      let headers: Record<string, string> | undefined;
-      let locked: Error | null = null;
-      if (text.trim()) {
-        try {
-          headers = await coachKeyHeaders();
-        } catch (error) {
-          // A cancelled passkey still saves the note; it waits, not read yet, for a Retry.
-          locked = error instanceof Error ? error : new Error(String(error));
-        }
-      }
-      const state = await addCoachNote({
+    mutationFn: () =>
+      addCoachNote({
         data: {
           date: day.date,
           kind,
           minutes: kind === "short" ? minutes : null,
           text: text.trim(),
         },
-        headers,
-      });
-      return { state, locked };
-    },
-    onSuccess: ({ state, locked }) => {
+      }),
+    onSuccess: (state) => {
       settle(state);
-      setUnlockError(locked);
-      if (!locked) onDone();
+      onDone();
     },
   });
   const remove = useMutation({
     mutationFn: (id: string) => removeCoachNote({ data: { id } }),
     onSuccess: settle,
   });
-  const read = useMutation({
-    mutationFn: async () => readCoachNotes({ headers: await coachKeyHeaders() }),
-    onSuccess: (state) => {
-      settle(state);
-      setUnlockError(null);
-    },
-  });
-  const notesError =
-    read.error ?? unlockError ?? (coach.notesError ? new Error(coach.notesError) : null);
+  const read = useMutation({ mutationFn: () => readCoachNotes(), onSuccess: settle });
+  const notesError = read.error ?? (coach.notesError ? new Error(coach.notesError) : null);
   const notes = coach.notes.filter((note) => note.date === day.date);
   const limits = constraintsOn(
     notes.flatMap((note) => note.constraints),

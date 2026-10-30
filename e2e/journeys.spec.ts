@@ -69,3 +69,21 @@ test("an athlete asks the coach a question and gets an answer", async ({ page })
   await page.getByRole("button", { name: "How did my last run go?" }).click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 });
+
+// Last: with a key saved, the coach would call OpenRouter instead of the mock coach.
+test("an athlete saves an OpenRouter key, sees it kept, and removes it", async ({ page }) => {
+  await page.goto("/settings/coach");
+  await settle(page);
+  const key = page.getByRole("textbox", { name: "Key" });
+  await key.fill("sk-or-e2e-not-a-real-key");
+  await page.getByRole("button", { name: "Save key" }).click();
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+
+  // Saved with the account, never shown back.
+  await page.reload();
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+  await expect(page.getByText("sk-or-e2e-not-a-real-key")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("textbox", { name: "Key" })).toBeVisible();
+});

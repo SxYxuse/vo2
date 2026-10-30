@@ -197,3 +197,16 @@ export const topEffortCelebrations = pgTable(
   },
   (table) => [index("top_effort_celebrations_user_idx").on(table.userId, table.seenAt)],
 );
+
+/**
+ * The athlete's own OpenRouter key, encrypted with a key derived from BETTER_AUTH_SECRET so it
+ * follows them to every device; only the server ever decrypts it (ADR 0036).
+ */
+export const coachKeys = pgTable("coach_keys", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** AES-256-GCM: base64 iv, auth tag, and ciphertext, joined by dots. */
+  sealed: text("sealed").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

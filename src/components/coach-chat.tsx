@@ -31,7 +31,7 @@ import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
 import { homeQueryOptions } from "@/lib/queries.ts";
 import { isSportTypeShown, sportTypeColor } from "@/services/athlete-settings.types.ts";
-import { coachErrorMessage, coachKeyHeaders } from "@/lib/coach-key.ts";
+import { coachErrorMessage } from "@/lib/coach-errors.ts";
 import { COACH_DATABASE } from "@/lib/coach-storage.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -370,9 +370,7 @@ export function CoachChat({
   const { shown, byId } = useMentionableActivities();
   const [persistence] = useState(() => indexedDBPersistence({ databaseName: COACH_DATABASE }));
   const coach = useCoachAvailable();
-  const [connection] = useState(() =>
-    fetchServerSentEvents("/api/coach", async () => ({ headers: await coachKeyHeaders() })),
-  );
+  const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
   const { messages, sendMessage, isLoading, error, stop, reload, clear, isHydrating } = useChat({
     connection,
     // One chat per device: sign-out deletes it, so the next athlete starts fresh.
@@ -411,8 +409,7 @@ export function CoachChat({
       <div className="relative flex min-h-0 flex-1 flex-col">
         {empty && needsKey ? (
           <CoachKeyPrompt>
-            The coach answers on your own OpenRouter key. Add it once on this device to ask about
-            your training.
+            The coach answers on your own OpenRouter key. Add it once to ask about your training.
           </CoachKeyPrompt>
         ) : empty ? (
           <Empty className="flex-1">

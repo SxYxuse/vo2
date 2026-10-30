@@ -76,7 +76,7 @@ const athleteSettingsSchema = z.object({
   calendarPeriod: calendarPeriodSchema.default("month"),
   /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
   topEffortsSince: z.iso.datetime().nullable().default(null),
-  /** The model each coach feature runs on; the key itself stays on the device (ADR 0036). */
+  /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */
   coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
 });
 
