@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { removeCoachChats } from "@/lib/coach-storage.ts";

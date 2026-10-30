@@ -3,7 +3,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { FlagIcon } from "lucide-react";
 
 import { SeasonView } from "@/components/season.tsx";
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { loaderQuery, seasonQueryOptions } from "@/lib/queries.ts";
 import {
   Empty,

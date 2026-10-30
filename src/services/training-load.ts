@@ -18,6 +18,7 @@ import {
   estimateLthr,
   thresholdEffort,
 } from "./lthr-estimate.ts";
+import { dayKey } from "./day-key.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
 export const CTL_DAYS = 42;
@@ -113,24 +114,6 @@ function toZoned(date: Date, timeZone: string) {
 
 function zonedDayStart(date: Date, timeZone: string) {
   return startOfDay(toZoned(date, timeZone));
-}
-
-// Building an Intl.DateTimeFormat costs far more than formatting with one, and day keys run
-// once per activity and per day of history, so keep one formatter per time zone.
-const dayKeyFormats = new Map<string, Intl.DateTimeFormat>();
-
-export function dayKey(date: Date, timeZone: string) {
-  let format = dayKeyFormats.get(timeZone);
-  if (!format) {
-    format = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    dayKeyFormats.set(timeZone, format);
-  }
-  return format.format(date);
 }
 
 function percentile(values: number[], p: number) {
@@ -721,3 +704,5 @@ export const loadFitnessData = createServerFn({ method: "GET" }).handler(
     return loadFitnessDataImpl();
   },
 );
+
+export { dayKey };

@@ -73,10 +73,10 @@ const config = defineConfig({
         tanstackStart({
           router: {
             codeSplittingOptions: {
-              // TanStack keeps pending components in the entry by default, and with them every
-              // component file a skeleton imports from; ship each with its page instead.
+              // TanStack keeps loaders and pending components in the entry by default, and with
+              // them every query, service and component file they import; ship each with its page.
               defaultBehavior: [
-                ["component", "pendingComponent"],
+                ["loader", "component", "pendingComponent"],
                 ["errorComponent"],
                 ["notFoundComponent"],
               ],

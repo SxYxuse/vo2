@@ -16,7 +16,7 @@ import { TopEffortCelebration } from "@/components/top-effort-celebration.tsx";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
-import { isSetUp } from "@/services/app-shell.ts";
+import { isSetUp } from "@/services/app-setup.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Route = createFileRoute("/_app")({

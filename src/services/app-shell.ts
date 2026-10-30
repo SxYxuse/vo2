@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { isTrainingPlanComplete, type TrainingPlan } from "./training-plan.types.ts";
+import type { TrainingPlan } from "./training-plan.types.ts";
 
 export type AppShellData = {
   signedIn: boolean;
@@ -15,8 +15,3 @@ export const loadAppShell = createServerFn({ method: "GET" }).handler(
     return loadAppShellImpl();
   },
 );
-
-/** The app opens once the athlete has a complete training plan, a birthday and a weight. */
-export function isSetUp(shell: AppShellData) {
-  return isTrainingPlanComplete(shell.training) && shell.hasProfile;
-}

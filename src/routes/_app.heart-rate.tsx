@@ -4,7 +4,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { HeartPulseIcon } from "lucide-react";
 
 import { HeartRateZones } from "@/components/heart-rate-zones.tsx";
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { heartRateQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,

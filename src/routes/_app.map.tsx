@@ -4,7 +4,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { MapIcon } from "lucide-react";
 
 import { ActivityMap } from "@/components/activity-map.tsx";
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { activityMapQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,

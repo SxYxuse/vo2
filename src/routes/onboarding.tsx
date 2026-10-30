@@ -10,7 +10,7 @@ import { ProfilePrompt, OnboardingForm } from "@/components/onboarding.tsx";
 import { OnboardingShell } from "@/components/onboarding-shell.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions, loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
-import { isSetUp } from "@/services/app-shell.ts";
+import { isSetUp } from "@/services/app-setup.ts";
 import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteError } from "@/components/route-states.tsx";

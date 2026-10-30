@@ -1,12 +1,13 @@
 import { TZDate } from "@date-fns/tz";
-import { addDays, startOfDay } from "date-fns";
+import { startOfDay } from "date-fns";
 import { z } from "zod";
 
 import type { ZoneAnchors } from "./heart-rate.ts";
 import { sportGroupFor } from "./sport-groups.ts";
-import { buildPmc, dayKey, periodStartMs, type FitnessLoad } from "./training-load.ts";
+import { dayKey } from "./day-key.ts";
+import { buildPmc, periodStartMs, type FitnessLoad } from "./training-load.ts";
 
-export { dayKey };
+export { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 
 /** Which key session types lead a week; the season phase picks one (ADR 0021). */
 export type BuildPace = "hold" | "slow" | "steady" | "fast" | "overreach";
@@ -415,19 +416,6 @@ export function sportFamilyOf(sportType: string): SportFamily {
 
 function toZoned(date: Date, timeZone: string) {
   return new TZDate(date.getTime(), timeZone);
-}
-
-export function weekStartKey(date: Date, timeZone: string) {
-  const zoned = startOfDay(toZoned(date, timeZone));
-  const weekday = zoned.getDay();
-  const offset = weekday === 0 ? 6 : weekday - 1;
-  return dayKey(addDays(zoned, -offset), timeZone);
-}
-
-export function addDayKey(key: string, days: number) {
-  const [year, month, day] = key.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days));
-  return next.toISOString().slice(0, 10);
 }
 
 export function latestPmc(loads: FitnessLoad[], timeZone: string) {

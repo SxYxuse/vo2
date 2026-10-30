@@ -3,7 +3,6 @@ import { queryOptions } from "@tanstack/react-query";
 import { getActivityAnalysis, getAnalysisStatus } from "@/services/activity-analysis.ts";
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
-import { loadAppShell } from "@/services/app-shell.ts";
 import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData } from "@/services/home-data.ts";
@@ -18,19 +17,8 @@ import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
 
-/**
- * Loader/preload read: use cached data if present, otherwise fetch once. Offline with nothing
- * saved, it fails to the route's error state instead of pausing on a skeleton until reconnect.
- */
-export function loaderQuery<T extends Record<string, unknown>>(options: T) {
-  return { ...options, staleTime: "static" as const, retry: 1, networkMode: "always" as const };
-}
-
-export const appShellQueryOptions = queryOptions({
-  queryKey: ["app-shell"],
-  queryFn: () => loadAppShell(),
-  staleTime: 60_000,
-});
+// Apart so the sign-in page can read the app shell without loading every service's validators.
+export { appShellQueryOptions, loaderQuery } from "./app-shell-query.ts";
 
 export const homeQueryOptions = queryOptions({
   queryKey: ["home"],

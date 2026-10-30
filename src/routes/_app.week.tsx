@@ -3,7 +3,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 
 import { TargetIcon } from "lucide-react";
 
-import { SignInPanel } from "@/components/sync-panel.tsx";
+import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { WeekView, WeekViewSkeleton, WeeksAhead } from "@/components/week-view.tsx";
 import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
 import { Button } from "@/components/ui/button";
