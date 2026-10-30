@@ -30,9 +30,18 @@ export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
  */
 export const COACH_MODELS = [
   { id: "openai/gpt-6-luna", label: "GPT-6 Luna", hint: "OpenAI · quick and cheap" },
+  { id: "openai/gpt-6.1-terra", label: "GPT-6.1 Terra", hint: "OpenAI · balanced" },
+  { id: "openai/gpt-6.1-sol", label: "GPT-6.1 Sol", hint: "OpenAI · strong" },
+  {
+    id: "anthropic/claude-haiku-5.5",
+    label: "Claude Haiku 5.5",
+    hint: "Anthropic · quick and cheap",
+  },
+  { id: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5", hint: "Anthropic · strong" },
+  { id: "anthropic/claude-opus-5.5", label: "Claude Opus 5.5", hint: "Anthropic · strongest" },
+  { id: "z-ai/glm-5.3-flash", label: "GLM 5.3 Flash", hint: "Z.ai · quick and cheap" },
   { id: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", hint: "DeepSeek · cheapest" },
   { id: "google/gemini-3.8-flash", label: "Gemini 3.8 Flash", hint: "Google · balanced" },
-  { id: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5", hint: "Anthropic · strongest" },
 ] as const;
 
 export type CoachModelId = (typeof COACH_MODELS)[number]["id"];
