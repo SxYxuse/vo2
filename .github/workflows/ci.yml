@@ -156,6 +156,7 @@ jobs:
     needs: [ci, lighthouse, e2e]
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     steps:
@@ -170,9 +171,22 @@ jobs:
         with:
           path: reports
 
+      # Main's latest scores, so the report shows what this pull request changes. Until main has
+      # a successful run with them, the report shows this pull request's scores alone.
+      - name: Download main's Lighthouse scores
+        continue-on-error: true
+        run: |
+          read -r run sha < <(gh run list --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json databaseId,headSha -q '.[0] | "\(.databaseId) \(.headSha)"')
+          gh run download "$run" --name lighthouse --dir baseline
+          echo "BASELINE_SHA=$sha" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
       - name: Write the quality report
         run: |
-          bun scripts/quality-report.ts reports > quality-report.md
+          bun scripts/quality-report.ts reports baseline > quality-report.md
           cat quality-report.md >> "$GITHUB_STEP_SUMMARY"
         env:
           SHA: ${{ github.event.pull_request.head.sha }}

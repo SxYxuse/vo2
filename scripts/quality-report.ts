@@ -2,7 +2,7 @@
  * Writes the quality report CI posts on each pull request (ci.yml, job `report`) from the reports
  * the other jobs upload. A missing report means its job failed before writing it.
  *
- *   bun scripts/quality-report.ts <reports dir>
+ *   bun scripts/quality-report.ts <reports dir> [<main's reports dir>]
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -17,6 +17,11 @@ const LIGHTHOUSE_CATEGORIES = [
   ["agentic-browsing", "Agentic browsing"],
 ] as const;
 
+/** One run on the same page varies by up to about this many points, so a smaller change is noise. */
+const NOISE_POINTS = 5;
+
+type LighthousePage = { path: string; scores: Record<string, number> };
+
 /** A Lighthouse CI assertion, such as `["error", { "minScore": 0.9 }]`. */
 type Assertion = [level: "error" | "warn" | "off", options?: { minScore?: number }];
 
@@ -24,7 +29,9 @@ export type QualityInput = {
   sha: string;
   jobs: { ci: string; lighthouse: string; e2e: string };
   /** Each page's category scores from 0 to 1, from its median Lighthouse run. */
-  lighthouse: { path: string; scores: Record<string, number> }[] | null;
+  lighthouse: LighthousePage[] | null;
+  /** The same from the latest successful run on main, to compare against. */
+  baseline: { sha: string; pages: LighthousePage[] } | null;
   lighthouseAssertions: Record<string, Assertion>;
   lighthouseReportUrl: string | null;
   duplication: { percentage: number; clones: number } | null;
@@ -37,12 +44,25 @@ function jobLine(name: string, result: string) {
   return `${JOB_ICONS[result] ?? "⏭️"} \`${name}\` ${result}`;
 }
 
-function scoreCell(score: number | undefined, [level, options]: Assertion) {
+function comparison(value: number, before: number | undefined) {
+  if (before === undefined) return "";
+  const main = Math.round(before * 100);
+  const change = value - main;
+  if (Math.abs(change) < NOISE_POINTS) return ` (main ${main}, ≈)`;
+  return ` (main ${main}, ${change > 0 ? "+" : ""}${change})`;
+}
+
+function scoreCell(
+  score: number | undefined,
+  before: number | undefined,
+  [level, options]: Assertion,
+) {
   if (score === undefined) return "not run";
   const value = Math.round(score * 100);
-  if (level === "off" || !options?.minScore) return `${value}`;
+  const compared = comparison(value, before);
+  if (level === "off" || !options?.minScore) return `${value}${compared}`;
   const icon = value >= Math.round(options.minScore * 100) ? "✅" : level === "error" ? "❌" : "⚠️";
-  return `${value} ${icon}`;
+  return `${value} ${icon}${compared}`;
 }
 
 function ruleCell([level, options]: Assertion) {
@@ -57,9 +77,15 @@ function lighthouseSection(input: QualityInput) {
   const pages = input.lighthouse;
   const rows = LIGHTHOUSE_CATEGORIES.map(([key, label]) => {
     const assertion = input.lighthouseAssertions[`categories:${key}`] ?? ["off"];
-    const cells = pages.map((page) => scoreCell(page.scores[key], assertion));
+    const cells = pages.map((page) => {
+      const before = input.baseline?.pages.find(({ path }) => path === page.path);
+      return scoreCell(page.scores[key], before?.scores[key], assertion);
+    });
     return `| ${label} | ${cells.join(" | ")} | ${ruleCell(assertion)} |`;
   });
+  const legend = input.baseline
+    ? `\n\nIn brackets: \`main\` at ${input.baseline.sha.slice(0, 7)}. A change under ${NOISE_POINTS} points is within Lighthouse's run-to-run noise (≈).`
+    : "";
   const link = input.lighthouseReportUrl
     ? `\n\n[Full Lighthouse reports](${input.lighthouseReportUrl}) (zip of the HTML reports)`
     : "";
@@ -68,7 +94,9 @@ function lighthouseSection(input: QualityInput) {
       `| Lighthouse (mobile) | ${pages.map((page) => `\`${page.path}\``).join(" | ")} | Required |`,
       `|---|${pages.map(() => "---|").join("")}---|`,
       ...rows,
-    ].join("\n") + link
+    ].join("\n") +
+    legend +
+    link
   );
 }
 
@@ -118,12 +146,25 @@ function lighthousePages(manifest: ManifestRun[] | null, agentic?: number | null
     });
 }
 
-function main(reportsDir: string) {
-  const root = join(fileURLToPath(import.meta.url), "../..");
-  const manifest = readJson<ManifestRun[]>(join(reportsDir, "lighthouse/manifest.json"));
+function readLighthousePages(lighthouseDir: string) {
   const agentic = readJson<{ categories: Record<string, { score: number | null }> }>(
-    join(reportsDir, "lighthouse/agentic-browsing.json"),
+    join(lighthouseDir, "agentic-browsing.json"),
   );
+  return lighthousePages(
+    readJson<ManifestRun[]>(join(lighthouseDir, "manifest.json")),
+    agentic?.categories["agentic-browsing"]?.score,
+  );
+}
+
+/** Main's scores, when ci.yml found a run on main to download them from. */
+function lighthouseBaseline(baselineDir: string | undefined, sha: string | undefined) {
+  if (!baselineDir || !sha) return null;
+  const pages = readLighthousePages(baselineDir);
+  return pages?.length ? { sha, pages } : null;
+}
+
+function main(reportsDir: string, baselineDir?: string) {
+  const root = join(fileURLToPath(import.meta.url), "../..");
   const jscpd = readJson<{ statistics: { total: { percentage: number; clones: number } } }>(
     // The artifact holds this one file, so upload-artifact drops its folder.
     join(reportsDir, "quality/jscpd-report.json"),
@@ -142,7 +183,8 @@ function main(reportsDir: string) {
         lighthouse: env.LIGHTHOUSE_RESULT ?? "unknown",
         e2e: env.E2E_RESULT ?? "unknown",
       },
-      lighthouse: lighthousePages(manifest, agentic?.categories["agentic-browsing"]?.score),
+      lighthouse: readLighthousePages(join(reportsDir, "lighthouse")),
+      baseline: lighthouseBaseline(baselineDir, env.BASELINE_SHA),
       lighthouseAssertions: lighthouserc?.ci.assert.assertions ?? {},
       lighthouseReportUrl: env.LIGHTHOUSE_REPORT_URL || null,
       duplication: jscpd?.statistics.total ?? null,
@@ -152,5 +194,5 @@ function main(reportsDir: string) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main(process.argv[2] ?? "reports");
+  main(process.argv[2] ?? "reports", process.argv[3]);
 }

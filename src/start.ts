@@ -82,6 +82,33 @@ const requestLogger = createMiddleware().server(async ({ next, request, pathname
   });
 });
 
+/**
+ * Gzips rendered pages, which carry the athlete's data and run to 100 KB. Nitro compresses only
+ * the build files. Server functions stay as they are: a sync streams its progress through them.
+ */
+const compressPages = createMiddleware().server(async ({ next, request }) => {
+  const result = await next();
+  const response = result instanceof Response ? result : result.response;
+  if (
+    !response.body ||
+    response.headers.has("content-encoding") ||
+    !(response.headers.get("content-type") ?? "").startsWith("text/html") ||
+    !(request.headers.get("accept-encoding") ?? "").includes("gzip")
+  ) {
+    return result;
+  }
+  const headers = new Headers(response.headers);
+  headers.set("content-encoding", "gzip");
+  headers.delete("content-length");
+  headers.append("vary", "Accept-Encoding");
+  const compressed = new Response(response.body.pipeThrough(new CompressionStream("gzip")), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  return result instanceof Response ? compressed : { ...result, response: compressed };
+});
+
 export const startInstance = createStart(() => ({
-  requestMiddleware: [csrfMiddleware, requestLogger],
+  requestMiddleware: [csrfMiddleware, compressPages, requestLogger],
 }));

@@ -14,7 +14,7 @@ import { OfflineBanner } from "@/components/offline-banner.tsx";
 import { SyncPanel } from "@/components/sync-panel.tsx";
 import { TopEffortCelebration } from "@/components/top-effort-celebration.tsx";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
-import { scheduleIdle, warmApp } from "@/lib/prefetch.ts";
+import { afterPageSettles, warmApp } from "@/lib/prefetch.ts";
 import { appShellQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import { isSetUp } from "@/services/app-setup.ts";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -38,7 +38,7 @@ function SignedInPrefetch() {
   const router = useRouter();
   const queryClient = useQueryClient();
   useEffect(() => {
-    return scheduleIdle(() => warmApp(router, queryClient));
+    return afterPageSettles(() => warmApp(router, queryClient));
   }, [queryClient, router]);
   return null;
 }

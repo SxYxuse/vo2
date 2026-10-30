@@ -62,6 +62,30 @@ const config = defineConfig({
     // chunk stays well under the 500 kB default.
     chunkSizeWarningLimit: 1100,
   },
+  environments: {
+    client: {
+      build: {
+        rolldownOptions: {
+          output: {
+            codeSplitting: {
+              // Rolldown splits shared libraries into dozens of sub-kilobyte chunks, each a
+              // request before first paint; merge small ones. App code stays as it splits, since
+              // grouping it created import cycles between chunks that broke hydration.
+              groups: [
+                {
+                  name: "vendor",
+                  test: /node_modules/,
+                  minShareCount: 2,
+                  entriesAware: true,
+                  entriesAwareMergeThreshold: 20_000,
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
   test: {
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
   },
