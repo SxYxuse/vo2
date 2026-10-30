@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { coachErrorMessage, coachKeyHeaders } from "@/lib/coach-key.ts";
 import { activityAnalysisQueryOptions } from "@/lib/queries.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -142,7 +143,10 @@ export function ActivityAnalysisLive({
   const started = useRef(false);
   const connection = useMemo(
     () =>
-      fetchServerSentEvents(`/api/activity-analysis?activityId=${encodeURIComponent(activityId)}`),
+      fetchServerSentEvents(
+        `/api/activity-analysis?activityId=${encodeURIComponent(activityId)}`,
+        async () => ({ headers: await coachKeyHeaders() }),
+      ),
     [activityId],
   );
   const { messages, sendMessage, isLoading, error, stop } = useChat({
@@ -192,7 +196,7 @@ export function ActivityAnalysisLive({
       {error ? (
         <Alert variant="destructive">
           <AlertTitle>Analysis failed</AlertTitle>
-          <AlertDescription>{error.message}</AlertDescription>
+          <AlertDescription>{coachErrorMessage(error)}</AlertDescription>
         </Alert>
       ) : null}
     </div>

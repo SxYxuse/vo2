@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 
 import { authClient } from "@/lib/auth-client.ts";
+import { removeCoachKey } from "@/lib/coach-key.ts";
 import { removeCoachChats } from "@/lib/coach-storage.ts";
 import { afterSignOut } from "@/lib/query-events.ts";
 import { removeSavedPages } from "@/lib/service-worker.ts";
@@ -10,7 +11,7 @@ import { removeOfflineCopy } from "@/integrations/tanstack-query/offline-copy.ts
 
 /**
  * Ends the session, drops every cached athlete query, the copy saved on the device for
- * offline, and the coach chat, and returns to sign-in.
+ * offline, the coach chat, and the OpenRouter key, and returns to sign-in.
  * Pass ignoreBlocker once the athlete is gone, so unsaved settings edits cannot hold them on a dead page.
  */
 export function useSignOut() {
@@ -21,7 +22,12 @@ export function useSignOut() {
       // Offline or an already-deleted session must not strand the athlete here.
       await authClient.signOut().catch(() => undefined);
       afterSignOut(queryClient);
-      await Promise.all([removeOfflineCopy(), removeSavedPages(), removeCoachChats()]);
+      await Promise.all([
+        removeOfflineCopy(),
+        removeSavedPages(),
+        removeCoachChats(),
+        removeCoachKey(),
+      ]);
       await router.invalidate();
       await router.navigate({ to: "/sign-in", replace: true, ignoreBlocker });
     },

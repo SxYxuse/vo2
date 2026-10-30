@@ -3,6 +3,7 @@ import {
   CalendarDaysIcon,
   HeartPulseIcon,
   RefreshCwIcon,
+  SparklesIcon,
   TargetIcon,
   TrophyIcon,
   UserIcon,
@@ -15,6 +16,7 @@ export const SETTINGS_SECTIONS = [
   { id: "heart-rate", label: "Heart rate", icon: HeartPulseIcon },
   { id: "calendar", label: "Calendar", icon: CalendarDaysIcon },
   { id: "bests", label: "Bests", icon: TrophyIcon },
+  { id: "coach", label: "Coach", icon: SparklesIcon },
   { id: "sync", label: "Sync", icon: RefreshCwIcon },
 ] as const;
 

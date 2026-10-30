@@ -1,0 +1,67 @@
+import { z } from "zod";
+
+/** The three things the coach does that need a model (ADR 0036). */
+export const COACH_FEATURES = [
+  {
+    id: "analysis",
+    label: "Activity analysis",
+    hint: "Reads one activity's streams and writes up the session.",
+  },
+  {
+    id: "notes",
+    label: "Coach notes",
+    hint: "Reads what you write about a day into the week plan.",
+  },
+  {
+    id: "chat",
+    label: "Coach chat",
+    hint: "Answers your questions about your training.",
+  },
+] as const;
+
+export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
+
+/**
+ * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (analysis,
+ * chat) and structured JSON output (notes), so any of them runs every coach feature.
+ */
+export const COACH_MODELS = [
+  { id: "openai/gpt-6-luna", label: "GPT-6 Luna", hint: "OpenAI · quick and cheap" },
+  { id: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", hint: "DeepSeek · cheapest" },
+  { id: "google/gemini-3.8-flash", label: "Gemini 3.8 Flash", hint: "Google · balanced" },
+  { id: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5", hint: "Anthropic · strongest" },
+] as const;
+
+export type CoachModelId = (typeof COACH_MODELS)[number]["id"];
+
+export const DEFAULT_COACH_MODEL: CoachModelId = "openai/gpt-6-luna";
+
+/**
+ * Stored as chosen: a model later dropped from the list keeps running and shows as no longer
+ * offered until the athlete picks another, rather than switching silently (ADR 0036).
+ */
+const coachModelSchema = z.string().min(1).catch(DEFAULT_COACH_MODEL);
+
+export const coachModelsSchema = z.object({
+  analysis: coachModelSchema.default(DEFAULT_COACH_MODEL),
+  notes: coachModelSchema.default(DEFAULT_COACH_MODEL),
+  chat: coachModelSchema.default(DEFAULT_COACH_MODEL),
+});
+
+export type CoachModels = z.infer<typeof coachModelsSchema>;
+
+export const DEFAULT_COACH_MODELS: CoachModels = {
+  analysis: DEFAULT_COACH_MODEL,
+  notes: DEFAULT_COACH_MODEL,
+  chat: DEFAULT_COACH_MODEL,
+};
+
+export function isCoachModel(id: string): id is CoachModelId {
+  return COACH_MODELS.some((model) => model.id === id);
+}
+
+/** Saved analyses keep the id of whatever wrote them, including models no longer listed. */
+export function coachModelLabel(id: string) {
+  if (id === "mock") return "Mock coach";
+  return COACH_MODELS.find((model) => model.id === id)?.label ?? id;
+}

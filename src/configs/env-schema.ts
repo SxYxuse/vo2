@@ -29,7 +29,6 @@ export const env$ = z
     STRAVA_CLIENT_ID: optionalString,
     STRAVA_CLIENT_SECRET: optionalString,
     STRAVA_WEBHOOK_SECRET: optionalString,
-    OPENROUTER_API_KEY: optionalString,
     LOKI_HOST: optionalString,
   })
   .superRefine((raw, ctx) => {
@@ -67,7 +66,6 @@ export const env$ = z
       STRAVA_CLIENT_SECRET: raw.STRAVA_CLIENT_SECRET ?? "mock",
       /** Unset turns the Strava webhook off; the mock always has one so its events reach the app. */
       STRAVA_WEBHOOK_SECRET: raw.STRAVA_WEBHOOK_SECRET ?? (stravaMock ? "mock" : undefined),
-      OPENROUTER_API_KEY: raw.OPENROUTER_API_KEY,
       LOKI_HOST: raw.LOKI_HOST,
     };
   });

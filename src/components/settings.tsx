@@ -47,6 +47,7 @@ import {
 import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
+import { SettingsCoachSection } from "@/components/coach-key.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
@@ -258,6 +259,8 @@ export function SettingsForm({
               <CalendarPeriodField idPrefix="settings" control={form.control} />
             ) : section === "bests" ? (
               <CelebrateTopEffortsField idPrefix="settings" control={form.control} />
+            ) : section === "coach" ? (
+              <SettingsCoachSection />
             ) : section === "sync" ? (
               <SettingsSyncSection enabled />
             ) : section === "heart-rate" ? (

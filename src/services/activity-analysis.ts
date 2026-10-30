@@ -6,9 +6,10 @@ import type { StoredActivityAnalysis } from "./activity-analysis.types.ts";
 export type { CoachSection, StoredActivityAnalysis } from "./activity-analysis.types.ts";
 export { parseCoachMarkdown } from "./activity-analysis.types.ts";
 
+/** Whether the mock coach answers without a key (mock Strava only, ADR 0036). */
 export const getAnalysisStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const { isAnalysisMocked } = await import("./activity-analysis.server.ts");
-  return { mocked: isAnalysisMocked() };
+  const { isCoachMocked } = await import("./coach-model.server.ts");
+  return { mocked: isCoachMocked() };
 });
 
 export const getActivityAnalysis = createServerFn({ method: "GET" })

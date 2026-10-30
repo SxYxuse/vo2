@@ -5,8 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { SparklesIcon } from "lucide-react";
 
-import { activityAnalysisQueryOptions, analysisStatusQueryOptions } from "@/lib/queries.ts";
+import { activityAnalysisQueryOptions } from "@/lib/queries.ts";
+import { coachModelLabel } from "@/services/coach-models.ts";
 import { CoachWriteup } from "@/components/activity-analysis-writeup.tsx";
+import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { Badge } from "@/components/ui/badge";
 import { useOnline } from "@/hooks/use-online.ts";
 import { Button } from "@/components/ui/button";
@@ -45,7 +47,7 @@ export function ActivityAnalysisCard({
   hasStreams: boolean;
 }) {
   const online = useOnline();
-  const statusQuery = useQuery(analysisStatusQueryOptions);
+  const coach = useCoachAvailable();
   const savedQuery = useQuery({
     ...activityAnalysisQueryOptions(activityId),
     enabled: Boolean(activityId),
@@ -55,25 +57,27 @@ export function ActivityAnalysisCard({
   const onBusyChange = useCallback((busy: boolean) => setLiveBusy(busy), []);
 
   const saved = savedQuery.data;
-  const mocked = saved?.mocked ?? statusQuery.data?.mocked ?? false;
+  const mocked = saved?.mocked ?? coach.mocked;
   const isLoading = liveBusy;
+  // Saved analyses stay readable without a key; only a new one needs it (ADR 0036).
+  const needsKey = coach.decided && !coach.available;
 
   return (
     <Card aria-busy={isLoading}>
       <CardHeader className="border-b">
         <CardTitle className={isLoading ? "shimmer" : undefined}>
-          {isLoading ? "Analyzing" : "AI analysis"}
+          {isLoading ? "Analyzing" : "Activity analysis"}
         </CardTitle>
         <CardDescription>
           {isLoading
             ? "Working through stream tools, then writing the coach note."
             : saved
-              ? `Saved ${formatDistanceToNow(new Date(saved.updatedAt), { addSuffix: true })}. Run again only if you want a fresh read.`
+              ? `${saved.model ? `By ${coachModelLabel(saved.model)}, saved` : "Saved"} ${formatDistanceToNow(new Date(saved.updatedAt), { addSuffix: true })}. Run again only if you want a fresh read.`
               : "Coach note of intensity, pacing, and terrain. Runs only when you ask."}
         </CardDescription>
         <CardAction className="flex items-center gap-2">
           {mocked ? <Badge variant="warning">Mocked</Badge> : null}
-          {isLoading ? null : (
+          {isLoading || needsKey ? null : (
             <Button
               disabled={!hasStreams || !online}
               onMouseEnter={preloadActivityAnalysis}
@@ -111,6 +115,10 @@ export function ActivityAnalysisCard({
           </Suspense>
         ) : saved?.body ? (
           <CoachWriteup markdown={saved.body} />
+        ) : needsKey ? (
+          <CoachKeyPrompt>
+            The coach analyzes activities on your own OpenRouter key. Add it once on this device.
+          </CoachKeyPrompt>
         ) : (
           <Empty className="min-h-36 border-0 py-6">
             <EmptyHeader>
