@@ -655,22 +655,36 @@ function DaySheetBody({
   const coachReady = useCoachAvailable();
   const settle = (state: WeekCoachState) =>
     queryClient.setQueryData(weekCoachQueryOptions.queryKey, state);
+  // A key left locked says so, rather than the server's "missing key" for a request sent without it.
+  const [unlockError, setUnlockError] = useState<Error | null>(null);
   const add = useMutation({
     // Only a note in the athlete's own words needs the key, so only it may ask for the passkey.
-    mutationFn: async () =>
-      addCoachNote({
+    mutationFn: async () => {
+      let headers: Record<string, string> | undefined;
+      let locked: Error | null = null;
+      if (text.trim()) {
+        try {
+          headers = await coachKeyHeaders();
+        } catch (error) {
+          // A cancelled passkey still saves the note; it waits, not read yet, for a Retry.
+          locked = error instanceof Error ? error : new Error(String(error));
+        }
+      }
+      const state = await addCoachNote({
         data: {
           date: day.date,
           kind,
           minutes: kind === "short" ? minutes : null,
           text: text.trim(),
         },
-        // A cancelled passkey still saves the note; it waits, not read yet, for a Retry.
-        headers: text.trim() ? await coachKeyHeaders().catch(() => undefined) : undefined,
-      }),
-    onSuccess: (state) => {
+        headers,
+      });
+      return { state, locked };
+    },
+    onSuccess: ({ state, locked }) => {
       settle(state);
-      onDone();
+      setUnlockError(locked);
+      if (!locked) onDone();
     },
   });
   const remove = useMutation({
@@ -679,8 +693,13 @@ function DaySheetBody({
   });
   const read = useMutation({
     mutationFn: async () => readCoachNotes({ headers: await coachKeyHeaders() }),
-    onSuccess: settle,
+    onSuccess: (state) => {
+      settle(state);
+      setUnlockError(null);
+    },
   });
+  const notesError =
+    read.error ?? unlockError ?? (coach.notesError ? new Error(coach.notesError) : null);
   const notes = coach.notes.filter((note) => note.date === day.date);
   const limits = constraintsOn(
     notes.flatMap((note) => note.constraints),
@@ -848,10 +867,8 @@ function DaySheetBody({
                           Retry
                         </Button>
                       ) : null}
-                      {read.error || coach.notesError ? (
-                        <span className="text-destructive">
-                          {coachErrorMessage(read.error ?? new Error(coach.notesError ?? ""))}
-                        </span>
+                      {notesError ? (
+                        <span className="text-destructive">{coachErrorMessage(notesError)}</span>
                       ) : null}
                     </span>
                   ) : null}

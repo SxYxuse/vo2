@@ -56,9 +56,13 @@ export function useCoachKey(): CoachKey {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     let live = true;
-    void client?.ready().then(() => {
-      if (live) setReady(true);
-    });
+    // A keyring that fails to load still shows the key field, so the athlete is never stuck.
+    void client
+      ?.ready()
+      .catch(() => undefined)
+      .then(() => {
+        if (live) setReady(true);
+      });
     return () => {
       live = false;
     };
@@ -85,6 +89,8 @@ export async function saveCoachKey(key: string) {
 export async function removeCoachKey() {
   const client = coachKeyring();
   if (client) await client.clear().catch(() => undefined);
+  // Drop the client too, so a key it still holds in memory can't reach the next athlete.
+  keyring = null;
   if (typeof indexedDB === "undefined") return;
   await new Promise<void>((resolve) => {
     const request = indexedDB.deleteDatabase(KEY_DATABASE);
