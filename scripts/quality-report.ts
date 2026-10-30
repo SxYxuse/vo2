@@ -125,7 +125,8 @@ function main(reportsDir: string) {
     join(reportsDir, "lighthouse/agentic-browsing.json"),
   );
   const jscpd = readJson<{ statistics: { total: { percentage: number; clones: number } } }>(
-    join(reportsDir, "quality/jscpd-report/jscpd-report.json"),
+    // The artifact holds this one file, so upload-artifact drops its folder.
+    join(reportsDir, "quality/jscpd-report.json"),
   );
   const lighthouserc = readJson<{ ci: { assert: { assertions: Record<string, Assertion> } } }>(
     join(root, "lighthouserc.json"),
