@@ -172,16 +172,8 @@ export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
       ) : (
         <Field orientation="horizontal" className="flex-wrap items-center gap-2">
           <code className="bg-muted rounded px-2 py-1 text-sm">{key.masked}</code>
-          <Badge
-            variant={
-              key.state === "set" ? "success" : key.state === "error" ? "destructive" : "outline"
-            }
-          >
-            {key.state === "set"
-              ? "Unlocked"
-              : key.state === "error"
-                ? "Could not unlock"
-                : "Locked until first use"}
+          <Badge variant={key.state === "set" ? "success" : "outline"}>
+            {key.state === "set" ? "Unlocked" : "Locked until first use"}
           </Badge>
           <div className="ms-auto flex gap-2">
             <Button
