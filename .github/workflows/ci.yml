@@ -30,8 +30,6 @@ jobs:
           node-version: "22"
           cache: true
 
-      - name: Generated route tree is up to date
-        run: vp run generate-routes && git diff --exit-code -- src/routeTree.gen.ts
       - run: vp check
       # Knip loads drizzle.config.ts, which validates the environment like db:check does.
       - run: vp run knip
@@ -44,6 +42,10 @@ jobs:
           STRAVA_MOCK: "1"
       - run: vp test run
       - run: vp build
+      # Start's Vite plugin writes the route tree; the tsr CLI is not supported for Start
+      # (TanStack/router#8437), so the build is the check.
+      - name: Committed route tree matches the build
+        run: git diff --exit-code -- src/routeTree.gen.ts
 
       - name: Upload reports for the quality comment
         if: always()

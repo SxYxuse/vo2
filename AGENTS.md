@@ -42,7 +42,7 @@ The most common defect is a change that works on the path you tested and is miss
 
 Regenerate these, rather than editing them by hand:
 
-- `src/routeTree.gen.ts`: `vp run generate-routes`.
+- `src/routeTree.gen.ts`: written by `vp dev` and `vp build`; commit what they write. CI fails when it differs from the build's.
 - `src/integrations/strava/strava.types.ts`: `vp run generate:strava-sdk` from `openapi.json`.
 
 ## Verifying
