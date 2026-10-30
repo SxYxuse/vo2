@@ -1,6 +1,7 @@
 import { differenceInYears, isValid } from "date-fns";
 import { z } from "zod";
 
+import { coachModelsSchema, DEFAULT_COACH_MODELS } from "./coach-models.ts";
 import {
   DEFAULT_SPORT_GROUP_SHARES,
   isOtherSportType,
@@ -75,6 +76,8 @@ const athleteSettingsSchema = z.object({
   calendarPeriod: calendarPeriodSchema.default("month"),
   /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
   topEffortsSince: z.iso.datetime().nullable().default(null),
+  /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */
+  coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
 });
 
 export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
@@ -168,6 +171,7 @@ export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
   calendarPeriod: "month",
   topEffortsSince: null,
+  coachModels: DEFAULT_COACH_MODELS,
 };
 
 export function formatSportType(sportType: string) {

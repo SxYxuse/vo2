@@ -18,6 +18,14 @@ export const replanWeek = createServerFn({ method: "POST" }).handler(
   },
 );
 
+/** Reads notes still waiting; the athlete's key comes in the request headers. */
+export const readCoachNotes = createServerFn({ method: "POST" }).handler(
+  async (): Promise<WeekCoachState> => {
+    const { readCoachNotesImpl } = await import("./week-coach.server.ts");
+    return readCoachNotesImpl();
+  },
+);
+
 export const addCoachNote = createServerFn({ method: "POST" })
   .validator(coachNoteInputSchema)
   .handler(async ({ data }): Promise<WeekCoachState> => {

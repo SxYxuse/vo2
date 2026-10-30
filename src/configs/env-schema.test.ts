@@ -20,7 +20,6 @@ describe("parseEnv", () => {
     expect(env.APP_ENV).toBe("development");
     expect(env.STRAVA_MOCK).toBe(false);
     expect(env.STRAVA_BASE_URL).toBe("https://www.strava.com");
-    expect(env.OPENROUTER_API_KEY).toBeUndefined();
     expect(env.LOKI_HOST).toBeUndefined();
   });
 

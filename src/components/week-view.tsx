@@ -25,7 +25,14 @@ import { weekCoachQueryOptions } from "@/lib/queries.ts";
 import { LIGHTER_HINT, PHASES } from "@/services/season-phase.ts";
 import { daysBetween, formatDaysLeft, seasonEvents, eventTitle } from "@/services/season.types.ts";
 import { formatHours, keySessionName, type TrainingPlan } from "@/services/training-plan.types.ts";
-import { addCoachNote, removeCoachNote, replanWeek } from "@/services/week-coach.ts";
+import {
+  addCoachNote,
+  readCoachNotes,
+  removeCoachNote,
+  replanWeek,
+} from "@/services/week-coach.ts";
+import { coachErrorMessage } from "@/lib/coach-errors.ts";
+import { useCoachAvailable } from "@/components/coach-key.tsx";
 import {
   CONSTRAINT_KINDS,
   constraintsOn,
@@ -645,6 +652,7 @@ function DaySheetBody({
   const [minutes, setMinutes] = useState<number>(45);
   const [text, setText] = useState("");
   const editable = day.date >= data.today;
+  const coachReady = useCoachAvailable();
   const settle = (state: WeekCoachState) =>
     queryClient.setQueryData(weekCoachQueryOptions.queryKey, state);
   const add = useMutation({
@@ -666,12 +674,14 @@ function DaySheetBody({
     mutationFn: (id: string) => removeCoachNote({ data: { id } }),
     onSuccess: settle,
   });
+  const read = useMutation({ mutationFn: () => readCoachNotes(), onSuccess: settle });
+  const notesError = read.error ?? (coach.notesError ? new Error(coach.notesError) : null);
   const notes = coach.notes.filter((note) => note.date === day.date);
   const limits = constraintsOn(
     notes.flatMap((note) => note.constraints),
     day.date,
   );
-  const canSend = online && (kind != null || (coach.aiAvailable && text.trim().length > 0));
+  const canSend = online && (kind != null || (coachReady.available && text.trim().length > 0));
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -766,11 +776,11 @@ function DaySheetBody({
             <Textarea
               aria-label="Note for your coach"
               placeholder={
-                coach.aiAvailable
+                !coachReady.needsKey
                   ? "Storm all afternoon, I'll have 40 min on the trainer…"
-                  : "Free text needs the AI coach; the quick choices above work now."
+                  : "Your own words need your OpenRouter key (Settings → Coach). The quick choices above work now."
               }
-              disabled={!coach.aiAvailable}
+              disabled={!coachReady.available}
               maxLength={500}
               value={text}
               onChange={(event) => setText(event.target.value)}
@@ -793,8 +803,19 @@ function DaySheetBody({
                   Offline: the week shown is the last one saved.
                 </span>
               ) : null}
+              {coachReady.needsKey ? (
+                <Link
+                  to="/settings/$section"
+                  params={{ section: "coach" }}
+                  className="text-xs underline"
+                >
+                  Add your OpenRouter key
+                </Link>
+              ) : null}
               {add.error ? (
-                <span className="text-destructive text-xs">Could not re-plan. Try again.</span>
+                <span className="text-destructive text-xs">
+                  Could not re-plan. {coachErrorMessage(add.error)}
+                </span>
               ) : null}
             </div>
           </form>
@@ -807,8 +828,24 @@ function DaySheetBody({
                 <span className="min-w-0 flex-1 text-sm">
                   {note.text}
                   {!note.parsed ? (
-                    <span className="text-muted-foreground mt-1 block text-xs">
-                      Waiting for the coach to read it.
+                    <span className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
+                      Not read yet: the plan ignores it until the coach reads it.
+                      {coachReady.available ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-10 sm:min-h-7"
+                          disabled={read.isPending || !online}
+                          onClick={() => read.mutate()}
+                        >
+                          {read.isPending ? <Spinner data-icon="inline-start" /> : null}
+                          Retry
+                        </Button>
+                      ) : null}
+                      {notesError ? (
+                        <span className="text-destructive">{coachErrorMessage(notesError)}</span>
+                      ) : null}
                     </span>
                   ) : null}
                 </span>

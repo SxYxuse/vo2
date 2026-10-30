@@ -8,6 +8,7 @@ import {
   type AthleteSettings,
   type ProfileSettings,
 } from "./athlete-settings.types.ts";
+import { COACH_FEATURES, COACH_MODELS, type CoachModels } from "./coach-models.ts";
 import {
   heartRateSettingsSchema,
   type HeartRateEstimates,
@@ -62,4 +63,16 @@ export const saveProfile = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<void> => {
     const { saveProfileImpl } = await import("./athlete-settings.server.ts");
     await saveProfileImpl(data);
+  });
+
+const coachModelSaveSchema = z.object({
+  feature: z.enum(COACH_FEATURES.map((feature) => feature.id)),
+  model: z.enum(COACH_MODELS.map((model) => model.id)),
+});
+
+export const saveCoachModel = createServerFn({ method: "POST" })
+  .validator(coachModelSaveSchema)
+  .handler(async ({ data }): Promise<CoachModels> => {
+    const { saveCoachModelImpl } = await import("./athlete-settings.server.ts");
+    return saveCoachModelImpl(data.feature, data.model);
   });

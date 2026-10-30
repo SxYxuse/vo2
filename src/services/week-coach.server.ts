@@ -1,16 +1,14 @@
 import { createHash } from "node:crypto";
 
 import { chat } from "@tanstack/ai";
-import { createOpenRouterText } from "@tanstack/ai-openrouter";
+import { scrubSecrets } from "@tanstack/ai/byok";
 import { and, eq } from "drizzle-orm";
 
-import { env } from "@/configs/env.ts";
 import { db } from "@/db/index.ts";
 import { weekCoach } from "@/db/schema.ts";
-import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getRequiredSession } from "@/lib/session.server.ts";
-import { ANALYSIS_MODEL } from "./activity-analysis.server.ts";
+import { coachModelFor, type CoachModel } from "./coach-model.server.ts";
 import { planGoalsFrom } from "./plan-builder.types.ts";
 import { adoptedNote, planImpact, type PlanImpact } from "./plan-impact.ts";
 import { PHASES } from "./season-phase.ts";
@@ -42,14 +40,15 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 
 type Planned = WeekTargetData & { plan: TrainingPlan };
 
-/** The coach model, or null without an API key: quick choices still plan the week. */
-function adapter() {
-  const apiKey = env.OPENROUTER_API_KEY;
-  if (!apiKey) return null;
-  return createOpenRouterText(ANALYSIS_MODEL, apiKey, {
-    httpReferer: env.BETTER_AUTH_URL,
-    appTitle: APP_NAME,
-  });
+/** The mock coach reads a note without changing the week, so the flow runs with no key. */
+const MOCK_READING: CoachReading = {
+  constraints: [],
+  note: "This is the mock coach: no model key is set, so your note was read without changing the week.",
+};
+
+/** Only adding or retrying a note reads it, so opening the week never spends the athlete's credit. */
+async function notesModel(userId: string) {
+  return coachModelFor(userId, "notes");
 }
 
 /**
@@ -158,42 +157,54 @@ function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], plan
   };
 }
 
-async function askCoach(prompt: unknown): Promise<CoachReading | null> {
-  const model = adapter();
-  if (!model) return null;
+/** The coach's reading, or why there is none, said so the athlete can act on it. */
+async function askCoach(coach: CoachModel, prompt: unknown): Promise<CoachReading | string> {
+  if (coach.kind === "missing") return "Missing openrouter API key";
+  if (coach.kind === "mock") return MOCK_READING;
   try {
     return (await chat({
-      adapter: model,
+      adapter: coach.adapter,
+      // Each reading stands alone: no conversation carries over between notes.
+      threadId: crypto.randomUUID(),
       systemPrompts: [SYSTEM_PROMPT],
       messages: [{ role: "user", content: JSON.stringify(prompt) }],
       outputSchema: coachReadingSchema,
     })) as CoachReading;
   } catch (error) {
-    logger.warn("week_coach.failed", { error: String(error) });
-    return null;
+    // The athlete's key must never reach a log or the screen, even inside a provider's error.
+    const message = scrubSecrets(error instanceof Error ? error.message : String(error), [
+      coach.key,
+    ]);
+    logger.warn("week_coach.failed", { model: coach.model, error: message });
+    return message;
   }
 }
 
 /**
- * Plans the days after today with the algorithm. Free-text notes still waiting are read by the
- * model first, into the same constraints quick choices give; its note goes on the week.
+ * Plans the days after today with the algorithm. With a model, free-text notes still waiting are
+ * read first, into the same constraints quick choices give; its note goes on the week. Without
+ * one they wait, and the plan ignores them until they are read.
  */
-async function makePlan(data: Planned, notes: CoachNote[], previous: WeekPlan | null) {
+async function makePlan(
+  data: Planned,
+  notes: CoachNote[],
+  previous: WeekPlan | null,
+  coach: CoachModel | null,
+) {
   const summary = summarizeWeek(data);
   const constraintsOf = (list: CoachNote[]) => list.flatMap((note) => note.constraints);
   const draft = planWeek({ data, summary, constraints: constraintsOf(notes), previous });
-  if (!notes.some((note) => !note.parsed)) {
-    return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
-  }
-  const reading = await askCoach(promptFor(data, summary, notes, draft));
-  if (!reading) return { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  const unchanged = { plan: { ...draft, note: previous?.note ?? null }, notes, summary };
+  if (!coach || !notes.some((note) => !note.parsed)) return { ...unchanged, error: null };
+  const reading = await askCoach(coach, promptFor(data, summary, notes, draft));
+  if (typeof reading === "string") return { ...unchanged, error: reading };
   const updated = withParsedConstraints(
     notes,
     acceptConstraints(reading.constraints, weekDates(data.weekStart)),
   );
   const plan = planWeek({ data, summary, constraints: constraintsOf(updated), previous });
   logger.info("week_coach.planned", { constraints: constraintsOf(updated).length });
-  return { plan: { ...plan, note: reading.note }, notes: updated, summary };
+  return { plan: { ...plan, note: reading.note }, notes: updated, summary, error: null };
 }
 
 async function plannedWeek() {
@@ -231,9 +242,9 @@ function emptyState(weekStart: string): WeekCoachState {
     notes: [],
     plan: null,
     stale: false,
-    aiAvailable: adapter() != null,
     seasonChange: null,
     needsReview: false,
+    notesError: null,
   };
 }
 
@@ -257,14 +268,17 @@ export async function loadWeekCoachImpl(): Promise<WeekCoachState> {
     notes: row.notes,
     plan,
     stale: row.plan == null || row.inputKey !== inputKeyOf(data, summary, row.notes, row.plan),
-    aiAvailable: adapter() != null,
     seasonChange: await seasonChangeFor(session.user.id, data),
     needsReview: data.plan.goals == null,
+    notesError: null,
   };
 }
 
-/** Plans the rest of the week again when its inputs changed; otherwise returns what is stored. */
-export async function replanWeekImpl(): Promise<WeekCoachState> {
+/**
+ * Plans the rest of the week again when its inputs changed; otherwise returns what is stored.
+ * Given the notes model, it also reads notes still waiting, even when nothing else changed.
+ */
+async function replanWeekWith(coach: CoachModel | null): Promise<WeekCoachState> {
   const data = await plannedWeek();
   if (!data) return emptyState("");
   const session = await getRequiredSession();
@@ -275,17 +289,29 @@ export async function replanWeekImpl(): Promise<WeekCoachState> {
   const base = {
     weekStart: data.weekStart,
     stale: false,
-    aiAvailable: adapter() != null,
     seasonChange,
     needsReview: data.plan.goals == null,
+    notesError: null,
   };
-  if (row.plan && row.inputKey === inputKeyOf(data, summary, row.notes, row.plan)) {
+  const unread = coach != null && row.notes.some((note) => !note.parsed);
+  if (!unread && row.plan && row.inputKey === inputKeyOf(data, summary, row.notes, row.plan)) {
     return { ...base, notes: row.notes, plan: row.plan };
   }
-  const made = await makePlan(data, row.notes, row.plan);
+  const made = await makePlan(data, row.notes, row.plan, coach);
   const inputKey = inputKeyOf(data, made.summary, made.notes, made.plan);
   await saveRow(userId, data.weekStart, { notes: made.notes, plan: made.plan, inputKey });
-  return { ...base, notes: made.notes, plan: made.plan };
+  return { ...base, notes: made.notes, plan: made.plan, notesError: made.error };
+}
+
+/** Never calls the model, so a page load or sync never spends the athlete's credit (ADR 0036). */
+export async function replanWeekImpl(): Promise<WeekCoachState> {
+  return replanWeekWith(null);
+}
+
+/** Reads the notes still waiting with the athlete's key: the Retry on a note not read yet. */
+export async function readCoachNotesImpl(): Promise<WeekCoachState> {
+  const session = await getRequiredSession();
+  return replanWeekWith(await notesModel(session.user.id));
 }
 
 export async function addCoachNoteImpl(input: CoachNoteInput): Promise<WeekCoachState> {
@@ -296,7 +322,7 @@ export async function addCoachNoteImpl(input: CoachNoteInput): Promise<WeekCoach
   const notes = [...row.notes, noteFrom(input, crypto.randomUUID())];
   await saveRow(session.user.id, data.weekStart, { ...row, notes });
   logger.info("week_coach.note_added", { kind: input.kind, text: input.text.length > 0 });
-  return replanWeekImpl();
+  return replanWeekWith(input.text ? await notesModel(session.user.id) : null);
 }
 
 export async function removeCoachNoteImpl(id: string): Promise<WeekCoachState> {

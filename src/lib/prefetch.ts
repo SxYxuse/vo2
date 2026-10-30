@@ -5,7 +5,7 @@ import type { RegisteredRouter } from "@tanstack/react-router";
 import {
   activityAnalysisQueryOptions,
   activityDetailQueryOptions,
-  analysisStatusQueryOptions,
+  coachStatusQueryOptions,
   settingsSnapshotQueryOptions,
 } from "./queries.ts";
 
@@ -31,7 +31,7 @@ export function warmApp(router: RegisteredRouter, queryClient: QueryClient) {
   }
   void router.preloadRoute({ to: "/settings/$section", params: { section: "profile" } });
   void queryClient.query(settingsSnapshotQueryOptions).catch(noop);
-  void queryClient.query(analysisStatusQueryOptions).catch(noop);
+  void queryClient.query(coachStatusQueryOptions).catch(noop);
 }
 
 export function prefetchActivityDetail(queryClient: QueryClient, id: string) {

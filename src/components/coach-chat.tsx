@@ -27,9 +27,11 @@ import {
 import { CoachComposer, type MentionableActivity } from "@/components/coach-composer.tsx";
 import { CoachMarkdown, type ActivityLookup } from "@/components/coach-markdown.tsx";
 import { CoachVisual } from "@/components/coach-visual.tsx";
+import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
 import { homeQueryOptions } from "@/lib/queries.ts";
 import { isSportTypeShown, sportTypeColor } from "@/services/athlete-settings.types.ts";
+import { coachErrorMessage } from "@/lib/coach-errors.ts";
 import { COACH_DATABASE } from "@/lib/coach-storage.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -367,6 +369,7 @@ export function CoachChat({
   const online = useOnline();
   const { shown, byId } = useMentionableActivities();
   const [persistence] = useState(() => indexedDBPersistence({ databaseName: COACH_DATABASE }));
+  const coach = useCoachAvailable();
   const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
   const { messages, sendMessage, isLoading, error, stop, reload, clear, isHydrating } = useChat({
     connection,
@@ -389,6 +392,9 @@ export function CoachChat({
     if (initialActivityId) onInitialActivitySent();
   };
   const empty = !messages.length && !isHydrating;
+  // The chat stays readable without a key; only asking needs one (ADR 0036).
+  const { needsKey } = coach;
+  const canAsk = online && !needsKey;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -401,7 +407,11 @@ export function CoachChat({
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {empty ? (
+        {empty && needsKey ? (
+          <CoachKeyPrompt>
+            The coach answers on your own OpenRouter key. Add it once to ask about your training.
+          </CoachKeyPrompt>
+        ) : empty ? (
           <Empty className="flex-1">
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -420,7 +430,7 @@ export function CoachChat({
                     key={starter}
                     variant="outline"
                     className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
-                    disabled={!online}
+                    disabled={!canAsk}
                     onClick={() => send(starter)}
                   >
                     {starter}
@@ -456,12 +466,12 @@ export function CoachChat({
                     <MessageScrollerItem>
                       <Alert variant="destructive">
                         <AlertTitle>The coach could not answer</AlertTitle>
-                        <AlertDescription>{error.message}</AlertDescription>
+                        <AlertDescription>{coachErrorMessage(error)}</AlertDescription>
                         <AlertAction>
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={!online}
+                            disabled={!canAsk}
                             onClick={() => void reload()}
                           >
                             <RefreshCwIcon />
@@ -485,11 +495,13 @@ export function CoachChat({
           key={`${initialActivityId}-${initialMentions.length}`}
           activities={shown}
           initialMentions={initialMentions}
-          disabled={!online}
+          disabled={!canAsk}
           placeholder={
-            online
-              ? "Ask the coach… (@ to mention an activity)"
-              : "You're offline. You can read this chat; the coach answers once you're back online."
+            !online
+              ? "You're offline. You can read this chat; the coach answers once you're back online."
+              : needsKey
+                ? "Add your OpenRouter key in Settings → Coach to ask the coach."
+                : "Ask the coach… (@ to mention an activity)"
           }
           busy={isLoading}
           onSend={send}

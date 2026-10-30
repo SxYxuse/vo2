@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { coachErrorMessage } from "@/lib/coach-errors.ts";
 import { activityAnalysisQueryOptions } from "@/lib/queries.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -192,7 +193,7 @@ export function ActivityAnalysisLive({
       {error ? (
         <Alert variant="destructive">
           <AlertTitle>Analysis failed</AlertTitle>
-          <AlertDescription>{error.message}</AlertDescription>
+          <AlertDescription>{coachErrorMessage(error)}</AlertDescription>
         </Alert>
       ) : null}
     </div>

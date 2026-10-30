@@ -37,6 +37,7 @@ export const SETUP_STEP_TITLES = [
   "About you",
   "Your sports",
   "Your plan",
+  "Your coach",
   "You're set",
 ] as const;
 

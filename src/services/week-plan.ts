@@ -846,12 +846,12 @@ export type WeekCoachState = {
   plan: WeekPlan | null;
   /** The plan predates a sync, a note, or a settings change; planning again brings it up to date. */
   stale: boolean;
-  /** False without a model: quick choices still work, free text waits. */
-  aiAvailable: boolean;
   /** Goals on Season that would reshape weeks of the current block, until the plan adapts. */
   seasonChange: PlanImpact | null;
   /** A plan saved before the plan builder: it follows Season and asks to be reviewed. */
   needsReview: boolean;
+  /** Why the coach could not read the notes still waiting, from the request that tried. */
+  notesError: string | null;
 };
 
 export const coachNoteInputSchema = z

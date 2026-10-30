@@ -5,15 +5,12 @@ import {
   maxIterations,
   toServerSentEventsResponse,
 } from "@tanstack/ai";
-import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
-import { env } from "@/configs/env.ts";
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
-import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { ANALYSIS_MODEL, loadActivityAnalysisSnapshot } from "./activity-analysis.server.ts";
+import { loadActivityAnalysisSnapshot } from "./activity-analysis.server.ts";
 import {
   correlateStreams,
   detectElevationSegments,
@@ -26,6 +23,7 @@ import {
 import { isBestEfforts } from "./best-efforts.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { mockCoachText } from "./coach-mock.ts";
+import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
 import { COACH_SYSTEM_PROMPT } from "./coach-prompt.ts";
 import {
   correlateStreamsDef,
@@ -311,20 +309,13 @@ export async function handleCoachChat(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const coach = await coachModelFor(session.user.id, "chat");
+  if (coach.kind === "missing") return coachKeyMissing();
   const params = await chatParamsFromRequest(request);
   const timeZone = validTimeZone(params.forwardedProps.timeZone);
-  const apiKey = env.OPENROUTER_API_KEY;
-  const adapter = apiKey
-    ? createOpenRouterText(ANALYSIS_MODEL, apiKey, {
-        httpReferer: env.BETTER_AUTH_URL,
-        appTitle: APP_NAME,
-      })
-    : mockCoachText();
+  const adapter = coach.kind === "mock" ? mockCoachText() : coach.adapter;
 
-  logger.info("coach.start", {
-    model: apiKey ? ANALYSIS_MODEL : "mock",
-    messages: params.messages.length,
-  });
+  logger.info("coach.start", { model: coach.model, messages: params.messages.length });
 
   const stream = chat({
     adapter,

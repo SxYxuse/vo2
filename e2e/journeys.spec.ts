@@ -24,3 +24,66 @@ for (const [way, goBack] of Object.entries(WAYS_BACK)) {
     await expect(range).toHaveText(shown);
   });
 }
+
+test("a model picked for a coach feature stays picked on every visit", async ({ page }) => {
+  await page.goto("/settings/coach");
+  await settle(page);
+  const chat = page.getByRole("combobox", { name: "Coach chat" });
+  await expect(chat).toHaveValue("openai/gpt-6-luna");
+
+  await chat.selectOption("anthropic/claude-sonnet-5.5");
+  await settle(page);
+  await page.reload();
+  await settle(page);
+
+  await expect(page.getByRole("combobox", { name: "Coach chat" })).toHaveValue(
+    "anthropic/claude-sonnet-5.5",
+  );
+  await expect(page.getByRole("combobox", { name: "Activity analysis" })).toHaveValue(
+    "openai/gpt-6-luna",
+  );
+  // Back to the default, so the other specs see the athlete as the setup left them.
+  await page.getByRole("combobox", { name: "Coach chat" }).selectOption("openai/gpt-6-luna");
+  await settle(page);
+});
+
+// The mock coach answers without a key, so these prove the client and server still speak the
+// same stream after a TanStack AI upgrade. "Long run" keeps the screenshot activity unanalyzed.
+test("an athlete analyzes an activity and the analysis stays with it", async ({ page }) => {
+  await page.goto("/");
+  await settle(page);
+  // One week on a phone, a month on desktop: the last long run is in the one before either way.
+  await page.getByRole("button", { name: /^Previous / }).click();
+  await page.locator("[data-event-id]").filter({ hasText: "Long run" }).first().click();
+  await expect(page.getByRole("heading", { name: "Long run", level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: /^Analyze/ }).click();
+  await expect(page.getByText(/^By Mock coach, saved/)).toBeVisible({ timeout: 30_000 });
+
+  await page.reload();
+  await expect(page.getByText(/^By Mock coach, saved/)).toBeVisible();
+});
+
+test("an athlete asks the coach a question and gets an answer", async ({ page }) => {
+  await page.goto("/coach");
+  await page.getByRole("button", { name: "How did my last run go?" }).click();
+  await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
+});
+
+// Last: with a key saved, the coach would call OpenRouter instead of the mock coach.
+test("an athlete saves an OpenRouter key, sees it kept, and removes it", async ({ page }) => {
+  await page.goto("/settings/coach");
+  await settle(page);
+  const key = page.getByRole("textbox", { name: "Key" });
+  await key.fill("sk-or-e2e-not-a-real-key");
+  await page.getByRole("button", { name: "Save key" }).click();
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+
+  // Saved with the account, never shown back.
+  await page.reload();
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+  await expect(page.getByText("sk-or-e2e-not-a-real-key")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("textbox", { name: "Key" })).toBeVisible();
+});

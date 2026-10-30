@@ -46,6 +46,7 @@ import {
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
+import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
 
 const STEPS = [
   {
@@ -69,6 +70,12 @@ const STEPS = [
     id: "plan",
     title: "Your plan",
     description: "Built from your season and your last 12 weeks.",
+  },
+  {
+    id: "coach",
+    title: "Add your OpenRouter key",
+    description:
+      "The coach analyzes activities, reads your notes on the week, and answers questions, on your own OpenRouter key. Skip it to train without the coach and add it later in Settings.",
   },
   {
     id: "ready",
@@ -141,7 +148,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
       // profile prompt.
       void afterSettingsSaved(queryClient, saved, { profileDone: true });
       setSaveError(null);
-      setStepIndex(STEPS.length - 1);
+      setStepIndex(STEPS.findIndex((item) => item.id === "coach"));
     },
     onError: (caught) => {
       setSaveError(caught instanceof Error ? caught.message : "Could not save your setup");
@@ -171,7 +178,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
       const ok = await form.trigger([...SPORTS_FIELDS]);
       if (!ok) return;
       setStepIndex((current) => current + 1);
+      return;
     }
+    if (step.id === "coach") setStepIndex((current) => current + 1);
   }
 
   async function startWith(draft: PlanDraft) {
@@ -185,6 +194,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const isReady = step.id === "ready";
+  // The plan is saved by now, so the steps before it stay closed.
+  const planSaved = step.id === "coach" || isReady;
+  const coachKey = useCoachAvailable();
   const copyUnfinished = syncStatus?.status !== "complete";
 
   if (step.id === "plan") {
@@ -214,7 +226,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     >
       <Card className={SETUP_CARD}>
         <CardHeader className="gap-2 border-b">
-          <SetupProgress step={stepIndex} onSelect={goToStep} locked={isReady} />
+          <SetupProgress step={stepIndex} onSelect={goToStep} locked={planSaved} />
           <h1 className="text-xl font-semibold tracking-tight">
             {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
           </h1>
@@ -259,6 +271,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   </FieldDescription>
                 ) : null}
               </>
+            ) : step.id === "coach" ? (
+              <CoachKeyField idPrefix="onboard" />
             ) : (
               <Empty className="min-h-48 border-0">
                 <EmptyHeader>
@@ -298,7 +312,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
             </Button>
           ) : (
             <>
-              {stepIndex > 0 ? (
+              {stepIndex > 0 && !planSaved ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -319,7 +333,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 }
               >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-                Continue
+                {step.id === "coach" && !coachKey.hasKey ? "Skip for now" : "Continue"}
               </Button>
             </>
           )}

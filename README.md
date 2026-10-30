@@ -9,7 +9,7 @@ Sign in with Strava, import every activity and its streams into Postgres, then:
 - plot GPS tracks on a map
 - chart fitness, fatigue, and form
 - inspect sport-specific heart-rate zones
-- optionally analyze an activity via OpenRouter (`OPENROUTER_API_KEY` in `.env.example`; mocked until set)
+- analyze activities and talk to the coach on the athlete's own OpenRouter key, added in the app (a mock coach answers under mock Strava)
 
 Stack: **TanStack Start**, **Vite+**, **Bun**, **Better Auth**, **Drizzle**, **Docker Postgres**, **shadcn/ui**, **ReUI Event Calendar**.
 

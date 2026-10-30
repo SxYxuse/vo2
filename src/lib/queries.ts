@@ -1,9 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
 
-import { getActivityAnalysis, getAnalysisStatus } from "@/services/activity-analysis.ts";
+import { getActivityAnalysis } from "@/services/activity-analysis.ts";
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
+import { getCoachStatus } from "@/services/coach-key.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData } from "@/services/home-data.ts";
 import { loadBests } from "@/services/personal-bests.ts";
@@ -108,9 +109,9 @@ export const heartRateQueryOptions = queryOptions({
   staleTime: 5 * 60_000,
 });
 
-export const analysisStatusQueryOptions = queryOptions({
-  queryKey: ["analysis-status"],
-  queryFn: () => getAnalysisStatus(),
+export const coachStatusQueryOptions = queryOptions({
+  queryKey: ["coach-status"],
+  queryFn: () => getCoachStatus(),
   staleTime: 60_000,
 });
 

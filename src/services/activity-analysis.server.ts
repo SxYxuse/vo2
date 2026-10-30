@@ -5,15 +5,13 @@ import {
   maxIterations,
   toServerSentEventsResponse,
 } from "@tanstack/ai";
-import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
-import { env } from "@/configs/env.ts";
 import { db } from "@/db/index.ts";
 import { activities, activityAnalyses, activityStreams, athleteMetrics } from "@/db/schema.ts";
-import { APP_NAME } from "@/lib/brand.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { mockActivityAnalysisText } from "./activity-analysis-mock.ts";
+import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
 import { analysisMessages, persistAnalysisOnce } from "./activity-analysis-run.ts";
@@ -38,8 +36,6 @@ import {
   type AnalysisStreamKey,
   type StoredActivityAnalysis,
 } from "./activity-analysis.types.ts";
-
-export const ANALYSIS_MODEL = "openai/gpt-6-luna";
 
 export type AnalysisRuntime = {
   activityId: string;
@@ -143,10 +139,6 @@ export function createActivityAnalysisTools() {
   ];
 }
 
-export function isAnalysisMocked() {
-  return !env.OPENROUTER_API_KEY;
-}
-
 export async function getActivityAnalysisImpl(
   activityId: string,
 ): Promise<StoredActivityAnalysis | null> {
@@ -233,18 +225,14 @@ export async function handleActivityAnalysis(request: Request) {
     return new Response("Activity not found", { status: 404 });
   }
 
+  const coach = await coachModelFor(session.user.id, "analysis");
+  if (coach.kind === "missing") return coachKeyMissing();
   // Only the run ids come from the request; the messages are built here.
   const params = await chatParamsFromRequest(request);
-  const apiKey = env.OPENROUTER_API_KEY;
-  const mocked = !apiKey;
-  const adapter = apiKey
-    ? createOpenRouterText(ANALYSIS_MODEL, apiKey, {
-        httpReferer: env.BETTER_AUTH_URL,
-        appTitle: APP_NAME,
-      })
-    : mockActivityAnalysisText();
+  const mocked = coach.kind === "mock";
+  const adapter = coach.kind === "mock" ? mockActivityAnalysisText() : coach.adapter;
 
-  logger.info("analysis.start", { activityId, mocked, model: mocked ? "mock" : ANALYSIS_MODEL });
+  logger.info("analysis.start", { activityId, model: coach.model });
 
   const stream = chat({
     adapter,
@@ -267,7 +255,7 @@ export async function handleActivityAnalysis(request: Request) {
         userId: session.user.id,
         body,
         mocked,
-        model: mocked ? "mock" : ANALYSIS_MODEL,
+        model: coach.model,
       }),
     ),
   );
