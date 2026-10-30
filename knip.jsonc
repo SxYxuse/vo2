@@ -1,7 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
   // TanStack Start loads these by convention; nothing imports them.
-  "entry": ["src/router.tsx", "src/start.ts", "public/sw.js", "scripts/*.ts"],
+  "entry": [
+    "src/router.tsx",
+    "src/start.ts",
+    "public/sw.js",
+    "scripts/*.ts",
+    // Preloaded into the end-to-end web server by e2e/serve.ts.
+    "e2e/fixed-clock.ts",
+  ],
   "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.ts"],
   "ignore": [
     // Vendored component kits: unused components stay available for later screens.
