@@ -42,7 +42,7 @@ jobs:
       - run: vp run db:check
         env:
           STRAVA_MOCK: "1"
-      - run: vp run coverage
+      - run: vp test run
       - run: vp build
 
       - name: Upload reports for the quality comment
@@ -50,9 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quality
-          path: |
-            coverage/coverage-summary.json
-            jscpd-report/jscpd-report.json
+          path: jscpd-report/jscpd-report.json
           if-no-files-found: ignore
 
   lighthouse:
@@ -142,7 +140,7 @@ jobs:
   # One comment per PR, edited on every push, with the numbers behind the checks.
   report:
     if: always() && github.event_name == 'pull_request'
-    needs: [ci, lighthouse]
+    needs: [ci, lighthouse, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -167,6 +165,7 @@ jobs:
           SHA: ${{ github.event.pull_request.head.sha }}
           CI_RESULT: ${{ needs.ci.result }}
           LIGHTHOUSE_RESULT: ${{ needs.lighthouse.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
           LIGHTHOUSE_REPORT_URL: ${{ needs.lighthouse.outputs.report-url }}
 
       - uses: marocchino/sticky-pull-request-comment@v2

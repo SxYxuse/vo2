@@ -26,11 +26,10 @@
     "knip": "knip",
     "jscpd": "jscpd",
     "audit": "bun audit --audit-level=high",
-    "coverage": "vp test run --coverage",
     "lighthouse": "vp dlx @lhci/cli@0.15.1 autorun",
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
-    "gate": "vp check && knip && jscpd && bun audit --audit-level=high && vp test run --coverage"
+    "gate": "vp check && knip && jscpd && bun audit --audit-level=high && vp test run"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -87,7 +86,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "@vitest/coverage-v8": "5.0.5",
     "dotenv": "^18.0.8",
     "jscpd": "^5.4.2",
     "knip": "^6.43.0",

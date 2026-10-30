@@ -16,9 +16,6 @@ todos.json
 .env.*
 !.env.example
 
-# Test coverage reports
-coverage
-
 # Quality reports (CI uploads them for the PR comment)
 .lighthouseci
 lighthouse-report
