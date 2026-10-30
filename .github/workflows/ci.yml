@@ -44,6 +44,10 @@ jobs:
           STRAVA_MOCK: "1"
       - run: vp test run
       - run: vp build
+      # The build regenerates the route tree with Start's plugin; tsr.config.json gives the tsr CLI
+      # the same footer, so `vp dev`, `vp build`, and `vp run generate-routes` all write one file.
+      - name: The build leaves the route tree as generated
+        run: git diff --exit-code -- src/routeTree.gen.ts
 
       - name: Upload reports for the quality comment
         if: always()

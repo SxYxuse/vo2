@@ -42,14 +42,14 @@ The most common defect is a change that works on the path you tested and is miss
 
 Regenerate these, rather than editing them by hand:
 
-- `src/routeTree.gen.ts`: `vp run generate-routes`.
+- `src/routeTree.gen.ts`: `vp run generate-routes`; the gate runs it too. `vp dev` and `vp build` write the same file, because `tsr.config.json` carries the footer Start's plugin adds. Keep the two in step if that footer changes: CI fails otherwise.
 - `src/integrations/strava/strava.types.ts`: `vp run generate:strava-sdk` from `openapi.json`.
 
 ## Verifying
 
 - Prove behavior end to end, not function by function. Vitest keeps only guards: tests that hold a rule over the whole repository (every athlete table cascades on delete, ADR numbers are unique, mock Strava stays off in production), not tests of one function.
 - Open the app in a browser to verify only when the developer asks for it.
-- **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps, plus Lighthouse on the signed-out page and the end-to-end suite.
+- **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate regenerates the route tree, then runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps, plus Lighthouse on the signed-out page and the end-to-end suite.
 - **Before a pull request that changes what the athlete sees or does,** run `vp run e2e` (needs Docker and `vp run db:up`). It drives a production build against mock Strava, at phone and desktop size, and compares a screenshot of every screen.
   - A screenshot diff you did not intend is a bug. For an intended one, run `vp run e2e:update` and commit the new images in `e2e/screenshots/`, so the reviewer sees before and after in the pull request.
   - A new screen gets a line in `e2e/screens.spec.ts`; a new flow, or a way out of one, gets a journey in `e2e/`.

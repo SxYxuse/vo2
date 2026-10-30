@@ -29,7 +29,7 @@
     "lighthouse": "vp dlx @lhci/cli@0.15.1 autorun",
     "e2e": "playwright test",
     "e2e:update": "playwright test --update-snapshots",
-    "gate": "vp check && knip && jscpd && bun audit --audit-level=high && vp test run"
+    "gate": "vp run generate-routes && vp check && knip && jscpd && bun audit --audit-level=high && vp test run"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
