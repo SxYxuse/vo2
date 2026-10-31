@@ -20,6 +20,7 @@ import {
   summarizeEffort,
   type AnalysisStreamKey,
 } from "./activity-analysis.types.ts";
+import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { isBestEfforts } from "./best-efforts.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { mockCoachText } from "./coach-mock.ts";
@@ -248,9 +249,18 @@ function createCoachTools() {
           .filter((board) => board.top.length),
       };
     }),
-    getWeekPlanDef.server<CoachRuntime>(async () => {
+    getWeekPlanDef.server<CoachRuntime>(async (_input, { context }) => {
+      // Without this the empty week would read as a week of rest.
+      if ((await storedPlanningStyle(context.userId)) === "off") {
+        return {
+          planningOff: true,
+          message:
+            "The athlete turned planning off: VO2 plans no week, so there are no planned sessions or rest days. They can pick a planning style in Settings → Training.",
+        };
+      }
       const state = await loadWeekCoachImpl();
       return {
+        planningOff: false,
         weekStart: state.weekStart,
         days: state.plan?.days ?? [],
         note: state.plan?.note ?? null,

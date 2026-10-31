@@ -1,3 +1,4 @@
+import { onboardNewAthlete } from "./onboard.ts";
 import { test, expect, type Page } from "./test.ts";
 
 // The ways out, run once every other spec is done with the athlete.
@@ -30,4 +31,17 @@ test("an athlete who revokes VO2 on Strava is signed out and starts over", async
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
 
   await expectFreshStart(page);
+});
+
+// The athlete starts over above, so one more onboarding needs no second mock athlete.
+test("an athlete who onboards with planning off lands on the calendar with no week", async ({
+  page,
+}) => {
+  await onboardNewAthlete(page, { planningOff: true });
+  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "This week", exact: true })).toHaveCount(0);
+
+  await page.goto("/week");
+  await expect(page.getByText("Planning is off", { exact: true })).toBeVisible();
 });

@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_app/week")({
   component: WeekTargetPage,
 });
 
-function WeekTargetHeading() {
+function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
@@ -45,7 +45,9 @@ function WeekTargetHeading() {
         This week
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        Your week day by day, built from your season, your rest days, and your form.
+        {planned
+          ? "Your week day by day, built from your season, your rest days, and your form."
+          : "No week is planned while planning is off."}
       </p>
     </div>
   );
@@ -61,7 +63,7 @@ function WeekTargetPage() {
 function PlanningOff() {
   return (
     <>
-      <WeekTargetHeading />
+      <WeekTargetHeading planned={false} />
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">

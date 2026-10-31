@@ -47,6 +47,57 @@ test("a model picked for a coach feature stays picked on every visit", async ({ 
   await settle(page);
 });
 
+/**
+ * A reload restores the views saved on the device (offline-copy.ts), written at most once a
+ * second; waits until the saved app shell and settings carry `style`.
+ */
+async function keptOnDevice(page: Page, style: string) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<unknown[]>((resolve) => {
+            const open = indexedDB.open("keyval-store");
+            open.onerror = () => resolve([]);
+            open.onsuccess = () => {
+              const read = open.result
+                .transaction("keyval")
+                .objectStore("keyval")
+                .get("vo2-offline-copy");
+              read.onerror = () => resolve([]);
+              read.onsuccess = () => {
+                type Saved = { queryKey: unknown[]; state: { data?: Record<string, unknown> } };
+                const queries: Saved[] = read.result?.clientState?.queries ?? [];
+                const data = (key: string) =>
+                  queries.find((q) => q.queryKey[0] === key)?.state.data;
+                const settings = data("settings-snapshot")?.settings as
+                  | { planningStyle?: string }
+                  | undefined;
+                // Never chosen reads as the week planner for an athlete with a plan.
+                resolve([
+                  data("app-shell")?.planningStyle,
+                  settings && (settings.planningStyle ?? "weekPlanner"),
+                ]);
+              };
+            };
+          }),
+      ),
+    )
+    .toEqual([style, style]);
+}
+
+/** Picks a planning style in Settings → Training and waits until it is saved everywhere. */
+async function choosePlanningStyle(page: Page, label: "Off" | "Week planner", style: string) {
+  if (!page.url().endsWith("/settings/training")) await page.goto("/settings/training");
+  await settle(page);
+  const radio = page.getByRole("radio", { name: new RegExp(`^${label}`) });
+  if (!(await radio.isChecked())) {
+    await radio.click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  }
+  await keptOnDevice(page, style);
+}
+
 test("an athlete turns planning off and back on, and gets their week planner back", async ({
   page,
 }) => {
@@ -58,43 +109,42 @@ test("an athlete turns planning off and back on, and gets their week planner bac
     }
     return page.getByRole("link", { name: "This week", exact: true }).count();
   };
-  // A reload restores the views saved on the device, written at most once a second
-  // (offline-copy.ts); reloading sooner after a save would show the views from before it.
-  const keptOnDevice = () => page.waitForTimeout(1500);
-  await page.goto("/settings/training");
-  await settle(page);
-  await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
+  const planningOff = page.getByText("Planning is off", { exact: true });
+  try {
+    // A retry may start where a failed run left the shared athlete.
+    await choosePlanningStyle(page, "Week planner", "weekPlanner");
+    await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
 
-  await page.getByRole("radio", { name: /^Off/ }).click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Rebuild plan" })).toHaveCount(0);
-  await keptOnDevice();
+    await choosePlanningStyle(page, "Off", "off");
+    await expect(page.getByRole("button", { name: "Rebuild plan" })).toHaveCount(0);
 
-  await page.goto("/week");
-  await expect(page.getByText("Planning is off")).toBeVisible();
-  await settle(page);
-  await expect(page).toHaveScreenshot("week-planning-off.png", {
-    fullPage: true,
-    mask: [syncButton(page)],
-  });
-  expect(await thisWeekLinks()).toBe(0);
-  await page.goto("/plan");
-  await page.waitForURL("/week");
-  await expect(page.getByText("Planning is off")).toBeVisible();
+    await page.goto("/week");
+    await expect(planningOff).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot("week-planning-off.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+    expect(await thisWeekLinks()).toBe(0);
+    await page.goto("/plan");
+    await page.waitForURL("/week");
+    await expect(planningOff).toBeVisible();
 
-  await page.getByRole("button", { name: "Choose a planning style" }).click();
-  await page.waitForURL("/settings/training");
-  await settle(page);
-  await page.getByRole("radio", { name: /^Week planner/ }).click();
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
-  await keptOnDevice();
+    await page.getByRole("button", { name: "Choose a planning style" }).click();
+    await page.waitForURL("/settings/training");
+    await choosePlanningStyle(page, "Week planner", "weekPlanner");
+    await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
 
-  await page.goto("/week");
-  await expect(page.getByRole("button", { name: "Today: open the day" })).toContainText(
-    "Lunch run",
-  );
-  expect(await thisWeekLinks()).toBe(1);
+    await page.goto("/week");
+    await expect(page.getByRole("button", { name: "Today: open the day" })).toContainText(
+      "Lunch run",
+    );
+    expect(await thisWeekLinks()).toBe(1);
+  } finally {
+    // The other specs share this athlete and expect the week planner.
+    await page.goto("/settings/training");
+    await choosePlanningStyle(page, "Week planner", "weekPlanner");
+  }
 });
 
 // The mock coach answers without a key, so these prove the client and server still speak the

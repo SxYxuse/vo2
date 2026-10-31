@@ -49,7 +49,12 @@ import {
 } from "@/components/ui/empty";
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
+import {
+  SETUP_CARD,
+  SETUP_FOOTER,
+  SETUP_PLAN_STEP,
+  SetupProgress,
+} from "@/components/onboarding-shell.tsx";
 import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
 
 const STEPS = [
@@ -243,7 +248,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
     >
       <Card className={SETUP_CARD}>
         <CardHeader className="gap-2 border-b">
-          <SetupProgress step={stepIndex} onSelect={goToStep} locked={planSaved} />
+          <SetupProgress
+            step={stepIndex}
+            onSelect={goToStep}
+            locked={planSaved}
+            skipped={planningStyle === "off" ? SETUP_PLAN_STEP : undefined}
+          />
           <h1 className="text-xl font-semibold tracking-tight">
             {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
           </h1>

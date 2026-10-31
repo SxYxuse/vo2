@@ -1,9 +1,9 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
-import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { appShellQueryOptions, homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -48,6 +48,24 @@ export const Route = createFileRoute("/_app/")({
   component: CalendarPage,
 });
 
+function CalendarHeading() {
+  // The shell is cached by the app layout; the pending state may render before it, so no suspense.
+  const { data: shell } = useQuery(appShellQueryOptions);
+  return (
+    <>
+      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
+        <CalendarDaysIcon aria-hidden className="size-5" />
+        Activity calendar
+      </h1>
+      <p className="text-muted-foreground hidden text-sm sm:block">
+        {shell?.planningStyle === "off"
+          ? "Completed Strava activities."
+          : "Completed Strava activities. Time left lives on the This week page."}
+      </p>
+    </>
+  );
+}
+
 function CalendarPage() {
   const { month, week } = Route.useSearch();
   const { data } = useSuspenseQuery(homeQueryOptions);
@@ -56,13 +74,7 @@ function CalendarPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <CalendarDaysIcon aria-hidden className="size-5" />
-          Activity calendar
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Time left lives on the This week page.
-        </p>
+        <CalendarHeading />
       </div>
       {signedIn && Object.keys(settings.sportTypes).length === 0 ? (
         <Empty className="min-h-64 border">
@@ -92,13 +104,7 @@ function CalendarPending() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <CalendarDaysIcon aria-hidden className="size-5" />
-          Activity calendar
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Completed Strava activities. Time left lives on the This week page.
-        </p>
+        <CalendarHeading />
       </div>
       <ToolbarSkeleton widths={["w-60"]} />
       <ListSkeleton rows={7} className="md:hidden" />
