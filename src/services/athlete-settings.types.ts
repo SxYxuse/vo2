@@ -76,28 +76,21 @@ export const PLANNING_STYLES = [
     id: "weekPlanner",
     label: "Week planner",
     hint: "VO2 sets each week's time per sport and its key sessions, and lays them out on your free days.",
-    available: true,
   },
   {
     id: "coachPlan",
     label: "Coach plan",
-    hint: "The coach writes precise runs for the next four weeks toward your A goal, on your OpenRouter key.",
-    available: false,
+    hint: "The coach writes precise runs for the next four weeks toward your A running goal, on your OpenRouter key.",
   },
   {
     id: "off",
     label: "Off",
     hint: "No plan. Season, the calendar, fitness, and the coach chat stay.",
-    available: true,
   },
 ] as const;
 
 export const planningStyleSchema = z.enum(["off", "weekPlanner", "coachPlan"]);
 export type PlanningStyle = z.infer<typeof planningStyleSchema>;
-
-/** The styles an athlete can pick today; the coach plan opens with #137. */
-export const chosenPlanningStyleSchema = planningStyleSchema.exclude(["coachPlan"]);
-export type ChosenPlanningStyle = z.infer<typeof chosenPlanningStyleSchema>;
 
 /**
  * The athlete's planning style. Athletes who built a plan before the choice existed keep the

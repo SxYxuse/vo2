@@ -55,8 +55,11 @@ export function SetupProgress({
   onSelect,
   locked = false,
   skipped,
+  titles = SETUP_STEP_TITLES,
 }: {
   step: number;
+  /** The segments' names, when a planning style orders them differently. */
+  titles?: readonly string[];
   substep?: { index: number; count: number; title?: string };
   /** Going back to an earlier step; later steps stay closed. */
   onSelect?: (step: number) => void;
@@ -64,8 +67,8 @@ export function SetupProgress({
   /** A step the athlete's choices passed over, such as the plan with planning off. */
   skipped?: number;
 }) {
-  const total = SETUP_STEP_TITLES.length;
-  const title = SETUP_STEP_TITLES[step];
+  const total = titles.length;
+  const title = titles[step];
   return (
     <div className="flex w-full flex-col gap-1.5">
       <p className="text-muted-foreground text-xs">
@@ -73,7 +76,7 @@ export function SetupProgress({
         {substep ? ` · ${substep.title ?? `${substep.index + 1} of ${substep.count}`}` : null}
       </p>
       <ol aria-label="Setup steps" className="flex gap-1">
-        {SETUP_STEP_TITLES.map((item, index) => {
+        {titles.map((item, index) => {
           const isSkipped = index === skipped && index < step;
           const done = index < step && !isSkipped;
           const current = index === step;

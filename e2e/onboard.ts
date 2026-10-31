@@ -1,5 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 
+import { E2E_NOW } from "./env.ts";
+
 /**
  * Connects mock Strava, copies the training, and finishes onboarding, ending on This week, or on
  * the calendar with planning off. Shared by the e2e setup, the teardown, and the signed-in
@@ -10,7 +12,8 @@ export async function onboardNewAthlete(
   {
     onPlanningStyle,
     planningOff = false,
-  }: { onPlanningStyle?: () => Promise<void>; planningOff?: boolean } = {},
+    coachPlan = false,
+  }: { onPlanningStyle?: () => Promise<void>; planningOff?: boolean; coachPlan?: boolean } = {},
 ) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
@@ -37,8 +40,11 @@ export async function onboardNewAthlete(
 
   await expect(page.getByRole("heading", { name: "Planning style" })).toBeVisible();
   await expect(page.getByRole("radio", { name: /Week planner/ })).toBeChecked();
-  await expect(page.getByRole("radio", { name: /Coach plan/ })).toBeDisabled();
   await onPlanningStyle?.();
+  if (coachPlan) {
+    await onboardWithCoachPlan(page);
+    return;
+  }
   if (planningOff) {
     // Off saves the setup at once and skips the plan builder; the key step still follows.
     await page.getByRole("radio", { name: /^Off/ }).click();
@@ -67,4 +73,41 @@ export async function onboardNewAthlete(
 
   await page.waitForURL("/week");
   await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+}
+
+/**
+ * The coach plan's branch: the key (the mock coach stands in for one), an A race added on the
+ * spot, availability, paces, then "Write my plan"; ends on This week with the plan written.
+ */
+async function onboardWithCoachPlan(page: Page) {
+  const next = page.getByRole("button", { name: "Continue" });
+  await page.getByRole("radio", { name: /^Coach plan/ }).click();
+  await next.click();
+  await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
+  await next.click();
+
+  await expect(page.getByRole("heading", { name: "Your A race" })).toBeVisible();
+  await expect(next).toBeDisabled();
+  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
+  await page.getByRole("textbox", { name: "Race name" }).fill("Autumn half");
+  await page.getByLabel("Race date").fill(raceDay);
+  await page.getByRole("button", { name: "Half", exact: true }).click();
+  await page.getByRole("button", { name: "Add A race" }).click();
+  await expect(page.getByText("Autumn half")).toBeVisible();
+  await next.click();
+
+  await expect(page.getByRole("heading", { name: "When can you run?" })).toBeVisible();
+  await page.getByRole("button", { name: "4 runs a week" }).click();
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "Saturday", exact: true }).click();
+  await next.click();
+
+  await expect(page.getByRole("heading", { name: "Your paces" })).toBeVisible();
+  await page.getByRole("button", { name: "Write my plan" }).click();
+  await expect(page.getByText(/^Your coach is writing your next four weeks/)).toBeVisible();
+  await page.getByRole("button", { name: "Open This week" }).click();
+  await page.waitForURL("/week");
+  await expect(page.getByText(/km planned of a \d+ km budget/).first()).toBeVisible({
+    timeout: 30_000,
+  });
 }

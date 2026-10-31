@@ -20,6 +20,7 @@ export const OFFLINE_QUERY_KEYS = [
   "home",
   "week-target",
   "week-coach",
+  "coach-plan",
   "season",
   "fitness",
   "progress",

@@ -2,15 +2,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 
 import { PlanBuilder } from "@/components/plan-builder.tsx";
-import { isPlanningOff } from "@/lib/queries.ts";
+import { planningStyleOf } from "@/lib/queries.ts";
 import { afterPlanChanged } from "@/lib/query-events.ts";
 import { startPlan } from "@/services/plan-builder.ts";
 
 /** Build or rebuild the training plan (ADR 0026). Leaving keeps the plan as it was. */
 export const Route = createFileRoute("/_app/plan")({
   loader: async ({ context }) => {
-    // The plan builder is the week planner's; This week says planning is off and leads back.
-    if (await isPlanningOff(context)) throw redirect({ to: "/week", replace: true });
+    // The plan builder is the week planner's; This week shows the other styles.
+    if ((await planningStyleOf(context)) !== "weekPlanner") {
+      throw redirect({ to: "/week", replace: true });
+    }
   },
   component: PlanPage,
 });

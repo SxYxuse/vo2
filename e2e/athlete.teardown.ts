@@ -45,3 +45,19 @@ test("an athlete who onboards with planning off lands on the calendar with no we
   await page.goto("/week");
   await expect(page.getByText("Planning is off", { exact: true })).toBeVisible();
 });
+
+test("an athlete who onboards with the coach plan sees their four weeks written", async ({
+  page,
+}) => {
+  // This page still holds the session deleted above: sign in again as the athlete just onboarded.
+  await page.goto("/");
+  await page.getByRole("button", { name: "Connect Strava" }).click();
+  await page.waitForURL("/");
+  await page.goto("/settings/profile");
+  await page.getByRole("button", { name: "Delete my VO2 data" }).click();
+  await page.getByRole("button", { name: "Delete everything" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
+
+  await onboardNewAthlete(page, { coachPlan: true });
+  await expect(page.getByText("This week", { exact: true }).last()).toBeVisible();
+});

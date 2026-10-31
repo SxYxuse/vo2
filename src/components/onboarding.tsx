@@ -7,7 +7,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { CalendarDaysIcon, CheckIcon, ChevronLeftIcon } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 
-import { settingsSnapshotQueryOptions, syncStatusQueryOptions } from "@/lib/queries.ts";
+import {
+  coachPlanQueryOptions,
+  settingsSnapshotQueryOptions,
+  syncStatusQueryOptions,
+} from "@/lib/queries.ts";
 import { afterProfileSaved, afterSettingsSaved } from "@/lib/query-events.ts";
 import {
   PROFILE_FIELDS,
@@ -27,8 +31,9 @@ import { saveAthleteSettings, saveProfile } from "@/services/athlete-settings.ts
 import {
   hidesEverySportType,
   SHOW_ONE_SPORT_MESSAGE,
-  type ChosenPlanningStyle,
+  type PlanningStyle,
 } from "@/services/athlete-settings.types.ts";
+import { DEFAULT_AVAILABILITY, type Availability } from "@/services/coach-plan.types.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { startPlan } from "@/services/plan-builder.ts";
 import type { PlanDraft } from "@/services/plan-builder.types.ts";
@@ -56,8 +61,15 @@ import {
   SetupProgress,
 } from "@/components/onboarding-shell.tsx";
 import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
+import {
+  availabilityIssue,
+  AvailabilityFields,
+  CoachPlanGoalField,
+  useSaveAvailability,
+} from "@/components/coach-plan-setup.tsx";
+import { TrainingPacesSection } from "@/components/training-paces.tsx";
 
-const STEPS = [
+const STEP_LIST = [
   {
     id: "sync",
     title: "Copy from Strava",
@@ -92,11 +104,79 @@ const STEPS = [
       "The coach analyzes activities, reads your notes on the week, and answers questions, on your own OpenRouter key. Skip it to train without the coach and add it later in Settings.",
   },
   {
+    id: "coachKey",
+    title: "Add your OpenRouter key",
+    description:
+      "The coach plan is written by the coach on your own OpenRouter key, billed to your OpenRouter account. It also analyzes activities and answers questions.",
+  },
+  {
+    id: "goal",
+    title: "Your A race",
+    description: "The coach plan builds toward one race: an upcoming A goal that is a run.",
+  },
+  {
+    id: "availability",
+    title: "When can you run?",
+    description: "The coach writes your runs on these days, within the time you have.",
+  },
+  {
+    id: "paces",
+    title: "Your paces",
+    description:
+      "Sessions are written at these paces. Set a recent race result if your runs undersell you, or skip it.",
+  },
+  {
     id: "ready",
     title: "You're set",
     description: "Open the calendar to see your week.",
   },
 ] as const;
+
+type StepId = (typeof STEP_LIST)[number]["id"];
+const STEP = Object.fromEntries(STEP_LIST.map((step) => [step.id, step])) as Record<
+  StepId,
+  (typeof STEP_LIST)[number]
+>;
+
+/** The week planner's setup, also taken with planning off (which skips the plan). */
+const WEEK_PLANNER_FLOW: StepId[] = ["sync", "about", "sports", "style", "plan", "coach", "ready"];
+/** The coach plan needs the key first, then its A race, availability, and paces. */
+const COACH_PLAN_FLOW: StepId[] = [
+  "sync",
+  "about",
+  "sports",
+  "style",
+  "coachKey",
+  "goal",
+  "availability",
+  "paces",
+  "ready",
+];
+/** The coach plan's three plan steps share one segment of the progress bar. */
+const COACH_PLAN_STEPS: StepId[] = ["goal", "availability", "paces"];
+const COACH_PLAN_TITLES = [
+  "Copy from Strava",
+  "About you",
+  "Your sports",
+  "Planning style",
+  "Your coach",
+  "Your plan",
+  "You're set",
+];
+
+function progressOf(flow: StepId[], index: number) {
+  if (flow !== COACH_PLAN_FLOW) return { step: index };
+  const id = flow[index]!;
+  const sub = COACH_PLAN_STEPS.indexOf(id);
+  if (sub >= 0) return { step: 5, substep: { index: sub, count: COACH_PLAN_STEPS.length } };
+  return { step: id === "ready" ? 6 : index };
+}
+
+/** The step a progress segment opens: the first step it covers. */
+function stepOfSegment(flow: StepId[], segment: number) {
+  if (flow !== COACH_PLAN_FLOW || segment < 5) return segment;
+  return segment === 5 ? flow.indexOf("goal") : flow.indexOf("ready");
+}
 
 export function OnboardingForm({ userName }: { userName: string }) {
   const queryClient = useQueryClient();
@@ -104,7 +184,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const { data } = useSuspenseQuery(settingsSnapshotQueryOptions);
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [planningStyle, setPlanningStyle] = useState<ChosenPlanningStyle>("weekPlanner");
+  const [planningStyle, setPlanningStyle] = useState<PlanningStyle>("weekPlanner");
+  const [availability, setAvailability] = useState<Availability>(DEFAULT_AVAILABILITY);
+  const flow = planningStyle === "coachPlan" ? COACH_PLAN_FLOW : WEEK_PLANNER_FLOW;
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
@@ -121,7 +203,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
     reValidateMode: "onChange",
   });
 
-  const step = STEPS[stepIndex];
+  const step = STEP[flow[stepIndex]!];
   const sportTypes = useWatch({ control: form.control, name: "sportTypes" }) ?? {};
   const birthDate = useWatch({ control: form.control, name: "birthDate" });
   const weightKg = useWatch({ control: form.control, name: "weightKg" });
@@ -151,7 +233,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const save = useMutation({
     mutationFn: async ({ draft, values }: { draft?: PlanDraft; values: OnboardingFormValues }) => {
       if (draft) await startPlan({ data: draft });
-      return saveAthleteSettings({
+      const saved = await saveAthleteSettings({
         data: {
           profile: profileFromForm(values),
           sportTypes: values.sportTypes,
@@ -159,21 +241,25 @@ export function OnboardingForm({ userName }: { userName: string }) {
           planningStyle,
         },
       });
+      // Saved after the style, so the server starts writing the plan at once.
+      if (planningStyle === "coachPlan") await saveAvailability.mutateAsync(availability);
+      return saved;
     },
     onSuccess: (saved) => {
       // Marking the profile done keeps the onboarding route on "You're set" instead of the
       // profile prompt.
       void afterSettingsSaved(queryClient, saved, { profileDone: true });
       setSaveError(null);
-      setStepIndex(STEPS.findIndex((item) => item.id === "coach"));
+      setStepIndex(flow.indexOf(planningStyle === "coachPlan" ? "ready" : "coach"));
     },
     onError: (caught) => {
       setSaveError(caught instanceof Error ? caught.message : "Could not save your setup");
     },
   });
 
-  function goToStep(next: number) {
-    if (next < 0 || next >= STEPS.length) return;
+  function goToStep(segment: number) {
+    const next = stepOfSegment(flow, segment);
+    if (next < 0 || next >= flow.length) return;
     setStepIndex((current) => (next > current ? current : next));
   }
 
@@ -198,11 +284,15 @@ export function OnboardingForm({ userName }: { userName: string }) {
       return;
     }
     if (step.id === "style") {
-      if (planningStyle === "weekPlanner") setStepIndex((current) => current + 1);
-      else await startWith();
+      if (planningStyle === "off") await startWith();
+      else setStepIndex((current) => current + 1);
       return;
     }
-    if (step.id === "coach") setStepIndex((current) => current + 1);
+    if (step.id === "paces") {
+      await startWith();
+      return;
+    }
+    if (step.id === "coach" || canContinueCoachPlan) setStepIndex((current) => current + 1);
   }
 
   async function startWith(draft?: PlanDraft) {
@@ -220,6 +310,14 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const planSaved = step.id === "coach" || isReady;
   const coachKey = useCoachAvailable();
   const copyUnfinished = syncStatus?.status !== "complete";
+  const coachPlan = useQuery({ ...coachPlanQueryOptions, enabled: planningStyle === "coachPlan" });
+  const saveAvailability = useSaveAvailability();
+  // Each coach plan step needs its part before the next: the key, the A race, availability.
+  const canContinueCoachPlan =
+    (step.id === "coachKey" && coachKey.available) ||
+    (step.id === "goal" && coachPlan.data?.aGoal != null) ||
+    (step.id === "availability" && availabilityIssue(availability) == null);
+  const progress = progressOf(flow, stepIndex);
 
   if (step.id === "plan") {
     return (
@@ -249,7 +347,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
       <Card className={SETUP_CARD}>
         <CardHeader className="gap-2 border-b">
           <SetupProgress
-            step={stepIndex}
+            step={progress.step}
+            substep={progress.substep}
+            titles={flow === COACH_PLAN_FLOW ? COACH_PLAN_TITLES : undefined}
             onSelect={goToStep}
             locked={planSaved}
             skipped={planningStyle === "off" ? SETUP_PLAN_STEP : undefined}
@@ -308,6 +408,26 @@ export function OnboardingForm({ userName }: { userName: string }) {
               />
             ) : step.id === "coach" ? (
               <CoachKeyField idPrefix="onboard" />
+            ) : step.id === "coachKey" ? (
+              <>
+                <CoachKeyField idPrefix="onboard" />
+                {coachKey.needsKey ? (
+                  <FieldDescription>
+                    The coach plan can't be written without a key. Add it above, or go back and pick
+                    the week planner.
+                  </FieldDescription>
+                ) : null}
+              </>
+            ) : step.id === "goal" ? (
+              <CoachPlanGoalField state={coachPlan.data} />
+            ) : step.id === "availability" ? (
+              <AvailabilityFields
+                idPrefix="onboard"
+                value={availability}
+                onChange={setAvailability}
+              />
+            ) : step.id === "paces" ? (
+              <TrainingPacesSection idPrefix="onboard" />
             ) : (
               <Empty className="min-h-48 border-0">
                 <EmptyHeader>
@@ -320,7 +440,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   <EmptyDescription>
                     {planningStyle === "off"
                       ? "Planning is off: the calendar, Season, and fitness are ready. Pick a planning style anytime in Settings."
-                      : "Your plan is set: This week shows your days. Change your week or rebuild the plan from Settings."}
+                      : planningStyle === "coachPlan"
+                        ? "Your coach is writing your next four weeks. This week shows them when they're ready, even if you close the app now."
+                        : "Your plan is set: This week shows your days. Change your week or rebuild the plan from Settings."}
                     {copyUnfinished
                       ? " Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause."
                       : null}
@@ -367,11 +489,16 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 disabled={
                   save.isPending ||
                   (step.id === "sync" && !syncStep.canContinue) ||
-                  (step.id === "sports" && hidesEverySport)
+                  (step.id === "sports" && hidesEverySport) ||
+                  (COACH_PLAN_FLOW.slice(4, 7).includes(step.id) && !canContinueCoachPlan)
                 }
               >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-                {step.id === "coach" && !coachKey.hasKey ? "Skip for now" : "Continue"}
+                {step.id === "coach" && !coachKey.hasKey
+                  ? "Skip for now"
+                  : step.id === "paces"
+                    ? "Write my plan"
+                    : "Continue"}
               </Button>
             </>
           )}

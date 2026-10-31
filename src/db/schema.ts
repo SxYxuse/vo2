@@ -212,3 +212,27 @@ export const coachKeys = pgTable("coach_keys", {
   sealed: text("sealed").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * The coach plan (ADR 0037): the athlete's availability, the plan as last written, and whether
+ * one is being written now. Writing runs on the server, so the app picks it up when it returns.
+ */
+export const coachPlans = pgTable("coach_plans", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  availability: jsonb("availability").notNull(),
+  /** Days are the athlete's: today and the plan's weeks are read in this time zone. */
+  timeZone: text("time_zone").notNull(),
+  /** The last plan that passed every rule; it stays until a new one passes. */
+  plan: jsonb("plan"),
+  status: text("status").notNull().default("idle"),
+  /** Why the last writing failed, for the athlete. */
+  error: text("error"),
+  statusAt: timestamp("status_at", { withTimezone: true }).notNull().defaultNow(),
+  /** The athlete asked for the weeks from this day to be written again. */
+  requestedFrom: date("requested_from", { mode: "string" }),
+  /** What the last writing started from, so a failed one isn't started again on every load. */
+  attemptKey: text("attempt_key"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

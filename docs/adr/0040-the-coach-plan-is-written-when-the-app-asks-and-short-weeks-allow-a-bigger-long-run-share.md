@@ -1,0 +1,9 @@
+# The coach plan is written when the app asks, and short weeks allow a bigger long run share
+
+Two choices made while building the coach plan (ADR 0037) that the ADR did not settle.
+
+**When writing starts.** VO2 has no scheduler, so the plan is written when the app loads it: opening This week or Settings → Training under the coach plan checks whether writing is due and, if so, starts it on the server and returns at once. The app checks back every few seconds while it writes. Writing is due for the first plan, when availability, goals, or paces change, when a key session was missed, when the athlete switches back to the coach plan, and when a new week is due (the current week and the three after it are kept written). Each due writing is tried once: a failed one waits for the athlete's "Try again", so a plan the coach can't get right never spends their credit on every load. Paces drift a little every day (ADR 0039), so they count as changed only once the VDOT moved a full point, about 2 % in pace. Writing marked as running for more than ten minutes is read as stopped with the server.
+
+**The long run's share.** Rule 5 caps the long run at 30 % of the week. With two or three runs in a week even equal runs are half or a third of it, so a week of two runs allows 50 %, a week of three 40 %, and a week of one run has no share to keep. The cap counts the runs actually in that week, so a taper or race week with fewer runs is not held to the 30 % of a full week. The 2 h 30 cap and the 10 % rule on the longest run still hold.
+
+A scheduler would write a new week on Monday whether the athlete opens VO2 or not, but would spend their credit on weeks nobody looks at, and needs a worker VO2 doesn't run. Holding every week to 30 % would make the coach plan impossible for athletes who run two or three times a week, which the availability allows.

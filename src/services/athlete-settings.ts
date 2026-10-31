@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import {
   calendarPeriodSchema,
-  chosenPlanningStyleSchema,
+  planningStyleSchema,
   profileSaveSchema,
   shownSportTypesSchema,
   type AthleteSettings,
@@ -26,7 +26,7 @@ export const athleteSettingsSaveSchema = z.object({
   celebrateTopEfforts: z.boolean().optional(),
   training: trainingPlanSchema.optional(),
   heartRate: heartRateSettingsSchema.optional(),
-  planningStyle: chosenPlanningStyleSchema.optional(),
+  planningStyle: planningStyleSchema.optional(),
 });
 
 export type AthleteSettingsSave = z.infer<typeof athleteSettingsSaveSchema>;

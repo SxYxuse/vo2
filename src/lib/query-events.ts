@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
   activityDetailQueryOptions,
   appShellQueryOptions,
+  coachPlanQueryOptions,
   fitnessQueryOptions,
   homeQueryOptions,
   seasonChangeQueryOptions,
@@ -79,6 +80,7 @@ export async function afterGoalsChanged(queryClient: QueryClient): Promise<Seaso
     queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekTargetQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: weekCoachQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: coachPlanQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: ["plan-builder"] }),
