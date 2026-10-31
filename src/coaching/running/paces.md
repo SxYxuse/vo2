@@ -4,8 +4,8 @@ VO2 gives you the athlete's training paces: five pace ranges in seconds per km, 
 
 ## Where the paces come from
 
-- VO2 estimates fitness as a VDOT (Daniels and Gilbert's running model, as printed by the [Daniels calculator](https://rundida.com/tools/vdot-calculator/)) from the athlete's recent road-run best efforts. A best effort inside a training run is slower than a race, so the estimate errs slow. It changes gradually: one run can lift it at most 5 % above the next-best run.
-- A race result the athlete set wins over the estimate.
+- VO2 estimates fitness as a VDOT (Daniels and Gilbert's running model, as printed by the [Daniels calculator](https://rundida.com/tools/vdot-calculator/)) from the athlete's recent road-run best efforts. A best effort inside a training run is slower than a race, so the estimate errs slow. It changes gradually: older runs count a little less each week, and one run can lift it at most 5 % above the next-best run.
+- A race result the athlete set in the last 16 weeks wins over the estimate.
 - The predicted race time for a goal comes from the same VDOT. Goals have no target time; the predicted race time takes its place. Do not write sessions at a goal pace faster than the athlete's training paces: paces rise with fitness, and VO2 updates them.
 
 ## The five paces
@@ -30,12 +30,18 @@ When a session needs a race pace, write it as an effort ("10 km effort") with th
 
 ## How much at each pace
 
-Per session, as a share of the week's distance (Daniels, via [Coach Ray](https://www.coachray.nz/2023/05/03/jack-daniels-running-intensity/)); guidance:
+Per session, counting only the work at that pace (Daniels, via [Coach Ray](https://www.coachray.nz/2023/05/03/jack-daniels-running-intensity/)). Treat these as firm: they size every quality session (`sessions.md`).
 
-- T: at most 10 %. An athlete who can run 20 minutes at T pace can run about 30 minutes as cruise intervals.
-- I: at most 8 %. Each repeat 3–5 minutes; recovery 2–3 minutes of jogging, or about equal to the work.
-- R: at most 5 %. Each repeat at most 2 minutes; recovery 2–3 times the repeat's time, or jog the same distance.
-- M: 5–10 miles (8–16 km) in one session for experienced marathoners; less for others.
+| Pace | Most in one session                        | At 20 km a week | At 40 km | At 60 km |
+| ---- | ------------------------------------------ | --------------- | -------- | -------- |
+| M    | under 20 % of the week, and 1 h 50 at most | 4 km            | 8 km     | 12 km    |
+| T    | 10 % of the week                           | 2 km            | 4 km     | 6 km     |
+| I    | 8 % of the week                            | 1.6 km          | 3.2 km   | 4.8 km   |
+| R    | 5 % of the week                            | 1 km            | 2 km     | 3 km     |
+
+- T: an athlete who can run 20 minutes at T pace can run about 30 minutes as cruise intervals, still within the cap.
+- I: each repeat 3–5 minutes; recovery 2–3 minutes of jogging, or about equal to the work.
+- R: each repeat at most 2 minutes; recovery 2–3 times the repeat's time, or jog the same distance.
 
 Keep repeats even: within a few seconds per km of each other. Repeats that get faster through the set mean the pace was too easy or the athlete was racing it.
 

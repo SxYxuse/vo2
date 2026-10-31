@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, isNotNull, ne } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
@@ -7,6 +7,7 @@ import { ensureBestEfforts } from "./best-efforts.server.ts";
 import {
   ESTIMATE_WINDOW_DAYS,
   estimateVdot,
+  isRaceResultCurrent,
   parseRaceResult,
   trainingPaces,
   type RaceResult,
@@ -15,8 +16,9 @@ import {
 } from "./training-paces.types.ts";
 
 /**
- * Best efforts from road runs in the estimate window. Hidden sport types count: hiding changes
- * views, not the athlete's fitness (ADR 0018).
+ * Best efforts from road runs in the estimate window. A treadmill run is sport type Run too, but
+ * has no route, and its watch distance is often several percent off. Hidden sport types count:
+ * hiding changes views, not the athlete's fitness (ADR 0018).
  */
 async function recentRunEfforts(userId: string, now: Date): Promise<RunEffort[]> {
   const since = new Date(now.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000);
@@ -36,6 +38,8 @@ async function recentRunEfforts(userId: string, now: Date): Promise<RunEffort[]>
       and(
         eq(activities.userId, userId),
         eq(activities.sportType, "Run"),
+        isNotNull(activities.summaryPolyline),
+        ne(activities.summaryPolyline, ""),
         gte(activities.startDate, since),
       ),
     );
@@ -60,7 +64,7 @@ export async function trainingPacesFor(userId: string, now = new Date()): Promis
       .where(eq(athleteMetrics.userId, userId))
       .limit(1),
   ]);
-  return trainingPaces(parseRaceResult(metrics?.raceResult), estimateVdot(efforts));
+  return trainingPaces(parseRaceResult(metrics?.raceResult), estimateVdot(efforts, now), now);
 }
 
 export async function loadTrainingPacesImpl(): Promise<TrainingPaces> {
@@ -76,6 +80,9 @@ export async function saveRaceResultImpl(raceResult: RaceResult | null) {
   const latest = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
   if (raceResult && raceResult.date > latest) {
     throw new Error("A race result can't be in the future.");
+  }
+  if (raceResult && !isRaceResultCurrent(raceResult, new Date())) {
+    throw new Error("A race result must be from the last 16 weeks.");
   }
   const updatedAt = new Date();
   await db

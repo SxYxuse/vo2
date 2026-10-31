@@ -25,6 +25,7 @@ export const OFFLINE_QUERY_KEYS = [
   "progress",
   "bests",
   "heart-rate",
+  "training-paces",
   "settings-snapshot",
 ] as const;
 

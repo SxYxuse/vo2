@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 
 import { runDistanceLabel } from "@/components/best-labels.ts";
 import { useOnline } from "@/hooks/use-online.ts";
@@ -59,7 +59,7 @@ function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
       : "";
     return `From your race result: ${raceLine(paces.raceResult!)}. VDOT ${paces.vdot}.${estimate}`;
   }
-  return `Estimated from road runs of the last ${ESTIMATE_WINDOW_DAYS / 7} weeks: ${estimateLine(paces.estimate!)}. VDOT ${paces.vdot}. A best effort inside a training run is slower than a race, so a race result below is more precise.`;
+  return `Estimated from road runs of the last ${WINDOW_WEEKS} weeks, older runs counting a little less: ${estimateLine(paces.estimate!)}. VDOT ${paces.vdot}. A best effort inside a training run is slower than a race, so a race result below is more precise.`;
 }
 
 /** The athlete's training paces, predicted race times, and the race result that sets them. */
@@ -79,8 +79,8 @@ export function TrainingPacesSection({ idPrefix }: { idPrefix: string }) {
         {paces.source === "none" ? (
           <FieldDescription>
             No paces yet. VO2 reads them from best efforts of a mile or more in road runs of the
-            last {ESTIMATE_WINDOW_DAYS / 7} weeks, and needs at least two such runs. Or set a recent
-            race result below.
+            last {WINDOW_WEEKS} weeks, and needs at least two such runs. Or set a recent race result
+            below.
           </FieldDescription>
         ) : (
           <>
@@ -135,7 +135,11 @@ export function TrainingPacesSection({ idPrefix }: { idPrefix: string }) {
       {paces.signedIn ? (
         <>
           <FieldSeparator />
-          <RaceResultField idPrefix={idPrefix} raceResult={paces.raceResult} />
+          <RaceResultField
+            idPrefix={idPrefix}
+            raceResult={paces.raceResult}
+            current={paces.source === "race"}
+          />
         </>
       ) : null}
     </FieldGroup>
@@ -143,6 +147,8 @@ export function TrainingPacesSection({ idPrefix }: { idPrefix: string }) {
 }
 
 const todayKey = () => format(new Date(), "yyyy-MM-dd");
+const oldestRaceKey = () => format(subDays(new Date(), ESTIMATE_WINDOW_DAYS), "yyyy-MM-dd");
+const WINDOW_WEEKS = ESTIMATE_WINDOW_DAYS / 7;
 
 /**
  * Sets or clears the race result the paces are read from. Saved on its own with a button, not
@@ -151,9 +157,12 @@ const todayKey = () => format(new Date(), "yyyy-MM-dd");
 function RaceResultField({
   idPrefix,
   raceResult,
+  current,
 }: {
   idPrefix: string;
   raceResult: RaceResult | null;
+  /** Whether the result still sets the paces, or is older than the estimate window. */
+  current: boolean;
 }) {
   const queryClient = useQueryClient();
   const online = useOnline();
@@ -186,6 +195,10 @@ function RaceResultField({
       setInvalid("Pick a race that has already happened.");
       return;
     }
+    if (date < oldestRaceKey()) {
+      setInvalid(`Pick a race from the last ${WINDOW_WEEKS} weeks.`);
+      return;
+    }
     setInvalid(null);
     save.mutate(parsed.data);
   }
@@ -196,12 +209,20 @@ function RaceResultField({
     <FieldSet>
       <FieldLegend>Race result</FieldLegend>
       <FieldDescription>
-        A recent race or all-out time trial on a flat road. It sets your paces in place of the
-        estimate until you clear it.
+        A race or all-out time trial on a flat road from the last {WINDOW_WEEKS} weeks. It sets your
+        paces in place of the estimate until you clear it, or until it is {WINDOW_WEEKS} weeks old.
       </FieldDescription>
       {raceResult ? (
         <Field orientation="horizontal" className="flex-wrap items-center gap-2">
-          <span className="text-sm tabular-nums">{raceLine(raceResult)}</span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-sm tabular-nums">{raceLine(raceResult)}</span>
+            {current ? null : (
+              <span className="text-muted-foreground text-xs">
+                Older than {WINDOW_WEEKS} weeks, so it no longer sets your paces. Clear it and set a
+                newer one.
+              </span>
+            )}
+          </span>
           <Button
             type="button"
             variant="outline"
@@ -257,6 +278,7 @@ function RaceResultField({
               <Input
                 id={id("date")}
                 type="date"
+                min={oldestRaceKey()}
                 max={todayKey()}
                 value={date}
                 onChange={(event) => setDate(event.target.value)}

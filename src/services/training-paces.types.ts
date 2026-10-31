@@ -48,7 +48,8 @@ export function predictRaceSeconds(vdot: number, metres: number) {
 
 /**
  * The model is fitted to races of about 3.5 minutes to 4 hours (Riegel's range for the same kind
- * of curve), so it predicts from the mile to the marathon; ultras are left without a number.
+ * of curve), so it predicts from 1,500 m, about the shortest race that long, to the marathon;
+ * ultras are left without a number.
  */
 export const PREDICTION_MIN_M = 1500;
 export const PREDICTION_MAX_M = 42_500;
@@ -170,8 +171,13 @@ export type RunEffort = {
   seconds: number;
 };
 
-/** Only best efforts from the last eight weeks count: older ones say less about fitness now. */
-export const ESTIMATE_WINDOW_DAYS = 56;
+/**
+ * Best efforts from the last 16 weeks count, each worth 1 % less per week of age, so an old best
+ * fades a little every day and is close to ordinary training by the time it leaves the window.
+ * Both numbers are VO2's choice: no source gives a decay rate for best efforts.
+ */
+export const ESTIMATE_WINDOW_DAYS = 16 * 7;
+const AGE_DISCOUNT_PER_WEEK = 0.01;
 /** Shorter bests are sprints the model doesn't fit, and inflate VDOT. */
 const ESTIMATE_MIN_M = 1600;
 /** One run can lift the estimate at most this far above the next-best run. */
@@ -187,16 +193,17 @@ export type PaceEstimate = {
 
 /**
  * Current fitness from best efforts inside recent road runs. Each run counts once, by its best
- * effort of a mile or more. The best run sets the estimate, but at most 5 % above the next-best
- * one, so a GPS slip or a single unusual day can't move every pace at once; with only one run
- * there is nothing to check it against, so there is no estimate yet. Best efforts inside
- * training runs are a floor, not a race, so the estimate errs slow.
+ * effort of a mile or more, discounted by its age. The best run sets the estimate, but at most
+ * 5 % above the next-best one, so a GPS slip or a single unusual day can't move every pace at
+ * once; with only one run there is nothing to check it against, so there is no estimate yet.
+ * Best efforts inside training runs are a floor, not a race, so the estimate errs slow.
  */
-export function estimateVdot(efforts: RunEffort[]): PaceEstimate | null {
+export function estimateVdot(efforts: RunEffort[], now: Date): PaceEstimate | null {
   const bestPerRun = new Map<string, { effort: RunEffort; vdot: number }>();
   for (const effort of efforts) {
     if (effort.metres < ESTIMATE_MIN_M) continue;
-    const vdot = vdotFromRace(effort.metres, effort.seconds);
+    const weeks = Math.max(0, now.getTime() - Date.parse(effort.start)) / (7 * 86_400_000);
+    const vdot = vdotFromRace(effort.metres, effort.seconds) * (1 - AGE_DISCOUNT_PER_WEEK * weeks);
     const current = bestPerRun.get(effort.activityId);
     if (!current || vdot > current.vdot) bestPerRun.set(effort.activityId, { effort, vdot });
   }
@@ -208,6 +215,15 @@ export function estimateVdot(efforts: RunEffort[]): PaceEstimate | null {
   return { vdot: roundVdot(capped ? ceiling : best.vdot), from: best.effort, capped };
 }
 
+/**
+ * A race result sets the paces for as long as best efforts count, then stops, since it no
+ * longer says much about fitness now; it stays saved and shown until the athlete clears it.
+ */
+export function isRaceResultCurrent(raceResult: RaceResult, now: Date) {
+  const oldest = new Date(now.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000);
+  return raceResult.date >= oldest.toISOString().slice(0, 10);
+}
+
 export function roundVdot(vdot: number) {
   return Math.round(vdot * 10) / 10;
 }
@@ -216,7 +232,8 @@ export type TrainingPaces =
   | {
       signedIn: boolean;
       source: "none";
-      raceResult: null;
+      /** A saved race result too old to set the paces any more. */
+      raceResult: RaceResult | null;
       estimate: null;
     }
   | {
@@ -229,18 +246,18 @@ export type TrainingPaces =
       estimate: PaceEstimate | null;
     };
 
-/** The athlete's training paces: their race result when set, else the estimate. */
+/** The athlete's training paces: their race result while current, else the estimate. */
 export function trainingPaces(
   raceResult: RaceResult | null,
   estimate: PaceEstimate | null,
+  now: Date,
 ): TrainingPaces {
-  const vdot = raceResult
-    ? roundVdot(vdotFromRace(raceResult.metres, raceResult.seconds))
-    : estimate?.vdot;
-  if (vdot == null) return { signedIn: true, source: "none", raceResult: null, estimate: null };
+  const race = raceResult && isRaceResultCurrent(raceResult, now) ? raceResult : null;
+  const vdot = race ? roundVdot(vdotFromRace(race.metres, race.seconds)) : estimate?.vdot;
+  if (vdot == null) return { signedIn: true, source: "none", raceResult, estimate: null };
   return {
     signedIn: true,
-    source: raceResult ? "race" : "estimate",
+    source: race ? "race" : "estimate",
     vdot,
     paces: trainingPaceRanges(vdot),
     raceResult,
