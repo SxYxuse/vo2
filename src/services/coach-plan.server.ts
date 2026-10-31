@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq, gte, lt, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, coachPlans } from "@/db/schema.ts";
+import { activities, coachPlans, syncRuns } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
@@ -21,12 +21,14 @@ import {
   coachPlanGoal,
   parseAvailability,
   plannedRun,
+  stepSecPerKm,
   type Availability,
   type CoachPlan,
   type CoachPlanMissing,
   type CoachPlanState,
   type CoachPlanStatus,
   type PlanBasis,
+  type PlanGoal,
   type PlannedRun,
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
@@ -61,7 +63,7 @@ async function readRow(userId: string): Promise<Row | null> {
 
 /** Everything the plan is checked and written from, read fresh. */
 async function gather(userId: string, now = new Date()) {
-  const [row, style, goals, coach, paces, rows] = await Promise.all([
+  const [row, style, goals, coach, paces, rows, [sync]] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
     goalsFor(userId),
@@ -81,6 +83,11 @@ async function gather(userId: string, now = new Date()) {
           gte(activities.startDate, new Date(now.getTime() - HISTORY_DAYS * 86_400_000)),
         ),
       ),
+    db
+      .select({ status: syncRuns.status, updatedAt: syncRuns.updatedAt })
+      .from(syncRuns)
+      .where(eq(syncRuns.userId, userId))
+      .limit(1),
   ]);
   const timeZone = row?.timeZone ?? "UTC";
   const today = dayKey(now, timeZone);
@@ -101,6 +108,12 @@ async function gather(userId: string, now = new Date()) {
     now,
     today,
     currentWeek: weekStartKey(now, timeZone),
+    // A sync that copied the newest activities, paused or not finished with the oldest ones:
+    // runs on the days before the day it ended are in the local copy.
+    syncedDay:
+      sync && (sync.status === "complete" || sync.status === "incomplete")
+        ? dayKey(sync.updatedAt, timeZone)
+        : null,
     availability: row ? parseAvailability(row.availability) : null,
     aGoal: coachPlanGoal(goals, today),
     plan: (row?.plan as CoachPlan | null) ?? null,
@@ -138,28 +151,49 @@ function doneSessions(plan: CoachPlan | null, runs: RunDay[], today: string) {
 }
 
 /** Goals the plan is written around: upcoming runs, and every upcoming A goal. */
-function goalsKey(goals: Goal[], today: string) {
-  return JSON.stringify(
-    goals
-      .filter(
-        (goal) =>
-          goal.date >= today &&
-          (goal.priority === "A" || sportGroupFor(goal.sportType)?.id === "running"),
-      )
-      .sort((a, b) => a.id.localeCompare(b.id))
-      .map((goal) => [goal.id, goal.date, goal.distanceM, goal.priority, goal.sportType]),
-  );
+function planGoals(goals: Goal[], today: string): PlanGoal[] {
+  return goals
+    .filter(
+      (goal) =>
+        goal.date >= today &&
+        (goal.priority === "A" || sportGroupFor(goal.sportType)?.id === "running"),
+    )
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((goal) => [goal.id, goal.date, goal.distanceM, goal.priority, goal.sportType]);
 }
+
+/**
+ * The goals as they stand today, so a goal passing (the day after a race) changes nothing: only
+ * one added, edited, or removed before its day rewrites the plan. Plans written before goals were
+ * kept as a list stored them as text, hence `unknown`.
+ */
+function upcomingGoalsKey(goals: unknown, today: string) {
+  if (!Array.isArray(goals)) return null;
+  return JSON.stringify((goals as PlanGoal[]).filter((goal) => goal[1] >= today));
+}
+
+/** VDOT in whole points, so the drift of a day isn't a new writing (PACE_CHANGE_VDOT). */
+const vdotPoint = (vdot: number | null) => (vdot == null ? null : Math.floor(vdot));
 
 function basisOf(inputs: Inputs): PlanBasis {
   const done = new Set(doneSessions(inputs.plan, inputs.runs, inputs.today));
+  // A key session is missed only once a sync ended after its day: before that its run may just
+  // not be copied yet (the app-open sync, a sync paused on Strava's limits).
+  const { syncedDay } = inputs;
   const missed = (inputs.plan?.weeks ?? [])
     .flatMap((week) => week.sessions)
-    .filter((session) => session.key && session.date < inputs.today && !done.has(session.id))
+    .filter(
+      (session) =>
+        session.key &&
+        session.date < inputs.today &&
+        syncedDay != null &&
+        session.date < syncedDay &&
+        !done.has(session.id),
+    )
     .map((session) => session.id);
   return {
     availability: JSON.stringify(inputs.availability),
-    goals: goalsKey(inputs.goals, inputs.today),
+    goals: planGoals(inputs.goals, inputs.today),
     vdot: vdotOf(inputs),
     missed,
   };
@@ -172,35 +206,50 @@ function firstDay(inputs: Inputs) {
     : inputs.today;
 }
 
+type Due = {
+  from: string;
+  reason: string;
+  /** What set the writing off, so a failed one is tried again only when that changes. */
+  trigger: unknown;
+};
+
 /**
  * Whether the weeks ahead need writing, and from which day: the first plan; the athlete asked
  * (switching back to the coach plan); availability, goals, or paces changed; a key session was
  * missed; or a new week is due. Days before it are frozen.
  */
-export function dueWrite(
-  inputs: Inputs,
-  basis: PlanBasis,
-): { from: string; reason: string } | null {
+export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = firstDay(inputs);
-  const { plan, row } = inputs;
-  if (!plan) return { from: first, reason: "first" };
-  if (row?.requestedFrom) {
-    return { from: row.requestedFrom > first ? row.requestedFrom : first, reason: "asked" };
+  const { plan, row, today } = inputs;
+  const goals = upcomingGoalsKey(basis.goals, today);
+  if (!plan) {
+    return {
+      from: first,
+      reason: "first",
+      trigger: [basis.availability, goals, vdotPoint(basis.vdot)],
+    };
   }
-  if (plan.basis.availability !== basis.availability)
-    return { from: first, reason: "availability" };
-  if (plan.basis.goals !== basis.goals) return { from: first, reason: "goals" };
+  if (row?.requestedFrom) {
+    const from = row.requestedFrom > first ? row.requestedFrom : first;
+    return { from, reason: "asked", trigger: row.requestedFrom };
+  }
+  if (plan.basis.availability !== basis.availability) {
+    return { from: first, reason: "availability", trigger: basis.availability };
+  }
+  if (upcomingGoalsKey(plan.basis.goals, today) !== goals) {
+    return { from: first, reason: "goals", trigger: goals };
+  }
   const pacesChanged =
     (plan.basis.vdot == null) !== (basis.vdot == null) ||
     Math.abs((plan.basis.vdot ?? 0) - (basis.vdot ?? 0)) >= PACE_CHANGE_VDOT;
-  if (pacesChanged) return { from: first, reason: "paces" };
-  if (basis.missed.some((id) => !plan.basis.missed.includes(id))) {
-    return { from: first, reason: "missed" };
-  }
+  if (pacesChanged) return { from: first, reason: "paces", trigger: vdotPoint(basis.vdot) };
+  const missed = basis.missed.filter((id) => !plan.basis.missed.includes(id));
+  if (missed.length) return { from: first, reason: "missed", trigger: missed };
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
-    return { from: lastWeek && next > first ? next : first, reason: "new week" };
+    const from = lastWeek && next > first ? next : first;
+    return { from, reason: "new week", trigger: from };
   }
   return null;
 }
@@ -244,10 +293,13 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   if (!row || inputs.style !== "coachPlan" || missingOf(inputs).length) return row;
   const basis = basisOf(inputs);
   const due =
-    dueWrite(inputs, basis) ?? (force ? { from: firstDay(inputs), reason: "again" } : null);
+    dueWrite(inputs, basis) ??
+    (force ? { from: firstDay(inputs), reason: "again", trigger: null } : null);
   if (!due) return row;
+  // From the trigger, not the day or the exact VDOT: a failed writing waits for "Try again" until
+  // what set it off changes (ADR 0040).
   const attemptKey = createHash("sha1")
-    .update(JSON.stringify([due.from, basis]))
+    .update(JSON.stringify([due.reason, due.trigger]))
     .digest("hex");
   if (!force && row.attemptKey === attemptKey) return row;
   const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
@@ -264,15 +316,25 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   if (!claimed) return row;
   logger.info("coach_plan.writing", { from: due.from, reason: due.reason });
   // Not awaited: the writing outlives the request, so closing the app doesn't stop it.
-  void writePlan(userId, due.from);
+  void writePlan(userId, due.from, claimed.statusAt);
   return claimed;
 }
 
-async function finish(userId: string, values: Partial<Row>) {
+/**
+ * Saves a writing's result, only while it still holds the claim: a writing that outlived its
+ * claim (STALE_WRITING_MS) and was started again must not overwrite the newer one.
+ */
+async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
   await db
     .update(coachPlans)
     .set({ ...values, statusAt: new Date(), updatedAt: new Date() })
-    .where(eq(coachPlans.userId, userId));
+    .where(
+      and(
+        eq(coachPlans.userId, userId),
+        eq(coachPlans.status, "writing"),
+        eq(coachPlans.statusAt, claimedAt),
+      ),
+    );
 }
 
 function raceSession(goal: Goal): PlannedRun {
@@ -327,12 +389,15 @@ function recentTraining(inputs: Inputs) {
 }
 
 /** Writes the weeks from `from`, keeps the days before it, and stores the plan if it passes. */
-async function writePlan(userId: string, from: string) {
+async function writePlan(userId: string, from: string, claimedAt: Date) {
   try {
     const inputs = await gather(userId);
     const { availability, aGoal, coach } = inputs;
     if (!availability || !aGoal || coach.kind === "missing") {
-      await finish(userId, { status: "failed", error: "The coach plan is missing its setup." });
+      await finish(userId, claimedAt, {
+        status: "failed",
+        error: "The coach plan is missing its setup.",
+      });
       return;
     }
     const budgets = weekBudgets({
@@ -349,6 +414,11 @@ async function writePlan(userId: string, from: string) {
     const kept = old
       .flatMap((week) => week.sessions)
       .filter((session) => session.date >= fromWeek && session.date < from);
+    // Planned days around the ones written, such as the weeks kept when only a new week is added:
+    // neighbours for the longest run and hard days, counted toward no week written.
+    const neighbours = old
+      .flatMap((week) => week.sessions)
+      .filter((session) => session.date >= addDayKey(inputs.today, -1) && session.date < fromWeek);
     const lastDay = addDayKey(weeks.at(-1)!.weekStart, 6);
     const races = inputs.goals.filter(
       (goal) =>
@@ -365,6 +435,11 @@ async function writePlan(userId: string, from: string) {
       frozen: kept.filter((session) => session.kind !== "race"),
       runs: inputs.runs,
       raceDays: races.map((goal) => goal.date),
+      neighbours,
+      easySecPerKm: stepSecPerKm(
+        { part: "work", distanceM: 1000, durationS: null, pace: null, effort: "easy" },
+        rangesOf(inputs),
+      ),
     };
     const ranges = rangesOf(inputs);
     const prompt = {
@@ -389,13 +464,16 @@ async function writePlan(userId: string, from: string) {
       availability: availabilityText(ctx),
       paces: paceText(ranges),
       weeks: weeksText(ctx),
+      plannedBefore: neighbours.map(
+        (session) => `${session.date} ${session.kind} ${session.distanceKm} km`,
+      ),
       recentTraining: recentTraining(inputs),
       rules: rulesFor(ctx),
     };
     const result = await writeSessions(coach, prompt, ctx, ranges);
     if (!result.ok) {
       logger.warn("coach_plan.failed", { from });
-      await finish(userId, { status: "failed", error: result.error });
+      await finish(userId, claimedAt, { status: "failed", error: result.error });
       return;
     }
     const added = [
@@ -424,13 +502,13 @@ async function writePlan(userId: string, from: string) {
       writtenAt: new Date().toISOString(),
       model: coach.model,
     };
-    await finish(userId, { plan, status: "idle", error: null, requestedFrom: null });
+    await finish(userId, claimedAt, { plan, status: "idle", error: null, requestedFrom: null });
     logger.info("coach_plan.written", { from, sessions: result.sessions.length });
   } catch (error) {
     logger.error("coach_plan.crashed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    await finish(userId, {
+    await finish(userId, claimedAt, {
       status: "failed",
       error: "Something went wrong writing the plan. Try again.",
     });

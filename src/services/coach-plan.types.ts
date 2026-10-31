@@ -191,10 +191,13 @@ export type PlanWeek = {
   sessions: PlannedRun[];
 };
 
+/** A goal as the plan was written around it: id, date, distance, priority, sport type. */
+export type PlanGoal = [string, string, number | null, string, string];
+
 /** What a written plan was written from; a change in any of it rewrites the weeks ahead. */
 export type PlanBasis = {
   availability: string;
-  goals: string;
+  goals: PlanGoal[];
   vdot: number | null;
   /** Key sessions already found missed, so each rewrites the plan once. */
   missed: string[];

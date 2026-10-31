@@ -253,6 +253,32 @@ async function deleteGoalIfThere(page: Page, name: RegExp) {
   await expect(goal).toHaveCount(0);
 }
 
+/** Four runs on Tuesday, Thursday, Saturday, and Sunday, the long run on Sunday. */
+const AVAILABILITY = { Tuesday: "60", Thursday: "60", Saturday: "60", Sunday: "120" } as const;
+
+/** Sets the same availability whatever is saved, so the written plan doesn't depend on run order. */
+async function setAvailability(page: Page) {
+  await page.getByRole("button", { name: "4 runs a week" }).click();
+  for (const day of [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ]) {
+    const toggle = page.getByRole("button", { name: day, exact: true });
+    const wanted = day in AVAILABILITY;
+    if ((await toggle.getAttribute("aria-pressed")) !== String(wanted)) await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", String(wanted));
+  }
+  for (const [day, minutes] of Object.entries(AVAILABILITY)) {
+    await page.getByRole("combobox", { name: day }).selectOption(minutes);
+  }
+  await page.getByRole("button", { name: "Long run on Sunday" }).click();
+}
+
 /** Waits for the plan to be written: an earlier plan stays on screen while the next is written. */
 async function expectPlanWritten(page: Page) {
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
@@ -288,11 +314,11 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.goto("/settings/training");
     await settle(page);
     await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
-    // The phone run leaves its availability saved (each style keeps its setup), so toggle a day:
-    // a change either way, saved by "Save availability" or "Save and rewrite plan".
-    await page.getByRole("button", { name: "Saturday", exact: true }).click();
-    await page.getByRole("button", { name: /^Save (availability|and rewrite plan)$/ }).click();
-    await expect(page.getByText("Writing your plan…")).toBeVisible();
+    await setAvailability(page);
+    // The phone run leaves this availability saved (each style keeps its setup): then the new
+    // goal alone has the plan written again.
+    const save = page.getByRole("button", { name: "Save availability" });
+    if (await save.isVisible()) await save.click();
 
     await page.goto("/week");
     await expectPlanWritten(page);

@@ -29,6 +29,11 @@ import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
 /** A plan that breaks a rule goes back to the coach this many times before it is dropped. */
 const RETRIES = 2;
+/**
+ * Each model call gives up after this, so three calls end well inside the 10 minutes a writing
+ * holds its claim (STALE_WRITING_MS in coach-plan.server.ts).
+ */
+const MODEL_TIMEOUT_MS = 150_000;
 /** Paced like a real model, so the app's "writing" state shows in development and e2e. */
 const MOCK_PAUSE_MS = 1500;
 
@@ -51,11 +56,11 @@ export type PlanPrompt = Record<string, unknown>;
 export function rulesFor(ctx: RuleContext) {
   const { runsPerWeek } = ctx.availability;
   return [
-    "1. Each week's total distance stays at or under its budgetKm (lighter and taper weeks have smaller budgets). Sessions already kept count toward their week.",
-    "2. No run more than 10 % longer than the longest run of the 30 days before it (recentTraining.longestRunLast30DaysKm, then your own planned runs).",
-    "3. Never two hard days in a row, never the long run the day after a hard day. Races are hard days.",
+    "1. Each week's total distance stays at or under its budgetKm (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of it: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
+    "2. No run more than 10 % longer than the longest run of the 30 days before it (recentTraining.longestRunLast30DaysKm, then plannedBefore and your own planned runs).",
+    "3. Never two hard days in a row, never the long run the day after a hard day, also across plannedBefore. Races are hard days.",
     `4. At most ${maxQualitySessions(runsPerWeek)} quality session(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A race counts as one.`,
-    `5. One long run a week, on the long run day: at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % in a week of 3 runs, ${Math.round(maxLongShare(2) * 100)} % in a week of 2) and at most ${MAX_LONG_MINUTES} minutes.`,
+    `5. One long run a week, on the long run day. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % when only 3 of the athlete's runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all ${runsPerWeek} runs, and at most ${MAX_LONG_MINUTES} minutes.`,
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budget.",
     "8. One run a day at most. A missed session is skipped, never made up.",
     `Availability: ${runsPerWeek} runs a week at most, only on the athlete's days, each within that day's minutes. Write sessions from ${ctx.from} on; days before are kept. Write nothing on race days.`,
@@ -130,6 +135,8 @@ export async function writeSessions(
   let breaks: RuleBreak[] = [];
   for (let attempt = 0; attempt <= RETRIES; attempt += 1) {
     let written: WrittenPlan;
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), MODEL_TIMEOUT_MS);
     try {
       written = (await chat({
         adapter: coach.adapter,
@@ -137,6 +144,7 @@ export async function writeSessions(
         systemPrompts: [SYSTEM_PROMPT],
         messages,
         outputSchema: writtenPlanSchema,
+        abortController: abort,
       })) as WrittenPlan;
     } catch (error) {
       // The athlete's key must never reach a log or the screen, even inside a provider's error.
@@ -144,7 +152,14 @@ export async function writeSessions(
         coach.key,
       ]);
       logger.warn("coach_plan.model_failed", { model: coach.model, error: message });
-      return { ok: false, error: `The coach could not write the plan: ${message}` };
+      return {
+        ok: false,
+        error: abort.signal.aborted
+          ? "The coach took too long to answer. Try again, or pick a quicker model in Settings → Coach."
+          : `The coach could not write the plan: ${message}`,
+      };
+    } finally {
+      clearTimeout(timer);
     }
     const sessions = plan(written);
     breaks = checkPlan(sessions, ctx);

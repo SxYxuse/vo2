@@ -9,6 +9,7 @@ import {
   MAX_LONG_MINUTES,
   maxLongShare,
   maxQualitySessions,
+  longShareRuns,
   type RuleContext,
 } from "./coach-plan-rules.ts";
 import { addDayKey } from "./day-key.ts";
@@ -60,11 +61,12 @@ export function mockCoachPlan(
   const easySecPerKm = stepSecPerKm(step("work", 1, "easy", withPaces), paces);
   const kmIn = (minutes: number) => ((minutes * 60) / easySecPerKm) * MARGIN;
   const sessions: WrittenSession[] = [];
+  const planned = [...ctx.frozen, ...ctx.neighbours].filter(
+    (session) => session.date >= ctx.today && session.kind !== "race",
+  );
   const history = [
     ...ctx.runs.filter((run) => run.date < ctx.today),
-    ...ctx.frozen
-      .filter((session) => session.date >= ctx.today)
-      .map((session) => ({ date: session.date, km: session.distanceKm })),
+    ...planned.map((session) => ({ date: session.date, km: session.distanceKm })),
   ];
   const spikeLimit = (date: string) => {
     const since = addDayKey(date, -30);
@@ -76,7 +78,9 @@ export function mockCoachPlan(
   };
   const busy = new Set([...ctx.frozen.map((session) => session.date), ...ctx.raceDays]);
   const hardDays = new Set([
-    ...ctx.frozen.filter((session) => isQualityKind(session.kind)).map((session) => session.date),
+    ...[...ctx.frozen, ...ctx.neighbours]
+      .filter((session) => isQualityKind(session.kind))
+      .map((session) => session.date),
     ...ctx.raceDays,
   ]);
 
@@ -86,37 +90,44 @@ export function mockCoachPlan(
     const races = ctx.raceDays.filter((date) => dates.includes(date));
     const candidates = dates.filter(
       (date) =>
-        date >= ctx.from &&
-        !busy.has(date) &&
-        dayMinutes(availability, weekday(date)) != null &&
-        !hardDays.has(addDayKey(date, -1)),
+        date >= ctx.from && !busy.has(date) && dayMinutes(availability, weekday(date)) != null,
     );
-    const longDate = candidates.find((date) => weekday(date) === availability.longRunDay) ?? null;
+    // The long run never follows a hard day; easy runs may.
+    const longDate =
+      candidates.find(
+        (date) => weekday(date) === availability.longRunDay && !hardDays.has(addDayKey(date, -1)),
+      ) ?? null;
     const frozenKm = frozen.reduce((sum, session) => sum + session.distanceKm, 0);
-    const budget = week.budgetKm * MARGIN - frozenKm;
-    // Fewer, longer runs when the budget is small: none under about 3 km.
-    const wanted = Math.min(availability.runsPerWeek - frozen.length, Math.floor(budget / 3));
-    const picked = pickDays(candidates, Math.max(1, wanted), longDate);
-    if (!picked.length || budget < 2) continue;
+    const budget = week.budgetKm * 0.97 - frozenKm;
+    // As many runs as the longest-run share is read for, so equal runs always pass it.
+    const wanted = longShareRuns(week, ctx) - frozen.length;
+    const picked = pickDays(candidates, wanted, longDate);
+    if (!picked.length) continue;
 
-    const share = maxLongShare(picked.length + frozen.length);
-    const others = picked.filter((date) => date !== longDate);
-    const longWanted = picked.includes(longDate ?? "") ? budget * Math.min(1, share) : 0;
-    const each = (budget - longWanted) / Math.max(1, others.length);
-    const sizes = new Map<string, number>();
-    for (const date of others) {
+    // Grow every run by half a km a round, all together so no run outgrows the longest-run share,
+    // until the budget, a day's time, or the longest-run rule stops it.
+    const share = maxLongShare(longShareRuns(week, ctx));
+    const cap = (date: string) => {
       const minutes = dayMinutes(availability, weekday(date))!;
-      sizes.set(date, halfKm(Math.min(each, kmIn(minutes), spikeLimit(date))));
-    }
-    const othersKm = [...sizes.values()].reduce((sum, km) => sum + km, 0);
-    if (longDate) {
-      const minutes = Math.min(MAX_LONG_MINUTES, dayMinutes(availability, weekday(longDate))!);
-      const byShare =
-        share >= 1 ? Number.POSITIVE_INFINITY : ((frozenKm + othersKm) * share) / (1 - share);
-      sizes.set(
-        longDate,
-        halfKm(Math.min(budget - othersKm, kmIn(minutes), spikeLimit(longDate), byShare)),
-      );
+      const time = date === longDate ? Math.min(MAX_LONG_MINUTES, minutes) : minutes;
+      return Math.min(kmIn(time), spikeLimit(date));
+    };
+    const sizes = new Map(picked.map((date) => [date, Math.min(2, halfKm(cap(date)))]));
+    const sum = () => frozenKm + [...sizes.values()].reduce((total, km) => total + km, 0);
+    const growing = new Set(picked);
+    while (growing.size) {
+      for (const date of growing) {
+        if (sum() - frozenKm + 0.5 > budget || sizes.get(date)! + 0.5 > cap(date)) {
+          growing.delete(date);
+          continue;
+        }
+        sizes.set(date, sizes.get(date)! + 0.5);
+      }
+      for (const date of picked) {
+        if (sizes.get(date)! <= share * sum() + 0.01) continue;
+        sizes.set(date, sizes.get(date)! - 0.5);
+        growing.delete(date);
+      }
     }
 
     // One threshold run when the week allows quality and has no race: on a day with no hard day
@@ -127,11 +138,13 @@ export function mockCoachPlan(
       races.length;
     const tempoDate =
       qualityLeft > 0 && week.phase !== "recovery"
-        ? others.find(
+        ? picked.find(
             (date) =>
+              date !== longDate &&
               (sizes.get(date) ?? 0) >= 5 &&
               addDayKey(date, 1) !== longDate &&
-              !hardDays.has(addDayKey(date, 1)),
+              !hardDays.has(addDayKey(date, 1)) &&
+              !hardDays.has(addDayKey(date, -1)),
           )
         : undefined;
 
