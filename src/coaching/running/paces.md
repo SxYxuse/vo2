@@ -32,12 +32,12 @@ When a session needs a race pace, write it as an effort ("10 km effort") with th
 
 Per session, counting only the work at that pace (Daniels, via [Coach Ray](https://www.coachray.nz/2023/05/03/jack-daniels-running-intensity/)). Treat these as firm: they size every quality session (`sessions.md`).
 
-| Pace | Most in one session                        | At 20 km a week | At 40 km | At 60 km |
-| ---- | ------------------------------------------ | --------------- | -------- | -------- |
-| M    | under 20 % of the week, and 1 h 50 at most | 4 km            | 8 km     | 12 km    |
-| T    | 10 % of the week                           | 2 km            | 4 km     | 6 km     |
-| I    | 8 % of the week                            | 1.6 km          | 3.2 km   | 4.8 km   |
-| R    | 5 % of the week                            | 1 km            | 2 km     | 3 km     |
+| Pace | Most in one session                  | At 20 km a week | At 40 km | At 60 km |
+| ---- | ------------------------------------ | --------------- | -------- | -------- |
+| M    | 20 % of the week, and 1 h 50 at most | 4 km            | 8 km     | 12 km    |
+| T    | 10 % of the week                     | 2 km            | 4 km     | 6 km     |
+| I    | 8 % of the week                      | 1.6 km          | 3.2 km   | 4.8 km   |
+| R    | 5 % of the week                      | 1 km            | 2 km     | 3 km     |
 
 - T: an athlete who can run 20 minutes at T pace can run about 30 minutes as cruise intervals, still within the cap.
 - I: each repeat 3–5 minutes; recovery 2–3 minutes of jogging, or about equal to the work.

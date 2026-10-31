@@ -31,7 +31,7 @@ Cool-down: 1.5 km E
 
 ## Sizing a quality session
 
-The work at each pace in one session is capped by the week's distance (Daniels; table in `paces.md`): M under 20 % (and 1 h 50 at most), T 10 %, I 8 %, R 5 %. Count only the work at that pace, not the warm-up, cool-down, or recoveries.
+The work at each pace in one session is capped by the week's distance (Daniels; table in `paces.md`): M 20 % (and 1 h 50 at most), T 10 %, I 8 %, R 5 %. Count only the work at that pace, not the warm-up, cool-down, or recoveries.
 
 1. Take the week's budget from VO2.
 2. Multiply by the cap for the session's pace. That is the most work at that pace.
@@ -105,7 +105,7 @@ Fast finish, at a 60 km week (18 km at most):
 last 3 km steady
 ```
 
-Marathon pace, at a 70 km week (21 km at most; M under 14 km):
+Marathon pace, at a 70 km week (21 km at most; M 14 km at most):
 
 ```
 Warm-up: 4 km E
@@ -113,7 +113,7 @@ Warm-up: 4 km E
 Cool-down: 4 km E
 ```
 
-- Marathon-pace long run (build and peak, half and marathon goals only): a middle block at M, under 20 % of the week and 1 h 50 at most (Daniels). Counts as a quality session.
+- Marathon-pace long run (build and peak, half and marathon goals only): a middle block at M, at most 20 % of the week and 1 h 50 (Daniels). Counts as a quality session.
 - Fast finish: the last 15–20 % steady, never faster than M. Counts as quality only when the finish is at M or faster.
 
 ## Threshold: tempo run
@@ -220,7 +220,7 @@ Warm-up: 3 km E
 Cool-down: 2 km E
 ```
 
-Marathon, at a 60 km week (M under 12 km):
+Marathon, at a 60 km week (M 12 km at most):
 
 ```
 Warm-up: 2 km E
