@@ -112,6 +112,11 @@ export type SeasonData = {
   past: PastGoal[];
   /** Weeks from this one through the last goal, if every week hits its target. */
   map: SeasonWeek[];
+  /**
+   * The VDOT of the athlete's training paces, for predicted race times; null without running
+   * history, and undefined when no upcoming goal has a time to predict.
+   */
+  vdot?: number | null;
 };
 
 /** The sport types a goal can pick: those the athlete shows in Settings. */

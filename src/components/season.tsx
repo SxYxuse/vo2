@@ -18,7 +18,11 @@ import { cn } from "cn";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { SeasonChangePrompt, notifySeasonCheck } from "@/components/plan-adapt.tsx";
-import { formatDistanceKm, formatElevation } from "@/services/activity-detail.types.ts";
+import {
+  formatDistanceKm,
+  formatDuration,
+  formatElevation,
+} from "@/services/activity-detail.types.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { createEvent, createGoal, deleteGoal, pasteSeason, updateGoal } from "@/services/season.ts";
 import {
@@ -39,6 +43,11 @@ import {
   type SeasonEvent,
 } from "@/services/season.types.ts";
 import { sportGroupFor } from "@/services/sport-groups.ts";
+import {
+  canPredict,
+  predictRaceSeconds,
+  predictsRaceTime,
+} from "@/services/training-paces.types.ts";
 import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,6 +123,16 @@ function goalFacts(goal: Goal) {
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+/** The predicted race time for a road-run goal, or why there is none. */
+function goalPrediction(goal: Goal, vdot: SeasonData["vdot"]) {
+  if (vdot === undefined || !predictsRaceTime(goal.sportType) || goal.distanceM == null) {
+    return null;
+  }
+  if (!canPredict(goal.distanceM)) return null;
+  if (vdot == null) return "No recent runs to predict a time from";
+  return `Predicted ${formatDuration(predictRaceSeconds(vdot, goal.distanceM))}`;
 }
 
 function isHilly(goal: Goal) {
@@ -357,6 +376,7 @@ function EventCard({
         {event.goals.map((goal) => {
           const group = sportGroupFor(goal.sportType)?.id;
           const Icon = group ? SPORT_STYLE[group].icon : FlagIcon;
+          const prediction = goalPrediction(goal, data.vdot);
           return (
             <li key={goal.id}>
               <button
@@ -373,10 +393,17 @@ function EventCard({
                   aria-hidden
                   className={cn("size-4 shrink-0", group ? SPORT_STYLE[group].text : "")}
                 />
-                <span className="min-w-0 flex-1 truncate">
-                  {goalFacts(goal)}
-                  {goal.elevationGainM ? ` · ${formatElevation(goal.elevationGainM)} D+` : ""}
-                  {isHilly(goal) ? " (hilly)" : ""}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate">
+                    {goalFacts(goal)}
+                    {goal.elevationGainM ? ` · ${formatElevation(goal.elevationGainM)} D+` : ""}
+                    {isHilly(goal) ? " (hilly)" : ""}
+                  </span>
+                  {prediction ? (
+                    <span className="text-muted-foreground truncate text-xs tabular-nums">
+                      {prediction}
+                    </span>
+                  ) : null}
                 </span>
                 <ChevronRightIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
               </button>

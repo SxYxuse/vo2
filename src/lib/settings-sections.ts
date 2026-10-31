@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   CalendarDaysIcon,
+  GaugeIcon,
   HeartPulseIcon,
   RefreshCwIcon,
   SparklesIcon,
@@ -14,6 +15,7 @@ export const SETTINGS_SECTIONS = [
   { id: "training", label: "Training", icon: TargetIcon },
   { id: "sports", label: "Sports", icon: ActivityIcon },
   { id: "heart-rate", label: "Heart rate", icon: HeartPulseIcon },
+  { id: "paces", label: "Paces", icon: GaugeIcon },
   { id: "calendar", label: "Calendar", icon: CalendarDaysIcon },
   { id: "bests", label: "Bests", icon: TrophyIcon },
   { id: "coach", label: "Coach", icon: SparklesIcon },

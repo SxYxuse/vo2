@@ -26,6 +26,11 @@ const RUN_LABEL = new Map<number, string>(
   ]),
 );
 
+/** A run distance by its spoken name, such as "5 miles" or "Half marathon". */
+export function runDistanceLabel(metres: number) {
+  return RUN_LABEL.get(metres) ?? `${metres / 1000} km`;
+}
+
 const DAYS_LABEL = { longest: "Longest", climbing: "Most climbing", climb: "Biggest climb" };
 
 export function durationLabel(seconds: number) {
