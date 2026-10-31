@@ -1,10 +1,17 @@
 import { expect, type Page } from "@playwright/test";
 
 /**
- * Connects mock Strava, copies the training, and finishes onboarding, ending on This week. Shared
- * by the e2e setup and the signed-in Lighthouse run (scripts/lighthouse.ts).
+ * Connects mock Strava, copies the training, and finishes onboarding, ending on This week, or on
+ * the calendar with planning off. Shared by the e2e setup, the teardown, and the signed-in
+ * Lighthouse run (scripts/lighthouse.ts).
  */
-export async function onboardNewAthlete(page: Page) {
+export async function onboardNewAthlete(
+  page: Page,
+  {
+    onPlanningStyle,
+    planningOff = false,
+  }: { onPlanningStyle?: () => Promise<void>; planningOff?: boolean } = {},
+) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
 
@@ -26,6 +33,24 @@ export async function onboardNewAthlete(page: Page) {
   await expect(page.getByRole("heading", { name: "Your sports" })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Ride sports" })).toBeChecked();
   await expect(page.getByRole("switch", { name: "Run sports" })).toBeChecked();
+  await next.click();
+
+  await expect(page.getByRole("heading", { name: "Planning style" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Week planner/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Coach plan/ })).toBeDisabled();
+  await onPlanningStyle?.();
+  if (planningOff) {
+    // Off saves the setup at once and skips the plan builder; the key step still follows.
+    await page.getByRole("radio", { name: /^Off/ }).click();
+    await next.click();
+    await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
+    await page.getByRole("button", { name: "Skip for now" }).click();
+    await expect(page.getByText(/^Planning is off:/)).toBeVisible();
+    await page.getByRole("button", { name: "Open the calendar" }).click();
+    await page.waitForURL("/");
+    await expect(page.getByRole("heading", { name: "Activity calendar" })).toBeVisible();
+    return;
+  }
   await next.click();
 
   await expect(page.getByRole("heading", { name: "Your season" })).toBeVisible();

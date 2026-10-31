@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -18,6 +19,7 @@ import {
 
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
+import { appShellQueryOptions } from "@/lib/app-shell-query.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
@@ -181,6 +183,12 @@ export function AppSidebar() {
   const { isMobile } = useSidebar();
   const lastHref = useLastHrefOutsideSettings();
   const inSettings = isSettingsPath(pathname);
+  const { data: shell } = useSuspenseQuery(appShellQueryOptions);
+  // This week is the week planner's; with planning off it says so, reached from Settings.
+  const trainingItems =
+    shell.planningStyle === "off"
+      ? TRAINING_NAV_ITEMS.filter((item) => item.to !== "/week")
+      : TRAINING_NAV_ITEMS;
 
   return (
     <Sidebar collapsible="icon">
@@ -212,7 +220,7 @@ export function AppSidebar() {
               <SidebarGroupLabel>Training</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarNavMenu
-                  items={TRAINING_NAV_ITEMS}
+                  items={trainingItems}
                   pathname={pathname}
                   onLinkClick={onLinkClick}
                 />

@@ -1,9 +1,14 @@
 import { useMemo } from "react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
+import { Link, createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { SessionDetail } from "@/components/session-detail.tsx";
-import { loaderQuery, weekCoachQueryOptions, weekTargetQueryOptions } from "@/lib/queries.ts";
+import {
+  isPlanningOff,
+  loaderQuery,
+  weekCoachQueryOptions,
+  weekTargetQueryOptions,
+} from "@/lib/queries.ts";
 import { matchWeek, sessionRecommendation } from "@/services/week-plan.ts";
 import { summarizeWeek } from "@/services/week-target.ts";
 import { Button } from "@/components/ui/button";
@@ -31,9 +36,11 @@ export const Route = createFileRoute("/_app/week_/session")({
       : {}),
     ...(typeof search.id === "string" && search.id ? { id: search.id } : {}),
   }),
-  loader: ({ context }) => {
+  loader: async ({ context }) => {
+    // This week says planning is off and leads back to it.
+    if (await isPlanningOff(context)) throw redirect({ to: "/week", replace: true });
     void context.queryClient.prefetchQuery(weekCoachQueryOptions);
-    return context.queryClient.query(loaderQuery(weekTargetQueryOptions));
+    await context.queryClient.query(loaderQuery(weekTargetQueryOptions));
   },
   pendingMs: 200,
   pendingComponent: SessionPending,

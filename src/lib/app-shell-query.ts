@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, type QueryClient } from "@tanstack/react-query";
 
 import { loadAppShell } from "@/services/app-shell.ts";
 
@@ -15,3 +15,13 @@ export const appShellQueryOptions = queryOptions({
   queryFn: () => loadAppShell(),
   staleTime: 60_000,
 });
+
+/** For the week planner's routes: with planning off they have nothing to load (ADR 0037). */
+export async function isPlanningOff(context: {
+  queryClient: QueryClient;
+  offlineCopyRestored: Promise<void>;
+}) {
+  await context.offlineCopyRestored;
+  const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
+  return shell.planningStyle === "off";
+}

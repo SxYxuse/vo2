@@ -42,7 +42,12 @@ import {
   signed,
   weekdayShort,
 } from "@/components/planned-session.ts";
-import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
+import {
+  SETUP_CARD,
+  SETUP_FOOTER,
+  SETUP_PLAN_STEP,
+  SetupProgress,
+} from "@/components/onboarding-shell.tsx";
 import { ListSkeleton, PanelSkeleton } from "@/components/route-states.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { StatCard, StatGrid } from "@/components/stat-card.tsx";
@@ -168,7 +173,7 @@ function BuilderSteps({
       <CardHeader className="gap-2 border-b">
         {onboarding ? (
           <div className="col-span-full">
-            <SetupProgress step={3} substep={{ index, count: STEPS.length }} />
+            <SetupProgress step={SETUP_PLAN_STEP} substep={{ index, count: STEPS.length }} />
           </div>
         ) : (
           <CardDescription>

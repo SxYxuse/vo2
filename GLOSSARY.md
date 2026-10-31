@@ -72,6 +72,34 @@ _Avoid_: Cache, mirror
 
 ## Planning
 
+**Planning style**:
+How VO2 plans the athlete's training, chosen in onboarding and settings: off, the week planner, or the coach plan. Off leaves Season and the calendar but plans nothing.
+_Avoid_: Plan type, planning mode
+
+**Week planner**:
+The planning style where VO2's own rules set each week's time per sport and its key sessions, and lay them out on the athlete's free days.
+_Avoid_: Algorithmic plan, classic plan
+
+**Coach plan**:
+The planning style where the coach writes precise sessions for the next four weeks on the athlete's availability, toward an A goal, inside the weekly distance VO2 allows. For now it plans runs only. It is a coach feature (ADR 0037).
+_Avoid_: AI plan, Runna plan
+
+**Availability**:
+What the athlete gives the coach plan: how many runs a week, the days they can run, the time they have each day, and the long run day.
+_Avoid_: Schedule, rest days (that is the week planner's term), week shape
+
+**Training paces**:
+The pace ranges the coach plan's sessions target, from easy to repetition, read from the athlete's current fitness. A race result the athlete sets wins over the estimate from best efforts.
+_Avoid_: Zones (those are heart rate), target pace, goal pace
+
+**Predicted race time**:
+The time VO2 expects the athlete to run a goal's distance today, read from their training paces. Goals have no target time; the prediction takes its place.
+_Avoid_: Goal time, target time, race estimate
+
+**Plan change**:
+A change to the coach plan the coach proposes in the chat or from a note on a day, shown day by day before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
+_Avoid_: Re-plan (that is the week planner laying the week out again), adaptation, edit
+
 **Training plan**:
 What the athlete built in the plan builder: the week's shape (rest days, long session day, double-session days, sports to plan), the plan goals, when it started, and an optional starting point after a break. Settings → Training edits the shape; rebuilding the plan replaces it all (ADR 0026).
 _Avoid_: Program, schedule, calendar
@@ -93,7 +121,7 @@ A race or event on the athlete's season: name, sport type, date, distance, eleva
 _Avoid_: Target (that is the week's hours), race (not every goal is one)
 
 **Objective**:
-What the athlete wants from a goal: finish, finish well, or perform. On the goal the plan leads to, it sets how fast fitness rises and how many key sessions a week (one, two, or three); on a B or C goal it sets how many easy days go around it (ADR 0026).
+What the athlete wants from a goal: finish, finish well, or perform. On the goal the plan leads to, it sets how fast fitness rises and how many key sessions a week (one, two, or three); on a B or C goal it sets how many easy days go around it (ADR 0026). Only the week planner uses it; with the coach plan it is hidden and every goal is perform.
 _Avoid_: Priority, ambition
 
 **Priority**:
@@ -141,7 +169,7 @@ The training week laid out Monday to Sunday: key, easy, and second sessions, res
 _Avoid_: Schedule, calendar (that shows activities), day plan
 
 **Session status**:
-How a planned session stands against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned. An activity that fills no planned session is extra.
+How a planned session stands against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned. An activity that fills no planned session is extra. In the coach plan, a run linked or unlinked by the athlete wins over the automatic match.
 _Avoid_: Completed, compliance
 
 **Coach note**:
@@ -149,11 +177,11 @@ What the athlete tells the coach about a day: a quick choice (can't train, short
 _Avoid_: Comment, feedback, journal
 
 **Coach**:
-The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season without changing any of them. It also reads coach notes into the week plan and writes activity analyses. It runs only on the athlete's OpenRouter key.
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan, reads coach notes, and writes activity analyses. It runs only on the athlete's OpenRouter key.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:
-One of the three things the coach does: activity analysis, reading coach notes in the athlete's own words, and coach chat. The athlete picks the model for each one. Quick-choice coach notes are not a coach feature: they need no model.
+One of the four things the coach does: activity analysis, reading coach notes in the athlete's own words, coach chat, and writing the coach plan. The athlete picks the model for each one. Quick-choice coach notes are not a coach feature: they need no model.
 _Avoid_: AI feature
 
 **Activity analysis**:

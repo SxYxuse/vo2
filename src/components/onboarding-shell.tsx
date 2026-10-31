@@ -32,10 +32,14 @@ export const SETUP_FOOTER =
 /** Sticky needs the card to let its footer escape: no clipping, no bottom padding of its own. */
 export const SETUP_CARD = "overflow-visible pb-0";
 
+/** The plan builder's step, which the athlete skips with planning off. */
+export const SETUP_PLAN_STEP = 4;
+
 export const SETUP_STEP_TITLES = [
   "Copy from Strava",
   "About you",
   "Your sports",
+  "Planning style",
   "Your plan",
   "Your coach",
   "You're set",
@@ -50,12 +54,15 @@ export function SetupProgress({
   substep,
   onSelect,
   locked = false,
+  skipped,
 }: {
   step: number;
   substep?: { index: number; count: number; title?: string };
   /** Going back to an earlier step; later steps stay closed. */
   onSelect?: (step: number) => void;
   locked?: boolean;
+  /** A step the athlete's choices passed over, such as the plan with planning off. */
+  skipped?: number;
 }) {
   const total = SETUP_STEP_TITLES.length;
   const title = SETUP_STEP_TITLES[step];
@@ -67,14 +74,15 @@ export function SetupProgress({
       </p>
       <ol aria-label="Setup steps" className="flex gap-1">
         {SETUP_STEP_TITLES.map((item, index) => {
-          const done = index < step;
+          const isSkipped = index === skipped && index < step;
+          const done = index < step && !isSkipped;
           const current = index === step;
           const open = !locked && done && onSelect != null;
           return (
             <li key={item} className="flex-1">
               <button
                 type="button"
-                aria-label={`${item}${done ? ", done" : current ? ", current step" : ""}`}
+                aria-label={`${item}${isSkipped ? ", skipped" : done ? ", done" : current ? ", current step" : ""}`}
                 aria-current={current ? "step" : undefined}
                 disabled={!open}
                 onClick={() => onSelect?.(index)}

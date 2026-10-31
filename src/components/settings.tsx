@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import { CheckIcon } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { afterSettingsSaved } from "@/lib/query-events.ts";
@@ -22,8 +22,9 @@ import {
   type SettingsSection,
 } from "@/lib/settings-sections.ts";
 import { saveAthleteSettings } from "@/services/athlete-settings.ts";
+import { planningStyleOf } from "@/services/athlete-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import { dayKey } from "@/services/training-plan.ts";
+import { dayKey, isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -40,6 +41,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
   CelebrateTopEffortsField,
+  PlanningStyleChoice,
   PlanSummary,
   ProfileFields,
   TrainingShapeField,
@@ -98,6 +100,7 @@ export function SettingsForm({
     enableBeforeUnload: () => status === "error" || saving.current || timer.current != null,
     withResolver: true,
   });
+  const planningStyle = useWatch({ control: form.control, name: "planningStyle" });
   const sectionLabel =
     SETTINGS_SECTIONS.find((item) => item.id === section)?.label ?? SETTINGS_SECTIONS[0].label;
 
@@ -113,6 +116,12 @@ export function SettingsForm({
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
         celebrateTopEfforts: data.settings.topEffortsSince != null,
+        // The coach plan can't be saved yet (#137), so no saved style reads as it.
+        planningStyle:
+          planningStyleOf(data.settings.planningStyle, isTrainingPlanComplete(data.training)) ===
+          "off"
+            ? "off"
+            : "weekPlanner",
         timeZone,
       }),
       { keepDirtyValues: true, keepErrors: true },
@@ -244,14 +253,31 @@ export function SettingsForm({
               </>
             ) : section === "training" ? (
               <FieldGroup>
-                <PlanSummary
-                  plan={data.training}
-                  today={dayKey(new Date(), data.training?.timeZone ?? timeZone)}
+                <Controller
+                  name="planningStyle"
+                  control={form.control}
+                  render={({ field }) => (
+                    <PlanningStyleChoice
+                      idPrefix="settings"
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
-                {data.training ? (
+                {/* Off keeps the week planner's plan saved; only its settings hide. */}
+                {planningStyle === "weekPlanner" ? (
                   <>
                     <FieldSeparator />
-                    <TrainingShapeField control={form.control} />
+                    <PlanSummary
+                      plan={data.training}
+                      today={dayKey(new Date(), data.training?.timeZone ?? timeZone)}
+                    />
+                    {data.training ? (
+                      <>
+                        <FieldSeparator />
+                        <TrainingShapeField control={form.control} />
+                      </>
+                    ) : null}
                   </>
                 ) : null}
               </FieldGroup>

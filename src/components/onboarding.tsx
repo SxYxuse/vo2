@@ -24,14 +24,18 @@ import {
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { useSyncAutoResume } from "@/hooks/use-sync-auto-resume.ts";
 import { saveAthleteSettings, saveProfile } from "@/services/athlete-settings.ts";
-import { hidesEverySportType, SHOW_ONE_SPORT_MESSAGE } from "@/services/athlete-settings.types.ts";
+import {
+  hidesEverySportType,
+  SHOW_ONE_SPORT_MESSAGE,
+  type ChosenPlanningStyle,
+} from "@/services/athlete-settings.types.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
 import { startPlan } from "@/services/plan-builder.ts";
 import type { PlanDraft } from "@/services/plan-builder.types.ts";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
-import { BirthDateField, WeightField } from "@/components/settings-fields.tsx";
+import { BirthDateField, PlanningStyleChoice, WeightField } from "@/components/settings-fields.tsx";
 import { PlanBuilder } from "@/components/plan-builder.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -45,7 +49,12 @@ import {
 } from "@/components/ui/empty";
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
+import {
+  SETUP_CARD,
+  SETUP_FOOTER,
+  SETUP_PLAN_STEP,
+  SetupProgress,
+} from "@/components/onboarding-shell.tsx";
 import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
 
 const STEPS = [
@@ -65,6 +74,11 @@ const STEPS = [
     title: "Your sports",
     description:
       "Choose what shows in your calendar, map, and heart rate, and the gear you train with.",
+  },
+  {
+    id: "style",
+    title: "Planning style",
+    description: "Pick how VO2 plans your training. Change it anytime in Settings → Training.",
   },
   {
     id: "plan",
@@ -90,6 +104,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const { data } = useSuspenseQuery(settingsSnapshotQueryOptions);
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [planningStyle, setPlanningStyle] = useState<ChosenPlanningStyle>("weekPlanner");
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
@@ -131,15 +146,17 @@ export function OnboardingForm({ userName }: { userName: string }) {
     activityCount: syncStatus?.activityCount ?? 0,
   });
 
-  // The plan first, then the profile and sports: the app opens once both are saved.
+  // The week planner's plan first, then the profile, sports, and planning style: the app opens
+  // once they are saved. With planning off there is no plan to start.
   const save = useMutation({
-    mutationFn: async ({ draft, values }: { draft: PlanDraft; values: OnboardingFormValues }) => {
-      await startPlan({ data: draft });
+    mutationFn: async ({ draft, values }: { draft?: PlanDraft; values: OnboardingFormValues }) => {
+      if (draft) await startPlan({ data: draft });
       return saveAthleteSettings({
         data: {
           profile: profileFromForm(values),
           sportTypes: values.sportTypes,
           sportGroupShares: values.sportGroupShares,
+          planningStyle,
         },
       });
     },
@@ -180,10 +197,15 @@ export function OnboardingForm({ userName }: { userName: string }) {
       setStepIndex((current) => current + 1);
       return;
     }
+    if (step.id === "style") {
+      if (planningStyle === "weekPlanner") setStepIndex((current) => current + 1);
+      else await startWith();
+      return;
+    }
     if (step.id === "coach") setStepIndex((current) => current + 1);
   }
 
-  async function startWith(draft: PlanDraft) {
+  async function startWith(draft?: PlanDraft) {
     const ok = await form.trigger([...PROFILE_FIELDS, ...SPORTS_FIELDS]);
     if (!ok) {
       setSaveError("Check your birthday, weight, and sports in the steps before.");
@@ -226,7 +248,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
     >
       <Card className={SETUP_CARD}>
         <CardHeader className="gap-2 border-b">
-          <SetupProgress step={stepIndex} onSelect={goToStep} locked={planSaved} />
+          <SetupProgress
+            step={stepIndex}
+            onSelect={goToStep}
+            locked={planSaved}
+            skipped={planningStyle === "off" ? SETUP_PLAN_STEP : undefined}
+          />
           <h1 className="text-xl font-semibold tracking-tight">
             {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
           </h1>
@@ -271,6 +298,14 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   </FieldDescription>
                 ) : null}
               </>
+            ) : step.id === "style" ? (
+              <PlanningStyleChoice
+                idPrefix="onboard"
+                value={planningStyle}
+                onChange={setPlanningStyle}
+                disabled={save.isPending}
+                titled={false}
+              />
             ) : step.id === "coach" ? (
               <CoachKeyField idPrefix="onboard" />
             ) : (
@@ -283,9 +318,12 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   </EmptyMedia>
                   <EmptyTitle>Ready to train</EmptyTitle>
                   <EmptyDescription>
-                    {copyUnfinished
-                      ? "Your plan is set: This week shows your days. Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause. Change your week or rebuild the plan from Settings."
+                    {planningStyle === "off"
+                      ? "Planning is off: the calendar, Season, and fitness are ready. Pick a planning style anytime in Settings."
                       : "Your plan is set: This week shows your days. Change your week or rebuild the plan from Settings."}
+                    {copyUnfinished
+                      ? " Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause."
+                      : null}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -304,11 +342,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
               type="button"
               className="w-full sm:w-auto"
               onClick={() => {
-                void navigate({ to: "/week" });
+                void navigate({ to: planningStyle === "off" ? "/" : "/week" });
               }}
             >
               <CalendarDaysIcon data-icon="inline-start" />
-              Open This week
+              {planningStyle === "off" ? "Open the calendar" : "Open This week"}
             </Button>
           ) : (
             <>

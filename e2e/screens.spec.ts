@@ -14,6 +14,7 @@ const SCREENS = [
   { name: "heart-rate", path: "/heart-rate", heading: null },
   { name: "map", path: "/map", heading: null },
   { name: "settings", path: "/settings/profile", heading: null },
+  { name: "settings-training", path: "/settings/training", heading: null },
   { name: "settings-coach", path: "/settings/coach", heading: null },
 ] as const;
 

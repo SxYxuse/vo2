@@ -19,7 +19,7 @@ import { loadFitnessData } from "@/services/training-load.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
 
 // Apart so the sign-in page can read the app shell without loading every service's validators.
-export { appShellQueryOptions, loaderQuery } from "./app-shell-query.ts";
+export { appShellQueryOptions, isPlanningOff, loaderQuery } from "./app-shell-query.ts";
 
 export const homeQueryOptions = queryOptions({
   queryKey: ["home"],

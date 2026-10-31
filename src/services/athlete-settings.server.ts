@@ -51,6 +51,10 @@ async function copiedSportTypes(userId: string) {
   return rows.map((row) => row.sportType);
 }
 
+export async function storedPlanningStyle(userId: string) {
+  return (await storedAthleteSettings(userId))?.planningStyle ?? null;
+}
+
 /** Settings with an entry for every sport type in the athlete's local copy. */
 export async function getAthleteSettings(userId: string): Promise<AthleteSettings> {
   const [stored, sportTypes] = await Promise.all([
@@ -207,6 +211,7 @@ export async function saveAthleteSettingsImpl(
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
     sportGroupShares: value.sportGroupShares,
     calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
+    planningStyle: value.planningStyle ?? stored?.planningStyle ?? null,
     topEffortsSince: nextTopEffortsSince(
       stored?.topEffortsSince ?? null,
       value.celebrateTopEfforts,
@@ -276,7 +281,10 @@ export async function saveAthleteSettingsImpl(
   }
 
   const saved = training ?? (await getTrainingPlanForUser(userId));
-  logger.info("settings.saved", { hasTraining: Boolean(saved) });
+  logger.info("settings.saved", {
+    hasTraining: Boolean(saved),
+    planningStyle: settings.planningStyle,
+  });
   return { profile: value.profile, settings, training: saved, heartRate };
 }
 
