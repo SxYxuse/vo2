@@ -4,7 +4,10 @@ import { expect, type Page } from "@playwright/test";
  * Connects mock Strava, copies the training, and finishes onboarding, ending on This week. Shared
  * by the e2e setup and the signed-in Lighthouse run (scripts/lighthouse.ts).
  */
-export async function onboardNewAthlete(page: Page) {
+export async function onboardNewAthlete(
+  page: Page,
+  { onPlanningStyle }: { onPlanningStyle?: () => Promise<void> } = {},
+) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
 
@@ -26,6 +29,12 @@ export async function onboardNewAthlete(page: Page) {
   await expect(page.getByRole("heading", { name: "Your sports" })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Ride sports" })).toBeChecked();
   await expect(page.getByRole("switch", { name: "Run sports" })).toBeChecked();
+  await next.click();
+
+  await expect(page.getByRole("heading", { name: "Planning style" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Week planner/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /Coach plan/ })).toBeDisabled();
+  await onPlanningStyle?.();
   await next.click();
 
   await expect(page.getByRole("heading", { name: "Your season" })).toBeVisible();

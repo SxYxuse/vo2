@@ -1,4 +1,4 @@
-import { test, expect, settle, type Page } from "./test.ts";
+import { test, expect, settle, syncButton, type Page } from "./test.ts";
 
 // An installed PWA has no browser back button: the in-app link is the way back on iOS, and the
 // system back gesture on Android.
@@ -45,6 +45,56 @@ test("a model picked for a coach feature stays picked on every visit", async ({ 
   // Back to the default, so the other specs see the athlete as the setup left them.
   await page.getByRole("combobox", { name: "Coach chat" }).selectOption("openai/gpt-6-luna");
   await settle(page);
+});
+
+test("an athlete turns planning off and back on, and gets their week planner back", async ({
+  page,
+}) => {
+  // The sidebar is open on desktop; on a phone it opens as a sheet, left open for the next load.
+  const thisWeekLinks = async () => {
+    if (test.info().project.name === "phone") {
+      await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+      await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
+    }
+    return page.getByRole("link", { name: "This week", exact: true }).count();
+  };
+  // A reload restores the views saved on the device, written at most once a second
+  // (offline-copy.ts); reloading sooner after a save would show the views from before it.
+  const keptOnDevice = () => page.waitForTimeout(1500);
+  await page.goto("/settings/training");
+  await settle(page);
+  await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
+
+  await page.getByRole("radio", { name: /^Off/ }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rebuild plan" })).toHaveCount(0);
+  await keptOnDevice();
+
+  await page.goto("/week");
+  await expect(page.getByText("Planning is off")).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot("week-planning-off.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+  expect(await thisWeekLinks()).toBe(0);
+  await page.goto("/plan");
+  await page.waitForURL("/week");
+  await expect(page.getByText("Planning is off")).toBeVisible();
+
+  await page.getByRole("button", { name: "Choose a planning style" }).click();
+  await page.waitForURL("/settings/training");
+  await settle(page);
+  await page.getByRole("radio", { name: /^Week planner/ }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rebuild plan" })).toBeVisible();
+  await keptOnDevice();
+
+  await page.goto("/week");
+  await expect(page.getByRole("button", { name: "Today: open the day" })).toContainText(
+    "Lunch run",
+  );
+  expect(await thisWeekLinks()).toBe(1);
 });
 
 // The mock coach answers without a key, so these prove the client and server still speak the

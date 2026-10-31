@@ -11,7 +11,6 @@ import { OnboardingShell } from "@/components/onboarding-shell.tsx";
 import { authClient } from "@/lib/auth-client.ts";
 import { appShellQueryOptions, loaderQuery, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
 import { isSetUp } from "@/services/app-setup.ts";
-import { isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RouteError } from "@/components/route-states.tsx";
 
@@ -43,7 +42,7 @@ function OnboardingPage() {
 
   return (
     <OnboardingShell>
-      {isTrainingPlanComplete(shell.training) && !shell.hasProfile ? (
+      {shell.planningStyle != null && !shell.hasProfile ? (
         <ProfilePrompt />
       ) : (
         <OnboardingForm userName={session?.user.name ?? ""} />

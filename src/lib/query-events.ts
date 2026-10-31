@@ -12,9 +12,10 @@ import {
   weekTargetQueryOptions,
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
+import { planningStyleOf } from "@/services/athlete-settings.types.ts";
 import { checkSeason } from "@/services/plan-builder.ts";
 import type { SeasonCheck } from "@/services/plan-builder.types.ts";
-import type { TrainingPlan } from "@/services/training-plan.types.ts";
+import { isTrainingPlanComplete, type TrainingPlan } from "@/services/training-plan.types.ts";
 
 /*
  * Callers name what happened; this module decides what goes stale. Settings, the profile, and
@@ -44,7 +45,15 @@ export function afterSettingsSaved(
   );
   queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
     current
-      ? { ...current, training: saved.training, ...(profileDone ? { hasProfile: true } : {}) }
+      ? {
+          ...current,
+          training: saved.training,
+          planningStyle: planningStyleOf(
+            saved.settings.planningStyle,
+            isTrainingPlanComplete(saved.training),
+          ),
+          ...(profileDone ? { hasProfile: true } : {}),
+        }
       : current,
   );
   return queryClient.invalidateQueries();
@@ -107,6 +116,7 @@ export function afterSignOut(queryClient: QueryClient) {
     signedIn: false,
     training: null,
     hasProfile: false,
+    planningStyle: null,
   });
   queryClient.removeQueries({
     predicate: (query) => query.queryKey[0] !== appShellQueryOptions.queryKey[0],

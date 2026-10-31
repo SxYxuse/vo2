@@ -4,7 +4,7 @@ import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { getAthleteSettings, storedPlanningStyle } from "./athlete-settings.server.ts";
 import { ageFromBirthDate, familyCollectors } from "./athlete-settings.types.ts";
 import { estimateMaxHrAnchor, histogramFromStreams, type HeartPeak } from "./heart-insights.ts";
 import {
@@ -123,6 +123,9 @@ export async function loadWeekTargetImpl(draft?: TrainingPlan): Promise<WeekPage
     return emptyWeek(false, "UTC");
   }
   const userId = session.user.id;
+  // With planning off the week planner's plan stays saved for a switch back, but plans nothing,
+  // so the week coach never loads or replans it either (ADR 0037).
+  if (!draft && (await storedPlanningStyle(userId)) === "off") return emptyWeek(true, "UTC");
   const plan = draft ?? (await getTrainingPlanForUser(userId));
   if (!plan) return emptyWeek(true, "UTC");
   const timeZone = plan.timeZone;

@@ -6,7 +6,10 @@ import { test, expect } from "./test.ts";
 test("a new athlete connects Strava, copies their training, and lands on their week", async ({
   page,
 }) => {
-  await onboardNewAthlete(page);
+  await onboardNewAthlete(page, {
+    onPlanningStyle: () =>
+      expect(page).toHaveScreenshot("onboarding-planning-style.png", { fullPage: true }),
+  });
   await expect(page.getByRole("button", { name: "Today: open the day" })).toContainText(
     "Lunch run",
   );

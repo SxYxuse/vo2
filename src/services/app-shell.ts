@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import type { PlanningStyle } from "./athlete-settings.types.ts";
 import type { TrainingPlan } from "./training-plan.types.ts";
 
 export type AppShellData = {
@@ -7,6 +8,8 @@ export type AppShellData = {
   training: TrainingPlan | null;
   /** False for athletes who onboarded before the birthday and weight were required. */
   hasProfile: boolean;
+  /** Null until the athlete picks one in onboarding. */
+  planningStyle: PlanningStyle | null;
 };
 
 export const loadAppShell = createServerFn({ method: "GET" }).handler(

@@ -168,7 +168,7 @@ function BuilderSteps({
       <CardHeader className="gap-2 border-b">
         {onboarding ? (
           <div className="col-span-full">
-            <SetupProgress step={3} substep={{ index, count: STEPS.length }} />
+            <SetupProgress step={4} substep={{ index, count: STEPS.length }} />
           </div>
         ) : (
           <CardDescription>

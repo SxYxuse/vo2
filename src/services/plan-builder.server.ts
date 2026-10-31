@@ -13,6 +13,7 @@ import {
   type PlanPreview,
   type SeasonCheck,
 } from "./plan-builder.types.ts";
+import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { projectRaceDay, projectSeason, seasonPhase } from "./season-phase.ts";
 import { goalsFor, seasonContext } from "./season.server.ts";
 import { anchorEvent, seasonEvents } from "./season.types.ts";
@@ -171,8 +172,12 @@ export async function adaptPlanImpl(): Promise<TrainingPlan | null> {
 export async function checkSeasonImpl(): Promise<SeasonCheck> {
   const session = await getRequiredSession();
   const userId = session.user.id;
-  const plan = await getTrainingPlanForUser(userId);
-  if (!plan) return { hasPlan: false, impact: null, adopted: null };
+  const [plan, style] = await Promise.all([
+    getTrainingPlanForUser(userId),
+    storedPlanningStyle(userId),
+  ]);
+  // The week planner's saved plan sleeps while planning is off; Season changes wait for it.
+  if (!plan || style === "off") return { hasPlan: false, impact: null, adopted: null };
   const { weekStart } = clock(plan.timeZone);
   const { impact, adopted } = await reconcileSeason(userId, plan, weekStart);
   if (adopted) await forgetWeekPlan(userId, weekStart);

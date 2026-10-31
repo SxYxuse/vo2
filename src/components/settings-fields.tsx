@@ -11,6 +11,8 @@ import {
   CALENDAR_PERIODS,
   formatBirthDate,
   parseBirthDate,
+  PLANNING_STYLES,
+  type ChosenPlanningStyle,
 } from "@/services/athlete-settings.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
@@ -280,6 +282,65 @@ export function PlanSummary({ plan, today }: { plan: TrainingPlan | null; today:
         <RefreshCwIcon data-icon="inline-start" />
         Rebuild plan
       </Button>
+    </FieldSet>
+  );
+}
+
+/** Off, the week planner, or the coach plan; the coach plan shows, not yet selectable (#137). */
+export function PlanningStyleChoice({
+  idPrefix,
+  value,
+  onChange,
+  disabled = false,
+  titled = true,
+}: {
+  idPrefix: string;
+  value: ChosenPlanningStyle;
+  onChange: (next: ChosenPlanningStyle) => void;
+  disabled?: boolean;
+  /** False where the page heading already names the choice, as in onboarding. */
+  titled?: boolean;
+}) {
+  return (
+    <FieldSet>
+      <FieldLegend className={titled ? undefined : "sr-only"}>Planning style</FieldLegend>
+      {titled ? (
+        <FieldDescription>
+          How VO2 plans your training. Switching keeps each style's setup, so you can come back to
+          it.
+        </FieldDescription>
+      ) : null}
+      <RadioGroup
+        name="planningStyle"
+        value={value}
+        disabled={disabled}
+        onValueChange={(next) => {
+          if (next === "off" || next === "weekPlanner") onChange(next);
+        }}
+        className="gap-2"
+      >
+        {PLANNING_STYLES.map((style) => {
+          const id = `${idPrefix}-planning-style-${style.id}`;
+          return (
+            <FieldLabel key={style.id} htmlFor={id} className="w-full">
+              <Field
+                orientation="horizontal"
+                className="items-start p-3"
+                data-disabled={!style.available || undefined}
+              >
+                <RadioGroupItem value={style.id} id={id} disabled={!style.available} />
+                <FieldContent>
+                  <FieldTitle>
+                    {style.label}
+                    {style.available ? null : <Badge variant="secondary">Coming soon</Badge>}
+                  </FieldTitle>
+                  <FieldDescription>{style.hint}</FieldDescription>
+                </FieldContent>
+              </Field>
+            </FieldLabel>
+          );
+        })}
+      </RadioGroup>
     </FieldSet>
   );
 }

@@ -36,6 +36,7 @@ export const SETUP_STEP_TITLES = [
   "Copy from Strava",
   "About you",
   "Your sports",
+  "Planning style",
   "Your plan",
   "Your coach",
   "You're set",
