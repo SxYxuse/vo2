@@ -16,6 +16,7 @@ import { loadPlanBuilder } from "@/services/plan-builder.ts";
 import type { PlanImpact } from "@/services/plan-impact.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
+import { loadTrainingPaces } from "@/services/training-paces.ts";
 import { loadWeekTarget } from "@/services/week-target.ts";
 
 // Apart so the sign-in page can read the app shell without loading every service's validators.
@@ -106,6 +107,12 @@ export const seasonChangeQueryOptions = queryOptions({
 export const heartRateQueryOptions = queryOptions({
   queryKey: ["heart-rate"],
   queryFn: () => loadHeartRate(),
+  staleTime: 5 * 60_000,
+});
+
+export const trainingPacesQueryOptions = queryOptions({
+  queryKey: ["training-paces"],
+  queryFn: () => loadTrainingPaces(),
   staleTime: 5 * 60_000,
 });
 

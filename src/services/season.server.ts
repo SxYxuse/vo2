@@ -7,6 +7,8 @@ import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts"
 import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
+import { trainingPacesFor } from "./training-paces.server.ts";
+import { predictsRaceTime } from "./training-paces.types.ts";
 import { getTrainingPlanForUser } from "./training-plan.server.ts";
 import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
 import { recentLoadPerHour } from "./week-target.ts";
@@ -138,9 +140,13 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     .filter((goal) => goal.date < today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
   const upcoming = seasonEvents(all.filter((goal) => goal.date >= today));
-  const [matched, context] = await Promise.all([
+  const predicts = upcoming.some((event) =>
+    event.goals.some((goal) => predictsRaceTime(goal.sportType) && goal.distanceM != null),
+  );
+  const [matched, context, paces] = await Promise.all([
     matchPastActivities(userId, past, timeZone),
     upcoming.length ? seasonContext(userId, timeZone, weekStart) : null,
+    predicts ? trainingPacesFor(userId, now) : null,
   ]);
 
   let map: SeasonData["map"] = [];
@@ -163,6 +169,7 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     upcoming,
     past: matched.reverse(),
     map,
+    ...(paces ? { vdot: paces.source === "none" ? null : paces.vdot } : {}),
   };
 }
 

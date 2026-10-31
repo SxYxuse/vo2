@@ -105,6 +105,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   restHr: real("rest_hr"),
   /** Anchors the athlete set and each sport's zone method; the columns above stay estimates. */
   heartRate: jsonb("heart_rate"),
+  /** A recent race result the athlete set; it wins over the training-pace estimate. */
+  raceResult: jsonb("race_result"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
   training: jsonb("training"),

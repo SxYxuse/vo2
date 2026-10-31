@@ -1,3 +1,4 @@
+import { E2E_NOW } from "./env.ts";
 import { test, expect, settle, syncButton, type Page } from "./test.ts";
 
 // An installed PWA has no browser back button: the in-app link is the way back on iOS, and the
@@ -144,6 +145,76 @@ test("an athlete turns planning off and back on, and gets their week planner bac
     // The other specs share this athlete and expect the week planner.
     await page.goto("/settings/training");
     await choosePlanningStyle(page, "Week planner", "weekPlanner");
+  }
+});
+
+/**
+ * Keeps the plan when a goal change asks to adapt it, so the other specs see it unchanged. The
+ * prompt is decided before the goal's dialog closes, so waiting for that is enough.
+ */
+async function keepCurrentPlan(page: Page, dialogHeading: string) {
+  await expect(page.getByRole("heading", { name: dialogHeading })).toHaveCount(0);
+  const keep = page.getByRole("button", { name: "Keep current plan" });
+  if (await keep.isVisible()) await keep.click();
+  await expect(keep).toHaveCount(0);
+}
+
+test("an athlete sets a race result, sees a predicted race time, and clears it", async ({
+  page,
+}) => {
+  const raceDay = new Date(Date.parse(E2E_NOW) + 35 * 86_400_000).toISOString().slice(0, 10);
+  try {
+    await page.goto("/settings/paces");
+    await settle(page);
+    await expect(page.getByText(/^Estimated from road runs/)).toBeVisible();
+    await page.getByRole("textbox", { name: "Time" }).fill("42:30");
+    await page.getByRole("button", { name: "Set race result" }).click();
+    await expect(page.getByText(/^From your race result: 10 km in 42:30/)).toBeVisible();
+
+    await page.goto("/season");
+    await settle(page);
+    await page.getByRole("button", { name: "More season actions" }).click();
+    await page.getByRole("menuitem", { name: "Paste season" }).click();
+    await page.getByRole("textbox", { name: "Copied season" }).fill(
+      JSON.stringify({
+        vo2Season: 1,
+        goals: [
+          {
+            name: "City 10K",
+            sportType: "Run",
+            date: raceDay,
+            distanceM: 10_000,
+            elevationGainM: null,
+            objective: "perform",
+            priority: "C",
+          },
+        ],
+      }),
+    );
+    await page.getByRole("button", { name: "Add goals" }).click();
+    await keepCurrentPlan(page, "Paste a season");
+    // The race result sets the paces, so the 10 km prediction is the race itself.
+    await expect(page.getByText("Predicted 42:30")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Upcoming goals" })).toHaveScreenshot(
+      "season-prediction.png",
+    );
+  } finally {
+    // The other specs share this athlete and expect no goals and no race result.
+    await page.goto("/season");
+    await settle(page);
+    const goal = page.getByRole("button", { name: /Run · 10\.0 km/ });
+    if (await goal.isVisible()) {
+      await goal.click();
+      await page.getByRole("button", { name: "Delete", exact: true }).click();
+      await page.getByRole("button", { name: "Delete for good" }).click();
+      await keepCurrentPlan(page, "Edit goal");
+      await expect(goal).toHaveCount(0);
+    }
+    await page.goto("/settings/paces");
+    await settle(page);
+    const clear = page.getByRole("button", { name: "Clear race result" });
+    if (await clear.isVisible()) await clear.click();
+    await expect(page.getByRole("button", { name: "Set race result" })).toBeVisible();
   }
 });
 

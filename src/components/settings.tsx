@@ -47,6 +47,7 @@ import {
   TrainingShapeField,
 } from "@/components/settings-fields.tsx";
 import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
+import { TrainingPacesSection } from "@/components/training-paces.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
 import { SettingsCoachSection } from "@/components/coach-key.tsx";
@@ -287,6 +288,8 @@ export function SettingsForm({
               <CelebrateTopEffortsField idPrefix="settings" control={form.control} />
             ) : section === "coach" ? (
               <SettingsCoachSection />
+            ) : section === "paces" ? (
+              <TrainingPacesSection idPrefix="settings" />
             ) : section === "sync" ? (
               <SettingsSyncSection enabled />
             ) : section === "heart-rate" ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
@@ -23,8 +23,13 @@ import { appShellQueryOptions } from "@/lib/app-shell-query.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
-import { isSettingsPath, SETTINGS_SECTIONS } from "@/lib/settings-sections.ts";
+import {
+  isSettingsPath,
+  SETTINGS_SECTIONS,
+  showsSettingsSection,
+} from "@/lib/settings-sections.ts";
 import { cn } from "@/lib/utils";
+import type { SettingsSnapshot } from "@/services/athlete-settings.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -108,9 +113,14 @@ function SettingsNavMenu({
   pathname: string;
   onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
+  // Read from the cache the settings form fills, so the shell doesn't load the settings service.
+  const { data } = useQuery<SettingsSnapshot>({ queryKey: ["settings-snapshot"], enabled: false });
+  const sections = SETTINGS_SECTIONS.filter((item) =>
+    showsSettingsSection(item.id, data?.settings.sportTypes),
+  );
   return (
     <SidebarMenu>
-      {SETTINGS_SECTIONS.map((item) => (
+      {sections.map((item) => (
         <SidebarMenuItem key={item.id}>
           <SidebarMenuButton
             isActive={pathname === `/settings/${item.id}`}
