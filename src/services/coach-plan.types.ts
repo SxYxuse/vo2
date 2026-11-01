@@ -228,9 +228,96 @@ export type CoachPlanState = {
   status: CoachPlanStatus;
   /** Why the last writing failed, in words for the athlete. */
   error: string | null;
-  /** Sessions a run on their day covered (at least 70 % of the distance). */
-  done: string[];
+  /** The athlete's activities over the plan's weeks, each with the session it did, if any. */
+  activities: PlanActivity[];
+  /** The weeks from this one to the A race, with their season phase. */
+  road: { weekStart: string; phase: PhaseKind }[];
+  /** The VDOT of the athlete's training paces, for the predicted race time. */
+  vdot: number | null;
 };
+
+// ----- Done matching -----
+
+/** A run on the session's day covering this share of its distance counts as doing it. */
+export const DONE_SHARE = 0.7;
+
+/** Runs the athlete linked to sessions by hand, and runs they said did none (ADR 0037). */
+export type SessionLinks = {
+  /** Session id to the activity the athlete linked to it. */
+  linked: Record<string, string>;
+  /** Activities the athlete unlinked: never matched to a session automatically again. */
+  unlinked: string[];
+};
+
+export function parseLinks(value: unknown): SessionLinks {
+  const links = (value ?? {}) as Partial<SessionLinks>;
+  return { linked: links.linked ?? {}, unlinked: links.unlinked ?? [] };
+}
+
+/** An activity on a day of the plan, with the session it did. */
+export type PlanActivity = {
+  id: string;
+  date: string;
+  name: string;
+  sportType: string;
+  km: number;
+  seconds: number;
+  /** The session it did, or null for an extra. Only runs do sessions. */
+  sessionId: string | null;
+  /** Linked by the athlete rather than matched. */
+  manual: boolean;
+};
+
+type MatchRun = { id: string; date: string; km: number };
+
+/**
+ * Which run did each session: the athlete's link first, else the longest run on the session's day
+ * covering 70 % of its distance that no other session took and the athlete didn't unlink.
+ */
+export function matchSessions(
+  sessions: Pick<PlannedRun, "id" | "date" | "distanceKm">[],
+  runs: MatchRun[],
+  links: SessionLinks,
+  today: string,
+) {
+  const matched = new Map<string, { runId: string; manual: boolean }>();
+  const used = new Set<string>();
+  for (const session of sessions) {
+    const runId = links.linked[session.id];
+    if (runId && runs.some((run) => run.id === runId) && !used.has(runId)) {
+      matched.set(session.id, { runId, manual: true });
+      used.add(runId);
+    }
+  }
+  const unlinked = new Set(links.unlinked);
+  for (const session of sessions) {
+    if (matched.has(session.id) || session.date > today) continue;
+    const run = runs
+      .filter(
+        (item) =>
+          item.date === session.date &&
+          !used.has(item.id) &&
+          !unlinked.has(item.id) &&
+          item.km >= session.distanceKm * DONE_SHARE,
+      )
+      .sort((a, b) => b.km - a.km)[0];
+    if (!run) continue;
+    matched.set(session.id, { runId: run.id, manual: false });
+    used.add(run.id);
+  }
+  return matched;
+}
+
+export type SessionStatus = "done" | "missed" | "planned";
+
+export function sessionStatus(
+  session: Pick<PlannedRun, "id" | "date">,
+  activities: PlanActivity[],
+  today: string,
+): SessionStatus {
+  if (activities.some((item) => item.sessionId === session.id)) return "done";
+  return session.date < today ? "missed" : "planned";
+}
 
 /** The A goal the coach plan builds toward: the next A run with a distance. */
 export function coachPlanGoal(goals: Goal[], today: string): Goal | null {
@@ -320,7 +407,8 @@ export function plannedRun(
   };
 }
 
-function amountText(step: Step) {
+/** "800 m", "2.5 km", "90 s", "20 min". */
+export function stepAmountText(step: Step) {
   if (step.distanceM != null) {
     return step.distanceM >= 1000
       ? `${Math.round(step.distanceM / 100) / 10} km`
@@ -348,7 +436,7 @@ const PART_PREFIX: Partial<Record<StepPart, string>> = {
 };
 
 function stepText(step: PlannedStep) {
-  return `${PART_PREFIX[step.part] ?? ""}${amountText(step)} ${targetText(step)}`;
+  return `${PART_PREFIX[step.part] ?? ""}${stepAmountText(step)} ${targetText(step)}`;
 }
 
 /** One line per block, the way `sessions.md` writes them: "6 × 300 m R …, 300 m jog". */

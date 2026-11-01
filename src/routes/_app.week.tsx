@@ -5,7 +5,7 @@ import { Settings2Icon, TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { WeekView, WeekViewSkeleton, WeeksAhead } from "@/components/week-view.tsx";
-import { CoachPlanWeeks } from "@/components/coach-plan-weeks.tsx";
+import { CoachPlanView } from "@/components/coach-plan-view.tsx";
 import {
   appShellQueryOptions,
   coachPlanQueryOptions,
@@ -26,7 +26,16 @@ import {
 } from "@/components/ui/empty";
 import { RouteError } from "@/components/route-states.tsx";
 
+type WeekSearch = {
+  /** The coach plan's selected day, when not today. */
+  day?: string;
+};
+
 export const Route = createFileRoute("/_app/week")({
+  validateSearch: (search: Record<string, unknown>): WeekSearch =>
+    typeof search.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.day)
+      ? { day: search.day }
+      : {},
   loader: async ({ context }) => {
     const style = await planningStyleOf(context);
     if (style === "off") return;
@@ -59,7 +68,7 @@ function WeekTargetHeading({
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         {coach
-          ? "Your coach plan: the runs of the next four weeks, toward your A goal."
+          ? "Your coach plan: the runs of the next four weeks, day by day, toward your A goal."
           : planned
             ? "Your week day by day, built from your season, your rest days, and your form."
             : "No week is planned while planning is off."}
@@ -70,12 +79,13 @@ function WeekTargetHeading({
 
 function WeekTargetPage() {
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
+  const { day } = Route.useSearch();
   if (shell.planningStyle === "off") return <PlanningOff />;
   if (shell.planningStyle === "coachPlan") {
     return (
       <>
         <WeekTargetHeading coach />
-        <CoachPlanWeeks />
+        <CoachPlanView day={day} />
       </>
     );
   }

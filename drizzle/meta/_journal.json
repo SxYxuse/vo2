@@ -232,6 +232,13 @@
       "when": 1793458636258,
       "tag": "0032_coach_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793493264431,
+      "tag": "0033_coach_plan_links",
+      "breakpoints": true
     }
   ]
 }

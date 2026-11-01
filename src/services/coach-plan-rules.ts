@@ -209,23 +209,25 @@ export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
     MIN_LONGEST_KM,
     ...ctx.runs.filter((run) => run.date >= since && run.date < ctx.today).map((run) => run.km),
   );
-  // What each of the athlete's days allows (the long run at most 2 h 30), on their best days.
+  // What each of the athlete's days allows (the long run at most 2 h 30): the long run day, and
+  // the best of the others. The long run day counts as the long run even when it is the shortest,
+  // since that is where the coach puts it.
   const runs = longShareRuns(week, ctx);
-  const perDay = ctx.availability.days
-    .map((day) => {
-      const minutes =
-        day.weekday === ctx.availability.longRunDay
-          ? Math.min(day.minutes, MAX_LONG_MINUTES)
-          : day.minutes;
-      return Math.min((minutes * 60) / ctx.easySecPerKm, longest * MAX_RUN_GROWTH);
-    })
+  const reachOf = (minutes: number) =>
+    Math.min((minutes * 60) / ctx.easySecPerKm, longest * MAX_RUN_GROWTH);
+  const longDay = ctx.availability.days.find((day) => day.weekday === ctx.availability.longRunDay);
+  const longKm = longDay ? reachOf(Math.min(longDay.minutes, MAX_LONG_MINUTES)) : 0;
+  const others = ctx.availability.days
+    .filter((day) => day !== longDay)
+    .map((day) => reachOf(day.minutes))
     .sort((a, b) => b - a)
-    .slice(0, runs);
-  const total = perDay.reduce((sum, km) => sum + km, 0);
-  // The longest-run share caps the week too: with the longest day at its share, the rest must
-  // make up the other part, so a week of short days and one long one reaches less (rule 5).
+    .slice(0, runs - 1)
+    .reduce((sum, km) => sum + km, 0);
+  const total = longKm + others;
+  // The longest-run share caps the week too: with the long run at its share, the other days must
+  // make up the rest, so a week of short days and one long one reaches less (rule 5).
   const share = maxLongShare(runs);
-  const byShare = share >= 1 ? total : (total - (perDay[0] ?? 0)) / (1 - share);
+  const byShare = share >= 1 ? total : others / (1 - share);
   const reach = Math.min(total, byShare) * REACH_SHARE;
   return Math.round(Math.min(week.budgetKm, reach) * BUDGET_FLOOR * 10) / 10;
 }

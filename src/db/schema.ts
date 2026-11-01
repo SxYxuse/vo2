@@ -234,5 +234,7 @@ export const coachPlans = pgTable("coach_plans", {
   requestedFrom: date("requested_from", { mode: "string" }),
   /** What the last writing started from, so a failed one isn't started again on every load. */
   attemptKey: text("attempt_key"),
+  /** Runs the athlete linked to or unlinked from sessions; their choice wins (ADR 0037). */
+  links: jsonb("links"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

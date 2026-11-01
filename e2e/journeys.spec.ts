@@ -283,7 +283,9 @@ async function setAvailability(page: Page) {
 async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
   await writing;
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
-  await expect(page.getByText(/km planned of a \d+ km budget/).first()).toBeVisible();
+  // A failed rewrite also ends the writing, with the earlier plan still on screen.
+  await expect(page.getByText("Plan writing failed")).toHaveCount(0);
+  await expect(page.getByText(/\d+ km planned/).first()).toBeVisible();
 }
 
 /**
@@ -341,6 +343,44 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
       fullPage: true,
       mask: [syncButton(page)],
     });
+
+    // The strip opens on today. Another week from "Next weeks", and "This week" brings it back.
+    const strip = page.getByRole("group", { name: "Days of the week" });
+    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page
+      .getByRole("button", { name: /^Week of / })
+      .first()
+      .click();
+    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "This week", exact: true }).click();
+    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    // A run's session page. Today's Lunch run did no session: linked by hand, then unlinked.
+    await strip.getByRole("button", { name: / km$/ }).first().click();
+    await page.getByRole("button", { name: "Open the full session" }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot("coach-session.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+    await page.getByRole("button", { name: /^Link Lunch run/ }).click();
+    await expect(page.getByText("Linked by you.")).toBeVisible();
+    await expect(page.getByText("Done", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Not this run" }).click();
+    await expect(page.getByRole("button", { name: /^Link Lunch run/ })).toBeVisible();
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
+    // Back to the day it was opened from.
+    const opened = page.url();
+    await page.getByRole("main").getByRole("button", { name: "This week" }).click();
+    await expect(strip.getByRole("button", { pressed: true })).toHaveAccessibleName(/ km$/);
+    expect(opened).toContain("/week/run/");
 
     // Away to the week planner and back: the setup stays, and the plan is written again.
     await choosePlanningStyle(page, "Week planner", "weekPlanner");

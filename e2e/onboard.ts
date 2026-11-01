@@ -107,7 +107,7 @@ async function onboardWithCoachPlan(page: Page) {
   await expect(page.getByText(/^Your coach is writing your next four weeks/)).toBeVisible();
   await page.getByRole("button", { name: "Open This week" }).click();
   await page.waitForURL("/week");
-  await expect(page.getByText(/km planned of a \d+ km budget/).first()).toBeVisible({
+  await expect(page.getByText(/\d+ km planned/).first()).toBeVisible({
     timeout: 30_000,
   });
 }

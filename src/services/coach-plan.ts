@@ -37,3 +37,16 @@ export const writeCoachPlanAgain = createServerFn({ method: "POST" }).handler(
     return writeCoachPlanAgainImpl();
   },
 );
+
+/** Links a run to a coach-plan session, or unlinks its run with `activityId: null`. */
+export const linkCoachPlanRun = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      sessionId: z.string().min(1).max(64),
+      activityId: z.string().min(1).max(32).nullable(),
+    }),
+  )
+  .handler(async ({ data }): Promise<CoachPlanState> => {
+    const { linkRunImpl } = await import("./coach-plan.server.ts");
+    return linkRunImpl(data.sessionId, data.activityId);
+  });

@@ -19,7 +19,9 @@ import {
 } from "./coach-plan-writer.server.ts";
 import {
   coachPlanGoal,
+  matchSessions,
   parseAvailability,
+  parseLinks,
   plannedRun,
   stepSecPerKm,
   type Availability,
@@ -28,10 +30,12 @@ import {
   type CoachPlanState,
   type CoachPlanStatus,
   type PlanBasis,
+  type PlanActivity,
   type PlanGoal,
   type PlannedRun,
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
+import { mondayOf, seasonPhase } from "./season-phase.ts";
 import { goalsFor } from "./season.server.ts";
 import { daysBetween, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
@@ -45,8 +49,6 @@ const KEEP_PAST_WEEKS = 12;
 const HISTORY_DAYS = 27 * 7;
 /** Writing marked as running for longer than this stopped with the server. */
 const STALE_WRITING_MS = 10 * 60_000;
-/** A run on the session's day covering this share of its distance counts as doing it. */
-const DONE_SHARE = 0.7;
 /**
  * Paces drift a little every day as old runs fade (ADR 0039); a plan is written again when the
  * VDOT has moved this far since, about 2 % in pace, rather than on every small step.
@@ -54,7 +56,15 @@ const DONE_SHARE = 0.7;
 const PACE_CHANGE_VDOT = 1;
 
 type Row = typeof coachPlans.$inferSelect;
-type Activity = { date: string; sportType: string; km: number; minutes: number };
+type Activity = {
+  id: string;
+  name: string;
+  date: string;
+  sportType: string;
+  km: number;
+  seconds: number;
+  minutes: number;
+};
 
 async function readRow(userId: string): Promise<Row | null> {
   const [row] = await db.select().from(coachPlans).where(eq(coachPlans.userId, userId)).limit(1);
@@ -71,6 +81,8 @@ async function gather(userId: string, now = new Date()) {
     trainingPacesFor(userId, now),
     db
       .select({
+        id: activities.id,
+        name: activities.name,
         sportType: activities.sportType,
         startDate: activities.startDate,
         distance: activities.distance,
@@ -92,6 +104,9 @@ async function gather(userId: string, now = new Date()) {
   const timeZone = row?.timeZone ?? "UTC";
   const today = dayKey(now, timeZone);
   const all: Activity[] = rows.map((item) => ({
+    id: item.id,
+    name: item.name,
+    seconds: item.movingTime,
     date: dayKey(item.startDate, timeZone),
     sportType: item.sportType,
     km: (item.distance ?? 0) / 1000,
@@ -117,7 +132,9 @@ async function gather(userId: string, now = new Date()) {
     availability: row ? parseAvailability(row.availability) : null,
     aGoal: coachPlanGoal(goals, today),
     plan: (row?.plan as CoachPlan | null) ?? null,
-    runs: runs as RunDay[],
+    links: parseLinks(row?.links),
+    runs: runs as (RunDay & Activity)[],
+    all,
     others: all.filter((item) => sportGroupFor(item.sportType)?.id !== "running"),
   };
 }
@@ -135,19 +152,45 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   return missing;
 }
 
-/** Sessions a single run on their day covered, at least 70 % of the distance. */
-function doneSessions(plan: CoachPlan | null, runs: RunDay[], today: string) {
-  if (!plan) return [];
-  const longest = new Map<string, number>();
-  for (const run of runs) longest.set(run.date, Math.max(longest.get(run.date) ?? 0, run.km));
-  return plan.weeks
-    .flatMap((week) => week.sessions)
-    .filter(
-      (session) =>
-        session.date <= today &&
-        (longest.get(session.date) ?? 0) >= session.distanceKm * DONE_SHARE,
-    )
-    .map((session) => session.id);
+/** Which run did each session: the athlete's links win over the 70 % match. */
+function matchOf(inputs: Pick<Inputs, "plan" | "runs" | "links" | "today">) {
+  const sessions = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
+  return matchSessions(sessions, inputs.runs, inputs.links, inputs.today);
+}
+
+/** The activities over the plan's weeks, each with the session it did. */
+function planActivities(inputs: Inputs): PlanActivity[] {
+  const from = inputs.plan?.weeks[0]?.weekStart ?? inputs.currentWeek;
+  const bySession = new Map(
+    [...matchOf(inputs)].map(([sessionId, match]) => [match.runId, { sessionId, ...match }]),
+  );
+  return inputs.all
+    .filter((item) => item.date >= from)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((item) => ({
+      id: item.id,
+      date: item.date,
+      name: item.name,
+      sportType: item.sportType,
+      km: Math.round(item.km * 100) / 100,
+      seconds: item.seconds,
+      sessionId: bySession.get(item.id)?.sessionId ?? null,
+      manual: bySession.get(item.id)?.manual ?? false,
+    }));
+}
+
+/** The weeks from this one to the A race, each with its season phase. */
+function roadOf(inputs: Inputs) {
+  if (!inputs.aGoal) return [];
+  const road = [];
+  for (
+    let week = inputs.currentWeek;
+    week <= mondayOf(inputs.aGoal.date);
+    week = addDayKey(week, 7)
+  ) {
+    road.push({ weekStart: week, phase: seasonPhase(inputs.goals, week).kind });
+  }
+  return road;
 }
 
 /** Goals the plan is written around: upcoming runs, and every upcoming A goal. */
@@ -176,7 +219,7 @@ function upcomingGoalsKey(goals: unknown, today: string) {
 const vdotPoint = (vdot: number | null) => (vdot == null ? null : Math.floor(vdot));
 
 function basisOf(inputs: Inputs): PlanBasis {
-  const done = new Set(doneSessions(inputs.plan, inputs.runs, inputs.today));
+  const done = matchOf(inputs);
   // A key session is missed only once a sync ended after its day: before that its run may just
   // not be copied yet (the app-open sync, a sync paused on Strava's limits).
   const { syncedDay } = inputs;
@@ -281,7 +324,9 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
     missing: missingOf(inputs),
     plan: (row?.plan as CoachPlan | null) ?? null,
     ...statusOf(row, inputs.now),
-    done: doneSessions(inputs.plan, inputs.runs, inputs.today),
+    activities: planActivities(inputs),
+    road: roadOf(inputs),
+    vdot: vdotOf(inputs),
   };
 }
 
@@ -402,6 +447,7 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
       await finish(userId, claimedAt, {
         status: "failed",
         error: "The coach plan is missing its setup.",
+        requestedFrom: null,
       });
       return;
     }
@@ -478,7 +524,11 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     const result = await writeSessions(coach, prompt, ctx, ranges);
     if (!result.ok) {
       logger.warn("coach_plan.failed", { from });
-      await finish(userId, claimedAt, { status: "failed", error: result.error });
+      await finish(userId, claimedAt, {
+        status: "failed",
+        error: result.error,
+        requestedFrom: null,
+      });
       return;
     }
     const added = [
@@ -516,6 +566,7 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     await finish(userId, claimedAt, {
       status: "failed",
       error: "Something went wrong writing the plan. Try again.",
+      requestedFrom: null,
     });
   }
 }
@@ -529,7 +580,9 @@ const SIGNED_OUT: CoachPlanState = {
   plan: null,
   status: "idle",
   error: null,
-  done: [],
+  activities: [],
+  road: [],
+  vdot: null,
 };
 
 /** The stored plan, starting a writing when one is due (only under the coach plan). */
@@ -575,4 +628,44 @@ export async function requestCoachPlanRewrite(userId: string) {
     .update(coachPlans)
     .set({ requestedFrom: dayKey(new Date(), row.timeZone), updatedAt: new Date() })
     .where(eq(coachPlans.userId, userId));
+}
+
+/**
+ * The athlete links a run to a session ("Link a run": one of that week's runs) or unlinks the one
+ * matched ("Not this run", which then stays an extra). Their choice wins over the 70 % match.
+ */
+export async function linkRunImpl(
+  sessionId: string,
+  activityId: string | null,
+): Promise<CoachPlanState> {
+  const session = await getRequiredSession();
+  const userId = session.user.id;
+  const inputs = await gather(userId);
+  const planned = inputs.plan?.weeks
+    .flatMap((week) => week.sessions)
+    .find((s) => s.id === sessionId);
+  if (!inputs.row || !planned) throw new Error("That session is no longer in your plan.");
+  const { linked, unlinked } = inputs.links;
+  if (activityId == null) {
+    const current = matchOf(inputs).get(sessionId);
+    if (current) {
+      delete linked[sessionId];
+      if (!unlinked.includes(current.runId)) unlinked.push(current.runId);
+    }
+  } else {
+    const weekStart = mondayOf(planned.date);
+    const run = inputs.runs.find((item) => item.id === activityId);
+    if (!run || mondayOf(run.date) !== weekStart) {
+      throw new Error("Only a run from the session's week can be linked.");
+    }
+    for (const [id, runId] of Object.entries(linked)) if (runId === activityId) delete linked[id];
+    linked[sessionId] = activityId;
+    inputs.links.unlinked = unlinked.filter((id) => id !== activityId);
+  }
+  await db
+    .update(coachPlans)
+    .set({ links: inputs.links, updatedAt: new Date() })
+    .where(eq(coachPlans.userId, userId));
+  logger.info("coach_plan.run_linked", { linked: activityId != null });
+  return stateOf(inputs, inputs.row);
 }
