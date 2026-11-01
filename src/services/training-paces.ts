@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { raceResultSchema, type TrainingPaces } from "./training-paces.types.ts";
+import { paceChoiceSchema, raceResultSchema, type TrainingPaces } from "./training-paces.types.ts";
 
 export const loadTrainingPaces = createServerFn({ method: "GET" }).handler(
   async (): Promise<TrainingPaces> => {
@@ -16,4 +16,12 @@ export const saveRaceResult = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<TrainingPaces> => {
     const { saveRaceResultImpl } = await import("./training-paces.server.ts");
     return saveRaceResultImpl(data.raceResult);
+  });
+
+/** Saves one Paces choice: Automatic, a picked best effort, or where the easy pace comes from. */
+export const savePaceChoice = createServerFn({ method: "POST" })
+  .validator(z.object({ choice: paceChoiceSchema }))
+  .handler(async ({ data }): Promise<TrainingPaces> => {
+    const { savePaceChoiceImpl } = await import("./training-paces.server.ts");
+    return savePaceChoiceImpl(data.choice);
   });

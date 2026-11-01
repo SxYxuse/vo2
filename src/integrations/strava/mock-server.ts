@@ -340,7 +340,7 @@ function climbFor(spec: MockSpec) {
  * hilly ones climb from 30 % to 55 % of the time, descend until 75 %, and slow on the way up.
  */
 function terrainFor(spec: MockSpec, samples: number) {
-  const base = speedMps(spec.kind) * formFactor(spec);
+  const base = speedMps(spec.kind) * formFactor(spec) * (isEasyRun(spec) ? EASY_RUN_SPEED : 1);
   const gpsOn = hasGps(spec.kind);
   const climbM = gpsOn ? climbFor(spec) : 0;
   const onFoot = spec.kind === "run" || spec.kind === "trailRun" || spec.kind === "walk";
@@ -392,7 +392,13 @@ function toSummary(spec: MockSpec): SummaryActivity {
   const power = hasPower(spec);
   const heart = !spec.noSensors;
   const avgWatts = power ? (spec.kind === "ftpRide" ? 198 : 190) : undefined;
-  const avgHr = spec.kind === "swim" ? 128 : spec.kind === "walk" ? 110 : 148;
+  const avgHr = isEasyRun(spec)
+    ? 126
+    : spec.kind === "swim"
+      ? 128
+      : spec.kind === "walk"
+        ? 110
+        : 148;
   const iso = spec.start.toISOString();
   return {
     id: spec.id,
@@ -417,7 +423,7 @@ function toSummary(spec: MockSpec): SummaryActivity {
     average_speed: speed,
     has_heartrate: heart,
     average_heartrate: heart ? avgHr : undefined,
-    max_heartrate: heart ? avgHr + 28 : undefined,
+    max_heartrate: heart ? (isEasyRun(spec) ? 131 : avgHr + 28) : undefined,
     average_watts: avgWatts,
     device_watts: power,
     weighted_average_watts: avgWatts ? Math.round(avgWatts * 1.05) : undefined,
@@ -445,9 +451,7 @@ function streamsFor(spec: MockSpec): StreamSet {
     latlng: gpsOn ? stream(gps) : undefined,
     altitude: stream(terrain.altitude),
     velocity_smooth: stream(terrain.speed),
-    heartrate: spec.noSensors
-      ? undefined
-      : stream(indexes.map((i) => heartAt(spec.kind, progress(i)))),
+    heartrate: spec.noSensors ? undefined : stream(indexes.map((i) => heartAt(spec, progress(i)))),
     cadence: stream(indexes.map(() => (power ? 88 : spec.kind === "swim" ? 0 : 164))),
     watts: power
       ? stream(indexes.map((i) => Math.round(wattsAt(spec.kind, progress(i)) * formFactor(spec))))
@@ -458,7 +462,22 @@ function streamsFor(spec: MockSpec): StreamSet {
   } as StreamSet;
 }
 
-function heartAt(kind: MockKind, progress: number) {
+/**
+ * Long runs are easy: slower, and held in running zone 2 after a short warm-up (about 124–131 bpm
+ * for the LTHR the lunch runs give), so the easy pace from heart rate has flat zone 2 to read.
+ */
+const EASY_RUN_SPEED = 0.84;
+
+function isEasyRun(spec: MockSpec) {
+  return spec.kind === "run" && spec.name === "Long run";
+}
+
+function heartAt(spec: MockSpec, progress: number) {
+  const { kind } = spec;
+  if (isEasyRun(spec)) {
+    if (progress < 0.08) return 112 + Math.round((progress / 0.08) * 14);
+    return 127 + Math.round(Math.sin(progress * Math.PI * 6) * 3);
+  }
   if (kind === "walk") return 108 + Math.round(Math.sin(progress * Math.PI) * 8);
   if (kind === "swim") return 126 + Math.round(Math.sin(progress * Math.PI) * 10);
   if (kind === "ftpRide") return progress < 0.2 ? 132 : progress < 0.6 ? 165 : 128;

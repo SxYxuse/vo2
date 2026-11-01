@@ -89,7 +89,7 @@ What the athlete gives the coach plan: how many runs a week, the days they can r
 _Avoid_: Schedule, rest days (that is the week planner's term), week shape
 
 **Training paces**:
-The pace ranges the coach plan's sessions target, from easy to repetition, read from the athlete's current fitness. A race result the athlete sets wins over the estimate from best efforts.
+The pace ranges the coach plan's sessions target, from easy to repetition, read from a VDOT. The athlete chooses what it comes from: Automatic (the estimate from recent best efforts), one of their best efforts, or a race result. The easy pace comes from the pace they hold in running zone 2 by default, never faster than marathon pace, or from the VDOT (ADR 0042).
 _Avoid_: Zones (those are heart rate), target pace, goal pace
 
 **Predicted race time**:

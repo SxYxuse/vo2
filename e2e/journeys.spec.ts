@@ -173,7 +173,8 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
   try {
     await page.goto("/settings/paces");
     await settle(page);
-    await expect(page.getByText(/^Estimated from road runs/)).toBeVisible();
+    await expect(page.getByText(/^Estimated from /)).toBeVisible();
+    await page.getByRole("radio", { name: /^A race result/ }).click();
     await page.getByRole("textbox", { name: "Time" }).fill("42:30");
     await page.getByRole("button", { name: "Set race result" }).click();
     await expect(page.getByText(/^From your race result: 10 km in 42:30/)).toBeVisible();
@@ -217,18 +218,97 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
       await keepCurrentPlan(page, "Edit goal");
       await expect(goal).toHaveCount(0);
     }
-    // The device's copy is written at most once a second, so a page opened right after setting
-    // the result can restore paces from before it. Drop it to read the server's.
-    await page.goto("/settings/paces");
-    await page.evaluate(() => indexedDB.deleteDatabase("keyval-store"));
-    await page.reload();
-    await settle(page);
+    await openPacesFresh(page);
+    await page.getByRole("radio", { name: /^A race result/ }).click();
     const clear = page.getByRole("button", { name: "Clear race result" });
     await expect(clear.or(page.getByRole("button", { name: "Set race result" }))).toBeVisible();
     if (await clear.isVisible()) await clear.click();
-    await expect(page.getByRole("button", { name: "Set race result" })).toBeVisible();
+    // Clearing the result the paces came from goes back to Automatic.
+    await expect(page.getByRole("radio", { name: /^Automatic/ })).toBeChecked();
   }
 });
+
+/**
+ * Opens Settings → Paces as the server has them. The device's copy is written at most once a
+ * second, so a page opened right after a change can restore paces from before it; drop it.
+ */
+async function openPacesFresh(page: Page) {
+  await page.goto("/settings/paces");
+  await page.evaluate(() => indexedDB.deleteDatabase("keyval-store"));
+  await page.reload();
+  await settle(page);
+}
+
+test("an athlete picks a best effort for their paces, and goes back to Automatic", async ({
+  page,
+}) => {
+  try {
+    await openPacesFresh(page);
+    await expect(page.getByRole("radio", { name: /^Automatic/ })).toBeChecked();
+    await page.getByRole("radio", { name: /^One of your best efforts/ }).click();
+    const efforts = page.getByRole("radiogroup", { name: "Best efforts" });
+    await expect(efforts).toBeVisible();
+    await expect(page).toHaveScreenshot("settings-paces-efforts.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+    await efforts.getByRole("radio", { name: /^5 km/ }).first().click();
+    await expect(page.getByText(/^From your best effort: 5 km in/)).toBeVisible();
+    // The pick is saved: it is still there on the next visit.
+    await openPacesFresh(page);
+    await expect(page.getByRole("radio", { name: /^One of your best efforts/ })).toBeChecked();
+    await expect(page.getByText(/^From your best effort: 5 km in/)).toBeVisible();
+  } finally {
+    await openPacesFresh(page);
+    const automatic = page.getByRole("radio", { name: /^Automatic/ });
+    if (!(await automatic.isChecked())) await automatic.click();
+    await expect(page.getByText(/^Estimated from /)).toBeVisible();
+  }
+});
+
+test("an athlete switches where the easy pace comes from, and sees why zone 2 is not used", async ({
+  page,
+}) => {
+  const easyHint = page.getByText(/^From your zone 2 heart rate\./);
+  try {
+    await openPacesFresh(page);
+    await expect(page.getByRole("radio", { name: /^Heart rate \(zone 2\)/ })).toBeChecked();
+    await expect(easyHint).toBeVisible();
+    await page.getByRole("radio", { name: /^Fitness estimate \(VDOT\)/ }).click();
+    await expect(easyHint).toHaveCount(0);
+    await page.getByRole("radio", { name: /^Heart rate \(zone 2\)/ }).click();
+    await expect(easyHint).toBeVisible();
+
+    // A running LTHR this low puts zone 2 below every run, so there is no zone 2 to read.
+    await setRunningLthr(page, "110");
+    await openPacesFresh(page);
+    await expect(page.getByText(/^Not enough zone 2 running yet/)).toBeVisible();
+    await expect(easyHint).toHaveCount(0);
+    await expect(page).toHaveScreenshot("settings-paces-easy-fallback.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+  } finally {
+    // The other specs share this athlete and expect the estimated LTHR and zone 2 easy pace.
+    await setRunningLthr(page, "");
+    await openPacesFresh(page);
+    const heart = page.getByRole("radio", { name: /^Heart rate \(zone 2\)/ });
+    if (!(await heart.isChecked())) await heart.click();
+    await expect(easyHint).toBeVisible();
+  }
+});
+
+/** Sets the running LTHR in Settings → Heart rate, or clears it back to the estimate with "". */
+async function setRunningLthr(page: Page, bpm: string) {
+  await page.goto("/settings/heart-rate");
+  await settle(page);
+  const lthr = page.locator("#settings-running-lthr");
+  // An unchanged value saves nothing, so there is no "Saved" to wait for.
+  if ((await lthr.inputValue()) === bpm) return;
+  await lthr.fill(bpm);
+  await lthr.blur();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+}
 
 /** Pastes one goal into Season, keeping the week planner's plan as it is. */
 async function pasteGoal(page: Page, goal: Record<string, unknown>) {

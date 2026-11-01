@@ -18,7 +18,7 @@ VO2 gives you the athlete's training paces: five pace ranges in seconds per km, 
 | Interval   | I      | 95–100 %                        | Hard, about 3–5 km race effort               | Repeats of 3–5 minutes                                                              |
 | Repetition | R      | 105–110 %                       | Fast and relaxed, not a sprint               | Repeats of 200–400 m, at most 2 minutes                                             |
 
-Daniels' FAQ gives threshold 83–88 %, interval 95–100 %, and repetition 105–110 %. VO2 uses the top of the threshold band so it doesn't overlap marathon pace; 88 % gives Daniels' own threshold pace (4:15/km at VDOT 50). VO2's easy band is narrower than the FAQ's 59–74 %, set so VDOT 50 gives about 5:07–5:38/km, close to Daniels' tables. These bands are guidance: no source validates a range width.
+Daniels' FAQ gives threshold 83–88 %, interval 95–100 %, and repetition 105–110 %. VO2 uses the top of the threshold band so it doesn't overlap marathon pace; 88 % gives Daniels' own threshold pace (4:15/km at VDOT 50). VO2's easy band is narrower than the FAQ's 59–74 %, set so VDOT 50 gives about 5:07–5:38/km, close to Daniels' tables. These bands are guidance: no source validates a range width. By default VO2 reads the athlete's easy pace from the pace they hold in heart-rate zone 2 instead, so it can sit outside this band.
 
 Race paces against the five (checked at VDOT 50: 5 km 3:59/km, 10 km 4:08/km, half marathon 4:20/km):
 

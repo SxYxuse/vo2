@@ -1,5 +1,7 @@
 # Training paces come from the best recent run, held near the next best
 
+Which best efforts the estimate reads, and the race result as the only way to set the paces, are superseded by [0042](0042-athletes-choose-what-paces-come-from-and-easy-pace-comes-from-zone-2.md).
+
 Training paces (ADR 0037) are read from a VDOT, with Daniels and Gilbert's equations. Without a race result the athlete set, VO2 estimates it from best efforts inside outdoor road runs of the last 16 weeks: sport type Run with a recorded route, since a treadmill run is also sport type Run but has none, and its watch distance is often several percent off. Each run counts once, by its best effort of a mile or more, and is worth 1 % less VDOT per week of age. The best run sets the VDOT, but at most 5 % above the next-best run, and with fewer than two such runs there are no paces. Hidden sport types count, since hiding changes views, not fitness (ADR 0018).
 
 A race result the athlete sets (distance, time, date) wins over the estimate, as set anchors do (ADR 0021), while it is at most 16 weeks old. After that it stays saved and shown, marked as no longer setting the paces, until the athlete clears it or sets a newer one. Predicted race times are the same model solved for time, from 1,500 m to the marathon, and shown on Season for road-run goals only.
