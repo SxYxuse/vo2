@@ -5,10 +5,16 @@ import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { coachPlanProposals, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
-import { checkPlan, type RuleContext } from "./coach-plan-rules.ts";
+import { checkPlan, type RuleBreak, type RuleContext } from "./coach-plan-rules.ts";
 import { availabilityText, paceText, rulesFor } from "./coach-plan-writer.server.ts";
 import { firstDay, gather, matchOf, rangesOf, statusOf, type Inputs } from "./coach-plan.server.ts";
-import { plannedRun, stepSecPerKm, type CoachPlan, type PlannedRun } from "./coach-plan.types.ts";
+import {
+  plannedRun,
+  sessionLines,
+  stepSecPerKm,
+  type CoachPlan,
+  type PlannedRun,
+} from "./coach-plan.types.ts";
 import type {
   ChangeSide,
   ChangedDay,
@@ -24,6 +30,9 @@ const PROPOSAL_TTL_MS = 60 * 60_000;
 
 const STALE =
   "Your plan changed since the coach proposed this, so nothing was changed. Ask the coach again.";
+
+const WRITING =
+  "The coach plan is being written again right now, so nothing was changed. Ask again once it's written.";
 
 type StoredChange = { dates: string[]; sessions: PlannedRun[]; days: ChangedDay[] };
 
@@ -42,9 +51,7 @@ function blocker(inputs: Inputs): string | null {
     return "The coach plan isn't written yet. The athlete sets it up and writes it from This week.";
   }
   // A rewrite would replace the days the change was checked against.
-  if (statusOf(inputs.row, inputs.now).status === "writing") {
-    return "The coach plan is being written again right now. Ask again once it's written.";
-  }
+  if (statusOf(inputs.row, inputs.now).status === "writing") return WRITING;
   return null;
 }
 
@@ -53,18 +60,20 @@ const weeksAhead = (inputs: Inputs, plan: CoachPlan) =>
   plan.weeks.filter((week) => week.weekStart >= inputs.currentWeek);
 
 /**
- * The rule context for checking changed days: the weeks ahead with their budgets, every other
- * planned run kept, and no floor, since a change may leave a week shorter (ADR 0038).
+ * The rule context for checking the plan ahead: the weeks from this one with their budgets, the
+ * days before the first open one kept, and no floor, since a change may leave a week shorter
+ * (ADR 0038).
  */
-function changeContext(inputs: Inputs, plan: CoachPlan, changed: Set<string>): RuleContext {
+function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
   const weeks = weeksAhead(inputs, plan);
   const sessions = weeks.flatMap((week) => week.sessions);
+  const from = firstDay(inputs);
   return {
     availability: inputs.availability!,
     weeks: weeks.map(({ sessions: _sessions, ...budget }) => budget),
-    from: firstDay(inputs),
+    from,
     today: inputs.today,
-    frozen: sessions.filter((session) => session.kind !== "race" && !changed.has(session.date)),
+    frozen: sessions.filter((session) => session.kind !== "race" && session.date < from),
     runs: inputs.runs,
     raceDays: sessions.filter((session) => session.kind === "race").map((session) => session.date),
     neighbours: plan.weeks
@@ -79,13 +88,41 @@ function changeContext(inputs: Inputs, plan: CoachPlan, changed: Set<string>): R
   };
 }
 
+/** The open runs ahead, from the first open day on: what the checker reads as written. */
+const openRuns = (plan: CoachPlan, ctx: RuleContext) =>
+  plan.weeks
+    .flatMap((week) => week.sessions)
+    .filter(
+      (session) =>
+        session.kind !== "race" &&
+        session.date >= ctx.from &&
+        ctx.weeks.some((week) => session.date >= week.weekStart),
+    );
+
+/** A break by rule and the day or week it names, so the same break before and after matches. */
+const breakKey = (item: RuleBreak) =>
+  `${item.rule}|${/\d{4}-\d{2}-\d{2}/.exec(item.message)?.[0] ?? ""}`;
+
+/**
+ * The breaks the change brings: every rule is checked over the whole plan ahead, before and after,
+ * so a change that breaks a rule on a day it doesn't touch (a shorter long run lowering the next
+ * week's longest-run limit, a dropped run raising the long run's share) is caught, while a break
+ * the plan already had doesn't block an unrelated change.
+ */
+function newBreaks(before: PlannedRun[], after: PlannedRun[], ctx: RuleContext) {
+  const had = new Set(checkPlan(before, ctx).map(breakKey));
+  return checkPlan(after, ctx).filter((item) => !had.has(breakKey(item)));
+}
+
 const sideOf = (session: PlannedRun | undefined): ChangeSide =>
   session
     ? {
         title: session.title,
         kind: session.kind,
+        key: session.key,
         distanceKm: session.distanceKm,
         minutes: session.minutes,
+        steps: sessionLines(session),
       }
     : null;
 
@@ -95,7 +132,7 @@ export async function coachPlanForCoach(userId: string) {
   const blocked = blocker(inputs);
   if (blocked) return { canChange: false, message: blocked };
   const plan = inputs.plan!;
-  const ctx = changeContext(inputs, plan, new Set());
+  const ctx = changeContext(inputs, plan);
   const done = matchOf(inputs);
   return {
     canChange: true,
@@ -149,7 +186,7 @@ export async function proposePlanChange(
   const plan = inputs.plan!;
   const dates = input.days.map((day) => day.date);
   const changed = new Set(dates);
-  const ctx = changeContext(inputs, plan, changed);
+  const ctx = changeContext(inputs, plan);
   const last = addDayKey(ctx.weeks.at(-1)!.weekStart, 6);
   const broken: string[] = [];
   if (changed.size !== dates.length) broken.push("dates: list each day once.");
@@ -179,7 +216,9 @@ export async function proposePlanChange(
     .sort((a, b) => a.date.localeCompare(b.date));
   if (!days.length && !broken.length) broken.push("change: these days are already planned so.");
   if (!broken.length) {
-    broken.push(...checkPlan(sessions, ctx).map((item) => `${item.rule}: ${item.message}`));
+    const open = openRuns(plan, ctx);
+    const after = [...open.filter((session) => !changed.has(session.date)), ...sessions];
+    broken.push(...newBreaks(open, after, ctx).map((item) => `${item.rule}: ${item.message}`));
   }
   logger.info("coach_plan.change_checked", { days: dates.length, broken: broken.length });
   if (broken.length) return { ok: false, broken };
@@ -224,13 +263,15 @@ export async function applyPlanChange(
     return { applied: false, reason: STALE };
 
   const changed = new Set(change.dates);
-  const applied = await db.transaction(async (tx) => {
+  const refused = await db.transaction(async (tx) => {
+    // Locked, so a rewrite can't claim the plan between this check and the save.
     const [row] = await tx
-      .select({ plan: coachPlans.plan })
+      .select()
       .from(coachPlans)
       .where(eq(coachPlans.userId, userId))
       .for("update");
-    if (!row?.plan || planKeyOf(row.plan) !== proposal.planKey) return false;
+    if (!row?.plan || planKeyOf(row.plan) !== proposal.planKey) return STALE;
+    if (statusOf(row, new Date()).status === "writing") return WRITING;
     const plan = row.plan as CoachPlan;
     const next: CoachPlan = {
       ...plan,
@@ -251,8 +292,8 @@ export async function applyPlanChange(
       .where(eq(coachPlans.userId, userId));
     // Every other proposal was checked against the plan as it was.
     await tx.delete(coachPlanProposals).where(eq(coachPlanProposals.userId, userId));
-    return true;
+    return null;
   });
-  logger.info("coach_plan.change_applied", { applied, days: change.dates.length });
-  return applied ? { applied: true } : { applied: false, reason: STALE };
+  logger.info("coach_plan.change_applied", { applied: refused == null, days: change.dates.length });
+  return refused == null ? { applied: true } : { applied: false, reason: refused };
 }

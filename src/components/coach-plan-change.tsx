@@ -7,6 +7,8 @@ import { format, parseISO } from "date-fns";
 import { ArrowRightIcon, CalendarCogIcon, CheckIcon, XIcon } from "lucide-react";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
+import { cn } from "@/lib/utils";
+import { sessionKindLabel } from "@/services/coach-plan.types.ts";
 import type {
   ChangeSide,
   PlanChangeApplied,
@@ -62,12 +64,34 @@ export function usePlanChanges(
   }, [messages, interrupts, canAnswer]);
 }
 
-/** "6 km easy", or "Threshold, 7.2 km" when the title doesn't say how far. */
-function sideText(side: ChangeSide) {
-  if (!side) return "Rest";
-  return side.title.includes(`${side.distanceKm} km`)
-    ? side.title
-    : `${side.title}, ${side.distanceKm} km`;
+/** One side of a changed day: what the run is, how long, and its steps; or a rest day. */
+function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
+  const label = before ? "Before" : "After";
+  if (!side) {
+    return (
+      <div className="flex min-w-0 flex-col" aria-label={label} role="group">
+        <span className={cn("font-medium", before && "text-muted-foreground line-through")}>
+          Rest day
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5" aria-label={label} role="group">
+      <span className={cn("font-medium", before && "text-muted-foreground line-through")}>
+        {side.title}
+      </span>
+      <span className="text-muted-foreground text-xs">
+        {sessionKindLabel(side.kind)} · {side.distanceKm} km · about {side.minutes} min
+        {side.key ? " · key" : ""}
+      </span>
+      {side.steps.map((line, index) => (
+        <span key={index} className="text-muted-foreground text-xs">
+          {line}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function Outcome({ call }: { call: ToolCall }) {
@@ -134,16 +158,14 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
             {proposal.days.map((day) => (
               <li
                 key={day.date}
-                className="flex flex-col gap-0.5 border-t py-2 text-sm first:border-t-0 sm:flex-row sm:items-baseline sm:gap-3"
+                className="flex flex-col gap-1.5 border-t py-2 text-sm first:border-t-0"
               >
-                <b className="w-24 shrink-0 font-medium">
-                  {format(parseISO(day.date), "EEE d MMM")}
-                </b>
-                <span className="flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-muted-foreground line-through">{sideText(day.before)}</span>
-                  <ArrowRightIcon aria-label="becomes" className="size-3.5 self-center" />
-                  <span className="font-medium">{sideText(day.after)}</span>
-                </span>
+                <b className="font-medium">{format(parseISO(day.date), "EEE d MMM")}</b>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
+                  <Side side={day.before} before />
+                  <ArrowRightIcon aria-label="becomes" className="mt-1 size-3.5" />
+                  <Side side={day.after} />
+                </div>
               </li>
             ))}
           </ul>

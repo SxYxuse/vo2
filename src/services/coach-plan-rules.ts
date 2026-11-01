@@ -38,7 +38,8 @@ export type RuleContext = {
   easySecPerKm: number;
   /**
    * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
-   * athlete who is ill or away runs less, and less running breaks no safety rule.
+   * athlete who is ill or away runs less, and less running breaks no safety rule, and the long
+   * run's share is read by the runs left in the week.
    */
   allowShort?: true;
 };
@@ -380,7 +381,11 @@ export function weekShapeBreaks(sessions: PlannedRun[], ctx: RuleContext): RuleB
     }
     // The week's longest run counts whatever it is called, so a long run can't pass as easy.
     const longest = [...inWeek].sort((a, b) => b.distanceKm - a.distanceKm)[0];
-    const runs = longShareRuns(week, ctx);
+    // A plan change reads the share by the runs left in the week, so dropping a run for an absence
+    // isn't refused for leaving the others equal; a long run that dominates still breaks it.
+    const runs = ctx.allowShort
+      ? Math.max(1, Math.min(longShareRuns(week, ctx), inWeek.length))
+      : longShareRuns(week, ctx);
     const longShare = maxLongShare(runs);
     if (longest && sessions.includes(longest)) {
       if (longest.distanceKm > total * longShare + 0.05) {

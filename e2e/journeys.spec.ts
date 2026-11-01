@@ -481,12 +481,14 @@ test("an athlete changes the coach plan from the chat and from a note on a day",
     const card = page.getByRole("group", { name: "Plan change" }).last();
     await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
     await expect(card).toContainText("Thu 18 Jun");
+    // Nothing else can be asked until the change is answered.
+    const composer = page.getByRole("textbox", { name: "Message the coach" });
+    await expect(composer).toBeDisabled();
     await card.getByRole("button", { name: "Decline" }).click();
     await expect(card).toContainText("Declined: your plan stays as it was");
     await expect(page.getByText("No problem: your plan stays as it was.")).toBeVisible();
 
     // Asked again and applied: Thursday is a rest day on the plan.
-    const composer = page.getByRole("textbox", { name: "Message the coach" });
     await composer.fill("I can't run on Thursday this week");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
@@ -495,7 +497,7 @@ test("an athlete changes the coach plan from the chat and from a note on a day",
     await expect(page.getByText("Done: the change is in your plan.")).toBeVisible();
 
     // A change proposed before the plan changed again is not applied.
-    await composer.fill("This week feels too hard");
+    await composer.fill("I can't run on Sunday this week");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
     await withDatabase((client) =>
@@ -519,6 +521,8 @@ test("an athlete changes the coach plan from the chat and from a note on a day",
     await expect(dialog).toHaveScreenshot("plan-change-note.png");
     await dialog.getByRole("button", { name: "Apply" }).click();
     await expect(dialog).toContainText("Applied to your plan");
+    // The athlete can answer the coach without opening the chat.
+    await expect(dialog.getByRole("textbox", { name: "Reply to the coach" })).toBeEnabled();
     await dialog.getByRole("button", { name: "Close" }).click();
     await expect(page.getByRole("heading", { name: /\(treadmill\)/ })).toBeVisible();
   } finally {

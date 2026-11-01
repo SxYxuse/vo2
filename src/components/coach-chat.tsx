@@ -440,6 +440,10 @@ export function CoachChat({
   const { needsKey } = coach;
   const canAsk = online && !needsKey;
   const planChanges = usePlanChanges(messages, interrupts, canAsk && !isLoading && !resuming);
+  // A run paused on the athlete's Apply or Decline takes no new message until it's answered,
+  // even when the paused run was restored hours later.
+  const awaitingAnswer = interrupts.length > 0;
+  const canSend = canAsk && !awaitingAnswer;
   const starters = planChange ? PLAN_STARTERS : STARTERS;
 
   return (
@@ -476,7 +480,7 @@ export function CoachChat({
                     key={starter}
                     variant="outline"
                     className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
-                    disabled={!canAsk}
+                    disabled={!canSend}
                     onClick={() => send(starter)}
                   >
                     {starter}
@@ -518,7 +522,7 @@ export function CoachChat({
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={!canAsk}
+                              disabled={!canSend}
                               onClick={() => void reload()}
                             >
                               <RefreshCwIcon />
@@ -543,15 +547,17 @@ export function CoachChat({
           key={`${initialActivityId}-${initialMentions.length}`}
           activities={shown}
           initialMentions={initialMentions}
-          disabled={!canAsk}
+          disabled={!canSend}
           placeholder={
-            !online
-              ? "You're offline. You can read this chat; the coach answers once you're back online."
-              : needsKey
-                ? "Add your OpenRouter key in Settings → Coach to ask the coach."
-                : planChange
-                  ? "Tell the coach what changed… (away, ill, too hard, swap days)"
-                  : "Ask the coach… (@ to mention an activity)"
+            awaitingAnswer
+              ? "Apply or decline the change above, then ask the coach again."
+              : !online
+                ? "You're offline. You can read this chat; the coach answers once you're back online."
+                : needsKey
+                  ? "Add your OpenRouter key in Settings → Coach to ask the coach."
+                  : planChange
+                    ? "Tell the coach what changed… (away, ill, too hard, swap days)"
+                    : "Ask the coach… (@ to mention an activity)"
           }
           busy={isLoading}
           onSend={send}
