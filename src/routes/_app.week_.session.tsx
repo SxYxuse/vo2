@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_app/week_/session")({
     ...(typeof search.id === "string" && search.id ? { id: search.id } : {}),
   }),
   loader: async ({ context }) => {
-    // The week planner's sessions; This week shows the other styles.
+    // The week planner's sessions; Plan shows the other styles.
     if ((await planningStyleOf(context)) !== "weekPlanner") {
       throw redirect({ to: "/week", replace: true });
     }
@@ -73,12 +73,12 @@ function SessionPage() {
         <EmptyHeader>
           <EmptyTitle>Session not found</EmptyTitle>
           <EmptyDescription>
-            This session is no longer in your week plan. Pick one from This week.
+            This session is no longer in your week plan. Pick one from Plan.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to="/week" />} nativeButton={false}>
-            This week
+            Plan
           </Button>
         </EmptyContent>
       </Empty>

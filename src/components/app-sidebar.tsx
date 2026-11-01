@@ -57,7 +57,7 @@ import {
 
 const TRAINING_NAV_ITEMS = [
   { title: "Calendar", to: "/", icon: CalendarDaysIcon },
-  { title: "This week", to: "/week", icon: TargetIcon },
+  { title: "Plan", to: "/week", icon: TargetIcon },
   { title: "Season", to: "/season", icon: FlagIcon },
   { title: "Coach", to: "/coach", icon: SparklesIcon },
 ] as const;
@@ -194,7 +194,7 @@ export function AppSidebar() {
   const lastHref = useLastHrefOutsideSettings();
   const inSettings = isSettingsPath(pathname);
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
-  // This week is the week planner's; with planning off it says so, reached from Settings.
+  // With planning off, Plan leaves the sidebar: its page says so, reached from Settings.
   const trainingItems =
     shell.planningStyle === "off"
       ? TRAINING_NAV_ITEMS.filter((item) => item.to !== "/week")

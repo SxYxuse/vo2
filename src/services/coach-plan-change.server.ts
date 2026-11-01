@@ -48,7 +48,7 @@ function blocker(inputs: Inputs): string | null {
     return "The athlete doesn't follow the coach plan, so there is no plan to change.";
   }
   if (!inputs.plan || !inputs.availability) {
-    return "The coach plan isn't written yet. The athlete sets it up and writes it from This week.";
+    return "The coach plan isn't written yet. The athlete sets it up and writes it from Plan.";
   }
   // A rewrite would replace the days the change was checked against.
   if (statusOf(inputs.row, inputs.now).status === "writing") return WRITING;

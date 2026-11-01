@@ -48,7 +48,7 @@ declare module "@tanstack/history" {
   interface HistoryState {
     /** Set on the entry pushed by tapping the activity map, so closing it can pop that entry. */
     activityMapPushed?: true;
-    /** Set on a coach-plan session opened from the plan, so its "This week" can go back. */
+    /** Set on a coach-plan session opened from the plan, so its "Plan" button can go back. */
     planSessionPushed?: true;
   }
 }

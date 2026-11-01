@@ -115,7 +115,7 @@ test("an athlete turns planning off and back on, and gets their week planner bac
       await page.getByRole("button", { name: "Toggle Sidebar" }).click();
       await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
     }
-    return page.getByRole("link", { name: "This week", exact: true }).count();
+    return page.getByRole("link", { name: "Plan", exact: true }).count();
   };
   const planningOff = page.getByText("Planning is off", { exact: true });
   try {
@@ -327,7 +327,7 @@ async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
   // A failed rewrite also ends the writing, with the earlier plan still on screen.
   await expect(page.getByText("Plan writing failed")).toHaveCount(0);
-  await expect(page.getByText(/\d+ km planned/).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: / · \d+ km$/ })).toBeVisible();
 }
 
 /**
@@ -361,29 +361,40 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
       mask: [syncButton(page)],
     });
 
-    // The strip opens on today. Another week from "Next weeks", and "This week" brings it back.
+    // The strip opens on today. The arrows change the week, stopping at the written ones, and
+    // "Back to this week" brings today back.
     const strip = page.getByRole("group", { name: "Days of the week" });
-    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    await page
-      .getByRole("button", { name: /^Week of / })
-      .first()
-      .click();
-    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveCount(0);
-    await page.getByRole("button", { name: "This week", exact: true }).click();
-    await expect(strip.getByRole("button", { name: /, today:/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    const todayChip = strip.getByRole("button", { name: /, today:/ });
+    const weekHeading = page.getByRole("heading", { name: / · \d+ km$/ });
+    const previous = page.getByRole("button", { name: "Previous week" });
+    const next = page.getByRole("button", { name: "Next week" });
+    const back = page.getByRole("button", { name: "Back to this week" });
+    await expect(todayChip).toHaveAttribute("aria-pressed", "true");
+    await expect(weekHeading).toHaveText(/^This week · /);
+    await expect(previous).toBeDisabled();
+    await expect(back).toHaveCount(0);
+    for (let step = 1; step <= 3; step++) {
+      const shown = await weekHeading.textContent();
+      await next.click();
+      await expect(weekHeading).not.toHaveText(shown ?? "");
+      await expect(weekHeading).toHaveText(/^Week of /);
+      await expect(todayChip).toHaveCount(0);
+    }
+    await expect(next).toBeDisabled();
+    await expect(page).toHaveURL(/[?&]day=/);
+    await previous.click();
+    await expect(next).toBeEnabled();
+    await back.click();
+    await expect(todayChip).toHaveAttribute("aria-pressed", "true");
+    await expect(weekHeading).toHaveText(/^This week · /);
+    await expect(back).toHaveCount(0);
 
     // A run still ahead can't have a run linked: its day may be written again as another kind.
     await strip.getByRole("button", { name: / km$/ }).first().click();
     await page.getByRole("button", { name: "Open the full session" }).click();
     await expect(page.getByText(/^A run can be linked from /)).toBeVisible();
     // Back to the day it was opened from.
-    await page.getByRole("main").getByRole("button", { name: "This week" }).click();
+    await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
     await expect(strip.getByRole("button", { pressed: true })).toHaveAccessibleName(/ km$/);
 
     // A run planned today: today's Lunch run matches it, is unlinked, then linked by hand.
@@ -403,7 +414,7 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.getByRole("button", { name: /^Link Lunch run/ }).click();
     await expect(page.getByText("Linked by you.")).toBeVisible();
     await expect(page.getByText("Done", { exact: true })).toBeVisible();
-    await page.getByRole("main").getByRole("button", { name: "This week" }).click();
+    await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
     await expect(today).toHaveAttribute("aria-pressed", "true");
 
     // Away to the week planner and back: the setup stays, and the plan is written again.
@@ -420,7 +431,7 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   }
 });
 
-/** The A race the coach plan needs, then availability; ends on This week with the plan written. */
+/** The A race the coach plan needs, then availability; ends on Plan with the plan written. */
 async function addRaceAndWritePlan(page: Page) {
   const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
   // With the coach plan, goals have no objective: new ones are saved as perform.

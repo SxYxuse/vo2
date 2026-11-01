@@ -41,6 +41,8 @@ export function useWeekSwipe({
 
   /** Slides the shown week off toward the older or newer side and the new one in from the other. */
   const slide = async (direction: 1 | -1) => {
+    // A second tap on an arrow mid-slide would step from the week still shown.
+    if (sliding.current) return;
     const width = ref.current?.offsetWidth ?? 0;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     sliding.current = true;

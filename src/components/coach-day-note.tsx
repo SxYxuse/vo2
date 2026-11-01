@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
-// The reply carries the chat's rendering; loaded when a note is sent, so This week stays light.
+// The reply carries the chat's rendering; loaded when a note is sent, so Plan stays light.
 const NoteReply = lazy(() =>
   import("@/components/coach-note-reply.tsx").then((module) => ({ default: module.NoteReply })),
 );

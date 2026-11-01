@@ -44,7 +44,7 @@ export function notifySeasonCheck(check: SeasonCheck | null) {
 
 /**
  * Which weeks a season change reshapes, and the choice to adapt the plan or keep it (ADR 0026).
- * A kept plan stays as it is; This week keeps a reminder until it is adapted.
+ * A kept plan stays as it is; Plan keeps a reminder until it is adapted.
  */
 export function AdaptPlanDialog({
   impact,

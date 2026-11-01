@@ -6,7 +6,7 @@ import { test, expect, settle, syncButton } from "./test.ts";
 
 const SCREENS = [
   { name: "calendar", path: "/", heading: "Activity calendar" },
-  { name: "week", path: "/week", heading: "This week" },
+  { name: "week", path: "/week", heading: "Plan" },
   { name: "plan", path: "/plan", heading: null },
   { name: "fitness", path: "/fitness", heading: null },
   { name: "season", path: "/season", heading: null },

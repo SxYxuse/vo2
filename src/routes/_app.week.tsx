@@ -64,7 +64,7 @@ function WeekTargetHeading({
     <div className="flex flex-col gap-2">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
         <TargetIcon aria-hidden className="size-5" />
-        This week
+        Plan
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         {coach

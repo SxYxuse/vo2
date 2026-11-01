@@ -52,12 +52,12 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
         <EmptyHeader>
           <EmptyTitle>Session not found</EmptyTitle>
           <EmptyDescription>
-            This run is no longer in your coach plan. Pick one from This week.
+            This run is no longer in your coach plan. Pick one from Plan.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button render={<Link to="/week" />} nativeButton={false}>
-            This week
+            Plan
           </Button>
         </EmptyContent>
       </Empty>
@@ -83,7 +83,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           variant="ghost"
           size="sm"
           className="self-start"
-          // Opened from the plan: go back to it, as it was, so the back gesture on This week
+          // Opened from the plan: go back to it, as it was, so the back gesture on Plan
           // leaves rather than returning here. Opened from a link or reloaded: replace this page.
           onClick={() => {
             if (router.state.location.state.planSessionPushed) router.history.back();
@@ -91,7 +91,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           }}
         >
           <ArrowLeftIcon data-icon="inline-start" />
-          This week
+          Plan
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
           <FootprintsIcon aria-hidden className="text-ds-amber-700 size-5" />

@@ -437,8 +437,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                     {planningStyle === "off"
                       ? "Planning is off: the calendar, Season, and fitness are ready. Pick a planning style anytime in Settings."
                       : planningStyle === "coachPlan"
-                        ? "Your coach is writing your next four weeks. This week shows them when they're ready, even if you close the app now."
-                        : "Your plan is set: This week shows your days. Change your week or rebuild the plan from Settings."}
+                        ? "Your coach is writing your next four weeks. They show under Plan when they're ready, even if you close the app now."
+                        : "Your plan is set: open Plan to see your days. Change your week or rebuild the plan from Settings."}
                     {copyUnfinished
                       ? " Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause."
                       : null}
@@ -464,7 +464,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
               }}
             >
               <CalendarDaysIcon data-icon="inline-start" />
-              {planningStyle === "off" ? "Open the calendar" : "Open This week"}
+              {planningStyle === "off" ? "Open the calendar" : "Open Plan"}
             </Button>
           ) : (
             <>
