@@ -36,6 +36,11 @@ export type RuleContext = {
   neighbours: PlannedRun[];
   /** Seconds per km at the middle of easy pace, to size what a day's time allows. */
   easySecPerKm: number;
+  /**
+   * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
+   * athlete who is ill or away runs less, and less running breaks no safety rule.
+   */
+  allowShort?: true;
 };
 
 /** A week may come in this much over its budget, for rounding. */
@@ -174,7 +179,10 @@ const datesOf = (week: WeekBudget) =>
  */
 export function runsAvailable(week: WeekBudget, ctx: RuleContext) {
   const dates = datesOf(week);
-  const kept = ctx.frozen.filter((session) => dates.includes(session.date)).length;
+  // A plan change keeps days after `from` too; those are counted with the open days.
+  const kept = ctx.frozen.filter(
+    (session) => dates.includes(session.date) && session.date < ctx.from,
+  ).length;
   const open = dates.filter(
     (date) =>
       date >= ctx.from &&
@@ -220,7 +228,7 @@ function largestWeek(caps: number[], share: number) {
  * athlete's days allow when their time or the longest-run rule caps the week lower.
  */
 export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
-  if (week.weekStart < ctx.from || week.taper) return null;
+  if (ctx.allowShort || week.weekStart < ctx.from || week.taper) return null;
   const dates = datesOf(week);
   if (dates.some((date) => ctx.raceDays.includes(date))) return null;
   const since = addDayKey(ctx.today, -LONGEST_WINDOW_DAYS);

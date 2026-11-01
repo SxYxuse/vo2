@@ -72,7 +72,7 @@ async function readRow(userId: string): Promise<Row | null> {
 }
 
 /** Everything the plan is checked and written from, read fresh. */
-async function gather(userId: string, now = new Date()) {
+export async function gather(userId: string, now = new Date()) {
   const [row, style, goals, coach, paces, rows, [sync]] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
@@ -139,10 +139,11 @@ async function gather(userId: string, now = new Date()) {
   };
 }
 
-type Inputs = Awaited<ReturnType<typeof gather>>;
+export type Inputs = Awaited<ReturnType<typeof gather>>;
 
 const vdotOf = (inputs: Inputs) => (inputs.paces.source === "none" ? null : inputs.paces.vdot);
-const rangesOf = (inputs: Inputs) => (inputs.paces.source === "none" ? null : inputs.paces.paces);
+export const rangesOf = (inputs: Inputs) =>
+  inputs.paces.source === "none" ? null : inputs.paces.paces;
 
 function missingOf(inputs: Inputs): CoachPlanMissing[] {
   const missing: CoachPlanMissing[] = [];
@@ -153,7 +154,7 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
 }
 
 /** Which run did each session: the athlete's links win over the 70 % match. */
-function matchOf(inputs: Pick<Inputs, "plan" | "runs" | "links" | "today">) {
+export function matchOf(inputs: Pick<Inputs, "plan" | "runs" | "links" | "today">) {
   const sessions = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
   return matchSessions(sessions, inputs.runs, inputs.links, inputs.today);
 }
@@ -243,7 +244,7 @@ function basisOf(inputs: Inputs): PlanBasis {
 }
 
 /** Today, or tomorrow once the athlete ran today: a run done is not written again. */
-function firstDay(inputs: Inputs) {
+export function firstDay(inputs: Inputs) {
   return inputs.runs.some((run) => run.date === inputs.today)
     ? addDayKey(inputs.today, 1)
     : inputs.today;
@@ -299,7 +300,10 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   return null;
 }
 
-function statusOf(row: Row | null, now: Date): { status: CoachPlanStatus; error: string | null } {
+export function statusOf(
+  row: Row | null,
+  now: Date,
+): { status: CoachPlanStatus; error: string | null } {
   if (!row) return { status: "idle", error: null };
   if (row.status === "writing" && now.getTime() - row.statusAt.getTime() > STALE_WRITING_MS) {
     return { status: "failed", error: "Writing stopped before it finished. Try again." };
@@ -343,11 +347,15 @@ function attemptKeyOf(due: Due) {
 /**
  * A failed writing, held until "Try again". The rewrite the athlete asked for is cleared, so the
  * next real change gets its own key; the trigger then due is held as tried, since the writing asked
- * for already covered it and would otherwise start again on the next load.
+ * for already covered it and would otherwise start again on the next load. When the athlete's data
+ * couldn't even be read (a database error), the next trigger is unknown: the rewrite asked for is
+ * kept, so the key the writing claimed still holds it, rather than a lower trigger starting one
+ * more writing on its own.
  */
 function failedValues(inputs: Inputs | null, error: string): Partial<Row> {
+  if (!inputs) return { status: "failed", error };
   const values: Partial<Row> = { status: "failed", error, requestedFrom: null };
-  if (!inputs?.row) return values;
+  if (!inputs.row) return values;
   const next = dueWrite(
     { ...inputs, row: { ...inputs.row, requestedFrom: null } },
     basisOf(inputs),

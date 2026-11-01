@@ -23,6 +23,7 @@ import { addDayKey } from "@/services/day-key.ts";
 import { PHASES, mondayOf, type PhaseKind } from "@/services/season-phase.ts";
 import { daysBetween } from "@/services/season.types.ts";
 import { canPredict, predictRaceSeconds } from "@/services/training-paces.types.ts";
+import { CoachDayNote } from "@/components/coach-day-note.tsx";
 import { CoachPlanMissingAlert } from "@/components/coach-plan-setup.tsx";
 import {
   ActivityLine,
@@ -213,10 +214,27 @@ function RunSummary({
       <Button
         className="min-h-11 w-full sm:w-auto sm:self-start"
         nativeButton={false}
-        render={<Link to="/week/run/$sessionId" params={{ sessionId: run.id }} />}
+        // Marked, so the session's "This week" goes back here rather than adding an entry.
+        render={
+          <Link
+            to="/week/run/$sessionId"
+            params={{ sessionId: run.id }}
+            state={(prev) => ({ ...prev, planSessionPushed: true })}
+          />
+        }
       >
         Open the full session
       </Button>
+      {status !== "done" && run.kind !== "race" && run.date >= state.today ? (
+        <CoachDayNote
+          date={run.date}
+          disabledReason={
+            state.status === "writing"
+              ? "Your plan is being written again: send a note once it's written."
+              : undefined
+          }
+        />
+      ) : null}
     </div>
   );
 }
@@ -503,7 +521,7 @@ export function CoachPlanView({ day }: { day?: string }) {
               variant="outline"
               className="min-h-11 w-full"
               nativeButton={false}
-              render={<Link to="/coach" />}
+              render={<Link to="/coach" search={{ change: true }} />}
             >
               <SparklesIcon data-icon="inline-start" />
               Ask the coach to change my plan

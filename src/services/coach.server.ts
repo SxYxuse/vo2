@@ -25,19 +25,27 @@ import { isBestEfforts } from "./best-efforts.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { mockCoachText } from "./coach-mock.ts";
 import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
-import { COACH_SYSTEM_PROMPT } from "./coach-prompt.ts";
 import {
+  applyPlanChange,
+  coachPlanForCoach,
+  proposePlanChange,
+} from "./coach-plan-change.server.ts";
+import { COACH_PLAN_CHANGE_PROMPT, COACH_SYSTEM_PROMPT } from "./coach-prompt.ts";
+import {
+  applyPlanChangeDef,
   correlateStreamsDef,
   findActivitiesDef,
   findClimbsDef,
   getActivityDef,
   getActivityStreamsDef,
   getAthleteProfileDef,
+  getCoachPlanDef,
   getFitnessDef,
   getPersonalBestsDef,
   getSeasonDef,
   getWeekPlanDef,
   measureActivityDef,
+  proposePlanChangeDef,
   showVisualDef,
   summarizeEffortPhasesDef,
 } from "./coach-tools.ts";
@@ -89,8 +97,49 @@ async function loadStreams(activityId: string, userId: string) {
   return row;
 }
 
-function createCoachTools() {
+function weekPlanTool() {
+  return getWeekPlanDef.server<CoachRuntime>(async (_input, { context }) => {
+    // Without this the empty week would read as a week of rest.
+    if ((await storedPlanningStyle(context.userId)) === "off") {
+      return {
+        planningOff: true,
+        message:
+          "The athlete turned planning off: VO2 plans no week, so there are no planned sessions or rest days. They can pick a planning style in Settings → Training.",
+      };
+    }
+    const state = await loadWeekCoachImpl();
+    return {
+      planningOff: false,
+      weekStart: state.weekStart,
+      days: state.plan?.days ?? [],
+      note: state.plan?.note ?? null,
+      droppedKeySessions: state.plan?.dropped ?? [],
+      coachNotes: state.notes,
+    };
+  });
+}
+
+/**
+ * The coach plan replaces the week plan: the chat reads it, and may change it only through a
+ * checked proposal the athlete applies (ADR 0038). Other planning styles never get these tools.
+ */
+function coachPlanTools() {
   return [
+    getCoachPlanDef.server<CoachRuntime>((_input, { context }) =>
+      coachPlanForCoach(context.userId),
+    ),
+    proposePlanChangeDef.server<CoachRuntime>((input, { context }) =>
+      proposePlanChange(context.userId, input),
+    ),
+    applyPlanChangeDef.server<CoachRuntime>(({ proposalId }, { context }) =>
+      applyPlanChange(context.userId, proposalId),
+    ),
+  ];
+}
+
+function createCoachTools(coachPlan: boolean) {
+  return [
+    ...(coachPlan ? coachPlanTools() : []),
     findActivitiesDef.server<CoachRuntime>(async (input, { context }) => {
       const { userId, timeZone } = context;
       // Pad the bounds by a day, then keep the days the athlete means in their own timezone.
@@ -249,25 +298,7 @@ function createCoachTools() {
           .filter((board) => board.top.length),
       };
     }),
-    getWeekPlanDef.server<CoachRuntime>(async (_input, { context }) => {
-      // Without this the empty week would read as a week of rest.
-      if ((await storedPlanningStyle(context.userId)) === "off") {
-        return {
-          planningOff: true,
-          message:
-            "The athlete turned planning off: VO2 plans no week, so there are no planned sessions or rest days. They can pick a planning style in Settings → Training.",
-        };
-      }
-      const state = await loadWeekCoachImpl();
-      return {
-        planningOff: false,
-        weekStart: state.weekStart,
-        days: state.plan?.days ?? [],
-        note: state.plan?.note ?? null,
-        droppedKeySessions: state.plan?.dropped ?? [],
-        coachNotes: state.notes,
-      };
-    }),
+    ...(coachPlan ? [] : [weekPlanTool()]),
     getSeasonDef.server<CoachRuntime>(async () => {
       const season = await loadSeasonImpl();
       return {
@@ -319,22 +350,37 @@ export async function handleCoachChat(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const coach = await coachModelFor(session.user.id, "chat");
+  const [coach, style] = await Promise.all([
+    coachModelFor(session.user.id, "chat"),
+    storedPlanningStyle(session.user.id),
+  ]);
   if (coach.kind === "missing") return coachKeyMissing();
   const params = await chatParamsFromRequest(request);
   const timeZone = validTimeZone(params.forwardedProps.timeZone);
   const adapter = coach.kind === "mock" ? mockCoachText() : coach.adapter;
+  const coachPlan = style === "coachPlan";
 
-  logger.info("coach.start", { model: coach.model, messages: params.messages.length });
+  logger.info("coach.start", {
+    model: coach.model,
+    messages: params.messages.length,
+    resumed: Boolean(params.resume?.length),
+  });
 
   const stream = chat({
     adapter,
     messages: params.messages,
     threadId: params.threadId,
     runId: params.runId,
-    tools: createCoachTools(),
+    // The athlete's Apply or Decline on a plan change continues the paused run.
+    parentRunId: params.parentRunId,
+    resume: params.resume,
+    tools: createCoachTools(coachPlan),
     context: { userId: session.user.id, timeZone } satisfies CoachRuntime,
-    systemPrompts: [COACH_SYSTEM_PROMPT, todayLine(timeZone)],
+    systemPrompts: [
+      COACH_SYSTEM_PROMPT,
+      ...(coachPlan ? [COACH_PLAN_CHANGE_PROMPT] : []),
+      todayLine(timeZone),
+    ],
     agentLoopStrategy: maxIterations(12),
   });
 

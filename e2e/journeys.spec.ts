@@ -345,7 +345,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
 }) => {
   // Two plan writings and four style switches, each saved and checked on the device.
   test.setTimeout(90_000);
-  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
   try {
     await choosePlanningStyle(page, "Coach plan", "coachPlan");
     // No A running goal yet: Settings says what's missing and where to fix it.
@@ -355,31 +354,7 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
 
     // With the coach plan, goals have no objective: new ones are saved as perform.
-    await pasteGoal(page, {
-      name: "Autumn half",
-      sportType: "Run",
-      date: raceDay,
-      distanceM: 21_097.5,
-      elevationGainM: null,
-      objective: "finish",
-      priority: "A",
-    });
-    await expect(page.getByText(/· Finish/)).toHaveCount(0);
-
-    await page.goto("/settings/training");
-    await settle(page);
-    await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
-    const written = writingStarts(page);
-    await setAvailability(page);
-    // The phone run leaves this availability saved (each style keeps its setup): then the new
-    // goal alone has the plan written again, when it is next loaded.
-    const save = page.getByRole("button", { name: "Save availability" });
-    if (await save.isVisible()) await save.click();
-    // Saved before leaving, or leaving would cancel the save on its way.
-    await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeVisible();
-
-    await page.goto("/week");
-    await expectPlanWritten(page, written);
+    await addRaceAndWritePlan(page);
     await settle(page);
     await expect(page).toHaveScreenshot("week-coach-plan.png", {
       fullPage: true,
@@ -441,11 +416,113 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.goto("/week");
     await expectPlanWritten(page, rewritten);
   } finally {
-    // The other specs share this athlete and expect the week planner and no goals, and the other
-    // project's run writes its plan with no run moved to today.
-    await choosePlanningStyle(page, "Week planner", "weekPlanner");
-    await dropWrittenPlan();
-    await deleteGoalIfThere(page, /Run · 21\.1 km/);
+    await leaveCoachPlan(page);
+  }
+});
+
+/** The A race the coach plan needs, then availability; ends on This week with the plan written. */
+async function addRaceAndWritePlan(page: Page) {
+  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
+  // With the coach plan, goals have no objective: new ones are saved as perform.
+  await pasteGoal(page, {
+    name: "Autumn half",
+    sportType: "Run",
+    date: raceDay,
+    distanceM: 21_097.5,
+    elevationGainM: null,
+    objective: "finish",
+    priority: "A",
+  });
+  await expect(page.getByText(/· Finish/)).toHaveCount(0);
+
+  await page.goto("/settings/training");
+  await settle(page);
+  await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
+  const written = writingStarts(page);
+  await setAvailability(page);
+  // The phone run leaves this availability saved (each style keeps its setup): then the new
+  // goal alone has the plan written again, when it is next loaded.
+  const save = page.getByRole("button", { name: "Save availability" });
+  if (await save.isVisible()) await save.click();
+  // Saved before leaving, or leaving would cancel the save on its way.
+  await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeVisible();
+
+  await page.goto("/week");
+  await expectPlanWritten(page, written);
+}
+
+/**
+ * The other specs share this athlete and expect the week planner and no goals, and the other
+ * project's run writes its own plan.
+ */
+async function leaveCoachPlan(page: Page) {
+  await choosePlanningStyle(page, "Week planner", "weekPlanner");
+  await dropWrittenPlan();
+  await deleteGoalIfThere(page, /Run · 21\.1 km/);
+}
+
+test("an athlete changes the coach plan from the chat and from a note on a day", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  // Mock Strava's athlete ran today, so the plan can change from tomorrow, Thursday 18 June.
+  const thursday = page
+    .getByRole("group", { name: "Days of the week" })
+    .getByRole("button", { name: /^Thursday 18 June/ });
+  try {
+    await choosePlanningStyle(page, "Coach plan", "coachPlan");
+    await addRaceAndWritePlan(page);
+    await expect(thursday).not.toHaveAccessibleName(/rest day$/);
+
+    // From the plan, the chat opens ready for a change. The coach proposes one that passed the
+    // rules; declining it changes nothing.
+    await page.getByRole("button", { name: "Ask the coach to change my plan" }).click();
+    await page.getByRole("button", { name: "I can't run on Thursday this week" }).click();
+    const card = page.getByRole("group", { name: "Plan change" }).last();
+    await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+    await expect(card).toContainText("Thu 18 Jun");
+    await card.getByRole("button", { name: "Decline" }).click();
+    await expect(card).toContainText("Declined: your plan stays as it was");
+    await expect(page.getByText("No problem: your plan stays as it was.")).toBeVisible();
+
+    // Asked again and applied: Thursday is a rest day on the plan.
+    const composer = page.getByRole("textbox", { name: "Message the coach" });
+    await composer.fill("I can't run on Thursday this week");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+    await card.getByRole("button", { name: "Apply" }).click();
+    await expect(card).toContainText("Applied to your plan");
+    await expect(page.getByText("Done: the change is in your plan.")).toBeVisible();
+
+    // A change proposed before the plan changed again is not applied.
+    await composer.fill("This week feels too hard");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+    await withDatabase((client) =>
+      client.query("update coach_plans set plan = jsonb_set(plan, '{model}', '\"edited\"')"),
+    );
+    await card.getByRole("button", { name: "Apply" }).click();
+    await expect(card).toContainText(/^.*Your plan changed since the coach proposed this/);
+
+    await page.goto("/week");
+    await expect(thursday).toHaveAccessibleName(/rest day$/);
+
+    // A note on a day goes the same way, without the chat.
+    const saturday = page
+      .getByRole("group", { name: "Days of the week" })
+      .getByRole("button", { name: /^Saturday 20 June/ });
+    await saturday.click();
+    await page.getByRole("button", { name: "Indoor only" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+    await settle(page);
+    await expect(dialog).toHaveScreenshot("plan-change-note.png");
+    await dialog.getByRole("button", { name: "Apply" }).click();
+    await expect(dialog).toContainText("Applied to your plan");
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("heading", { name: /\(treadmill\)/ })).toBeVisible();
+  } finally {
+    await leaveCoachPlan(page);
   }
 });
 

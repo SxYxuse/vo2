@@ -2,6 +2,7 @@ import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 
 import { MAX_STREAM_POINTS, STREAM_CHANNELS } from "./coach-measure.ts";
+import { planChangeInputSchema } from "./coach-plan-change.ts";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const activityId = z.string().min(1).describe("The activity id, as in /activities/<id> links.");
@@ -128,4 +129,28 @@ export const showVisualDef = toolDefinition({
     title: z.string().min(1).max(120),
     html: z.string().min(1).max(200_000),
   }),
+});
+
+// The coach plan's tools (ADR 0038), given to the chat only when the athlete follows the coach plan.
+
+export const getCoachPlanDef = toolDefinition({
+  name: "get_coach_plan",
+  description:
+    "The athlete's coach plan from this week on: each written week's budget and phase, and each day's run in the plan's session format with its status, plus availability, paces, the rules every change must keep, and the first day a change may touch.",
+  inputSchema: z.object({}),
+});
+
+export const proposePlanChangeDef = toolDefinition({
+  name: "propose_plan_change",
+  description:
+    "Check a change to the coach plan before offering it. Send only the days that change, each with its run after the change (the same session format the plan is written in) or null for a rest day. VO2 checks the result against every coach plan rule and the athlete's availability, and answers with either a proposalId and the change day by day, or the rules it breaks: then fix them and propose again. Changes nothing by itself.",
+  inputSchema: planChangeInputSchema,
+});
+
+export const applyPlanChangeDef = toolDefinition({
+  name: "apply_plan_change",
+  description:
+    "Offer a checked change to the athlete: the chat shows it day by day with Apply and Decline. Takes the proposalId propose_plan_change returned. Saved only if the athlete applies it and the plan hasn't changed since; a decline changes nothing.",
+  inputSchema: z.object({ proposalId: z.string().min(1).max(64) }),
+  needsApproval: true,
 });
