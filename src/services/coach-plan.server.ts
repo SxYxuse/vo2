@@ -56,7 +56,7 @@ const STALE_WRITING_MS = 10 * 60_000;
  */
 const PACE_CHANGE_VDOT = 1;
 /**
- * An easy pace from zone 2 heart rate moves on its own, without the VDOT (ADR 0041): the plan is
+ * An easy pace from zone 2 heart rate moves on its own, without the VDOT (ADR 0042): the plan is
  * written again once its middle moved this far, about what one VDOT point does to easy pace.
  */
 const EASY_CHANGE_SEC_PER_KM = 10;

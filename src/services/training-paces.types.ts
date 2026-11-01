@@ -267,7 +267,7 @@ function estimateFrom(efforts: RunEffort[], now: Date, targetMetres: number): Pa
 }
 
 /**
- * Current fitness from best efforts inside recent road runs (ADR 0041): the best-effort distance
+ * Current fitness from best efforts inside recent road runs (ADR 0042): the best-effort distance
  * closest to the A goal's (10 km without one), from efforts of 3 km or more when two runs hold
  * one, else from a mile up. The best run at that distance sets the estimate, discounted by its
  * age and at most 5 % above the next-best run, so a GPS slip or a single unusual day can't move

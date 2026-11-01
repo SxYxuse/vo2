@@ -200,7 +200,7 @@ export type PlanBasis = {
   goals: PlanGoal[];
   vdot: number | null;
   /**
-   * The easy pace's middle and where it came from (ADR 0041). Plans written before it was kept
+   * The easy pace's middle and where it came from (ADR 0042). Plans written before it was kept
    * have none, and are not rewritten for it.
    */
   easy?: { from: EasyFrom; secPerKm: number } | null;

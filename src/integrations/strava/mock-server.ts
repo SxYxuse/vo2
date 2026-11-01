@@ -291,7 +291,7 @@ function buildCatalog(now: Date): MockSpec[] {
     if (week === 2) {
       push("trailRun", "Trail run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55);
     } else {
-      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45, week === 6);
+      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55, week === 6);
     }
     if (week === 1) {
       push("ftpRide", "Threshold ride", atUtcHour(addUtcDays(weekMonday, 3), 7), 50);

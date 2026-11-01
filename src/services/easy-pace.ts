@@ -2,7 +2,7 @@ import { isPlausibleBpm } from "./heart-rate.ts";
 import type { PaceRange } from "./training-paces.types.ts";
 
 /**
- * The easy pace from zone 2 heart rate (ADR 0041): the pace the athlete holds in running zone 2
+ * The easy pace from zone 2 heart rate (ADR 0042): the pace the athlete holds in running zone 2
  * on flat stretches of recent road runs. Each run's flat running is cached as seconds per heart
  * rate and pace, so changing zones or the window reads the cache rather than every stream.
  */

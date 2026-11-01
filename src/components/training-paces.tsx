@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   differenceInCalendarDays,
@@ -74,8 +74,8 @@ function effortLine(effort: RunEffort) {
 function estimateLine(estimate: PaceEstimate) {
   const effort = `${runDistanceLabel(estimate.from.metres)} in ${formatDuration(Math.round(estimate.from.seconds))} on ${estimate.from.name}, ${format(new Date(estimate.from.start), "d MMM")}`;
   return estimate.capped
-    ? `your best ${effort}, held to within 5 % of your next-best run`
-    : `your best ${effort}`;
+    ? `your strongest, ${effort}, held to within 5 % of your next-best run`
+    : `your strongest, ${effort}`;
 }
 
 const targetLabel = (metres: number) =>
@@ -92,7 +92,7 @@ function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
   const estimate = paces.estimate!;
   const stale =
     paces.from === "race" ? " Your race result is too old to set them, so they are estimated." : "";
-  return `Estimated from road runs of the last ${WINDOW_WEEKS} weeks, aiming at ${targetLabel(estimate.targetMetres)} and older runs counting a little less: ${estimateLine(estimate)}. VDOT ${paces.vdot}.${stale}`;
+  return `Estimated from ${runDistanceLabel(estimate.from.metres)} best efforts in road runs of the last ${WINDOW_WEEKS} weeks, the distance closest to ${targetLabel(estimate.targetMetres)}, older runs counting a little less: ${estimateLine(estimate)}. VDOT ${paces.vdot}.${stale}`;
 }
 
 type Paces = TrainingPaces;
@@ -260,6 +260,14 @@ function ChoiceCards<T extends string>({
   );
 }
 
+function Note({ children }: { children: ReactNode }) {
+  return (
+    <div className="text-muted-foreground flex flex-col rounded-lg border p-3 text-sm">
+      {children}
+    </div>
+  );
+}
+
 function SaveError({ show }: { show: boolean }) {
   return show ? (
     <Alert variant="destructive">
@@ -358,26 +366,22 @@ function EffortPicker({
   return (
     <div className="flex flex-col gap-3">
       {stale ? (
-        <Alert>
-          <AlertDescription className="flex flex-col gap-2">
-            <span>
-              Your picked effort is older than {WINDOW_WEEKS} weeks, so it may not say much about
-              your fitness now. It keeps setting your paces until you pick another.
-            </span>
-            {paces.suggestion ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-10 self-start sm:min-h-8"
-                disabled={disabled}
-                onClick={() => onPick(paces.suggestion!)}
-              >
-                Use your recent {runDistanceLabel(paces.suggestion.metres)} best,{" "}
-                {formatDuration(Math.round(paces.suggestion.seconds))}
-              </Button>
-            ) : null}
-          </AlertDescription>
-        </Alert>
+        <Note>
+          Your picked effort is older than {WINDOW_WEEKS} weeks, so it may not say much about your
+          fitness now. It keeps setting your paces until you pick another.
+          {paces.suggestion ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-2 min-h-10 w-full sm:min-h-8 sm:w-auto"
+              disabled={disabled}
+              onClick={() => onPick(paces.suggestion!)}
+            >
+              Use your recent {runDistanceLabel(paces.suggestion.metres)} best,{" "}
+              {formatDuration(Math.round(paces.suggestion.seconds))}
+            </Button>
+          ) : null}
+        </Note>
       ) : null}
       <RadioGroup
         name="best-effort"
@@ -460,9 +464,7 @@ function EasyFromField({ idPrefix, paces }: { idPrefix: string; paces: Paces }) 
         onChange={(next) => save.mutate(next)}
       />
       {note ? (
-        <Alert>
-          <AlertDescription>{note}</AlertDescription>
-        </Alert>
+        <Note>{note}</Note>
       ) : heart.kind === "zone2" && heart.range ? (
         <FieldDescription>
           Your running zone 2 is {heart.minBpm}–{heart.maxBpm} bpm. VO2 found {heart.minutes}{" "}
