@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 import { E2E_NOW } from "./env.ts";
 
 /**
- * Connects mock Strava, copies the training, and finishes onboarding, ending on This week, or on
+ * Connects mock Strava, copies the training, and finishes onboarding, ending on Plan, or on
  * the calendar with planning off. Shared by the e2e setup, the teardown, and the signed-in
  * Lighthouse run (scripts/lighthouse.ts).
  */
@@ -69,15 +69,15 @@ export async function onboardNewAthlete(
   // The OpenRouter key is optional: mock Strava's mock coach answers without one.
   await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "Open This week" }).click();
+  await page.getByRole("button", { name: "Open Plan" }).click();
 
   await page.waitForURL("/week");
-  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan", level: 1 })).toBeVisible();
 }
 
 /**
  * The coach plan's branch: the key (the mock coach stands in for one), an A race added on the
- * spot, availability, paces, then "Write my plan"; ends on This week with the plan written.
+ * spot, availability, paces, then "Write my plan"; ends on Plan with the plan written.
  */
 async function onboardWithCoachPlan(page: Page) {
   const next = page.getByRole("button", { name: "Continue" });
@@ -108,9 +108,9 @@ async function onboardWithCoachPlan(page: Page) {
   await expect(page.getByRole("heading", { name: "Your paces" })).toBeVisible();
   await page.getByRole("button", { name: "Write my plan" }).click();
   await expect(page.getByText(/^Your coach is writing your next four weeks/)).toBeVisible();
-  await page.getByRole("button", { name: "Open This week" }).click();
+  await page.getByRole("button", { name: "Open Plan" }).click();
   await page.waitForURL("/week");
-  await expect(page.getByText(/\d+ km planned/).first()).toBeVisible({
+  await expect(page.getByRole("heading", { name: / · \d+ km$/ })).toBeVisible({
     timeout: 30_000,
   });
 }

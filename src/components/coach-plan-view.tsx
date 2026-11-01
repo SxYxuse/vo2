@@ -3,7 +3,13 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
-import { ChevronRightIcon, RotateCcwIcon, SparklesIcon, Undo2Icon } from "lucide-react";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  RotateCcwIcon,
+  SparklesIcon,
+  Undo2Icon,
+} from "lucide-react";
 
 import { useOnline } from "@/hooks/use-online.ts";
 import { useWeekSwipe } from "@/hooks/use-week-swipe.ts";
@@ -40,16 +46,14 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 /*
- * The Plan view for coach-plan athletes (#134, mockup A2): a strip of the week's days, the
- * selected day in full, the other written weeks, and the road to the race. On desktop the same
- * pieces in two columns, the selected day on the right.
+ * The Plan view for coach-plan athletes (#134, mockup A2): the week shown with arrows to the
+ * other written weeks, a strip of its days, the selected day in full, and the road to the race.
+ * On desktop the same pieces in two columns, the selected day on the right.
  */
 
 const days = (weekStart: string) => Array.from({ length: 7 }, (_, i) => addDayKey(weekStart, i));
 const weekKm = (week: PlanWeek) =>
   Math.round(week.sessions.reduce((sum, run) => sum + run.distanceKm, 0));
-const shortRange = (weekStart: string) =>
-  `${format(parseISO(weekStart), "d")}–${format(parseISO(addDayKey(weekStart, 6)), "d MMM")}`;
 
 function PlanStatus({ state }: { state: CoachPlanState }) {
   const online = useOnline();
@@ -214,7 +218,7 @@ function RunSummary({
       <Button
         className="min-h-11 w-full sm:w-auto sm:self-start"
         nativeButton={false}
-        // Marked, so the session's "This week" goes back here rather than adding an entry.
+        // Marked, so the session's "Plan" button goes back here rather than adding an entry.
         render={
           <Link
             to="/week/run/$sessionId"
@@ -300,52 +304,57 @@ function DayDetail({
   );
 }
 
-function NextWeeks({
-  weeks,
-  current,
-  home,
-  shown,
-  onPick,
+function WeekHeader({
+  week,
+  thisWeek,
+  onStep,
+  canStepBack,
+  canStepForward,
 }: {
-  weeks: PlanWeek[];
-  current: string;
-  home: string;
-  shown: string;
-  onPick: (weekStart: string) => void;
+  week: PlanWeek;
+  thisWeek: string;
+  onStep: (direction: 1 | -1) => void;
+  canStepBack: boolean;
+  canStepForward: boolean;
 }) {
-  const others = weeks.filter((week) => week.weekStart !== shown);
-  if (!others.length) return null;
+  const arrow = "size-[2.75rem] shrink-0 [&_svg]:size-5";
   return (
-    <section aria-labelledby="next-weeks" className="flex flex-col">
-      <h2 id="next-weeks" className="text-muted-foreground mb-1 text-sm">
-        {shown === home ? "Next weeks" : "Other weeks"}
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={arrow}
+        aria-label="Previous week"
+        disabled={!canStepBack}
+        onClick={() => onStep(-1)}
+      >
+        <ChevronLeftIcon />
+      </Button>
+      <h2 aria-live="polite" className="min-w-0 flex-1 text-center text-sm text-balance">
+        <b className="font-medium">
+          {week.weekStart === thisWeek
+            ? "This week"
+            : `Week of ${format(parseISO(week.weekStart), "d MMM")}`}
+        </b>
+        <span className="text-muted-foreground">
+          {" "}
+          · {PHASES[week.phase].label}
+          {week.lighter ? ", lighter" : ""} · {weekKm(week)} km
+        </span>
       </h2>
-      {others.map((week) => {
-        const keys = week.sessions.filter((run) => run.key).map((run) => run.title.toLowerCase());
-        return (
-          <button
-            key={week.weekStart}
-            type="button"
-            onClick={() => onPick(week.weekStart)}
-            className="hover:bg-muted flex min-h-14 items-center gap-3 rounded-md border-t px-1 py-2.5 text-start"
-          >
-            <span className="flex min-w-0 flex-col">
-              <b className="font-medium">
-                {week.weekStart === current
-                  ? "This week"
-                  : `Week of ${format(parseISO(week.weekStart), "d MMM")}`}
-              </b>
-              <span className="text-muted-foreground truncate text-sm">
-                {PHASES[week.phase].label}
-                {week.lighter ? ", lighter" : ""}, {weekKm(week)} km
-                {keys.length ? `, ${keys.join(" and ")}` : ""}
-              </span>
-            </span>
-            <ChevronRightIcon aria-hidden className="text-muted-foreground ms-auto size-4" />
-          </button>
-        );
-      })}
-    </section>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={arrow}
+        aria-label="Next week"
+        disabled={!canStepForward}
+        onClick={() => onStep(1)}
+      >
+        <ChevronRightIcon />
+      </Button>
+    </div>
   );
 }
 
@@ -432,7 +441,13 @@ export function CoachPlanView({ day }: { day?: string }) {
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const thisWeek = state.today ? mondayOf(state.today) : "";
-  const weeks = (state.plan?.weeks ?? []).filter((week) => week.weekStart >= thisWeek).slice(0, 4);
+  // A plan written late in the week, on a Sunday without a run, starts this week with no day left
+  // to place a run on: that week is not shown, rather than read as a written week of 0 km.
+  const weeks = (state.plan?.weeks ?? [])
+    .filter(
+      (week) => week.weekStart > thisWeek || (week.weekStart === thisWeek && week.sessions.length),
+    )
+    .slice(0, 4);
   const inPlan = (date: string | undefined) =>
     date != null && weeks.some((week) => week.weekStart === mondayOf(date));
   // The week the view opens on: this week, or the first written one when the plan starts later (a
@@ -454,17 +469,14 @@ export function CoachPlanView({ day }: { day?: string }) {
       replace: true,
       resetScroll: false,
     });
-  const openWeek = (weekStart: string) => {
-    const target = weeks.find((item) => item.weekStart === weekStart);
-    if (!target) return;
-    return select(openingDay(target));
-  };
+  const canStepBack = index > 0;
+  const canStepForward = index < weeks.length - 1;
   const swipe = useWeekSwipe({
-    canStepForward: index < weeks.length - 1,
-    canStepBack: index > 0,
+    canStepForward,
+    canStepBack,
     onStep: async (direction) => {
       const target = weeks[index + direction];
-      if (target) await openWeek(target.weekStart);
+      if (target) await select(openingDay(target));
     },
   });
 
@@ -474,48 +486,36 @@ export function CoachPlanView({ day }: { day?: string }) {
       {week ? (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:gap-x-8">
           <div className="flex flex-col gap-2 lg:col-start-1 lg:row-start-1">
-            <div className="flex min-h-9 items-center justify-between gap-2">
-              <p className="text-sm">
-                <b className="font-medium">{shortRange(week.weekStart)}</b>
-                <span className="text-muted-foreground">
-                  {" "}
-                  · {PHASES[week.phase].label}
-                  {week.lighter ? ", lighter" : ""} · {weekKm(week)} km planned
-                </span>
-              </p>
-              {week.weekStart !== home ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="min-h-9"
-                  onClick={() => openWeek(home)}
-                >
-                  <Undo2Icon data-icon="inline-start" />
-                  {home === thisWeek ? "This week" : "First week"}
-                </Button>
-              ) : null}
-            </div>
+            <WeekHeader
+              week={week}
+              thisWeek={thisWeek}
+              canStepBack={canStepBack}
+              canStepForward={canStepForward}
+              onStep={(direction) => void swipe.slide(direction)}
+            />
             <div className="touch-pan-y overflow-hidden">
               <div ref={swipe.ref} {...swipe.handlers}>
                 <DayStrip week={week} state={state} selected={selected} onSelect={select} />
               </div>
             </div>
+            {week.weekStart !== home ? (
+              <Button
+                variant="link"
+                className="min-h-11 self-start px-0"
+                nativeButton={false}
+                render={<Link to="/week" search={{}} replace resetScroll={false} />}
+              >
+                <Undo2Icon data-icon="inline-start" />
+                {home === thisWeek ? "Back to this week" : "Back to the first week"}
+              </Button>
+            ) : null}
           </div>
-          <div className="lg:col-start-2 lg:row-span-3 lg:row-start-1">
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
             <div className="lg:sticky lg:top-4">
               <DayDetail date={selected} state={state} weeks={weeks} onSelect={select} />
             </div>
           </div>
-          <div className="lg:col-start-1 lg:row-start-2">
-            <NextWeeks
-              weeks={weeks}
-              current={thisWeek}
-              home={home}
-              shown={week.weekStart}
-              onPick={openWeek}
-            />
-          </div>
-          <div className="flex flex-col gap-3 lg:col-start-1 lg:row-start-3">
+          <div className="flex flex-col gap-3 lg:col-start-1 lg:row-start-2">
             <RoadToRace state={state} weeks={weeks} />
             <Button
               variant="outline"

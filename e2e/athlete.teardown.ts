@@ -40,7 +40,7 @@ test("an athlete who onboards with planning off lands on the calendar with no we
   await onboardNewAthlete(page, { planningOff: true });
   await page.getByRole("button", { name: "Toggle Sidebar" }).click();
   await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "This week", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Plan", exact: true })).toHaveCount(0);
 
   await page.goto("/week");
   await expect(page.getByText("Planning is off", { exact: true })).toBeVisible();
@@ -59,5 +59,5 @@ test("an athlete who onboards with the coach plan sees their four weeks written"
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
 
   await onboardNewAthlete(page, { coachPlan: true });
-  await expect(page.getByText("This week", { exact: true }).last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^This week · / })).toBeVisible();
 });

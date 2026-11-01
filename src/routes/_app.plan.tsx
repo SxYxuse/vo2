@@ -9,7 +9,7 @@ import { startPlan } from "@/services/plan-builder.ts";
 /** Build or rebuild the training plan (ADR 0026). Leaving keeps the plan as it was. */
 export const Route = createFileRoute("/_app/plan")({
   loader: async ({ context }) => {
-    // The plan builder is the week planner's; This week shows the other styles.
+    // The plan builder is the week planner's; Plan shows the other styles.
     if ((await planningStyleOf(context)) !== "weekPlanner") {
       throw redirect({ to: "/week", replace: true });
     }
