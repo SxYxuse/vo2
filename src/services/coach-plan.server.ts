@@ -249,7 +249,9 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
     const from = lastWeek && next > first ? next : first;
-    return { from, reason: "new week", trigger: from };
+    // Keyed on the week being added, not the day: a plan fallen behind would otherwise try again
+    // each day after a failure.
+    return { from, reason: "new week", trigger: next };
   }
   return null;
 }
@@ -301,7 +303,10 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   const attemptKey = createHash("sha1")
     .update(JSON.stringify([due.reason, due.trigger]))
     .digest("hex");
-  if (!force && row.attemptKey === attemptKey) return row;
+  // Only a failed writing waits for "Try again" (shown with its reason). One that succeeded and is
+  // due again for the same trigger, such as switching back twice in a day, writes again, so a
+  // rewrite asked for is always either written or shown as failed.
+  if (!force && row.status === "failed" && row.attemptKey === attemptKey) return row;
   const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [claimed] = await db
     .update(coachPlans)

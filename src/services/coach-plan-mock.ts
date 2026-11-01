@@ -23,6 +23,9 @@ import type { PaceRange, PaceType } from "./training-paces.types.ts";
 const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
 /** Rounds down to half a km, so rounding never takes a run over a limit. */
 const halfKm = (km: number) => Math.floor(km * 2) / 2;
+/** Runs grow by this much a round; small enough for a 5 km week to reach 90 % of its budget. */
+const STEP_KM = 0.1;
+const tenth = (km: number) => Math.round(km * 10) / 10;
 /** Room left under each limit, so the sizes VO2 works out from the steps stay inside it. */
 const MARGIN = 0.95;
 
@@ -104,7 +107,7 @@ export function mockCoachPlan(
     const picked = pickDays(candidates, wanted, longDate);
     if (!picked.length) continue;
 
-    // Grow every run by half a km a round, all together so no run outgrows the longest-run share,
+    // Grow every run by a tenth of a km a round, all together so no run outgrows the longest-run share,
     // until the budget, a day's time, or the longest-run rule stops it.
     const share = maxLongShare(longShareRuns(week, ctx));
     const cap = (date: string) => {
@@ -112,20 +115,22 @@ export function mockCoachPlan(
       const time = date === longDate ? Math.min(MAX_LONG_MINUTES, minutes) : minutes;
       return Math.min(kmIn(time), spikeLimit(date));
     };
-    const sizes = new Map(picked.map((date) => [date, Math.min(2, halfKm(cap(date)))]));
+    const sizes = new Map(
+      picked.map((date) => [date, Math.min(2, Math.floor(cap(date) * 10) / 10)]),
+    );
     const sum = () => frozenKm + [...sizes.values()].reduce((total, km) => total + km, 0);
     const growing = new Set(picked);
     while (growing.size) {
       for (const date of growing) {
-        if (sum() - frozenKm + 0.5 > budget || sizes.get(date)! + 0.5 > cap(date)) {
+        if (sum() - frozenKm + STEP_KM > budget || sizes.get(date)! + STEP_KM > cap(date)) {
           growing.delete(date);
           continue;
         }
-        sizes.set(date, sizes.get(date)! + 0.5);
+        sizes.set(date, tenth(sizes.get(date)! + STEP_KM));
       }
       for (const date of picked) {
         if (sizes.get(date)! <= share * sum() + 0.01) continue;
-        sizes.set(date, sizes.get(date)! - 0.5);
+        sizes.set(date, tenth(sizes.get(date)! - STEP_KM));
         growing.delete(date);
       }
     }

@@ -280,9 +280,20 @@ async function setAvailability(page: Page) {
 }
 
 /** Waits for the plan to be written: an earlier plan stays on screen while the next is written. */
-async function expectPlanWritten(page: Page) {
+async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
+  await writing;
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText(/km planned of a \d+ km budget/).first()).toBeVisible();
+}
+
+/**
+ * Resolves once the app shows a writing in progress, which it does only when the server started
+ * one: the answer that started it says "writing" until the next check, three seconds later.
+ * Started before the step that should write, and kept across pages, so a plan already on screen
+ * can't pass for a new one.
+ */
+function writingStarts(page: Page) {
+  return expect(page.getByText("Writing your plan…").first()).toBeVisible({ timeout: 30_000 });
 }
 
 test("an athlete switches to the coach plan, sets it up, and switches away and back", async ({
@@ -314,14 +325,17 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.goto("/settings/training");
     await settle(page);
     await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
+    const written = writingStarts(page);
     await setAvailability(page);
     // The phone run leaves this availability saved (each style keeps its setup): then the new
-    // goal alone has the plan written again.
+    // goal alone has the plan written again, when it is next loaded.
     const save = page.getByRole("button", { name: "Save availability" });
     if (await save.isVisible()) await save.click();
+    // Saved before leaving, or leaving would cancel the save on its way.
+    await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeVisible();
 
     await page.goto("/week");
-    await expectPlanWritten(page);
+    await expectPlanWritten(page, written);
     await settle(page);
     await expect(page).toHaveScreenshot("week-coach-plan.png", {
       fullPage: true,
@@ -332,10 +346,11 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await choosePlanningStyle(page, "Week planner", "weekPlanner");
     await page.goto("/week");
     await expect(page.getByRole("button", { name: "Today: open the day" })).toBeVisible();
+    const rewritten = writingStarts(page);
     await choosePlanningStyle(page, "Coach plan", "coachPlan");
     await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeDisabled();
     await page.goto("/week");
-    await expectPlanWritten(page);
+    await expectPlanWritten(page, rewritten);
   } finally {
     // The other specs share this athlete and expect the week planner and no goals.
     await choosePlanningStyle(page, "Week planner", "weekPlanner");
