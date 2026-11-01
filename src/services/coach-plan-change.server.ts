@@ -99,19 +99,38 @@ const openRuns = (plan: CoachPlan, ctx: RuleContext) =>
         ctx.weeks.some((week) => session.date >= week.weekStart),
     );
 
-/** A break by rule and the day or week it names, so the same break before and after matches. */
-const breakKey = (item: RuleBreak) =>
-  `${item.rule}|${/\d{4}-\d{2}-\d{2}/.exec(item.message)?.[0] ?? ""}`;
+/** The day or week a break names: its first date. */
+const breakDay = (item: RuleBreak) => /\d{4}-\d{2}-\d{2}/.exec(item.message)?.[0] ?? "";
+const breakKey = (item: RuleBreak) => `${item.rule}|${breakDay(item)}`;
 
 /**
  * The breaks the change brings: every rule is checked over the whole plan ahead, before and after,
  * so a change that breaks a rule on a day it doesn't touch (a shorter long run lowering the next
  * week's longest-run limit, a dropped run raising the long run's share) is caught, while a break
- * the plan already had doesn't block an unrelated change.
+ * the plan already had elsewhere doesn't block an unrelated change. A break on a changed day always
+ * counts: the change could have made it worse.
  */
-function newBreaks(before: PlannedRun[], after: PlannedRun[], ctx: RuleContext) {
-  const had = new Set(checkPlan(before, ctx).map(breakKey));
-  return checkPlan(after, ctx).filter((item) => !had.has(breakKey(item)));
+function newBreaks(
+  before: PlannedRun[],
+  after: PlannedRun[],
+  changed: Set<string>,
+  ctx: RuleContext,
+) {
+  const longestBefore: Record<string, number> = {};
+  for (const week of ctx.weeks) {
+    const end = addDayKey(week.weekStart, 6);
+    longestBefore[week.weekStart] = Math.max(
+      0,
+      ...[...ctx.frozen, ...before]
+        .filter((session) => session.date >= week.weekStart && session.date <= end)
+        .map((session) => session.distanceKm),
+    );
+  }
+  const checked = { ...ctx, longestBefore };
+  const had = new Set(checkPlan(before, checked).map(breakKey));
+  return checkPlan(after, checked).filter(
+    (item) => changed.has(breakDay(item)) || !had.has(breakKey(item)),
+  );
 }
 
 const sideOf = (session: PlannedRun | undefined): ChangeSide =>
@@ -218,7 +237,9 @@ export async function proposePlanChange(
   if (!broken.length) {
     const open = openRuns(plan, ctx);
     const after = [...open.filter((session) => !changed.has(session.date)), ...sessions];
-    broken.push(...newBreaks(open, after, ctx).map((item) => `${item.rule}: ${item.message}`));
+    broken.push(
+      ...newBreaks(open, after, changed, ctx).map((item) => `${item.rule}: ${item.message}`),
+    );
   }
   logger.info("coach_plan.change_checked", { days: dates.length, broken: broken.length });
   if (broken.length) return { ok: false, broken };
