@@ -19,10 +19,13 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function useWeekSwipe({
   onStep,
   canStepForward,
+  canStepBack = true,
 }: {
   /** Changes the week; resolves once the new week is shown. */
   onStep: (direction: 1 | -1) => Promise<unknown>;
   canStepForward: boolean;
+  /** False on the first week there is, which then only stretches like the newest. */
+  canStepBack?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const gesture = useRef<{ x: number; y: number; dx: number; axis: "x" | "y" | null } | null>(null);
@@ -81,7 +84,8 @@ export function useWeekSwipe({
         current.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
       }
       if (current.axis !== "x") return;
-      current.dx = dx < 0 && !canStepForward ? dx * EDGE_RESISTANCE : dx;
+      const blocked = dx < 0 ? !canStepForward : !canStepBack;
+      current.dx = blocked ? dx * EDGE_RESISTANCE : dx;
       moveTo(current.dx);
     },
     onTouchEnd: () => {
@@ -90,7 +94,8 @@ export function useWeekSwipe({
       if (current?.axis !== "x") return;
       swiped.current = true;
       const direction = current.dx > 0 ? -1 : 1;
-      if (Math.abs(current.dx) < SWIPE_DISTANCE || (direction === 1 && !canStepForward)) {
+      const blocked = direction === 1 ? !canStepForward : !canStepBack;
+      if (Math.abs(current.dx) < SWIPE_DISTANCE || blocked) {
         moveTo(0, SLIDE_MS);
         return;
       }
