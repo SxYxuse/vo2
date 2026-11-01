@@ -4,7 +4,12 @@ import { formatPaceClock } from "./locomotion.ts";
 import type { PhaseKind } from "./season-phase.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import type { Goal } from "./season.types.ts";
-import { PACE_TYPES, type PaceRange, type PaceType } from "./training-paces.types.ts";
+import {
+  PACE_TYPES,
+  type EasyFrom,
+  type PaceRange,
+  type PaceType,
+} from "./training-paces.types.ts";
 
 /*
  * The coach plan (ADR 0037): the athlete's availability, the structured session format the coach
@@ -194,6 +199,11 @@ export type PlanBasis = {
   availability: string;
   goals: PlanGoal[];
   vdot: number | null;
+  /**
+   * The easy pace's middle and where it came from (ADR 0041). Plans written before it was kept
+   * have none, and are not rewritten for it.
+   */
+  easy?: { from: EasyFrom; secPerKm: number } | null;
   /** Key sessions already found missed, so each rewrites the plan once. */
   missed: string[];
 };

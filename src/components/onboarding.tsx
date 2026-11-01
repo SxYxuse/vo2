@@ -123,7 +123,7 @@ const STEP_LIST = [
     id: "paces",
     title: "Your paces",
     description:
-      "Sessions are written at these paces. Set a recent race result if your runs undersell you, or skip it.",
+      "Sessions are written at these paces. Pick a best effort or set a race result if your runs undersell you, or skip it.",
   },
   {
     id: "ready",

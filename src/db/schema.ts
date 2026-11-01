@@ -89,6 +89,8 @@ export const activityStreams = pgTable("activity_streams", {
   rideAnalysis: jsonb("ride_analysis"),
   heartAnalysis: jsonb("heart_analysis"),
   bestEfforts: jsonb("best_efforts"),
+  /** Flat running time by heart rate and pace, for the easy pace from zone 2 (ADR 0041). */
+  flatPaces: jsonb("flat_paces"),
   raw: jsonb("raw").notNull(),
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -107,6 +109,8 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   heartRate: jsonb("heart_rate"),
   /** A recent race result the athlete set; it wins over the training-pace estimate. */
   raceResult: jsonb("race_result"),
+  /** What the training paces and the easy pace are read from (ADR 0041). */
+  paceSettings: jsonb("pace_settings"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
   training: jsonb("training"),

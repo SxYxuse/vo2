@@ -55,6 +55,11 @@ const STALE_WRITING_MS = 10 * 60_000;
  * VDOT has moved this far since, about 2 % in pace, rather than on every small step.
  */
 const PACE_CHANGE_VDOT = 1;
+/**
+ * An easy pace from zone 2 heart rate moves on its own, without the VDOT (ADR 0041): the plan is
+ * written again once its middle moved this far, about what one VDOT point does to easy pace.
+ */
+const EASY_CHANGE_SEC_PER_KM = 10;
 
 type Row = typeof coachPlans.$inferSelect;
 type Activity = {
@@ -143,6 +148,12 @@ export async function gather(userId: string, now = new Date()) {
 export type Inputs = Awaited<ReturnType<typeof gather>>;
 
 const vdotOf = (inputs: Inputs) => (inputs.paces.source === "none" ? null : inputs.paces.vdot);
+function easyOf(inputs: Inputs): PlanBasis["easy"] {
+  const { paces } = inputs;
+  if (paces.source === "none") return null;
+  const { fastSecPerKm, slowSecPerKm } = paces.paces.easy;
+  return { from: paces.easySource, secPerKm: Math.round((fastSecPerKm + slowSecPerKm) / 2) };
+}
 export const rangesOf = (inputs: Inputs) =>
   inputs.paces.source === "none" ? null : inputs.paces.paces;
 
@@ -240,6 +251,7 @@ function basisOf(inputs: Inputs): PlanBasis {
     availability: JSON.stringify(inputs.availability),
     goals: planGoals(inputs.goals, inputs.today),
     vdot: vdotOf(inputs),
+    easy: easyOf(inputs),
     missed,
   };
 }
@@ -263,6 +275,20 @@ type Due = {
  * (switching back to the coach plan); availability, goals, or paces changed; a key session was
  * missed; or a new week is due. Days before it are frozen.
  */
+/**
+ * Whether the easy pace alone moved enough to rewrite. An easy pace read from the VDOT moves with
+ * it, so the VDOT point covers it; only one from heart rate, before or now, is checked here.
+ */
+/** The easy pace in steps of EASY_CHANGE_SEC_PER_KM, so a failed writing waits as the VDOT's does. */
+const easyStep = (easy: PlanBasis["easy"]) =>
+  easy ? Math.round(easy.secPerKm / EASY_CHANGE_SEC_PER_KM) : null;
+
+function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
+  if (written === undefined || written == null || now == null) return false;
+  if (written.from !== "heartRate" && now.from !== "heartRate") return false;
+  return Math.abs(written.secPerKm - now.secPerKm) >= EASY_CHANGE_SEC_PER_KM;
+}
+
 export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = firstDay(inputs);
   const { plan, row, today } = inputs;
@@ -289,6 +315,9 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
     (plan.basis.vdot == null) !== (basis.vdot == null) ||
     Math.abs((plan.basis.vdot ?? 0) - (basis.vdot ?? 0)) >= PACE_CHANGE_VDOT;
   if (pacesChanged) return { from: first, reason: "paces", trigger: vdotPoint(basis.vdot) };
+  if (easyChanged(plan.basis.easy, basis.easy)) {
+    return { from: first, reason: "easy pace", trigger: easyStep(basis.easy) };
+  }
   const missed = basis.missed.filter((id) => !plan.basis.missed.includes(id));
   if (missed.length) return { from: first, reason: "missed", trigger: missed };
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";

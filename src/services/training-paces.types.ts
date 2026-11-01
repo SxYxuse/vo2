@@ -162,14 +162,47 @@ export function parseRaceResult(value: unknown): RaceResult | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** One run's best effort, as read for the estimate. */
-export type RunEffort = {
-  activityId: string;
-  name: string;
-  start: string;
-  metres: number;
-  seconds: number;
-};
+/** One run's best effort, as read for the estimate and offered to pick. */
+export const runEffortSchema = z.object({
+  activityId: z.string().min(1),
+  name: z.string(),
+  start: z.iso.datetime({ offset: true }),
+  metres: z.number().positive(),
+  seconds: z.number().positive(),
+});
+
+export type RunEffort = z.infer<typeof runEffortSchema>;
+
+/** What the training paces are read from: the estimate, a picked best effort, or a race. */
+export const PACES_FROM = ["automatic", "effort", "race"] as const;
+export type PacesFrom = (typeof PACES_FROM)[number];
+
+/** What the easy pace is read from: zone 2 heart rate, or the VDOT like the other paces. */
+export const EASY_FROM = ["heartRate", "vdot"] as const;
+export type EasyFrom = (typeof EASY_FROM)[number];
+
+const paceSettingsSchema = z.object({
+  /** Unset for athletes from before the choice: their race result, if any, keeps setting paces. */
+  from: z.enum(PACES_FROM).optional(),
+  effort: runEffortSchema.nullable().default(null),
+  easyFrom: z.enum(EASY_FROM).default("heartRate"),
+});
+
+export type PaceSettings = z.infer<typeof paceSettingsSchema>;
+
+export function parsePaceSettings(value: unknown): PaceSettings {
+  const parsed = paceSettingsSchema.safeParse(value ?? {});
+  return parsed.success ? parsed.data : paceSettingsSchema.parse({});
+}
+
+/** What the athlete can change on the Paces page, one choice at a time. */
+export const paceChoiceSchema = z.union([
+  z.object({ from: z.literal("automatic") }),
+  z.object({ from: z.literal("effort"), activityId: z.string().min(1), metres: z.number() }),
+  z.object({ easyFrom: z.enum(EASY_FROM) }),
+]);
+
+export type PaceChoice = z.infer<typeof paceChoiceSchema>;
 
 /**
  * Best efforts from the last 16 weeks count, each worth 1 % less per week of age, so an old best
@@ -180,6 +213,13 @@ export const ESTIMATE_WINDOW_DAYS = 16 * 7;
 const AGE_DISCOUNT_PER_WEEK = 0.01;
 /** Shorter bests are sprints the model doesn't fit, and inflate VDOT. */
 const ESTIMATE_MIN_M = 1600;
+/**
+ * Efforts this long are preferred: a mile or a 6-minute test sits where the model over-reads
+ * longer races, so a 2-mile best effort or longer wins whenever two runs hold one.
+ */
+const PREFERRED_MIN_M = 3000;
+/** The distance the estimate aims at without a running A goal. */
+export const DEFAULT_TARGET_M = 10_000;
 /** One run can lift the estimate at most this far above the next-best run. */
 const OUTLIER_LIFT = 1.05;
 
@@ -189,30 +229,65 @@ export type PaceEstimate = {
   from: RunEffort;
   /** Whether it was held to the next-best run because it stood too far above it. */
   capped: boolean;
+  /** The distance it aimed at: the A goal's, or 10 km. */
+  targetMetres: number;
 };
 
+const weeksOld = (start: string, now: Date) =>
+  Math.max(0, now.getTime() - Date.parse(start)) / (7 * 86_400_000);
+
+/** How far apart two distances are, by ratio: 5 km is as far from 10 km as 10 km from 20 km. */
+const distanceGap = (metres: number, target: number) => Math.abs(Math.log(metres / target));
+
 /**
- * Current fitness from best efforts inside recent road runs. Each run counts once, by its best
- * effort of a mile or more, discounted by its age. The best run sets the estimate, but at most
- * 5 % above the next-best one, so a GPS slip or a single unusual day can't move every pace at
- * once; with only one run there is nothing to check it against, so there is no estimate yet.
- * Best efforts inside training runs are a floor, not a race, so the estimate errs slow.
+ * The estimate from one pool: the best-effort distance closest to the target that at least two
+ * runs hold, then the best of those runs, discounted by age and held within 5 % of the next.
  */
-export function estimateVdot(efforts: RunEffort[], now: Date): PaceEstimate | null {
-  const bestPerRun = new Map<string, { effort: RunEffort; vdot: number }>();
+function estimateFrom(efforts: RunEffort[], now: Date, targetMetres: number): PaceEstimate | null {
+  const byDistance = new Map<number, Map<string, { effort: RunEffort; vdot: number }>>();
   for (const effort of efforts) {
-    if (effort.metres < ESTIMATE_MIN_M) continue;
-    const weeks = Math.max(0, now.getTime() - Date.parse(effort.start)) / (7 * 86_400_000);
-    const vdot = vdotFromRace(effort.metres, effort.seconds) * (1 - AGE_DISCOUNT_PER_WEEK * weeks);
-    const current = bestPerRun.get(effort.activityId);
-    if (!current || vdot > current.vdot) bestPerRun.set(effort.activityId, { effort, vdot });
+    const vdot =
+      vdotFromRace(effort.metres, effort.seconds) *
+      (1 - AGE_DISCOUNT_PER_WEEK * weeksOld(effort.start, now));
+    const runs = byDistance.get(effort.metres) ?? new Map();
+    const current = runs.get(effort.activityId);
+    if (!current || vdot > current.vdot) runs.set(effort.activityId, { effort, vdot });
+    byDistance.set(effort.metres, runs);
   }
-  const ranked = [...bestPerRun.values()].sort((a, b) => b.vdot - a.vdot);
-  if (ranked.length < 2) return null;
+  const [metres] = [...byDistance]
+    .filter(([, runs]) => runs.size >= 2)
+    .map(([distance]) => distance)
+    .sort((a, b) => distanceGap(a, targetMetres) - distanceGap(b, targetMetres) || b - a);
+  if (metres == null) return null;
+  const ranked = [...byDistance.get(metres)!.values()].sort((a, b) => b.vdot - a.vdot);
   const [best, next] = ranked as [(typeof ranked)[0], (typeof ranked)[0]];
   const ceiling = next.vdot * OUTLIER_LIFT;
   const capped = best.vdot > ceiling;
-  return { vdot: roundVdot(capped ? ceiling : best.vdot), from: best.effort, capped };
+  return { vdot: roundVdot(capped ? ceiling : best.vdot), from: best.effort, capped, targetMetres };
+}
+
+/**
+ * Current fitness from best efforts inside recent road runs (ADR 0041): the best-effort distance
+ * closest to the A goal's (10 km without one), from efforts of 3 km or more when two runs hold
+ * one, else from a mile up. The best run at that distance sets the estimate, discounted by its
+ * age and at most 5 % above the next-best run, so a GPS slip or a single unusual day can't move
+ * every pace at once. With fewer than two runs there is nothing to check against, so no estimate.
+ * Best efforts inside training runs are a floor, not a race, so the estimate errs slow.
+ */
+export function estimateVdot(
+  efforts: RunEffort[],
+  now: Date,
+  targetMetres = DEFAULT_TARGET_M,
+): PaceEstimate | null {
+  const counted = efforts.filter((effort) => effort.metres >= ESTIMATE_MIN_M);
+  const preferred = counted.filter((effort) => effort.metres >= PREFERRED_MIN_M);
+  return estimateFrom(preferred, now, targetMetres) ?? estimateFrom(counted, now, targetMetres);
+}
+
+/** Whether a date (YYYY-MM-DD or ISO) is inside the last 16 weeks, as best efforts count. */
+function isInWindow(date: string, now: Date) {
+  const oldest = new Date(now.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000);
+  return date.slice(0, 10) >= oldest.toISOString().slice(0, 10);
 }
 
 /**
@@ -220,48 +295,133 @@ export function estimateVdot(efforts: RunEffort[], now: Date): PaceEstimate | nu
  * longer says much about fitness now; it stays saved and shown until the athlete clears it.
  */
 export function isRaceResultCurrent(raceResult: RaceResult, now: Date) {
-  const oldest = new Date(now.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000);
-  return raceResult.date >= oldest.toISOString().slice(0, 10);
+  return isInWindow(raceResult.date, now);
 }
 
 export function roundVdot(vdot: number) {
   return Math.round(vdot * 10) / 10;
 }
 
-export type TrainingPaces =
+/** The race distances an athlete can pick a best effort at: the race result's distances. */
+export const EFFORT_CHOICE_DISTANCES = RACE_DISTANCES;
+
+/** One distance's best efforts to pick from: the best of the last 16 weeks, and of all time. */
+export type EffortChoice = {
+  metres: number;
+  recent: RunEffort | null;
+  allTime: RunEffort | null;
+};
+
+/** The fastest effort per race distance: in the window, and over every road run copied. */
+export function effortChoices(efforts: RunEffort[], now: Date): EffortChoice[] {
+  const fastest = (list: RunEffort[]) =>
+    list.reduce<RunEffort | null>(
+      (best, effort) => (!best || effort.seconds < best.seconds ? effort : best),
+      null,
+    );
+  return EFFORT_CHOICE_DISTANCES.flatMap((metres) => {
+    const atDistance = efforts.filter((effort) => effort.metres === metres);
+    const allTime = fastest(atDistance);
+    if (!allTime) return [];
+    const recent = fastest(atDistance.filter((effort) => isInWindow(effort.start, now)));
+    return [{ metres, recent, allTime }];
+  });
+}
+
+/** The easy pace from zone 2 heart rate, or why there is none. */
+export type EasyFromHeart =
+  | { kind: "zones-missing" }
   | {
-      signedIn: boolean;
-      source: "none";
-      /** A saved race result too old to set the paces any more. */
-      raceResult: RaceResult | null;
-      estimate: null;
-    }
-  | {
-      signedIn: true;
-      /** A race result the athlete set wins over the estimate from best efforts. */
-      source: "race" | "estimate";
-      vdot: number;
-      paces: Record<PaceType, PaceRange>;
-      raceResult: RaceResult | null;
-      estimate: PaceEstimate | null;
+      kind: "zone2";
+      minBpm: number;
+      maxBpm: number;
+      minutes: number;
+      range: PaceRange | null;
     };
 
-/** The athlete's training paces: their race result while current, else the estimate. */
-export function trainingPaces(
-  raceResult: RaceResult | null,
-  estimate: PaceEstimate | null,
-  now: Date,
-): TrainingPaces {
-  const race = raceResult && isRaceResultCurrent(raceResult, now) ? raceResult : null;
-  const vdot = race ? roundVdot(vdotFromRace(race.metres, race.seconds)) : estimate?.vdot;
-  if (vdot == null) return { signedIn: true, source: "none", raceResult, estimate: null };
-  return {
-    signedIn: true,
-    source: race ? "race" : "estimate",
-    vdot,
-    paces: trainingPaceRanges(vdot),
+type PaceSetup = {
+  /** The athlete's choice, which may not be what sets the paces: an old race result stops. */
+  from: PacesFrom;
+  raceResult: RaceResult | null;
+  /** The picked best effort, used as it is until the athlete changes it. */
+  effort: RunEffort | null;
+  /** A newer best at the picked effort's distance, once the pick is older than 16 weeks. */
+  suggestion: RunEffort | null;
+  choices: EffortChoice[];
+  estimate: PaceEstimate | null;
+  easyFrom: EasyFrom;
+  heart: EasyFromHeart;
+};
+
+export type TrainingPaces = PaceSetup &
+  (
+    | { signedIn: boolean; source: "none" }
+    | {
+        signedIn: true;
+        source: "race" | "effort" | "estimate";
+        vdot: number;
+        paces: Record<PaceType, PaceRange>;
+        /** Where the easy pace came from: zone 2 when chosen and enough of it was found. */
+        easySource: EasyFrom;
+      }
+  );
+
+export const NO_PACES: TrainingPaces = {
+  signedIn: false,
+  source: "none",
+  from: "automatic",
+  raceResult: null,
+  effort: null,
+  suggestion: null,
+  choices: [],
+  estimate: null,
+  easyFrom: "heartRate",
+  heart: { kind: "zones-missing" },
+};
+
+/**
+ * The athlete's training paces from their choice: a picked best effort as it is, a race result
+ * while current, else the estimate. The easy pace comes from zone 2 when chosen and found.
+ */
+export function trainingPaces(input: {
+  settings: PaceSettings;
+  raceResult: RaceResult | null;
+  estimate: PaceEstimate | null;
+  choices: EffortChoice[];
+  heart: EasyFromHeart;
+  now: Date;
+}): TrainingPaces {
+  const { settings, raceResult, estimate, choices, heart, now } = input;
+  const from = settings.from ?? (raceResult ? "race" : "automatic");
+  const effort = from === "effort" ? settings.effort : null;
+  const race =
+    from === "race" && raceResult && isRaceResultCurrent(raceResult, now) ? raceResult : null;
+  const picked = effort ?? race;
+  const vdot = picked ? roundVdot(vdotFromRace(picked.metres, picked.seconds)) : estimate?.vdot;
+  const newer = effort ? choices.find((choice) => choice.metres === effort.metres)?.recent : null;
+  const setup: PaceSetup = {
+    from,
     raceResult,
+    effort,
+    suggestion:
+      effort && !isInWindow(effort.start, now) && newer && newer.activityId !== effort.activityId
+        ? newer
+        : null,
+    choices,
     estimate,
+    easyFrom: settings.easyFrom,
+    heart,
+  };
+  if (vdot == null) return { ...setup, signedIn: true, source: "none" };
+  const paces = trainingPaceRanges(vdot);
+  const zone2 = settings.easyFrom === "heartRate" && heart.kind === "zone2" ? heart.range : null;
+  return {
+    ...setup,
+    signedIn: true,
+    source: effort ? "effort" : race ? "race" : "estimate",
+    vdot,
+    paces: zone2 ? { ...paces, easy: zone2 } : paces,
+    easySource: zone2 ? "heartRate" : "vdot",
   };
 }
 
