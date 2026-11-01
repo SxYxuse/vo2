@@ -291,7 +291,7 @@ function buildCatalog(now: Date): MockSpec[] {
     if (week === 2) {
       push("trailRun", "Trail run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55);
     } else {
-      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55, week === 6);
+      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45, week === 6);
     }
     if (week === 1) {
       push("ftpRide", "Threshold ride", atUtcHour(addUtcDays(weekMonday, 3), 7), 50);
@@ -466,7 +466,7 @@ function streamsFor(spec: MockSpec): StreamSet {
  * Long runs are easy: slower, and held in running zone 2 after a short warm-up (about 124–131 bpm
  * for the LTHR the lunch runs give), so the easy pace from heart rate has flat zone 2 to read.
  */
-const EASY_RUN_SPEED = 0.88;
+const EASY_RUN_SPEED = 0.84;
 
 function isEasyRun(spec: MockSpec) {
   return spec.kind === "run" && spec.name === "Long run";

@@ -215,10 +215,10 @@ const AGE_DISCOUNT_PER_WEEK = 0.01;
 const ESTIMATE_MIN_M = 1600;
 /**
  * Efforts this long are preferred: a mile or a 6-minute test sits where the model over-reads
- * longer races, so a 2-mile best effort or longer wins whenever two runs hold one.
+ * longer races, so only 2-mile best efforts or longer count whenever two runs hold one.
  */
 const PREFERRED_MIN_M = 3000;
-/** The distance the estimate aims at without a running A goal. */
+/** The distance near ties lean toward without a running A goal. */
 export const DEFAULT_TARGET_M = 10_000;
 /** One run can lift the estimate at most this far above the next-best run. */
 const OUTLIER_LIFT = 1.05;
@@ -229,7 +229,7 @@ export type PaceEstimate = {
   from: RunEffort;
   /** Whether it was held to the next-best run because it stood too far above it. */
   capped: boolean;
-  /** The distance it aimed at: the A goal's, or 10 km. */
+  /** The distance near ties leaned toward: the A goal's, or 10 km. */
   targetMetres: number;
 };
 
@@ -239,40 +239,47 @@ const weeksOld = (start: string, now: Date) =>
 /** How far apart two distances are, by ratio: 5 km is as far from 10 km as 10 km from 20 km. */
 const distanceGap = (metres: number, target: number) => Math.abs(Math.log(metres / target));
 
+/** VDOTs this close are a tie, broken by the distance closer to the target. */
+const VDOT_TIE = 0.05;
+
 /**
- * The estimate from one pool: the best-effort distance closest to the target that at least two
- * runs hold, then the best of those runs, discounted by age and held within 5 % of the next.
+ * The estimate from one pool (ADR 0039's rule): each run counts once, by its best effort
+ * discounted by age; the best run sets it, at most 5 % above the next-best run. The target
+ * distance only breaks near ties, within a run and between runs: it never picks a distance.
  */
 function estimateFrom(efforts: RunEffort[], now: Date, targetMetres: number): PaceEstimate | null {
-  const byDistance = new Map<number, Map<string, { effort: RunEffort; vdot: number }>>();
+  type Scored = { effort: RunEffort; vdot: number };
+  const stronger = (a: Scored, b: Scored) =>
+    Math.abs(a.vdot - b.vdot) > VDOT_TIE
+      ? b.vdot - a.vdot
+      : distanceGap(a.effort.metres, targetMetres) - distanceGap(b.effort.metres, targetMetres);
+  const bestPerRun = new Map<string, Scored>();
   for (const effort of efforts) {
-    const vdot =
-      vdotFromRace(effort.metres, effort.seconds) *
-      (1 - AGE_DISCOUNT_PER_WEEK * weeksOld(effort.start, now));
-    const runs = byDistance.get(effort.metres) ?? new Map();
-    const current = runs.get(effort.activityId);
-    if (!current || vdot > current.vdot) runs.set(effort.activityId, { effort, vdot });
-    byDistance.set(effort.metres, runs);
+    const scored = {
+      effort,
+      vdot:
+        vdotFromRace(effort.metres, effort.seconds) *
+        (1 - AGE_DISCOUNT_PER_WEEK * weeksOld(effort.start, now)),
+    };
+    const current = bestPerRun.get(effort.activityId);
+    if (!current || stronger(scored, current) < 0) bestPerRun.set(effort.activityId, scored);
   }
-  const [metres] = [...byDistance]
-    .filter(([, runs]) => runs.size >= 2)
-    .map(([distance]) => distance)
-    .sort((a, b) => distanceGap(a, targetMetres) - distanceGap(b, targetMetres) || b - a);
-  if (metres == null) return null;
-  const ranked = [...byDistance.get(metres)!.values()].sort((a, b) => b.vdot - a.vdot);
-  const [best, next] = ranked as [(typeof ranked)[0], (typeof ranked)[0]];
+  const ranked = [...bestPerRun.values()].sort(stronger);
+  if (ranked.length < 2) return null;
+  const [best, next] = ranked as [Scored, Scored];
   const ceiling = next.vdot * OUTLIER_LIFT;
   const capped = best.vdot > ceiling;
   return { vdot: roundVdot(capped ? ceiling : best.vdot), from: best.effort, capped, targetMetres };
 }
 
 /**
- * Current fitness from best efforts inside recent road runs (ADR 0042): the best-effort distance
- * closest to the A goal's (10 km without one), from efforts of 3 km or more when two runs hold
- * one, else from a mile up. The best run at that distance sets the estimate, discounted by its
- * age and at most 5 % above the next-best run, so a GPS slip or a single unusual day can't move
- * every pace at once. With fewer than two runs there is nothing to check against, so no estimate.
- * Best efforts inside training runs are a floor, not a race, so the estimate errs slow.
+ * Current fitness from best efforts inside recent road runs (ADR 0039, ADR 0042). Each run counts
+ * once, by its best effort of 3 km or more when two runs hold one, else of a mile or more, so a
+ * mile-long test can't set every pace. The best run sets the estimate, discounted by its age and
+ * at most 5 % above the next-best run, so a GPS slip or a single unusual day can't move every
+ * pace at once. The A goal's distance (10 km without one) only breaks near ties. With fewer than
+ * two runs there is nothing to check against, so no estimate. Best efforts inside training runs
+ * are a floor, not a race, so the estimate errs slow.
  */
 export function estimateVdot(
   efforts: RunEffort[],
@@ -281,7 +288,8 @@ export function estimateVdot(
 ): PaceEstimate | null {
   const counted = efforts.filter((effort) => effort.metres >= ESTIMATE_MIN_M);
   const preferred = counted.filter((effort) => effort.metres >= PREFERRED_MIN_M);
-  return estimateFrom(preferred, now, targetMetres) ?? estimateFrom(counted, now, targetMetres);
+  const runsHolding = new Set(preferred.map((effort) => effort.activityId)).size;
+  return estimateFrom(runsHolding >= 2 ? preferred : counted, now, targetMetres);
 }
 
 /** Whether a date (YYYY-MM-DD or ISO) is inside the last 16 weeks, as best efforts count. */
@@ -363,6 +371,8 @@ export type TrainingPaces = PaceSetup &
         paces: Record<PaceType, PaceRange>;
         /** Where the easy pace came from: zone 2 when chosen and enough of it was found. */
         easySource: EasyFrom;
+        /** Zone 2 was found but ran faster than marathon pace, so easy came from the VDOT. */
+        zone2TooFast: boolean;
       }
   );
 
@@ -414,7 +424,11 @@ export function trainingPaces(input: {
   };
   if (vdot == null) return { ...setup, signedIn: true, source: "none" };
   const paces = trainingPaceRanges(vdot);
-  const zone2 = settings.easyFrom === "heartRate" && heart.kind === "zone2" ? heart.range : null;
+  const found = settings.easyFrom === "heartRate" && heart.kind === "zone2" ? heart.range : null;
+  // Easy is never faster than marathon pace: a zone 2 that fast means zones set too high or a
+  // VDOT read too low, and the plan would prescribe easy running at race pace (ADR 0042).
+  const zone2TooFast = found != null && found.fastSecPerKm < paces.marathon.slowSecPerKm;
+  const zone2 = zone2TooFast ? null : found;
   return {
     ...setup,
     signedIn: true,
@@ -422,6 +436,7 @@ export function trainingPaces(input: {
     vdot,
     paces: zone2 ? { ...paces, easy: zone2 } : paces,
     easySource: zone2 ? "heartRate" : "vdot",
+    zone2TooFast,
   };
 }
 

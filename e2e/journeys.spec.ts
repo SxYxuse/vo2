@@ -303,6 +303,8 @@ async function setRunningLthr(page: Page, bpm: string) {
   await page.goto("/settings/heart-rate");
   await settle(page);
   const lthr = page.locator("#settings-running-lthr");
+  // An unchanged value saves nothing, so there is no "Saved" to wait for.
+  if ((await lthr.inputValue()) === bpm) return;
   await lthr.fill(bpm);
   await lthr.blur();
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();

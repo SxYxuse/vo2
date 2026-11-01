@@ -161,7 +161,7 @@ async function zone2Bounds(userId: string, metrics: Metrics | undefined) {
     : null;
 }
 
-/** The distance of the next running A goal, which the estimate aims at. */
+/** The distance of the next running A goal, which breaks the estimate's near ties. */
 async function targetMetres(userId: string, now: Date) {
   const today = now.toISOString().slice(0, 10);
   const rows = await db

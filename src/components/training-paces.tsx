@@ -22,7 +22,6 @@ import { formatPaceClock } from "@/services/locomotion.ts";
 import { ZONE_2_MIN_SEC } from "@/services/easy-pace.ts";
 import { savePaceChoice, saveRaceResult } from "@/services/training-paces.ts";
 import {
-  DEFAULT_TARGET_M,
   ESTIMATE_WINDOW_DAYS,
   PACE_TYPES,
   RACE_DISTANCES,
@@ -78,9 +77,6 @@ function estimateLine(estimate: PaceEstimate) {
     : `your strongest, ${effort}`;
 }
 
-const targetLabel = (metres: number) =>
-  metres === DEFAULT_TARGET_M ? "10 km" : `your A goal's ${Math.round(metres / 100) / 10} km`;
-
 /** Where the paces come from, in a sentence. */
 function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
   if (paces.source === "race") {
@@ -92,7 +88,7 @@ function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
   const estimate = paces.estimate!;
   const stale =
     paces.from === "race" ? " Your race result is too old to set them, so they are estimated." : "";
-  return `Estimated from ${runDistanceLabel(estimate.from.metres)} best efforts in road runs of the last ${WINDOW_WEEKS} weeks, the distance closest to ${targetLabel(estimate.targetMetres)}, older runs counting a little less: ${estimateLine(estimate)}. VDOT ${paces.vdot}.${stale}`;
+  return `Estimated from road runs of the last ${WINDOW_WEEKS} weeks, each counting by its best effort and older runs a little less: ${estimateLine(estimate)}. VDOT ${paces.vdot}.${stale}`;
 }
 
 type Paces = TrainingPaces;
@@ -262,7 +258,7 @@ function ChoiceCards<T extends string>({
 
 function Note({ children }: { children: ReactNode }) {
   return (
-    <div className="text-muted-foreground flex flex-col rounded-lg border p-3 text-sm">
+    <div className="text-muted-foreground flex flex-col rounded-lg border p-3 text-xs/relaxed">
       {children}
     </div>
   );
@@ -438,6 +434,10 @@ const EASY_FROM_OPTIONS: { id: EasyFrom; label: string; hint: string }[] = [
 function easyFallbackNote(paces: Paces) {
   if (paces.easyFrom !== "heartRate" || paces.source === "none") return null;
   if (paces.easySource === "heartRate") return null;
+  if (paces.zone2TooFast && paces.heart.kind === "zone2" && paces.heart.range) {
+    const { fastSecPerKm, slowSecPerKm } = paces.heart.range;
+    return `Your zone 2 pace, ${formatPaceClock(fastSecPerKm)}–${formatPaceClock(slowSecPerKm)} /km, is faster than your marathon pace, so your easy pace comes from your VDOT. Check your running zones, or what your paces come from.`;
+  }
   if (paces.heart.kind === "zones-missing") {
     return "VO2 has no running heart-rate zones for you yet, so your easy pace comes from your VDOT. Set them under Heart rate.";
   }
