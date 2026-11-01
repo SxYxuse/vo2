@@ -285,11 +285,13 @@ function DayDetail({
 function NextWeeks({
   weeks,
   current,
+  home,
   shown,
   onPick,
 }: {
   weeks: PlanWeek[];
   current: string;
+  home: string;
   shown: string;
   onPick: (weekStart: string) => void;
 }) {
@@ -298,7 +300,7 @@ function NextWeeks({
   return (
     <section aria-labelledby="next-weeks" className="flex flex-col">
       <h2 id="next-weeks" className="text-muted-foreground mb-1 text-sm">
-        {shown === current ? "Next weeks" : "Other weeks"}
+        {shown === home ? "Next weeks" : "Other weeks"}
       </h2>
       {others.map((week) => {
         const keys = week.sessions.filter((run) => run.key).map((run) => run.title.toLowerCase());
@@ -415,7 +417,13 @@ export function CoachPlanView({ day }: { day?: string }) {
   const weeks = (state.plan?.weeks ?? []).filter((week) => week.weekStart >= thisWeek).slice(0, 4);
   const inPlan = (date: string | undefined) =>
     date != null && weeks.some((week) => week.weekStart === mondayOf(date));
-  const selected = inPlan(day) ? day! : state.today;
+  // The week the view opens on: this week, or the first written one when the plan starts later (a
+  // first plan written on a Sunday after a run starts on Monday). This week opens on today, any
+  // other week on its first run.
+  const home = weeks[0]?.weekStart ?? thisWeek;
+  const openingDay = (target: PlanWeek) =>
+    target.weekStart === thisWeek ? state.today : (target.sessions[0]?.date ?? target.weekStart);
+  const selected = inPlan(day) ? day! : weeks[0] ? openingDay(weeks[0]) : state.today;
   const index = Math.max(
     0,
     weeks.findIndex((week) => week.weekStart === mondayOf(selected)),
@@ -424,20 +432,18 @@ export function CoachPlanView({ day }: { day?: string }) {
   const select = (date: string) =>
     navigate({
       to: "/week",
-      search: date === state.today ? {} : { day: date },
+      search: weeks[0] && date === openingDay(weeks[0]) ? {} : { day: date },
       replace: true,
       resetScroll: false,
     });
-  /** A week opens on today, or on its first run. */
   const openWeek = (weekStart: string) => {
     const target = weeks.find((item) => item.weekStart === weekStart);
     if (!target) return;
-    return select(
-      weekStart === thisWeek ? state.today : (target.sessions[0]?.date ?? target.weekStart),
-    );
+    return select(openingDay(target));
   };
   const swipe = useWeekSwipe({
     canStepForward: index < weeks.length - 1,
+    canStepBack: index > 0,
     onStep: async (direction) => {
       const target = weeks[index + direction];
       if (target) await openWeek(target.weekStart);
@@ -459,15 +465,15 @@ export function CoachPlanView({ day }: { day?: string }) {
                   {week.lighter ? ", lighter" : ""} · {weekKm(week)} km planned
                 </span>
               </p>
-              {week.weekStart !== thisWeek ? (
+              {week.weekStart !== home ? (
                 <Button
                   size="sm"
                   variant="outline"
                   className="min-h-9"
-                  onClick={() => openWeek(thisWeek)}
+                  onClick={() => openWeek(home)}
                 >
                   <Undo2Icon data-icon="inline-start" />
-                  This week
+                  {home === thisWeek ? "This week" : "First week"}
                 </Button>
               ) : null}
             </div>
@@ -483,7 +489,13 @@ export function CoachPlanView({ day }: { day?: string }) {
             </div>
           </div>
           <div className="lg:col-start-1 lg:row-start-2">
-            <NextWeeks weeks={weeks} current={thisWeek} shown={week.weekStart} onPick={openWeek} />
+            <NextWeeks
+              weeks={weeks}
+              current={thisWeek}
+              home={home}
+              shown={week.weekStart}
+              onPick={openWeek}
+            />
           </div>
           <div className="flex flex-col gap-3 lg:col-start-1 lg:row-start-3">
             <RoadToRace state={state} weeks={weeks} />

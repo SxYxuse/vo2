@@ -81,7 +81,9 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           variant="ghost"
           size="sm"
           className="self-start"
-          render={<Link to="/week" search={run.date === state.today ? {} : { day: run.date }} />}
+          // Replaces the session page, so the back gesture on This week leaves it rather than
+          // returning here.
+          render={<Link to="/week" search={{ day: run.date }} replace />}
           nativeButton={false}
         >
           <ArrowLeftIcon data-icon="inline-start" />
@@ -167,6 +169,10 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
                     Not this run
                   </Button>
                 </>
+              ) : run.date > state.today ? (
+                <p className="text-muted-foreground text-sm">
+                  A run can be linked from {format(parseISO(run.date), "EEEE")} on.
+                </p>
               ) : linkable.length ? (
                 <ul className="flex flex-col" aria-label="Link a run">
                   <li className="text-muted-foreground pb-1 text-xs">Link a run from this week</li>

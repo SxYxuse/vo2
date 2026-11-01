@@ -331,6 +331,31 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
 }
 
 /**
+ * From the trigger, not the day or the exact VDOT: a failed writing waits for "Try again" until
+ * what set it off changes (ADR 0040).
+ */
+function attemptKeyOf(due: Due) {
+  return createHash("sha1")
+    .update(JSON.stringify([due.reason, due.trigger]))
+    .digest("hex");
+}
+
+/**
+ * A failed writing, held until "Try again". The rewrite the athlete asked for is cleared, so the
+ * next real change gets its own key; the trigger then due is held as tried, since the writing asked
+ * for already covered it and would otherwise start again on the next load.
+ */
+function failedValues(inputs: Inputs | null, error: string): Partial<Row> {
+  const values: Partial<Row> = { status: "failed", error, requestedFrom: null };
+  if (!inputs?.row) return values;
+  const next = dueWrite(
+    { ...inputs, row: { ...inputs.row, requestedFrom: null } },
+    basisOf(inputs),
+  );
+  return next ? { ...values, attemptKey: attemptKeyOf(next) } : values;
+}
+
+/**
  * Starts writing when the plan is due and can be written, unless the same writing was already
  * tried: a failed one waits for the athlete's "Try again" rather than spending their credit on
  * every load. Returns the row as it is now.
@@ -343,11 +368,7 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
     dueWrite(inputs, basis) ??
     (force ? { from: firstDay(inputs), reason: "again", trigger: null } : null);
   if (!due) return row;
-  // From the trigger, not the day or the exact VDOT: a failed writing waits for "Try again" until
-  // what set it off changes (ADR 0040).
-  const attemptKey = createHash("sha1")
-    .update(JSON.stringify([due.reason, due.trigger]))
-    .digest("hex");
+  const attemptKey = attemptKeyOf(due);
   // Only a failed writing waits for "Try again" (shown with its reason). One that succeeded and is
   // due again for the same trigger, such as switching back twice in a day, writes again, so a
   // rewrite asked for is always either written or shown as failed.
@@ -440,15 +461,13 @@ function recentTraining(inputs: Inputs) {
 
 /** Writes the weeks from `from`, keeps the days before it, and stores the plan if it passes. */
 async function writePlan(userId: string, from: string, claimedAt: Date) {
+  let gathered: Inputs | null = null;
   try {
     const inputs = await gather(userId);
+    gathered = inputs;
     const { availability, aGoal, coach } = inputs;
     if (!availability || !aGoal || coach.kind === "missing") {
-      await finish(userId, claimedAt, {
-        status: "failed",
-        error: "The coach plan is missing its setup.",
-        requestedFrom: null,
-      });
+      await finish(userId, claimedAt, failedValues(inputs, "The coach plan is missing its setup."));
       return;
     }
     const budgets = weekBudgets({
@@ -524,11 +543,7 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     const result = await writeSessions(coach, prompt, ctx, ranges);
     if (!result.ok) {
       logger.warn("coach_plan.failed", { from });
-      await finish(userId, claimedAt, {
-        status: "failed",
-        error: result.error,
-        requestedFrom: null,
-      });
+      await finish(userId, claimedAt, failedValues(inputs, result.error));
       return;
     }
     const added = [
@@ -563,11 +578,11 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     logger.error("coach_plan.crashed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    await finish(userId, claimedAt, {
-      status: "failed",
-      error: "Something went wrong writing the plan. Try again.",
-      requestedFrom: null,
-    });
+    await finish(
+      userId,
+      claimedAt,
+      failedValues(gathered, "Something went wrong writing the plan. Try again."),
+    );
   }
 }
 
@@ -653,6 +668,8 @@ export async function linkRunImpl(
       if (!unlinked.includes(current.runId)) unlinked.push(current.runId);
     }
   } else {
+    // A session still ahead may be written again as another kind, which drops its link.
+    if (planned.date > inputs.today) throw new Error("A run can be linked from the session's day.");
     const weekStart = mondayOf(planned.date);
     const run = inputs.runs.find((item) => item.id === activityId);
     if (!run || mondayOf(run.date) !== weekStart) {

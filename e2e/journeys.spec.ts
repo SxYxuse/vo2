@@ -1,4 +1,7 @@
-import { E2E_NOW } from "./env.ts";
+import pg from "pg";
+
+import type { CoachPlan } from "../src/services/coach-plan.types.ts";
+import { E2E_NOW, e2eDatabaseUrl } from "./env.ts";
 import { test, expect, settle, syncButton, type Page } from "./test.ts";
 
 // An installed PWA has no browser back button: the in-app link is the way back on iOS, and the
@@ -279,6 +282,45 @@ async function setAvailability(page: Page) {
   await page.getByRole("button", { name: "Long run on Sunday" }).click();
 }
 
+/**
+ * Moves the written plan's first run to today, as if it had been written on an earlier day: a plan
+ * written today starts tomorrow once the athlete ran today, and the server's clock is fixed, so
+ * this is the one way to a session whose day has come. Leaves a run already on today as it is, and
+ * clears the athlete's links, so each project starts from the automatic match.
+ */
+async function moveFirstRunToToday() {
+  const today = E2E_NOW.slice(0, 10);
+  await withDatabase(async (client) => {
+    const { rows } = await client.query<{ user_id: string; plan: CoachPlan }>(
+      "select user_id, plan from coach_plans where plan is not null",
+    );
+    for (const { user_id: userId, plan } of rows) {
+      const sessions = plan.weeks.flatMap((week) => week.sessions);
+      const first = sessions.find((session) => session.date > today);
+      if (first && !sessions.some((session) => session.date === today)) first.date = today;
+      await client.query("update coach_plans set plan = $1, links = null where user_id = $2", [
+        plan,
+        userId,
+      ]);
+    }
+  });
+}
+
+/** Drops the written plan and links, keeping availability, so the next project writes its own. */
+async function dropWrittenPlan() {
+  await withDatabase((client) => client.query("update coach_plans set plan = null, links = null"));
+}
+
+async function withDatabase(use: (client: pg.Client) => Promise<unknown>) {
+  const client = new pg.Client({ connectionString: e2eDatabaseUrl() });
+  await client.connect();
+  try {
+    await use(client);
+  } finally {
+    await client.end();
+  }
+}
+
 /** Waits for the plan to be written: an earlier plan stays on screen while the next is written. */
 async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
   await writing;
@@ -361,26 +403,33 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
       "true",
     );
 
-    // A run's session page. Today's Lunch run did no session: linked by hand, then unlinked.
+    // A run still ahead can't have a run linked: its day may be written again as another kind.
     await strip.getByRole("button", { name: / km$/ }).first().click();
     await page.getByRole("button", { name: "Open the full session" }).click();
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByText(/^A run can be linked from /)).toBeVisible();
+    // Back to the day it was opened from.
+    await page.getByRole("main").getByRole("button", { name: "This week" }).click();
+    await expect(strip.getByRole("button", { pressed: true })).toHaveAccessibleName(/ km$/);
+
+    // A run planned today: today's Lunch run matches it, is unlinked, then linked by hand.
+    await moveFirstRunToToday();
+    await page.goto("/week");
+    const today = strip.getByRole("button", { name: /, today: .*, done$/ });
+    await expect(today).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Open the full session" }).click();
+    await expect(page.getByText(/^Matched: /)).toBeVisible();
     await settle(page);
     await expect(page).toHaveScreenshot("coach-session.png", {
       fullPage: true,
       mask: [syncButton(page)],
     });
+    await page.getByRole("button", { name: "Not this run" }).click();
+    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: /^Link Lunch run/ }).click();
     await expect(page.getByText("Linked by you.")).toBeVisible();
     await expect(page.getByText("Done", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Not this run" }).click();
-    await expect(page.getByRole("button", { name: /^Link Lunch run/ })).toBeVisible();
-    await expect(page.getByText("Done", { exact: true })).toHaveCount(0);
-    // Back to the day it was opened from.
-    const opened = page.url();
     await page.getByRole("main").getByRole("button", { name: "This week" }).click();
-    await expect(strip.getByRole("button", { pressed: true })).toHaveAccessibleName(/ km$/);
-    expect(opened).toContain("/week/run/");
+    await expect(today).toHaveAttribute("aria-pressed", "true");
 
     // Away to the week planner and back: the setup stays, and the plan is written again.
     await choosePlanningStyle(page, "Week planner", "weekPlanner");
@@ -392,8 +441,10 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.goto("/week");
     await expectPlanWritten(page, rewritten);
   } finally {
-    // The other specs share this athlete and expect the week planner and no goals.
+    // The other specs share this athlete and expect the week planner and no goals, and the other
+    // project's run writes its plan with no run moved to today.
     await choosePlanningStyle(page, "Week planner", "weekPlanner");
+    await dropWrittenPlan();
     await deleteGoalIfThere(page, /Run · 21\.1 km/);
   }
 });

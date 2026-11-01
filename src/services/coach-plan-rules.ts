@@ -196,6 +196,25 @@ export function longShareRuns(week: WeekBudget, ctx: RuleContext) {
 }
 
 /**
+ * The largest week those day caps allow under the longest-run share (rule 5): the largest W where
+ * each run can be min(cap, share × W) and together they still make W. What the days hold at that
+ * share only grows more slowly than W once a cap binds, so the weeks that fit run from 0 to one
+ * largest W, which halving finds.
+ */
+function largestWeek(caps: number[], share: number) {
+  const holds = (week: number) =>
+    caps.reduce((sum, cap) => sum + Math.min(cap, share * week), 0) >= week - 1e-9;
+  let low = 0;
+  let high = caps.reduce((sum, cap) => sum + cap, 0);
+  for (let step = 0; step < 50; step += 1) {
+    const mid = (low + high) / 2;
+    if (holds(mid)) low = mid;
+    else high = mid;
+  }
+  return low;
+}
+
+/**
  * The least a week must reach (rule 1), or null when it has no floor: a week written only in part,
  * a race week, and a taper week can come in lower. The floor is 90 % of the budget, or of what the
  * athlete's days allow when their time or the longest-run rule caps the week lower.
@@ -209,26 +228,25 @@ export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
     MIN_LONGEST_KM,
     ...ctx.runs.filter((run) => run.date >= since && run.date < ctx.today).map((run) => run.km),
   );
-  // What each of the athlete's days allows (the long run at most 2 h 30): the long run day, and
-  // the best of the others. The long run day counts as the long run even when it is the shortest,
-  // since that is where the coach puts it.
+  // What each of the athlete's days allows: its time at easy pace, no run past the longest-run
+  // rule, and none over 2 h 30 (the week's longest run is held to it, so any run is). The long run
+  // day is counted even when it is the shortest, since that is where the coach puts the long run;
+  // the other days are the best of the rest.
   const runs = longShareRuns(week, ctx);
-  const reachOf = (minutes: number) =>
-    Math.min((minutes * 60) / ctx.easySecPerKm, longest * MAX_RUN_GROWTH);
+  const capOf = (minutes: number) =>
+    Math.min(
+      (Math.min(minutes, MAX_LONG_MINUTES) * 60) / ctx.easySecPerKm,
+      longest * MAX_RUN_GROWTH,
+    );
   const longDay = ctx.availability.days.find((day) => day.weekday === ctx.availability.longRunDay);
-  const longKm = longDay ? reachOf(Math.min(longDay.minutes, MAX_LONG_MINUTES)) : 0;
-  const others = ctx.availability.days
-    .filter((day) => day !== longDay)
-    .map((day) => reachOf(day.minutes))
-    .sort((a, b) => b - a)
-    .slice(0, runs - 1)
-    .reduce((sum, km) => sum + km, 0);
-  const total = longKm + others;
-  // The longest-run share caps the week too: with the long run at its share, the other days must
-  // make up the rest, so a week of short days and one long one reaches less (rule 5).
-  const share = maxLongShare(runs);
-  const byShare = share >= 1 ? total : others / (1 - share);
-  const reach = Math.min(total, byShare) * REACH_SHARE;
+  const caps = [
+    ...(longDay ? [capOf(longDay.minutes)] : []),
+    ...ctx.availability.days
+      .filter((day) => day !== longDay)
+      .map((day) => capOf(day.minutes))
+      .sort((a, b) => b - a),
+  ].slice(0, runs);
+  const reach = largestWeek(caps, maxLongShare(runs)) * REACH_SHARE;
   return Math.round(Math.min(week.budgetKm, reach) * BUDGET_FLOOR * 10) / 10;
 }
 
