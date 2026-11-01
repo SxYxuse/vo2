@@ -12,7 +12,8 @@ import {
   formatBirthDate,
   parseBirthDate,
   PLANNING_STYLES,
-  type ChosenPlanningStyle,
+  planningStyleSchema,
+  type PlanningStyle,
 } from "@/services/athlete-settings.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
@@ -295,8 +296,8 @@ export function PlanningStyleChoice({
   titled = true,
 }: {
   idPrefix: string;
-  value: ChosenPlanningStyle;
-  onChange: (next: ChosenPlanningStyle) => void;
+  value: PlanningStyle;
+  onChange: (next: PlanningStyle) => void;
   disabled?: boolean;
   /** False where the page heading already names the choice, as in onboarding. */
   titled?: boolean;
@@ -315,7 +316,8 @@ export function PlanningStyleChoice({
         value={value}
         disabled={disabled}
         onValueChange={(next) => {
-          if (next === "off" || next === "weekPlanner") onChange(next);
+          const parsed = planningStyleSchema.safeParse(next);
+          if (parsed.success) onChange(parsed.data);
         }}
         className="gap-2"
       >
@@ -323,17 +325,10 @@ export function PlanningStyleChoice({
           const id = `${idPrefix}-planning-style-${style.id}`;
           return (
             <FieldLabel key={style.id} htmlFor={id} className="w-full">
-              <Field
-                orientation="horizontal"
-                className="items-start p-3"
-                data-disabled={!style.available || undefined}
-              >
-                <RadioGroupItem value={style.id} id={id} disabled={!style.available} />
+              <Field orientation="horizontal" className="items-start p-3">
+                <RadioGroupItem value={style.id} id={id} />
                 <FieldContent>
-                  <FieldTitle>
-                    {style.label}
-                    {style.available ? null : <Badge variant="secondary">Coming soon</Badge>}
-                  </FieldTitle>
+                  <FieldTitle>{style.label}</FieldTitle>
                   <FieldDescription>{style.hint}</FieldDescription>
                 </FieldContent>
               </Field>

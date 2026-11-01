@@ -3,7 +3,7 @@ import { z } from "zod";
 /** The provider id the athlete's key is stored under (TanStack AI's BYOK provider ids). */
 export const OPENROUTER = "openrouter";
 
-/** The three things the coach does that need a model (ADR 0036). */
+/** The things the coach does that need a model (ADR 0036). */
 export const COACH_FEATURES = [
   {
     id: "analysis",
@@ -20,13 +20,18 @@ export const COACH_FEATURES = [
     label: "Coach chat",
     hint: "Answers your questions about your training.",
   },
+  {
+    id: "plan",
+    label: "Plan writing",
+    hint: "Writes the coach plan's runs, four weeks ahead.",
+  },
 ] as const;
 
 export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
 
 /**
  * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (analysis,
- * chat) and structured JSON output (notes), so any of them runs every coach feature.
+ * chat) and structured JSON output (notes, plan writing), so any of them runs every coach feature.
  */
 export const COACH_MODELS = [
   { id: "openai/gpt-6-luna", label: "GPT-6 Luna", hint: "OpenAI · quick and cheap" },
@@ -48,6 +53,9 @@ export type CoachModelId = (typeof COACH_MODELS)[number]["id"];
 
 export const DEFAULT_COACH_MODEL: CoachModelId = "openai/gpt-6-luna";
 
+/** Plan writing has the longest prompt and the strictest rules, so it starts on the strongest. */
+const DEFAULT_PLAN_MODEL: CoachModelId = "anthropic/claude-opus-5.5";
+
 /**
  * Stored as chosen: a model later dropped from the list keeps running and shows as no longer
  * offered until the athlete picks another, rather than switching silently (ADR 0036).
@@ -58,6 +66,7 @@ export const coachModelsSchema = z.object({
   analysis: coachModelSchema.default(DEFAULT_COACH_MODEL),
   notes: coachModelSchema.default(DEFAULT_COACH_MODEL),
   chat: coachModelSchema.default(DEFAULT_COACH_MODEL),
+  plan: z.string().min(1).catch(DEFAULT_PLAN_MODEL).default(DEFAULT_PLAN_MODEL),
 });
 
 export type CoachModels = z.infer<typeof coachModelsSchema>;
@@ -66,6 +75,7 @@ export const DEFAULT_COACH_MODELS: CoachModels = {
   analysis: DEFAULT_COACH_MODEL,
   notes: DEFAULT_COACH_MODEL,
   chat: DEFAULT_COACH_MODEL,
+  plan: DEFAULT_PLAN_MODEL,
 };
 
 export function isCoachModel(id: string): id is CoachModelId {

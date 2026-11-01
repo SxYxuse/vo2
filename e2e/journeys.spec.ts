@@ -88,7 +88,11 @@ async function keptOnDevice(page: Page, style: string) {
 }
 
 /** Picks a planning style in Settings → Training and waits until it is saved everywhere. */
-async function choosePlanningStyle(page: Page, label: "Off" | "Week planner", style: string) {
+async function choosePlanningStyle(
+  page: Page,
+  label: "Off" | "Week planner" | "Coach plan",
+  style: string,
+) {
   if (!page.url().endsWith("/settings/training")) await page.goto("/settings/training");
   await settle(page);
   const radio = page.getByRole("radio", { name: new RegExp(`^${label}`) });
@@ -210,11 +214,147 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
       await keepCurrentPlan(page, "Edit goal");
       await expect(goal).toHaveCount(0);
     }
+    // The device's copy is written at most once a second, so a page opened right after setting
+    // the result can restore paces from before it. Drop it to read the server's.
     await page.goto("/settings/paces");
+    await page.evaluate(() => indexedDB.deleteDatabase("keyval-store"));
+    await page.reload();
     await settle(page);
     const clear = page.getByRole("button", { name: "Clear race result" });
+    await expect(clear.or(page.getByRole("button", { name: "Set race result" }))).toBeVisible();
     if (await clear.isVisible()) await clear.click();
     await expect(page.getByRole("button", { name: "Set race result" })).toBeVisible();
+  }
+});
+
+/** Pastes one goal into Season, keeping the week planner's plan as it is. */
+async function pasteGoal(page: Page, goal: Record<string, unknown>) {
+  await page.goto("/season");
+  await settle(page);
+  await page.getByRole("button", { name: "More season actions" }).click();
+  await page.getByRole("menuitem", { name: "Paste season" }).click();
+  await page
+    .getByRole("textbox", { name: "Copied season" })
+    .fill(JSON.stringify({ vo2Season: 1, goals: [goal] }));
+  await page.getByRole("button", { name: "Add goals" }).click();
+  await keepCurrentPlan(page, "Paste a season");
+}
+
+/** Deletes the goal whose button matches `name`, if it is there. */
+async function deleteGoalIfThere(page: Page, name: RegExp) {
+  await page.goto("/season");
+  await settle(page);
+  const goal = page.getByRole("button", { name });
+  if (!(await goal.isVisible())) return;
+  await goal.click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete for good" }).click();
+  await keepCurrentPlan(page, "Edit goal");
+  await expect(goal).toHaveCount(0);
+}
+
+/** Four runs on Tuesday, Thursday, Saturday, and Sunday, the long run on Sunday. */
+const AVAILABILITY = { Tuesday: "60", Thursday: "60", Saturday: "60", Sunday: "120" } as const;
+
+/** Sets the same availability whatever is saved, so the written plan doesn't depend on run order. */
+async function setAvailability(page: Page) {
+  await page.getByRole("button", { name: "4 runs a week" }).click();
+  for (const day of [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ]) {
+    const toggle = page.getByRole("button", { name: day, exact: true });
+    const wanted = day in AVAILABILITY;
+    if ((await toggle.getAttribute("aria-pressed")) !== String(wanted)) await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", String(wanted));
+  }
+  for (const [day, minutes] of Object.entries(AVAILABILITY)) {
+    await page.getByRole("combobox", { name: day }).selectOption(minutes);
+  }
+  await page.getByRole("button", { name: "Long run on Sunday" }).click();
+}
+
+/** Waits for the plan to be written: an earlier plan stays on screen while the next is written. */
+async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
+  await writing;
+  await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByText(/km planned of a \d+ km budget/).first()).toBeVisible();
+}
+
+/**
+ * Resolves once the app shows a writing in progress, which it does only when the server started
+ * one: the answer that started it says "writing" until the next check, three seconds later.
+ * Started before the step that should write, and kept across pages, so a plan already on screen
+ * can't pass for a new one.
+ */
+function writingStarts(page: Page) {
+  return expect(page.getByText("Writing your plan…").first()).toBeVisible({ timeout: 30_000 });
+}
+
+test("an athlete switches to the coach plan, sets it up, and switches away and back", async ({
+  page,
+}) => {
+  // Two plan writings and four style switches, each saved and checked on the device.
+  test.setTimeout(90_000);
+  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
+  try {
+    await choosePlanningStyle(page, "Coach plan", "coachPlan");
+    // No A running goal yet: Settings says what's missing and where to fix it.
+    await expect(page.getByText("The coach plan can't be written yet")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
+    await page.goto("/week");
+    await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
+
+    // With the coach plan, goals have no objective: new ones are saved as perform.
+    await pasteGoal(page, {
+      name: "Autumn half",
+      sportType: "Run",
+      date: raceDay,
+      distanceM: 21_097.5,
+      elevationGainM: null,
+      objective: "finish",
+      priority: "A",
+    });
+    await expect(page.getByText(/· Finish/)).toHaveCount(0);
+
+    await page.goto("/settings/training");
+    await settle(page);
+    await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
+    const written = writingStarts(page);
+    await setAvailability(page);
+    // The phone run leaves this availability saved (each style keeps its setup): then the new
+    // goal alone has the plan written again, when it is next loaded.
+    const save = page.getByRole("button", { name: "Save availability" });
+    if (await save.isVisible()) await save.click();
+    // Saved before leaving, or leaving would cancel the save on its way.
+    await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeVisible();
+
+    await page.goto("/week");
+    await expectPlanWritten(page, written);
+    await settle(page);
+    await expect(page).toHaveScreenshot("week-coach-plan.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+
+    // Away to the week planner and back: the setup stays, and the plan is written again.
+    await choosePlanningStyle(page, "Week planner", "weekPlanner");
+    await page.goto("/week");
+    await expect(page.getByRole("button", { name: "Today: open the day" })).toBeVisible();
+    const rewritten = writingStarts(page);
+    await choosePlanningStyle(page, "Coach plan", "coachPlan");
+    await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeDisabled();
+    await page.goto("/week");
+    await expectPlanWritten(page, rewritten);
+  } finally {
+    // The other specs share this athlete and expect the week planner and no goals.
+    await choosePlanningStyle(page, "Week planner", "weekPlanner");
+    await deleteGoalIfThere(page, /Run · 21\.1 km/);
   }
 });
 

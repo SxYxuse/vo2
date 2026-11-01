@@ -4,7 +4,7 @@ import { Link, createFileRoute, redirect, type ErrorComponentProps } from "@tans
 
 import { SessionDetail } from "@/components/session-detail.tsx";
 import {
-  isPlanningOff,
+  planningStyleOf,
   loaderQuery,
   weekCoachQueryOptions,
   weekTargetQueryOptions,
@@ -37,8 +37,10 @@ export const Route = createFileRoute("/_app/week_/session")({
     ...(typeof search.id === "string" && search.id ? { id: search.id } : {}),
   }),
   loader: async ({ context }) => {
-    // This week says planning is off and leads back to it.
-    if (await isPlanningOff(context)) throw redirect({ to: "/week", replace: true });
+    // The week planner's sessions; This week shows the other styles.
+    if ((await planningStyleOf(context)) !== "weekPlanner") {
+      throw redirect({ to: "/week", replace: true });
+    }
     void context.queryClient.prefetchQuery(weekCoachQueryOptions);
     await context.queryClient.query(loaderQuery(weekTargetQueryOptions));
   },

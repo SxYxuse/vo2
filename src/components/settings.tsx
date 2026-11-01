@@ -47,6 +47,7 @@ import {
   TrainingShapeField,
 } from "@/components/settings-fields.tsx";
 import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
+import { CoachPlanSettings } from "@/components/coach-plan-setup.tsx";
 import { TrainingPacesSection } from "@/components/training-paces.tsx";
 import { SettingsDeleteAthlete } from "@/components/settings-delete-athlete.tsx";
 import { SettingsSyncSection } from "@/components/settings-sync-section.tsx";
@@ -117,12 +118,9 @@ export function SettingsForm({
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
         celebrateTopEfforts: data.settings.topEffortsSince != null,
-        // The coach plan can't be saved yet (#137), so no saved style reads as it.
         planningStyle:
-          planningStyleOf(data.settings.planningStyle, isTrainingPlanComplete(data.training)) ===
-          "off"
-            ? "off"
-            : "weekPlanner",
+          planningStyleOf(data.settings.planningStyle, isTrainingPlanComplete(data.training)) ??
+          "weekPlanner",
         timeZone,
       }),
       { keepDirtyValues: true, keepErrors: true },
@@ -265,7 +263,7 @@ export function SettingsForm({
                     />
                   )}
                 />
-                {/* Off keeps the week planner's plan saved; only its settings hide. */}
+                {/* Each style keeps its setup while another is chosen; only its settings hide. */}
                 {planningStyle === "weekPlanner" ? (
                   <>
                     <FieldSeparator />
@@ -279,6 +277,11 @@ export function SettingsForm({
                         <TrainingShapeField control={form.control} />
                       </>
                     ) : null}
+                  </>
+                ) : planningStyle === "coachPlan" ? (
+                  <>
+                    <FieldSeparator />
+                    <CoachPlanSettings />
                   </>
                 ) : null}
               </FieldGroup>

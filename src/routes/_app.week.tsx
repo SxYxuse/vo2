@@ -5,9 +5,11 @@ import { Settings2Icon, TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { WeekView, WeekViewSkeleton, WeeksAhead } from "@/components/week-view.tsx";
+import { CoachPlanWeeks } from "@/components/coach-plan-weeks.tsx";
 import {
   appShellQueryOptions,
-  isPlanningOff,
+  coachPlanQueryOptions,
+  planningStyleOf,
   loaderQuery,
   weekCoachQueryOptions,
   weekTargetQueryOptions,
@@ -26,7 +28,12 @@ import { RouteError } from "@/components/route-states.tsx";
 
 export const Route = createFileRoute("/_app/week")({
   loader: async ({ context }) => {
-    if (await isPlanningOff(context)) return;
+    const style = await planningStyleOf(context);
+    if (style === "off") return;
+    if (style === "coachPlan") {
+      await context.queryClient.query(loaderQuery(coachPlanQueryOptions));
+      return;
+    }
     // The stored week plan fills in when ready; the week's activities do not wait for it.
     void context.queryClient.prefetchQuery(weekCoachQueryOptions);
     await context.queryClient.query(loaderQuery(weekTargetQueryOptions));
@@ -37,7 +44,13 @@ export const Route = createFileRoute("/_app/week")({
   component: WeekTargetPage,
 });
 
-function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
+function WeekTargetHeading({
+  planned = true,
+  coach = false,
+}: {
+  planned?: boolean;
+  coach?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
@@ -45,9 +58,11 @@ function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
         This week
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        {planned
-          ? "Your week day by day, built from your season, your rest days, and your form."
-          : "No week is planned while planning is off."}
+        {coach
+          ? "Your coach plan: the runs of the next four weeks, toward your A goal."
+          : planned
+            ? "Your week day by day, built from your season, your rest days, and your form."
+            : "No week is planned while planning is off."}
       </p>
     </div>
   );
@@ -56,6 +71,14 @@ function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
 function WeekTargetPage() {
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   if (shell.planningStyle === "off") return <PlanningOff />;
+  if (shell.planningStyle === "coachPlan") {
+    return (
+      <>
+        <WeekTargetHeading coach />
+        <CoachPlanWeeks />
+      </>
+    );
+  }
   return <PlannedWeek />;
 }
 

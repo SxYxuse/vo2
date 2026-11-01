@@ -4,7 +4,7 @@ import { db } from "@/db/index.ts";
 import { activities, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
-import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { getAthleteSettings, storedPlanningStyle } from "./athlete-settings.server.ts";
 import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
@@ -184,9 +184,19 @@ function siblingsOf(goal: Goal, all: Goal[]) {
   );
 }
 
-export async function createGoalImpl(data: GoalInput) {
+/**
+ * With the coach plan, goals have no objective to pick: new ones are saved as perform, and the
+ * predicted race time stands in for a target (ADR 0037).
+ */
+async function forStyle<T extends Pick<GoalInput, "objective">>(userId: string, goals: T[]) {
+  if ((await storedPlanningStyle(userId)) !== "coachPlan") return goals;
+  return goals.map((goal) => ({ ...goal, objective: "perform" as const }));
+}
+
+export async function createGoalImpl(input: GoalInput) {
   const session = await getRequiredSession();
   const id = crypto.randomUUID();
+  const data = (await forStyle(session.user.id, [input]))[0]!;
   await db.insert(goals).values({ id, userId: session.user.id, ...data });
   logger.info("goal.created", {
     sportType: data.sportType,
@@ -200,10 +210,11 @@ export async function createGoalImpl(data: GoalInput) {
 export async function createEventImpl(data: { legs: GoalInput[] }) {
   const session = await getRequiredSession();
   const ids = data.legs.map(() => crypto.randomUUID());
+  const legs = await forStyle(session.user.id, data.legs);
   await db
     .insert(goals)
-    .values(data.legs.map((leg, index) => ({ id: ids[index]!, userId: session.user.id, ...leg })));
-  logger.info("goal.event_created", { legs: data.legs.length });
+    .values(legs.map((leg, index) => ({ id: ids[index]!, userId: session.user.id, ...leg })));
+  logger.info("goal.event_created", { legs: legs.length });
   return { ids };
 }
 
@@ -244,7 +255,7 @@ export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }
 export async function pasteSeasonImpl(pasted: GoalInput[]) {
   const session = await getRequiredSession();
   const userId = session.user.id;
-  const added = newGoals(pasted, await goalsFor(userId));
+  const added = await forStyle(userId, newGoals(pasted, await goalsFor(userId)));
   if (added.length) {
     await db
       .insert(goals)

@@ -39,7 +39,14 @@ async function signedInAthlete() {
     const page = await context.newPage();
     await onboardNewAthlete(page);
     await page.goto("/");
-    await page.locator("[data-event-id]").first().click();
+    const activity = page.locator("[data-event-id]").first();
+    // Early in a month the calendar's current period has no activity yet: step back one.
+    const shown = await activity.waitFor({ timeout: 10_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (!shown) await page.getByRole("button", { name: /^Previous / }).click();
+    await activity.click();
     await page.waitForURL(/\/activities\//);
     const cookie = (await context.cookies())
       .map(({ name, value }) => `${name}=${value}`)

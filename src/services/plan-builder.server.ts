@@ -176,8 +176,9 @@ export async function checkSeasonImpl(): Promise<SeasonCheck> {
     getTrainingPlanForUser(userId),
     storedPlanningStyle(userId),
   ]);
-  // The week planner's saved plan sleeps while planning is off; Season changes wait for it.
-  if (!plan || style === "off") return { hasPlan: false, impact: null, adopted: null };
+  // The week planner's saved plan sleeps under another style; Season changes wait for it.
+  if (!plan || (style != null && style !== "weekPlanner"))
+    return { hasPlan: false, impact: null, adopted: null };
   const { weekStart } = clock(plan.timeZone);
   const { impact, adopted } = await reconcileSeason(userId, plan, weekStart);
   if (adopted) await forgetWeekPlan(userId, weekStart);

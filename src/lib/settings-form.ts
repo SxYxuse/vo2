@@ -4,11 +4,11 @@ import {
   MAX_WEIGHT_KG,
   MIN_WEIGHT_KG,
   calendarPeriodSchema,
-  chosenPlanningStyleSchema,
+  planningStyleSchema,
   profileSaveSchema,
   shownSportTypesSchema,
   type CalendarPeriod,
-  type ChosenPlanningStyle,
+  type PlanningStyle,
   type ProfileSave,
   type ProfileSettings,
 } from "@/services/athlete-settings.types.ts";
@@ -125,7 +125,7 @@ export const settingsFormSchema = profileFormSchema
   .extend({
     calendarPeriod: calendarPeriodSchema,
     celebrateTopEfforts: z.boolean(),
-    planningStyle: chosenPlanningStyleSchema,
+    planningStyle: planningStyleSchema,
   });
 
 export const onboardingFormSchema = profileFormSchema.extend(sportsFormFields);
@@ -293,7 +293,7 @@ export function settingsFormDefaults(input: {
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
   celebrateTopEfforts?: boolean;
-  planningStyle?: ChosenPlanningStyle;
+  planningStyle?: PlanningStyle;
   timeZone: string;
 }): SettingsFormInput {
   return {

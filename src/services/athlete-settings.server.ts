@@ -274,6 +274,13 @@ export async function saveAthleteSettingsImpl(
     }
   });
 
+  // Switching back to the coach plan writes it again from today (ADR 0037). Imported here, not
+  // at the top: the coach plan reads these settings too.
+  if (settings.planningStyle === "coachPlan" && stored?.planningStyle !== "coachPlan") {
+    const { requestCoachPlanRewrite } = await import("./coach-plan.server.ts");
+    await requestCoachPlanRewrite(userId);
+  }
+
   // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load; set anchors
   // score it directly. Either way every past activity is rescored (ADR 0021).
   if (previousProfile.birthDate !== value.profile.birthDate || heartRateChanged) {

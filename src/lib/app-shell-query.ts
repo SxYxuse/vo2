@@ -16,12 +16,12 @@ export const appShellQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-/** For the week planner's routes: with planning off they have nothing to load (ADR 0037). */
-export async function isPlanningOff(context: {
+/** The athlete's planning style, for routes that load differently by style (ADR 0037). */
+export async function planningStyleOf(context: {
   queryClient: QueryClient;
   offlineCopyRestored: Promise<void>;
 }) {
   await context.offlineCopyRestored;
   const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
-  return shell.planningStyle === "off";
+  return shell.planningStyle;
 }

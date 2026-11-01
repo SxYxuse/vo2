@@ -81,7 +81,9 @@ export async function saveRaceResultImpl(raceResult: RaceResult | null) {
   if (raceResult && raceResult.date > latest) {
     throw new Error("A race result can't be in the future.");
   }
-  if (raceResult && !isRaceResultCurrent(raceResult, new Date())) {
+  // The form's earliest date is the athlete's local day, a day behind UTC for some; allow it.
+  const yesterday = new Date(Date.now() - 86_400_000);
+  if (raceResult && !isRaceResultCurrent(raceResult, yesterday)) {
     throw new Error("A race result must be from the last 16 weeks.");
   }
   const updatedAt = new Date();

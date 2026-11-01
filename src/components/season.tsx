@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { addYears, format, parseISO } from "date-fns";
 import {
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 
+import { appShellQueryOptions } from "@/lib/queries.ts";
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { SeasonChangePrompt, notifySeasonCheck } from "@/components/plan-adapt.tsx";
 import {
@@ -115,6 +116,12 @@ const formatGoalDate = (key: string) => format(parseISO(key), "EEE d MMM yyyy");
 
 /** Metres of climbing per km from which a goal reads as hilly, as the plan treats it. */
 const HILLY_M_PER_KM = 15;
+
+/** With the coach plan goals have no objective: they're saved as perform (ADR 0037). */
+function useHidesObjective() {
+  const { data } = useQuery(appShellQueryOptions);
+  return data?.planningStyle === "coachPlan";
+}
 
 function goalFacts(goal: Goal) {
   return [
@@ -352,6 +359,7 @@ function EventCard({
   onEdit: (goal: Goal) => void;
 }) {
   const priority = eventPriority(event);
+  const hidesObjective = useHidesObjective();
   // Each leg opens on its own, so only a single-leg event can make the whole card its button.
   const whole = event.goals.length === 1;
 
@@ -370,7 +378,8 @@ function EventCard({
         </span>
       </div>
       <p className="text-muted-foreground text-xs tabular-nums">
-        {formatGoalDate(event.date)} · {objectiveLabel(event.goals[0]!.objective)}
+        {formatGoalDate(event.date)}
+        {hidesObjective ? null : ` · ${objectiveLabel(event.goals[0]!.objective)}`}
       </p>
       <ul className="-mx-2 flex flex-col">
         {event.goals.map((goal) => {
@@ -605,6 +614,7 @@ function GoalFormBody({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
+  const hidesObjective = useHidesObjective();
   // A goal keeps its sport even after the athlete hides it in Settings.
   const sportOptions =
     goal && !sportTypes.includes(goal.sportType) ? [goal.sportType, ...sportTypes] : sportTypes;
@@ -877,7 +887,7 @@ function GoalFormBody({
                   })}
                 </RadioGroup>
               </FieldSet>
-              <FieldSet>
+              <FieldSet hidden={hidesObjective}>
                 <FieldLegend variant="label">Objective</FieldLegend>
                 <RadioGroup
                   name="goal-objective"

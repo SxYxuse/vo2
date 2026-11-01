@@ -225,6 +225,13 @@
       "when": 1793454520237,
       "tag": "0031_race_result",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793458636258,
+      "tag": "0032_coach_plans",
+      "breakpoints": true
     }
   ]
 }
