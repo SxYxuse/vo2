@@ -238,3 +238,23 @@ export const coachPlans = pgTable("coach_plans", {
   links: jsonb("links"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Plan changes the coach proposed in the chat that passed every rule (ADR 0038). Applying takes one
+ * by id, so only a checked change is ever saved, and only onto the plan it was checked against.
+ */
+export const coachPlanProposals = pgTable(
+  "coach_plan_proposals",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** The plan it was checked against, hashed: applying needs the same plan. */
+    planKey: text("plan_key").notNull(),
+    /** The changed days and the sessions on them after the change. */
+    change: jsonb("change").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("coach_plan_proposals_user_idx").on(table.userId)],
+);

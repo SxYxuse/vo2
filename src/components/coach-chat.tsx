@@ -11,6 +11,7 @@ import {
   FlagIcon,
   GaugeIcon,
   HeartPulseIcon,
+  ListChecksIcon,
   ListOrderedIcon,
   MountainIcon,
   RefreshCwIcon,
@@ -27,8 +28,14 @@ import {
 import { CoachComposer, type MentionableActivity } from "@/components/coach-composer.tsx";
 import { CoachMarkdown, type ActivityLookup } from "@/components/coach-markdown.tsx";
 import { CoachVisual } from "@/components/coach-visual.tsx";
+import {
+  PlanChangeCard,
+  PlanChangeProvider,
+  usePlanChanges,
+} from "@/components/coach-plan-change.tsx";
 import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
+import { applyPlanChangeDef } from "@/services/coach-tools.ts";
 import { homeQueryOptions } from "@/lib/queries.ts";
 import { isSportTypeShown, sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { coachErrorMessage } from "@/lib/coach-errors.ts";
@@ -80,6 +87,13 @@ const STARTERS = [
   "What are my best 5 km times this year?",
 ];
 
+/** Offered when the athlete came from "Ask the coach to change my plan". */
+const PLAN_STARTERS = [
+  "I can't run on Thursday this week",
+  "This week feels too hard",
+  "Can I swap my long run to Saturday?",
+];
+
 const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
   find_activities: {
     running: "Finding activities",
@@ -126,6 +140,16 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
     icon: ListOrderedIcon,
   },
   show_visual: { running: "Drawing a visual", done: "Drew a visual", icon: ChartLineIcon },
+  get_coach_plan: {
+    running: "Reading your coach plan",
+    done: "Read your coach plan",
+    icon: TargetIcon,
+  },
+  propose_plan_change: {
+    running: "Checking a change against your plan's rules",
+    done: "Checked a change against your plan's rules",
+    icon: ListChecksIcon,
+  },
 };
 
 type Part = UIMessage["parts"][number];
@@ -134,7 +158,8 @@ type Block =
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string }
   | { kind: "tools"; calls: ToolCall[] }
-  | { kind: "visual"; call: ToolCall };
+  | { kind: "visual"; call: ToolCall }
+  | { kind: "change"; call: ToolCall };
 
 /** Text, thinking, visuals, and runs of tool calls, in the order the coach produced them. */
 function blocksOf(parts: readonly Part[]): Block[] {
@@ -148,6 +173,8 @@ function blocksOf(parts: readonly Part[]): Block[] {
       blocks.push({ kind: "thinking", text: part.content });
     } else if (part.type === "tool-call" && part.name === "show_visual") {
       blocks.push({ kind: "visual", call: part });
+    } else if (part.type === "tool-call" && part.name === "apply_plan_change") {
+      blocks.push({ kind: "change", call: part });
     } else if (part.type === "tool-call") {
       if (last?.kind === "tools") last.calls.push(part);
       else blocks.push({ kind: "tools", calls: [part] });
@@ -259,7 +286,7 @@ function VisualBlock({ call, live }: { call: ToolCall; live: boolean }) {
   );
 }
 
-function CoachMessage({
+export function CoachMessage({
   message,
   lookup,
   live,
@@ -296,6 +323,7 @@ function CoachMessage({
               <ToolTrace calls={block.calls} failed={failed} live={live} />
             ) : null}
             {block.kind === "visual" ? <VisualBlock call={block.call} live={live} /> : null}
+            {block.kind === "change" ? <PlanChangeCard call={block.call} /> : null}
           </Fragment>
         ))}
       </MessageContent>
@@ -362,21 +390,37 @@ function NewChatButton({ onConfirm, disabled }: { onConfirm: () => void; disable
 export function CoachChat({
   initialActivityId,
   onInitialActivitySent,
+  planChange = false,
 }: {
   initialActivityId?: string;
   onInitialActivitySent: () => void;
+  /** Opened from "Ask the coach to change my plan": offer plan changes to start with. */
+  planChange?: boolean;
 }) {
   const online = useOnline();
   const { shown, byId } = useMentionableActivities();
   const [persistence] = useState(() => indexedDBPersistence({ databaseName: COACH_DATABASE }));
   const coach = useCoachAvailable();
   const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
-  const { messages, sendMessage, isLoading, error, stop, reload, clear, isHydrating } = useChat({
+  const {
+    messages,
+    sendMessage,
+    isLoading,
+    error,
+    stop,
+    reload,
+    clear,
+    isHydrating,
+    interrupts,
+    resuming,
+  } = useChat({
     connection,
     // One chat per device: sign-out deletes it, so the next athlete starts fresh.
     threadId: "coach",
     persistence,
     forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    // The approval the coach asks for on a plan change binds to this definition.
+    tools: [applyPlanChangeDef],
   });
 
   const lookup = useCallback<ActivityLookup>((id) => byId.get(id), [byId]);
@@ -395,6 +439,12 @@ export function CoachChat({
   // The chat stays readable without a key; only asking needs one (ADR 0036).
   const { needsKey } = coach;
   const canAsk = online && !needsKey;
+  const planChanges = usePlanChanges(messages, interrupts, canAsk && !isLoading && !resuming);
+  // A run paused on the athlete's Apply or Decline takes no new message until it's answered,
+  // even when the paused run was restored hours later.
+  const awaitingAnswer = interrupts.length > 0;
+  const canSend = canAsk && !awaitingAnswer;
+  const starters = planChange ? PLAN_STARTERS : STARTERS;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -425,12 +475,12 @@ export function CoachChat({
             {/* A starter would send without the activity "Ask about this activity" brought in. */}
             {initialMentions.length ? null : (
               <EmptyContent className="flex-col">
-                {STARTERS.map((starter) => (
+                {starters.map((starter) => (
                   <Button
                     key={starter}
                     variant="outline"
                     className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
-                    disabled={!canAsk}
+                    disabled={!canSend}
                     onClick={() => send(starter)}
                   >
                     {starter}
@@ -440,52 +490,54 @@ export function CoachChat({
             )}
           </Empty>
         ) : (
-          <MessageScrollerProvider>
-            <MessageScroller className="flex-1">
-              <MessageScrollerViewport>
-                <MessageScrollerContent className="mx-auto w-full max-w-3xl pb-4">
-                  {messages.map((message, index) => (
-                    <MessageScrollerItem
-                      key={message.id}
-                      messageId={message.id}
-                      // Only the latest question anchors: the scroller snaps to any anchor it
-                      // hasn't scrolled to itself, so older ones pulled the view back up mid-reply.
-                      scrollAnchor={message.id === lastQuestionId}
-                      // Skipped offscreen rendering would size visuals at 0 and make the list
-                      // jump as estimated heights turn real while scrolling back.
-                      className="[content-visibility:visible]"
-                    >
-                      <CoachMessage
-                        message={message}
-                        lookup={lookup}
-                        live={isLoading && index === messages.length - 1}
-                      />
-                    </MessageScrollerItem>
-                  ))}
-                  {error && !isLoading ? (
-                    <MessageScrollerItem>
-                      <Alert variant="destructive">
-                        <AlertTitle>The coach could not answer</AlertTitle>
-                        <AlertDescription>{coachErrorMessage(error)}</AlertDescription>
-                        <AlertAction>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!canAsk}
-                            onClick={() => void reload()}
-                          >
-                            <RefreshCwIcon />
-                            Retry
-                          </Button>
-                        </AlertAction>
-                      </Alert>
-                    </MessageScrollerItem>
-                  ) : null}
-                </MessageScrollerContent>
-              </MessageScrollerViewport>
-              <MessageScrollerButton />
-            </MessageScroller>
-          </MessageScrollerProvider>
+          <PlanChangeProvider value={planChanges}>
+            <MessageScrollerProvider>
+              <MessageScroller className="flex-1">
+                <MessageScrollerViewport>
+                  <MessageScrollerContent className="mx-auto w-full max-w-3xl pb-4">
+                    {messages.map((message, index) => (
+                      <MessageScrollerItem
+                        key={message.id}
+                        messageId={message.id}
+                        // Only the latest question anchors: the scroller snaps to any anchor it
+                        // hasn't scrolled to itself, so older ones pulled the view back up mid-reply.
+                        scrollAnchor={message.id === lastQuestionId}
+                        // Skipped offscreen rendering would size visuals at 0 and make the list
+                        // jump as estimated heights turn real while scrolling back.
+                        className="[content-visibility:visible]"
+                      >
+                        <CoachMessage
+                          message={message}
+                          lookup={lookup}
+                          live={isLoading && index === messages.length - 1}
+                        />
+                      </MessageScrollerItem>
+                    ))}
+                    {error && !isLoading ? (
+                      <MessageScrollerItem>
+                        <Alert variant="destructive">
+                          <AlertTitle>The coach could not answer</AlertTitle>
+                          <AlertDescription>{coachErrorMessage(error)}</AlertDescription>
+                          <AlertAction>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={!canSend}
+                              onClick={() => void reload()}
+                            >
+                              <RefreshCwIcon />
+                              Retry
+                            </Button>
+                          </AlertAction>
+                        </Alert>
+                      </MessageScrollerItem>
+                    ) : null}
+                  </MessageScrollerContent>
+                </MessageScrollerViewport>
+                <MessageScrollerButton />
+              </MessageScroller>
+            </MessageScrollerProvider>
+          </PlanChangeProvider>
         )}
       </div>
 
@@ -495,13 +547,17 @@ export function CoachChat({
           key={`${initialActivityId}-${initialMentions.length}`}
           activities={shown}
           initialMentions={initialMentions}
-          disabled={!canAsk}
+          disabled={!canSend}
           placeholder={
-            !online
-              ? "You're offline. You can read this chat; the coach answers once you're back online."
-              : needsKey
-                ? "Add your OpenRouter key in Settings → Coach to ask the coach."
-                : "Ask the coach… (@ to mention an activity)"
+            awaitingAnswer
+              ? "Apply or decline the change above, then ask the coach again."
+              : !online
+                ? "You're offline. You can read this chat; the coach answers once you're back online."
+                : needsKey
+                  ? "Add your OpenRouter key in Settings → Coach to ask the coach."
+                  : planChange
+                    ? "Tell the coach what changed… (away, ill, too hard, swap days)"
+                    : "Ask the coach… (@ to mention an activity)"
           }
           busy={isLoading}
           onSend={send}

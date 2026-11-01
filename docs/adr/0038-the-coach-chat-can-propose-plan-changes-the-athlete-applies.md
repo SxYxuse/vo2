@@ -4,4 +4,6 @@ The coach chat answered questions without changing anything. With the coach plan
 
 Athletes asked to adjust a plan in their own words, which a form of fixed choices can't cover. A model editing the plan directly would make every rule a request and every mistake silent. Checking before asking, and asking before saving, means the athlete only ever sees changes that keep the rules, and nothing changes without their tap.
 
+A change is checked over the whole plan ahead, before and after, and refused only for a break it brings, so a change that breaks a rule on a day it doesn't touch is caught and a break the plan already had doesn't block an unrelated one. Two rules are read for an athlete who runs less: a week may end under its budget's floor, and the long run's share of the week is read by the runs left in it (two equal runs left of three are half each), unless the change makes the week's longest run longer. A break on a day the change touches always counts, since the change may have made it worse. Less running breaks no safety rule, and a long run that dominates its week still does. A change can't be applied while the plan is being written again.
+
 This supersedes, for the coach plan only, the rule that the coach chat changes nothing.

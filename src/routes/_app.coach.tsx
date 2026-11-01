@@ -3,15 +3,18 @@ import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router
 import { CoachChat } from "@/components/coach-chat.tsx";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type CoachSearch = { activity?: string };
+type CoachSearch = { activity?: string; change?: true };
 
 export const Route = createFileRoute("/_app/coach")({
   // `activity` starts the message with that activity mentioned (Ask the coach on its page).
   // Strava ids are numeric, so the router parses them as numbers.
-  validateSearch: (search: Record<string, unknown>): CoachSearch =>
-    typeof search.activity === "string" || typeof search.activity === "number"
+  // `change` comes from "Ask the coach to change my plan" on the coach plan.
+  validateSearch: (search: Record<string, unknown>): CoachSearch => ({
+    ...(typeof search.activity === "string" || typeof search.activity === "number"
       ? { activity: String(search.activity) }
-      : {},
+      : {}),
+    ...(search.change === true ? { change: true as const } : {}),
+  }),
   component: CoachPage,
 });
 
@@ -26,7 +29,7 @@ function CoachSkeleton() {
 }
 
 function CoachPage() {
-  const { activity } = Route.useSearch();
+  const { activity, change } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   // The chat lives in this browser's storage, so it renders on the client only. It needs no
   // session, so it still opens offline.
@@ -34,8 +37,11 @@ function CoachPage() {
     <ClientOnly fallback={<CoachSkeleton />}>
       <CoachChat
         initialActivityId={activity}
+        planChange={change}
         // Once sent, the mention is in the chat; a reload must not offer it again.
-        onInitialActivitySent={() => void navigate({ search: {}, replace: true })}
+        onInitialActivitySent={() =>
+          void navigate({ search: ({ activity: _activity, ...rest }) => rest, replace: true })
+        }
       />
     </ClientOnly>
   );

@@ -173,7 +173,7 @@ How a planned session stands against the copied activities: done, missed (its da
 _Avoid_: Completed, compliance
 
 **Coach note**:
-What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them.
+What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them; on the coach plan, a note asks the coach for a plan change.
 _Avoid_: Comment, feedback, journal
 
 **Coach**:

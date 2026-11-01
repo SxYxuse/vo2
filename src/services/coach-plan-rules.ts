@@ -36,6 +36,15 @@ export type RuleContext = {
   neighbours: PlannedRun[];
   /** Seconds per km at the middle of easy pace, to size what a day's time allows. */
   easySecPerKm: number;
+  /**
+   * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
+   * athlete who is ill or away runs less, and less running breaks no safety rule, and the long
+   * run's share is read by the runs left in the week, as long as the week's longest run doesn't
+   * grow past `longestBefore`.
+   */
+  allowShort?: true;
+  /** For a plan change: each week's longest run before it, by week start. */
+  longestBefore?: Record<string, number>;
 };
 
 /** A week may come in this much over its budget, for rounding. */
@@ -174,7 +183,10 @@ const datesOf = (week: WeekBudget) =>
  */
 export function runsAvailable(week: WeekBudget, ctx: RuleContext) {
   const dates = datesOf(week);
-  const kept = ctx.frozen.filter((session) => dates.includes(session.date)).length;
+  // A plan change keeps days after `from` too; those are counted with the open days.
+  const kept = ctx.frozen.filter(
+    (session) => dates.includes(session.date) && session.date < ctx.from,
+  ).length;
   const open = dates.filter(
     (date) =>
       date >= ctx.from &&
@@ -220,7 +232,7 @@ function largestWeek(caps: number[], share: number) {
  * athlete's days allow when their time or the longest-run rule caps the week lower.
  */
 export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
-  if (week.weekStart < ctx.from || week.taper) return null;
+  if (ctx.allowShort || week.weekStart < ctx.from || week.taper) return null;
   const dates = datesOf(week);
   if (dates.some((date) => ctx.raceDays.includes(date))) return null;
   const since = addDayKey(ctx.today, -LONGEST_WINDOW_DAYS);
@@ -372,7 +384,16 @@ export function weekShapeBreaks(sessions: PlannedRun[], ctx: RuleContext): RuleB
     }
     // The week's longest run counts whatever it is called, so a long run can't pass as easy.
     const longest = [...inWeek].sort((a, b) => b.distanceKm - a.distanceKm)[0];
-    const runs = longShareRuns(week, ctx);
+    // A plan change reads the share by the runs left in the week, so dropping a run for an absence
+    // isn't refused for leaving the others equal; a long run that dominates still breaks it, and
+    // one that grows is held to the usual share (ADR 0038).
+    const loose =
+      ctx.allowShort &&
+      longest != null &&
+      longest.distanceKm <= (ctx.longestBefore?.[week.weekStart] ?? 0) + 0.05;
+    const runs = loose
+      ? Math.max(1, Math.min(longShareRuns(week, ctx), inWeek.length))
+      : longShareRuns(week, ctx);
     const longShare = maxLongShare(runs);
     if (longest && sessions.includes(longest)) {
       if (longest.distanceKm > total * longShare + 0.05) {

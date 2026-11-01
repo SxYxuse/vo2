@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import { ArrowLeftIcon, FootprintsIcon, Link2Icon, Unlink2Icon } from "lucide-react";
 
@@ -36,6 +36,8 @@ import { Spinner } from "@/components/ui/spinner";
 export function CoachSession({ sessionId }: { sessionId: string }) {
   const online = useOnline();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const link = useMutation({
     mutationFn: (activityId: string | null) =>
@@ -81,10 +83,12 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           variant="ghost"
           size="sm"
           className="self-start"
-          // Replaces the session page, so the back gesture on This week leaves it rather than
-          // returning here.
-          render={<Link to="/week" search={{ day: run.date }} replace />}
-          nativeButton={false}
+          // Opened from the plan: go back to it, as it was, so the back gesture on This week
+          // leaves rather than returning here. Opened from a link or reloaded: replace this page.
+          onClick={() => {
+            if (router.state.location.state.planSessionPushed) router.history.back();
+            else void navigate({ to: "/week", search: { day: run.date }, replace: true });
+          }}
         >
           <ArrowLeftIcon data-icon="inline-start" />
           This week
