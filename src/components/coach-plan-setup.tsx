@@ -10,7 +10,6 @@ import { coachPlanQueryOptions, seasonQueryOptions } from "@/lib/queries.ts";
 import { saveCoachPlanAvailability } from "@/services/coach-plan.ts";
 import {
   availabilitySchema,
-  DAY_MINUTE_CHOICES,
   DEFAULT_AVAILABILITY,
   MAX_RUNS_PER_WEEK,
   MIN_RUNS_PER_WEEK,
@@ -32,7 +31,6 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -58,30 +56,25 @@ export function availabilityIssue(value: Availability) {
 }
 
 /**
- * Availability (ADR 0037): runs a week, the days the athlete can run with the time they have on
- * each, and the long run day. The plan picks which of the days to use.
+ * Availability (ADR 0041): runs a week, the days the athlete can run, and the long run day. The
+ * plan picks which of the days to use.
  */
 export function AvailabilityFields({
-  idPrefix,
   value,
   onChange,
   disabled = false,
 }: {
-  idPrefix: string;
   value: Availability;
   onChange: (next: Availability) => void;
   disabled?: boolean;
 }) {
-  const chosen = WEEKDAYS.filter((day) => value.days.some((item) => item.weekday === day.id));
+  const chosen = WEEKDAYS.filter((day) => value.days.includes(day.id));
   const issue = availabilityIssue(value);
   const setDays = (weekdays: number[]) => {
-    const days = WEEKDAYS.filter((day) => weekdays.includes(day.id)).map((day) => ({
-      weekday: day.id,
-      minutes: value.days.find((item) => item.weekday === day.id)?.minutes ?? 60,
-    }));
+    const days = WEEKDAYS.filter((day) => weekdays.includes(day.id)).map((day) => day.id);
     const longRunDay = weekdays.includes(value.longRunDay)
       ? value.longRunDay
-      : (days.at(-1)?.weekday ?? value.longRunDay);
+      : (days.at(-1) ?? value.longRunDay);
     onChange({ ...value, days, longRunDay });
   };
 
@@ -142,49 +135,6 @@ export function AvailabilityFields({
           ))}
         </ToggleGroup>
       </FieldSet>
-
-      {chosen.length ? (
-        <FieldSet>
-          <FieldLegend>Time you have</FieldLegend>
-          <div className="flex flex-col gap-2">
-            {chosen.map((day) => {
-              const id = `${idPrefix}-minutes-${day.id}`;
-              const minutes = value.days.find((item) => item.weekday === day.id)!.minutes;
-              return (
-                <Field key={day.id} orientation="horizontal" className="items-center">
-                  <FieldLabel htmlFor={id} className="flex-1">
-                    {day.label}
-                  </FieldLabel>
-                  <NativeSelect
-                    id={id}
-                    className="w-32"
-                    disabled={disabled}
-                    value={String(minutes)}
-                    onChange={(event) =>
-                      onChange({
-                        ...value,
-                        days: value.days.map((item) =>
-                          item.weekday === day.id
-                            ? { ...item, minutes: Number(event.target.value) }
-                            : item,
-                        ),
-                      })
-                    }
-                  >
-                    {DAY_MINUTE_CHOICES.map((choice) => (
-                      <NativeSelectOption key={choice} value={String(choice)}>
-                        {choice < 60
-                          ? `${choice} min`
-                          : `${Math.floor(choice / 60)} h${choice % 60 ? ` ${choice % 60}` : ""}`}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              );
-            })}
-          </div>
-        </FieldSet>
-      ) : null}
 
       {chosen.length ? (
         <FieldSet>
@@ -432,7 +382,7 @@ export function CoachPlanSettings() {
           Building toward <strong>{state.aGoal.name}</strong> on {state.aGoal.date}.
         </FieldDescription>
       ) : null}
-      <AvailabilityFields idPrefix="settings" value={draft} onChange={setDraft} />
+      <AvailabilityFields value={draft} onChange={setDraft} />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Button
           type="button"

@@ -20,6 +20,7 @@ import {
 import {
   coachPlanGoal,
   matchSessions,
+  availabilityKey,
   parseAvailability,
   parseLinks,
   plannedRun,
@@ -277,7 +278,8 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
     const from = row.requestedFrom > first ? row.requestedFrom : first;
     return { from, reason: "asked", trigger: row.requestedFrom };
   }
-  if (plan.basis.availability !== basis.availability) {
+  // Read through the schema, so a plan written when availability had minutes isn't rewritten.
+  if (availabilityKey(JSON.parse(plan.basis.availability)) !== basis.availability) {
     return { from: first, reason: "availability", trigger: basis.availability };
   }
   if (upcomingGoalsKey(plan.basis.goals, today) !== goals) {

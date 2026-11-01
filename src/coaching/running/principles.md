@@ -17,7 +17,7 @@ Evidence tags: **rule** means VO2 checks it in code. **Guidance** means coaching
 
 ## Week structure
 
-Use the athlete's availability: runs per week, the days they can run, the time they have each day, and the long run day. Pick which available days to use. Respect each day's time: the session's estimated duration, at the middle of its target paces, must fit.
+Use the athlete's availability: runs per week, the days they can run, and the long run day. Pick which available days to use. There is no time per day: size each session by the week's budget and the rules, and keep the long run within 2 h 30.
 
 Templates by runs per week (guidance; no study compares them):
 
