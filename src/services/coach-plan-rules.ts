@@ -1,5 +1,4 @@
 import {
-  dayMinutes,
   isLongKind,
   isQualityKind,
   type Availability,
@@ -34,7 +33,7 @@ export type RuleContext = {
    * count toward no week being written.
    */
   neighbours: PlannedRun[];
-  /** Seconds per km at the middle of easy pace, to size what a day's time allows. */
+  /** Seconds per km at the middle of easy pace, to size a 2 h 30 run for the floor. */
   easySecPerKm: number;
   /**
    * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
@@ -51,10 +50,10 @@ export type RuleContext = {
 const BUDGET_TOLERANCE = 1.05;
 /**
  * A full week must reach this share of its budget: the coaching knowledge asks for 95–100 %, and
- * the gap leaves room for rounding. Rest of the limits may hold a week lower; see weekFloorKm.
+ * the gap leaves room for rounding. The longest-run rules may hold a week lower; see weekFloorKm.
  */
 const BUDGET_FLOOR = 0.9;
-/** What the day's time and the longest-run rule allow is estimated, so only this much counts. */
+/** What the longest-run rules allow is estimated from easy pace, so only this much counts. */
 const REACH_SHARE = 0.85;
 /** A run may be at most this much longer than the longest of the last 30 days (rule 2). */
 const MAX_RUN_GROWTH = 1.1;
@@ -134,21 +133,15 @@ export function dateBreaks(sessions: PlannedRun[], ctx: RuleContext): RuleBreak[
   return breaks;
 }
 
-/** Runs only on the athlete's days, within each day's time, the long run on its day. */
+/** Runs only on the athlete's days, the long run on its day. */
 export function availabilityBreaks(sessions: PlannedRun[], ctx: RuleContext): RuleBreak[] {
   const { availability } = ctx;
   const breaks: RuleBreak[] = [];
   for (const session of sessions) {
-    const minutes = dayMinutes(availability, weekday(session.date));
-    if (minutes == null) {
+    if (!availability.days.includes(weekday(session.date))) {
       breaks.push({
         rule: "availability",
         message: `${session.date}: the athlete can't run on that weekday.`,
-      });
-    } else if (session.minutes > minutes) {
-      breaks.push({
-        rule: "availability",
-        message: `${session.date}: about ${session.minutes} min, but the athlete has ${minutes} min that day.`,
       });
     }
     if (isLongKind(session.kind) && weekday(session.date) !== availability.longRunDay) {
@@ -191,7 +184,7 @@ export function runsAvailable(week: WeekBudget, ctx: RuleContext) {
     (date) =>
       date >= ctx.from &&
       !ctx.raceDays.includes(date) &&
-      dayMinutes(ctx.availability, weekday(date)) != null,
+      ctx.availability.days.includes(weekday(date)),
   ).length;
   return Math.min(ctx.availability.runsPerWeek, kept + open);
 }
@@ -208,28 +201,11 @@ export function longShareRuns(week: WeekBudget, ctx: RuleContext) {
 }
 
 /**
- * The largest week those day caps allow under the longest-run share (rule 5): the largest W where
- * each run can be min(cap, share × W) and together they still make W. What the days hold at that
- * share only grows more slowly than W once a cap binds, so the weeks that fit run from 0 to one
- * largest W, which halving finds.
- */
-function largestWeek(caps: number[], share: number) {
-  const holds = (week: number) =>
-    caps.reduce((sum, cap) => sum + Math.min(cap, share * week), 0) >= week - 1e-9;
-  let low = 0;
-  let high = caps.reduce((sum, cap) => sum + cap, 0);
-  for (let step = 0; step < 50; step += 1) {
-    const mid = (low + high) / 2;
-    if (holds(mid)) low = mid;
-    else high = mid;
-  }
-  return low;
-}
-
-/**
  * The least a week must reach (rule 1), or null when it has no floor: a week written only in part,
  * a race week, and a taper week can come in lower. The floor is 90 % of the budget, or of what the
- * athlete's days allow when their time or the longest-run rule caps the week lower.
+ * longest-run rules allow when they hold the week lower: no run past 10 % over the longest of the
+ * last 30 days nor 2 h 30, so an athlete back from a break isn't asked for more than they may run.
+ * Equal runs always keep the long run's share, so the share never holds the week lower.
  */
 export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
   if (ctx.allowShort || week.weekStart < ctx.from || week.taper) return null;
@@ -240,25 +216,8 @@ export function weekFloorKm(week: WeekBudget, ctx: RuleContext): number | null {
     MIN_LONGEST_KM,
     ...ctx.runs.filter((run) => run.date >= since && run.date < ctx.today).map((run) => run.km),
   );
-  // What each of the athlete's days allows: its time at easy pace, no run past the longest-run
-  // rule, and none over 2 h 30 (the week's longest run is held to it, so any run is). The long run
-  // day is counted even when it is the shortest, since that is where the coach puts the long run;
-  // the other days are the best of the rest.
-  const runs = longShareRuns(week, ctx);
-  const capOf = (minutes: number) =>
-    Math.min(
-      (Math.min(minutes, MAX_LONG_MINUTES) * 60) / ctx.easySecPerKm,
-      longest * MAX_RUN_GROWTH,
-    );
-  const longDay = ctx.availability.days.find((day) => day.weekday === ctx.availability.longRunDay);
-  const caps = [
-    ...(longDay ? [capOf(longDay.minutes)] : []),
-    ...ctx.availability.days
-      .filter((day) => day !== longDay)
-      .map((day) => capOf(day.minutes))
-      .sort((a, b) => b - a),
-  ].slice(0, runs);
-  const reach = largestWeek(caps, maxLongShare(runs)) * REACH_SHARE;
+  const perRun = Math.min((MAX_LONG_MINUTES * 60) / ctx.easySecPerKm, longest * MAX_RUN_GROWTH);
+  const reach = longShareRuns(week, ctx) * perRun * REACH_SHARE;
   return Math.round(Math.min(week.budgetKm, reach) * BUDGET_FLOOR * 10) / 10;
 }
 

@@ -1,10 +1,4 @@
-import {
-  dayMinutes,
-  isQualityKind,
-  stepSecPerKm,
-  type Step,
-  type WrittenSession,
-} from "./coach-plan.types.ts";
+import { isQualityKind, stepSecPerKm, type Step, type WrittenSession } from "./coach-plan.types.ts";
 import {
   MAX_LONG_MINUTES,
   maxLongShare,
@@ -92,8 +86,7 @@ export function mockCoachPlan(
     const frozen = ctx.frozen.filter((session) => dates.includes(session.date));
     const races = ctx.raceDays.filter((date) => dates.includes(date));
     const candidates = dates.filter(
-      (date) =>
-        date >= ctx.from && !busy.has(date) && dayMinutes(availability, weekday(date)) != null,
+      (date) => date >= ctx.from && !busy.has(date) && availability.days.includes(weekday(date)),
     );
     // The long run never follows a hard day; easy runs may.
     const longDate =
@@ -108,13 +101,9 @@ export function mockCoachPlan(
     if (!picked.length) continue;
 
     // Grow every run by a tenth of a km a round, all together so no run outgrows the longest-run share,
-    // until the budget, a day's time, or the longest-run rule stops it.
+    // until the budget or the longest-run rules (2 h 30, 10 % over the last 30 days) stop it.
     const share = maxLongShare(longShareRuns(week, ctx));
-    const cap = (date: string) => {
-      const minutes = dayMinutes(availability, weekday(date))!;
-      const time = date === longDate ? Math.min(MAX_LONG_MINUTES, minutes) : minutes;
-      return Math.min(kmIn(time), spikeLimit(date));
-    };
+    const cap = (date: string) => Math.min(kmIn(MAX_LONG_MINUTES), spikeLimit(date));
     const sizes = new Map(
       picked.map((date) => [date, Math.min(2, Math.floor(cap(date) * 10) / 10)]),
     );

@@ -117,7 +117,7 @@ const STEP_LIST = [
   {
     id: "availability",
     title: "When can you run?",
-    description: "The coach writes your runs on these days, within the time you have.",
+    description: "The coach writes your runs on these days, the long one on your long run day.",
   },
   {
     id: "paces",
@@ -421,11 +421,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
             ) : step.id === "goal" ? (
               <CoachPlanGoalField state={coachPlan.data} />
             ) : step.id === "availability" ? (
-              <AvailabilityFields
-                idPrefix="onboard"
-                value={availability}
-                onChange={setAvailability}
-              />
+              <AvailabilityFields value={availability} onChange={setAvailability} />
             ) : step.id === "paces" ? (
               <TrainingPacesSection idPrefix="onboard" />
             ) : (

@@ -257,7 +257,7 @@ async function deleteGoalIfThere(page: Page, name: RegExp) {
 }
 
 /** Four runs on Tuesday, Thursday, Saturday, and Sunday, the long run on Sunday. */
-const AVAILABILITY = { Tuesday: "60", Thursday: "60", Saturday: "60", Sunday: "120" } as const;
+const AVAILABILITY = ["Tuesday", "Thursday", "Saturday", "Sunday"];
 
 /** Sets the same availability whatever is saved, so the written plan doesn't depend on run order. */
 async function setAvailability(page: Page) {
@@ -272,13 +272,13 @@ async function setAvailability(page: Page) {
     "Sunday",
   ]) {
     const toggle = page.getByRole("button", { name: day, exact: true });
-    const wanted = day in AVAILABILITY;
+    const wanted = AVAILABILITY.includes(day);
     if ((await toggle.getAttribute("aria-pressed")) !== String(wanted)) await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", String(wanted));
   }
-  for (const [day, minutes] of Object.entries(AVAILABILITY)) {
-    await page.getByRole("combobox", { name: day }).selectOption(minutes);
-  }
+  // Availability has no time per day (ADR 0041): the coach plan's rules size the runs.
+  await expect(page.getByText("Time you have")).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Sunday" })).toHaveCount(0);
   await page.getByRole("button", { name: "Long run on Sunday" }).click();
 }
 

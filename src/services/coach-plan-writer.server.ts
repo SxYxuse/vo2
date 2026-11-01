@@ -63,7 +63,7 @@ export function rulesFor(ctx: RuleContext) {
     `5. One long run a week, on the long run day. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % when only 3 of the athlete's runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all ${runsPerWeek} runs, and at most ${MAX_LONG_MINUTES} minutes.`,
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budget.",
     "8. One run a day at most. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs a week at most, only on the athlete's days, each within that day's minutes. Write sessions from ${ctx.from} on; days before are kept. Write nothing on race days.`,
+    `Availability: ${runsPerWeek} runs a week at most, only on the athlete's days. Write sessions from ${ctx.from} on; days before are kept. Write nothing on race days.`,
   ];
 }
 
@@ -99,7 +99,7 @@ export function availabilityText(ctx: RuleContext) {
   const { availability } = ctx;
   return {
     runsPerWeek: availability.runsPerWeek,
-    days: availability.days.map((day) => `${WEEKDAYS[day.weekday]}: ${day.minutes} min`),
+    days: availability.days.map((day) => WEEKDAYS[day]),
     longRunDay: WEEKDAYS[availability.longRunDay],
   };
 }

@@ -125,9 +125,7 @@ function candidateChanges(plan: MockCoachPlan, target: MockSession, kind: string
     ];
   }
   const week = plan.weeks.find((item) => item.sessions.includes(target))!;
-  const open = plan.availability.days.map((text) =>
-    WEEKDAY_NAMES.indexOf(text.split(":")[0].toLowerCase()),
-  );
+  const open = plan.availability.days.map((text) => WEEKDAY_NAMES.indexOf(text.toLowerCase()));
   const moves = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(Date.parse(`${week.weekStart}T12:00:00Z`) + index * 86_400_000);
     return date.toISOString().slice(0, 10);

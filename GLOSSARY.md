@@ -85,7 +85,7 @@ The planning style where the coach writes precise sessions for the next four wee
 _Avoid_: AI plan, Runna plan
 
 **Availability**:
-What the athlete gives the coach plan: how many runs a week, the days they can run, the time they have each day, and the long run day.
+What the athlete gives the coach plan: how many runs a week, the days they can run, and the long run day. It has no time per day (ADR 0041).
 _Avoid_: Schedule, rest days (that is the week planner's term), week shape
 
 **Training paces**:

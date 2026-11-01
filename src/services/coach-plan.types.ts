@@ -13,29 +13,27 @@ import { PACE_TYPES, type PaceRange, type PaceType } from "./training-paces.type
 
 export const MIN_RUNS_PER_WEEK = 2;
 export const MAX_RUNS_PER_WEEK = 6;
-export const MIN_DAY_MINUTES = 20;
-export const MAX_DAY_MINUTES = 240;
-/** The choices the availability form offers for a day's time. */
-export const DAY_MINUTE_CHOICES = [30, 45, 60, 75, 90, 120, 150, 180] as const;
 
 const weekdaySchema = z.number().int().min(0).max(6);
 
-/** How much the athlete can run: runs a week, the days they can run, their time, the long run day. */
+/**
+ * A running day: its weekday. Availability saved before ADR 0041 stored each day as
+ * `{ weekday, minutes }`; those still parse, and the minutes are dropped.
+ */
+const daySchema = z.preprocess(
+  (day) => (typeof day === "object" && day != null && "weekday" in day ? day.weekday : day),
+  weekdaySchema,
+);
+
+/** How much the athlete can run: runs a week, the days they can run, and the long run day. */
 export const availabilitySchema = z
   .object({
     runsPerWeek: z.number().int().min(MIN_RUNS_PER_WEEK).max(MAX_RUNS_PER_WEEK),
-    days: z
-      .array(
-        z.object({
-          weekday: weekdaySchema,
-          minutes: z.number().int().min(MIN_DAY_MINUTES).max(MAX_DAY_MINUTES),
-        }),
-      )
-      .max(7),
+    days: z.array(daySchema).max(7),
     longRunDay: weekdaySchema,
   })
   .superRefine((value, ctx) => {
-    const weekdays = value.days.map((day) => day.weekday);
+    const weekdays = value.days;
     if (new Set(weekdays).size !== weekdays.length) {
       ctx.addIssue({ code: "custom", path: ["days"], message: "A day is listed twice." });
     }
@@ -60,11 +58,7 @@ export type Availability = z.infer<typeof availabilitySchema>;
 /** A starting point: three runs on Tuesday, Thursday, and Sunday. */
 export const DEFAULT_AVAILABILITY: Availability = {
   runsPerWeek: 3,
-  days: [
-    { weekday: 2, minutes: 60 },
-    { weekday: 4, minutes: 60 },
-    { weekday: 0, minutes: 120 },
-  ],
+  days: [2, 4, 0],
   longRunDay: 0,
 };
 
@@ -73,8 +67,9 @@ export function parseAvailability(value: unknown): Availability | null {
   return parsed.success ? parsed.data : null;
 }
 
-export function dayMinutes(availability: Availability, weekday: number) {
-  return availability.days.find((day) => day.weekday === weekday)?.minutes ?? null;
+/** An availability as plan bases compare it, so one saved with minutes reads as without. */
+export function availabilityKey(value: unknown) {
+  return JSON.stringify(parseAvailability(value));
 }
 
 // ----- The session format the coach writes in -----
