@@ -18,6 +18,7 @@ import { Route as AppCoachRouteImport } from './routes/_app.coach'
 import { Route as AppFitnessRouteImport } from './routes/_app.fitness'
 import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
+import { Route as AppMergeGpxRouteImport } from './routes/_app.merge-gpx'
 import { Route as AppPlanRouteImport } from './routes/_app.plan'
 import { Route as AppSeasonRouteImport } from './routes/_app.season'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
@@ -76,6 +77,11 @@ const AppHeartRateRoute = AppHeartRateRouteImport.update({
 const AppMapRoute = AppMapRouteImport.update({
   id: '/map',
   path: '/map',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMergeGpxRoute = AppMergeGpxRouteImport.update({
+  id: '/merge-gpx',
+  path: '/merge-gpx',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPlanRoute = AppPlanRouteImport.update({
@@ -163,6 +169,7 @@ export interface FileRoutesByFullPath {
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/merge-gpx': typeof AppMergeGpxRoute
   '/plan': typeof AppPlanRoute
   '/season': typeof AppSeasonRoute
   '/settings': typeof AppSettingsRouteWithChildren
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/fitness': typeof AppFitnessRoute
   '/heart-rate': typeof AppHeartRateRoute
   '/map': typeof AppMapRoute
+  '/merge-gpx': typeof AppMergeGpxRoute
   '/plan': typeof AppPlanRoute
   '/season': typeof AppSeasonRoute
   '/week': typeof AppWeekRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/_app/fitness': typeof AppFitnessRoute
   '/_app/heart-rate': typeof AppHeartRateRoute
   '/_app/map': typeof AppMapRoute
+  '/_app/merge-gpx': typeof AppMergeGpxRoute
   '/_app/plan': typeof AppPlanRoute
   '/_app/season': typeof AppSeasonRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
@@ -241,6 +250,7 @@ export interface FileRouteTypes {
     | '/fitness'
     | '/heart-rate'
     | '/map'
+    | '/merge-gpx'
     | '/plan'
     | '/season'
     | '/settings'
@@ -265,6 +275,7 @@ export interface FileRouteTypes {
     | '/fitness'
     | '/heart-rate'
     | '/map'
+    | '/merge-gpx'
     | '/plan'
     | '/season'
     | '/week'
@@ -290,6 +301,7 @@ export interface FileRouteTypes {
     | '/_app/fitness'
     | '/_app/heart-rate'
     | '/_app/map'
+    | '/_app/merge-gpx'
     | '/_app/plan'
     | '/_app/season'
     | '/_app/settings'
@@ -382,6 +394,13 @@ declare module '@tanstack/react-router' {
       path: '/map'
       fullPath: '/map'
       preLoaderRoute: typeof AppMapRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/merge-gpx': {
+      id: '/_app/merge-gpx'
+      path: '/merge-gpx'
+      fullPath: '/merge-gpx'
+      preLoaderRoute: typeof AppMergeGpxRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/plan': {
@@ -512,6 +531,7 @@ interface AppRouteChildren {
   AppFitnessRoute: typeof AppFitnessRoute
   AppHeartRateRoute: typeof AppHeartRateRoute
   AppMapRoute: typeof AppMapRoute
+  AppMergeGpxRoute: typeof AppMergeGpxRoute
   AppPlanRoute: typeof AppPlanRoute
   AppSeasonRoute: typeof AppSeasonRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
@@ -529,6 +549,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFitnessRoute: AppFitnessRoute,
   AppHeartRateRoute: AppHeartRateRoute,
   AppMapRoute: AppMapRoute,
+  AppMergeGpxRoute: AppMergeGpxRoute,
   AppPlanRoute: AppPlanRoute,
   AppSeasonRoute: AppSeasonRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,

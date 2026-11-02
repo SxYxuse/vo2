@@ -11,6 +11,7 @@ import {
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
+  RouteIcon,
   Settings2Icon,
   SparklesIcon,
   TrendingUpIcon,
@@ -70,6 +71,7 @@ const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 
 const NAV_ITEMS = [
   { title: "Map", to: "/map", icon: MapIcon },
+  { title: "Merge GPX", to: "/merge-gpx", icon: RouteIcon },
   { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
   { title: "Bests", to: "/bests", icon: TrophyIcon },
   { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
