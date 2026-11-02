@@ -73,6 +73,14 @@ const config = defineConfig({
               // grouping it created import cycles between chunks that broke hydration.
               groups: [
                 {
+                  // Merged with the rest, Base UI's modules split across vendor chunks that import
+                  // each other, and a chunk that runs first finds the other's exports undefined.
+                  name: "base-ui",
+                  test: /[\\/]@base-ui[\\/]/,
+                  minShareCount: 2,
+                  priority: 1,
+                },
+                {
                   name: "vendor",
                   test: /node_modules/,
                   minShareCount: 2,

@@ -69,7 +69,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Empty,
   EmptyContent,
@@ -523,7 +522,7 @@ function FilesCard({
             Add at least one more file that crosses or shares a road with this one.
           </p>
         ) : (
-          <Collapsible open={adjusting || apart} onOpenChange={setAdjusting}>
+          <>
             {apart ? (
               <Alert variant="warning" className="mt-1">
                 <TriangleAlertIcon />
@@ -537,34 +536,41 @@ function FilesCard({
                 <p className="text-muted-foreground min-w-0 flex-1">
                   {junctionCount} meeting {junctionCount === 1 ? "point" : "points"} found
                 </p>
-                <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={adjusting}
+                  onClick={() => setAdjusting((open) => !open)}
+                >
                   <SlidersHorizontalIcon />
                   {adjusting ? "Done" : "Adjust"}
-                </CollapsibleTrigger>
+                </Button>
               </div>
             )}
-            <CollapsibleContent className="flex flex-col gap-2 pt-2">
-              <div className="flex items-center justify-between gap-2">
-                <span>Files meet within</span>
-                <span className="text-muted-foreground tabular-nums">{toleranceM} m</span>
+            {adjusting || apart ? (
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Files meet within</span>
+                  <span className="text-muted-foreground tabular-nums">{toleranceM} m</span>
+                </div>
+                <Slider
+                  aria-label="Meeting distance in metres"
+                  value={[toleranceM]}
+                  min={TOLERANCE_MIN_M}
+                  max={TOLERANCE_MAX_M}
+                  step={5}
+                  onValueChange={(value) =>
+                    onToleranceChange(Array.isArray(value) ? value[0]! : (value as number))
+                  }
+                  className="py-2"
+                />
+                <p className="text-muted-foreground">
+                  How close two files must pass to count as meeting. Raise it for files drawn on
+                  different maps or recorded by different devices.
+                </p>
               </div>
-              <Slider
-                aria-label="Meeting distance in metres"
-                value={[toleranceM]}
-                min={TOLERANCE_MIN_M}
-                max={TOLERANCE_MAX_M}
-                step={5}
-                onValueChange={(value) =>
-                  onToleranceChange(Array.isArray(value) ? value[0]! : (value as number))
-                }
-                className="py-2"
-              />
-              <p className="text-muted-foreground">
-                How close two files must pass to count as meeting. Raise it for files drawn on
-                different maps or recorded by different devices.
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>
@@ -732,6 +738,7 @@ function RouteStep({
   onSwitchAt: (stop: JunctionStop) => void;
   onRemove: (() => void) | undefined;
 }) {
+  const [adjusting, setAdjusting] = useState(false);
   const length = trackLength(track);
   const direction = legDirection(leg);
   const nameOf = (id: string) => tracks.find((candidate) => candidate.id === id)?.name ?? "";
@@ -812,7 +819,7 @@ function RouteStep({
           style={{ backgroundColor: track.color }}
         />
       </div>
-      <Collapsible className="flex min-w-0 flex-col gap-2 pb-4">
+      <div className="flex min-w-0 flex-col gap-2 pb-4">
         <StepRow label={index === 0 ? "Start on" : "Switch to"}>
           <NativeSelect
             className="min-w-0 flex-1"
@@ -845,70 +852,77 @@ function RouteStep({
             on {track.name}
             {direction < 0 ? ", ridden backward" : null}
           </p>
-          <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={adjusting}
+            onClick={() => setAdjusting((open) => !open)}
+          >
             <SlidersHorizontalIcon />
-            Adjust
-          </CollapsibleTrigger>
+            {adjusting ? "Done" : "Adjust"}
+          </Button>
         </div>
-        <CollapsibleContent className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
-          {previous && previousTrack && leg.linked ? (
-            <div className="flex items-center gap-2">
-              <Link2Icon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-              <p className="min-w-0 flex-1">Starts where {previousTrack.name} ends</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onPatch({ linked: false, fromM: leg.fromM })}
-              >
-                <Link2OffIcon />
-                Start elsewhere
-              </Button>
-            </div>
-          ) : (
+        {adjusting ? (
+          <div className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
+            {previous && previousTrack && leg.linked ? (
+              <div className="flex items-center gap-2">
+                <Link2Icon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+                <p className="min-w-0 flex-1">Starts where {previousTrack.name} ends</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onPatch({ linked: false, fromM: leg.fromM })}
+                >
+                  <Link2OffIcon />
+                  Start elsewhere
+                </Button>
+              </div>
+            ) : (
+              <PositionField
+                label="From"
+                valueM={leg.fromM}
+                lengthM={length}
+                onChange={(fromM) => onPatch({ fromM })}
+                action={
+                  previous && previousTrack ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Start where ${previousTrack.name} ends`}
+                      onClick={() => onPatch({ linked: true })}
+                    >
+                      <Link2Icon />
+                    </Button>
+                  ) : null
+                }
+              />
+            )}
             <PositionField
-              label="From"
-              valueM={leg.fromM}
+              label="To"
+              valueM={leg.toM}
               lengthM={length}
-              onChange={(fromM) => onPatch({ fromM })}
-              action={
-                previous && previousTrack ? (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Start where ${previousTrack.name} ends`}
-                    onClick={() => onPatch({ linked: true })}
-                  >
-                    <Link2Icon />
-                  </Button>
-                ) : null
-              }
+              onChange={(toM) => onPatch({ toM })}
             />
-          )}
-          <PositionField
-            label="To"
-            valueM={leg.toM}
-            lengthM={length}
-            onChange={(toM) => onPatch({ toM })}
-          />
-          <p className="text-muted-foreground">Positions are km along {track.name}.</p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPatch({ fromM: leg.toM, toM: leg.fromM, linked: false })}
-            >
-              <ArrowRightLeftIcon />
-              Reverse direction
-            </Button>
-            {onRemove ? (
-              <Button variant="ghost" size="sm" className="text-destructive" onClick={onRemove}>
-                <Trash2Icon />
-                Remove this switch
+            <p className="text-muted-foreground">Positions are km along {track.name}.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPatch({ fromM: leg.toM, toM: leg.fromM, linked: false })}
+              >
+                <ArrowRightLeftIcon />
+                Reverse direction
               </Button>
-            ) : null}
+              {onRemove ? (
+                <Button variant="ghost" size="sm" className="text-destructive" onClick={onRemove}>
+                  <Trash2Icon />
+                  Remove this switch
+                </Button>
+              ) : null}
+            </div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        ) : null}
+      </div>
     </li>
   );
 }
