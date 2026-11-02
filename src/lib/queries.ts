@@ -3,6 +3,7 @@ import { queryOptions } from "@tanstack/react-query";
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
+import { listCoachChats } from "@/services/coach-chats.ts";
 import { getCoachStatus } from "@/services/coach-key.ts";
 import { loadCoachPlan } from "@/services/coach-plan.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
@@ -133,6 +134,21 @@ export const coachStatusQueryOptions = queryOptions({
   queryFn: () => getCoachStatus(),
   staleTime: 60_000,
 });
+
+/** The athlete's coach chats, newest first; each opens from the list in the coach chat. */
+export const coachChatsQueryOptions = queryOptions({
+  queryKey: ["coach-chats"],
+  queryFn: () => listCoachChats(),
+  staleTime: 30_000,
+});
+
+/**
+ * The last chat the athlete opened, as shown, so it still reads offline. Client-only: the chat
+ * loads from the server through TanStack AI and writes here.
+ */
+export function coachChatQueryKey(threadId: string) {
+  return ["coach-chat", threadId] as const;
+}
 
 export function activityDetailQueryOptions(id: string) {
   return queryOptions({

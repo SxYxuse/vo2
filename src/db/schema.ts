@@ -244,3 +244,67 @@ export const coachPlanProposals = pgTable(
   },
   (table) => [index("coach_plan_proposals_user_idx").on(table.userId)],
 );
+
+/**
+ * Coach chats, kept on the server so every device sees them and the athlete can reopen any of
+ * them later. TanStack AI's `withPersistence` writes the transcript; VO2 adds the owner and title.
+ */
+export const coachChats = pgTable(
+  "coach_chats",
+  {
+    /** The chat's TanStack AI thread id, made by the app when the athlete starts a chat. */
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** The athlete's first question, shortened, so the list of chats reads at a glance. */
+    title: text("title").notNull(),
+    /** The model messages in order (TanStack AI `ModelMessage[]`). */
+    messages: jsonb("messages").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("coach_chats_user_updated_idx").on(table.userId, table.updatedAt)],
+);
+
+/**
+ * Each answer the coach gave or is giving in a chat (TanStack AI `RunRecord`), so a reload can
+ * find a reply still running. The record is stored whole; the columns are what's queried.
+ */
+export const coachChatRuns = pgTable(
+  "coach_chat_runs",
+  {
+    runId: text("run_id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull(),
+    record: jsonb("record").notNull(),
+  },
+  (table) => [index("coach_chat_runs_thread_idx").on(table.threadId, table.startedAt)],
+);
+
+/**
+ * A plan change waiting on the athlete's Apply or Decline (TanStack AI `InterruptRecord`), so it
+ * is offered again on any device until answered (ADR 0038).
+ */
+export const coachChatInterrupts = pgTable(
+  "coach_chat_interrupts",
+  {
+    interruptId: text("interrupt_id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    threadId: text("thread_id").notNull(),
+    runId: text("run_id").notNull(),
+    status: text("status").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true, mode: "date" }).notNull(),
+    record: jsonb("record").notNull(),
+  },
+  (table) => [
+    index("coach_chat_interrupts_thread_idx").on(table.threadId, table.requestedAt),
+    index("coach_chat_interrupts_run_idx").on(table.runId, table.requestedAt),
+  ],
+);

@@ -629,6 +629,37 @@ test("an athlete asks the coach a question and gets an answer", async ({ page })
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 });
 
+test("an athlete reopens an earlier coach chat from Chats, then deletes it", async ({ page }) => {
+  await page.goto("/coach");
+  await page
+    .getByRole("button", { name: "Am I fresh enough for a hard session tomorrow?" })
+    .click();
+  await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
+
+  // The reply is saved once it's finished.
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+
+  // A new chat keeps the first one; it reopens from Chats, also after a reload.
+  await page.getByRole("button", { name: "New chat" }).click();
+  await expect(page.getByText("Ask the coach", { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Chats" }).click();
+  const sheet = page.getByRole("dialog", { name: "Chats" });
+  await sheet.getByRole("link", { name: "Am I fresh enough for a hard session tomorrow?" }).click();
+  await expect(page.getByText(/This is the mock coach/)).toBeVisible();
+
+  // Deleting the open chat starts a new one, and the chat is gone from the list.
+  await page.getByRole("button", { name: "Chats" }).click();
+  await sheet
+    .getByRole("button", { name: "Delete “Am I fresh enough for a hard session tomorrow?”" })
+    .click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("Ask the coach", { exact: true })).toBeVisible();
+  await expect(
+    sheet.getByRole("link", { name: "Am I fresh enough for a hard session tomorrow?" }),
+  ).toHaveCount(0);
+});
+
 // Last: with a key saved, the coach would call OpenRouter instead of the mock coach.
 test("an athlete saves an OpenRouter key, sees it kept, and removes it", async ({ page }) => {
   await page.goto("/settings/coach");

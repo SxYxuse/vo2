@@ -1,15 +1,17 @@
-import { ClientOnly, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 
 import { CoachChat } from "@/components/coach-chat.tsx";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type CoachSearch = { activity?: string; change?: true };
+type CoachSearch = { thread?: string; activity?: string; change?: true };
 
 export const Route = createFileRoute("/_app/coach")({
+  // `thread` is the chat open; without one, a new chat starts.
   // `activity` starts the message with that activity mentioned (Ask the coach on its page).
   // Strava ids are numeric, so the router parses them as numbers.
   // `change` comes from "Ask the coach to change my plan" on the coach plan.
   validateSearch: (search: Record<string, unknown>): CoachSearch => ({
+    ...(typeof search.thread === "string" && search.thread ? { thread: search.thread } : {}),
     ...(typeof search.activity === "string" || typeof search.activity === "number"
       ? { activity: String(search.activity) }
       : {}),
@@ -29,13 +31,21 @@ function CoachSkeleton() {
 }
 
 function CoachPage() {
-  const { activity, change } = Route.useSearch();
+  const { thread, activity, change } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  // The chat lives in this browser's storage, so it renders on the client only. It needs no
-  // session, so it still opens offline.
+  // The chat's id is in the address from the start, so a reload or a return keeps it.
+  if (!thread) {
+    return (
+      <Navigate to="/coach" search={(prev) => ({ ...prev, thread: crypto.randomUUID() })} replace />
+    );
+  }
+  // The chat renders on the client only: it loads from the server, or from the copy saved for
+  // offline, through TanStack AI.
   return (
     <ClientOnly fallback={<CoachSkeleton />}>
       <CoachChat
+        key={thread}
+        threadId={thread}
         initialActivityId={activity}
         planChange={change}
         // Once sent, the mention is in the chat; a reload must not offer it again.
