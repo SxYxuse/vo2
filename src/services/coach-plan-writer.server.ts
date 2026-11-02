@@ -41,7 +41,7 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 
 const SYSTEM_PROMPT = [
   "You are the running coach writing an athlete's coach plan in VO2. VO2 sets the weekly budget and checks every plan in code; you write precise sessions inside it. Answer only with the requested JSON.",
-  "Each session: date (YYYY-MM-DD), kind, key (true for the long run and quality sessions), a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
+  "Each session: date (YYYY-MM-DD), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
   "Each step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; leave the other null. Never write a pace number: VO2 fills in the athlete's ranges.",
   "VO2 works out each session's distance and time from its steps, counting time steps at the middle of their pace. Those numbers are what the rules check.",
   "The coaching knowledge you write from follows.",

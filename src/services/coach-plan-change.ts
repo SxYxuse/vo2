@@ -40,7 +40,6 @@ export type PlanChangeInput = z.infer<typeof planChangeInputSchema>;
 export type ChangeSide = {
   title: string;
   kind: SessionKind;
-  key: boolean;
   distanceKm: number;
   minutes: number;
   /** One line per block, so a change of steps under the same title shows. */

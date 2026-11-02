@@ -96,7 +96,6 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
           <FootprintsIcon aria-hidden className="text-ds-amber-700 size-5" />
           {run.title}
-          {run.key ? <Badge variant="info">Key session</Badge> : null}
           {status === "done" ? <Badge variant="success">Done</Badge> : null}
           {status === "missed" ? <Badge variant="destructive">Missed</Badge> : null}
         </h1>
