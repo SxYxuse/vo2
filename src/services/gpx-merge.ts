@@ -451,6 +451,144 @@ export function suggestLegs(
   return legs;
 }
 
+/** 1 when a leg is ridden toward the end of its track, -1 when ridden back toward its start. */
+export function legDirection(leg: { fromM: number; toM: number }) {
+  return leg.toM < leg.fromM ? -1 : 1;
+}
+
+/**
+ * Meeting points on a leg's track past where the leg starts, in riding order. `marginM` skips the
+ * meeting point the leg starts from, which is no place to switch again.
+ */
+export function stopsAhead(
+  stops: JunctionStop[],
+  leg: { fromM: number; toM: number },
+  marginM: number,
+) {
+  const direction = legDirection(leg);
+  const ahead = stops.filter((stop) => (stop.m - leg.fromM) * direction > marginM);
+  return direction < 0 ? ahead.reverse() : ahead;
+}
+
+/** The legs to store for a built route: linked starts keep where they resolved to. */
+export function planLegs(route: MergedRoute): MergeLeg[] {
+  return route.legs.map(({ id, trackId, fromM, toM, linked }) => ({
+    id,
+    trackId,
+    fromM,
+    toM,
+    linked,
+  }));
+}
+
+function trackById(tracks: GpxTrack[], id: string) {
+  return tracks.find((track) => track.id === id);
+}
+
+/**
+ * Switches from leg `index - 1` to leg `index` at a meeting point on the earlier leg's track: the
+ * earlier leg ends there, and leg `index` carries on along the other track from the same spot.
+ */
+export function switchLegAt(
+  legs: MergeLeg[],
+  index: number,
+  stop: JunctionStop,
+  tracks: GpxTrack[],
+): MergeLeg[] {
+  const other = trackById(tracks, stop.other.trackId);
+  const leg = legs[index];
+  if (index < 1 || !leg || !other) return legs;
+  return legs.map((item, at) => {
+    if (at === index - 1) return { ...item, toM: stop.m };
+    if (at !== index) return item;
+    const toM = leg.trackId === other.id ? leg.toM : trackLength(other);
+    return { ...leg, trackId: other.id, fromM: stop.other.m, toM, linked: true };
+  });
+}
+
+/**
+ * Puts leg `index` on another track, switching to it at the first meeting point ahead on the leg
+ * before, or jumping straight to its start when the two never meet.
+ */
+export function changeLegTrack(
+  route: MergedRoute,
+  index: number,
+  trackId: string,
+  tracks: GpxTrack[],
+  junctions: Junction[],
+  marginM: number,
+): MergeLeg[] {
+  const legs = planLegs(route);
+  const track = trackById(tracks, trackId);
+  const leg = legs[index];
+  if (!track || !leg) return legs;
+  legs[index] = { ...leg, trackId, fromM: 0, toM: trackLength(track), linked: false };
+  const previous = route.legs[index - 1];
+  if (!previous) return legs;
+  const stop = stopsAhead(junctionStops(junctions, previous.trackId), previous, marginM).find(
+    (candidate) => candidate.other.trackId === trackId,
+  );
+  return stop ? switchLegAt(legs, index, stop, tracks) : legs;
+}
+
+/**
+ * Adds a leg after the last one, switching at the first meeting point ahead with any other track,
+ * or jumping to the next track's start when none is ahead.
+ */
+export function addLeg(
+  route: MergedRoute,
+  tracks: GpxTrack[],
+  junctions: Junction[],
+  marginM: number,
+  newId: () => string,
+): MergeLeg[] {
+  const legs = planLegs(route);
+  const last = route.legs.at(-1);
+  const lastIndex = tracks.findIndex((track) => track.id === last?.trackId);
+  const fallback = tracks[(lastIndex + 1) % tracks.length];
+  if (!fallback) return legs;
+  const fresh = { id: newId(), fromM: 0, linked: false };
+  if (!last) return [{ ...fresh, trackId: fallback.id, toM: trackLength(fallback) }];
+  const stop = stopsAhead(junctionStops(junctions, last.trackId), last, marginM)[0];
+  if (!stop) return [...legs, { ...fresh, trackId: fallback.id, toM: trackLength(fallback) }];
+  const other = trackById(tracks, stop.other.trackId);
+  const added = [
+    ...legs,
+    { ...fresh, trackId: stop.other.trackId, toM: other ? trackLength(other) : 0 },
+  ];
+  return switchLegAt(added, added.length - 1, stop, tracks);
+}
+
+/**
+ * Removes leg `index`. The leg after it starts where the leg before ends; when the last leg goes,
+ * the one before rides on to the end of its track.
+ */
+export function removeLeg(route: MergedRoute, index: number, tracks: GpxTrack[]): MergeLeg[] {
+  const legs = planLegs(route);
+  legs.splice(index, 1);
+  const next = legs[index];
+  const previous = legs[index - 1];
+  if (next && previous) legs[index] = { ...next, linked: true };
+  if (!next && previous) {
+    const track = trackById(tracks, previous.trackId);
+    const end = legDirection(previous) > 0 && track ? trackLength(track) : 0;
+    legs[index - 1] = { ...previous, toM: end };
+  }
+  return legs;
+}
+
+/** The first leg that rides past a junction, or -1. */
+export function legPassing(route: MergedRoute, junction: Junction) {
+  return route.legs.findIndex((leg) => {
+    const side = [junction.a, junction.b].find((end) => end.trackId === leg.trackId);
+    return (
+      side !== undefined &&
+      side.m >= Math.min(leg.fromM, leg.toM) &&
+      side.m <= Math.max(leg.fromM, leg.toM)
+    );
+  });
+}
+
 /**
  * Changes track at a junction: the first leg passing it now ends there, and the route carries on
  * along the other track from the same spot (toward its finish). Null when no leg passes it.
@@ -461,41 +599,26 @@ export function switchAtJunction(
   junction: Junction,
   newId: () => string,
 ): MergeLeg[] | null {
-  const index = route.legs.findIndex((leg) => {
-    const side = [junction.a, junction.b].find((end) => end.trackId === leg.trackId);
-    return (
-      side !== undefined &&
-      side.m >= Math.min(leg.fromM, leg.toM) &&
-      side.m <= Math.max(leg.fromM, leg.toM)
-    );
-  });
+  const index = legPassing(route, junction);
   if (index < 0) return null;
   const leg = route.legs[index]!;
   const [here, there] =
     junction.a.trackId === leg.trackId ? [junction.a, junction.b] : [junction.b, junction.a];
-  const other = tracks.find((track) => track.id === there.trackId);
-  if (!other) return null;
-  const legs: MergeLeg[] = route.legs.map(({ id, trackId, fromM, toM, linked }) => ({
-    id,
-    trackId,
-    fromM,
-    toM,
-    linked,
-  }));
-  legs[index] = { ...legs[index]!, toM: here.m };
-  const next = legs[index + 1];
-  if (next?.trackId === there.trackId) {
-    legs[index + 1] = { ...next, fromM: there.m, linked: true };
-  } else {
+  const stop: JunctionStop = { junction, m: here.m, other: there };
+  const legs = planLegs(route);
+  // A next leg already on the other track is kept (with its finish); anything else gets a new leg.
+  if (legs[index + 1]?.trackId !== there.trackId) {
+    const other = trackById(tracks, there.trackId);
+    if (!other) return null;
     legs.splice(index + 1, 0, {
       id: newId(),
-      trackId: there.trackId,
-      fromM: there.m,
+      trackId: other.id,
+      fromM: 0,
       toM: trackLength(other),
-      linked: true,
+      linked: false,
     });
   }
-  return legs;
+  return switchLegAt(legs, index + 1, stop, tracks);
 }
 
 function escapeXml(text: string) {

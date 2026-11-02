@@ -14,30 +14,35 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ArrowDownIcon,
   ArrowRightLeftIcon,
-  ArrowUpIcon,
   DownloadIcon,
-  EllipsisVerticalIcon,
   FileUpIcon,
   Link2Icon,
   Link2OffIcon,
   PlusIcon,
   RotateCcwIcon,
   RouteIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
 
 import {
+  addLeg,
   buildMergedRoute,
+  changeLegTrack,
   findAllJunctions,
   GpxError,
   junctionStops,
+  legDirection,
   parseGpx,
+  planLegs,
+  removeLeg,
+  stopsAhead,
   suggestLegs,
   switchAtJunction,
+  switchLegAt,
   toGpx,
   trackLength,
   type GpxPoint,
@@ -56,14 +61,15 @@ import {
 } from "@/lib/gpx-merge-draft.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Empty,
   EmptyContent,
@@ -107,6 +113,8 @@ const TOLERANCE_MIN_M = 5;
 const TOLERANCE_MAX_M = 200;
 const SLIDER_STEP_M = 10;
 const PLAN_SAVE_DELAY_MS = 300;
+// A position this close to a meeting point or a file end is shown as that place.
+const SAME_PLACE_M = 1;
 // iOS greys out .gpx in the Files picker unless generic XML and binary types are allowed too.
 const GPX_ACCEPT = ".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream";
 
@@ -128,6 +136,9 @@ function fileSlug(name: string) {
       .replace(/\s+/g, "-") || "merged-route"
   );
 }
+
+/** The meeting point the leg starts from is no place to switch again. */
+const switchMargin = (toleranceM: number) => toleranceM * 2;
 
 /** Saves tracks when files change and the plan shortly after edits, flushing when the app is hidden. */
 function useDraftSaving(ready: boolean, tracks: GpxMergeTrack[], plan: GpxMergePlan) {
@@ -203,6 +214,7 @@ export function GpxMerge() {
   const junctions = useMemo(() => findAllJunctions(tracks, toleranceM), [toleranceM, tracks]);
   const route = useMemo(() => buildMergedRoute(tracks, plan.legs), [plan.legs, tracks]);
   const mapRoute = useDeferredValue(route);
+  const marginM = switchMargin(toleranceM);
 
   const setLegs = useCallback((update: (legs: MergeLeg[]) => MergeLeg[]) => {
     setPlan((current) => ({ ...current, legs: update(current.legs) }));
@@ -254,24 +266,6 @@ export function GpxMerge() {
   const switchAt = (junction: Junction) => {
     const legs = switchAtJunction(route, tracks, junction, newId);
     if (legs) setLegs(() => legs);
-    else
-      toast.add({
-        type: "info",
-        title: "Not on your route",
-        description: "No leg passes this meeting point. Extend a leg to reach it first.",
-      });
-  };
-
-  const addLeg = () => {
-    setLegs((legs) => {
-      const last = legs.at(-1);
-      const lastIndex = tracks.findIndex((track) => track.id === last?.trackId);
-      const track = tracks[(lastIndex + 1) % tracks.length]!;
-      return [
-        ...legs,
-        { id: newId(), trackId: track.id, fromM: 0, toM: trackLength(track), linked: !!last },
-      ];
-    });
   };
 
   const onDrop = (event: DragEvent) => {
@@ -317,8 +311,8 @@ export function GpxMerge() {
           </EmptyMedia>
           <EmptyTitle>Merge GPX routes</EmptyTitle>
           <EmptyDescription>
-            Add two or more GPX files that cross or share a road. Pick where to switch from one to
-            the next and download the result as a single route.
+            Add two or more GPX files that cross or share a road. You then pick where to switch from
+            one file to the next, and download the result as one GPX.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -344,7 +338,7 @@ export function GpxMerge() {
       onDrop={onDrop}
     >
       {filePicker}
-      {/* On phones the map stays in view while the legs below are edited. */}
+      {/* On phones the map stays in view while the route below is edited. */}
       <div
         className={cn(
           "bg-muted/40 sticky top-0 z-10 h-[38svh] min-h-56 overflow-hidden rounded-xl border lg:order-2 lg:h-[calc(100svh-9rem)]",
@@ -354,26 +348,36 @@ export function GpxMerge() {
         <MapSurface tracks={tracks} route={mapRoute} junctions={junctions} onSwitch={switchAt} />
       </div>
       <div className="flex min-w-0 flex-col gap-3 lg:order-1">
-        <FilesCard tracks={tracks} importing={importing} onAdd={pickFiles} onRemove={removeTrack} />
-        <MeetingDistanceCard
+        <FilesCard
+          tracks={tracks}
+          importing={importing}
           toleranceM={plan.toleranceM}
           junctionCount={junctions.length}
-          trackCount={tracks.length}
-          onChange={(value) => setPlan((current) => ({ ...current, toleranceM: value }))}
+          onAdd={pickFiles}
+          onRemove={removeTrack}
+          onToleranceChange={(value) => setPlan((current) => ({ ...current, toleranceM: value }))}
         />
         {tracks.length >= 2 ? (
           <>
-            <LegsCard
+            <RouteCard
               tracks={tracks}
-              plan={plan}
               route={route}
               junctions={junctions}
-              onLegsChange={setLegs}
-              onSwitch={switchAt}
-              onAddLeg={addLeg}
+              toleranceM={toleranceM}
+              onPatch={(id, patch) =>
+                setLegs((legs) => legs.map((leg) => (leg.id === id ? { ...leg, ...patch } : leg)))
+              }
+              onTrack={(index, trackId) =>
+                setLegs(() => changeLegTrack(route, index, trackId, tracks, junctions, marginM))
+              }
+              onSwitchAt={(index, stop) =>
+                setLegs(() => switchLegAt(planLegs(route), index, stop, tracks))
+              }
+              onRemove={(index) => setLegs(() => removeLeg(route, index, tracks))}
+              onAdd={() => setLegs(() => addLeg(route, tracks, junctions, marginM, newId))}
               onReset={() => setLegs(() => suggestLegs(tracks, junctions, newId))}
             />
-            <ExportCard
+            <DownloadCard
               tracks={tracks}
               plan={plan}
               route={route}
@@ -467,18 +471,28 @@ function TrackDot({ color, className }: { color: string; className?: string }) {
 function FilesCard({
   tracks,
   importing,
+  toleranceM,
+  junctionCount,
   onAdd,
   onRemove,
+  onToleranceChange,
 }: {
   tracks: GpxMergeTrack[];
   importing: boolean;
+  toleranceM: number;
+  junctionCount: number;
   onAdd: () => void;
   onRemove: (id: string) => void;
+  onToleranceChange: (value: number) => void;
 }) {
+  const [adjusting, setAdjusting] = useState(false);
+  // Files that never meet need the setting, so it stays open with the reason.
+  const apart = junctionCount === 0;
+
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Files</CardTitle>
+        <CardTitle>Add your files</CardTitle>
         <CardAction>
           <Button variant="outline" size="sm" onClick={onAdd} disabled={importing}>
             <PlusIcon />
@@ -508,324 +522,453 @@ function FilesCard({
           <p className="text-muted-foreground pt-1">
             Add at least one more file that crosses or shares a road with this one.
           </p>
-        ) : null}
+        ) : (
+          <Collapsible open={adjusting || apart} onOpenChange={setAdjusting}>
+            {apart ? (
+              <Alert variant="warning" className="mt-1">
+                <TriangleAlertIcon />
+                <AlertDescription>
+                  These files never come within {toleranceM} m of each other. Raise the distance
+                  below, or carry on: the route will jump between them in a straight line.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="flex min-h-10 items-center gap-2">
+                <p className="text-muted-foreground min-w-0 flex-1">
+                  {junctionCount} meeting {junctionCount === 1 ? "point" : "points"} found
+                </p>
+                <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+                  <SlidersHorizontalIcon />
+                  {adjusting ? "Done" : "Adjust"}
+                </CollapsibleTrigger>
+              </div>
+            )}
+            <CollapsibleContent className="flex flex-col gap-2 pt-2">
+              <div className="flex items-center justify-between gap-2">
+                <span>Files meet within</span>
+                <span className="text-muted-foreground tabular-nums">{toleranceM} m</span>
+              </div>
+              <Slider
+                aria-label="Meeting distance in metres"
+                value={[toleranceM]}
+                min={TOLERANCE_MIN_M}
+                max={TOLERANCE_MAX_M}
+                step={5}
+                onValueChange={(value) =>
+                  onToleranceChange(Array.isArray(value) ? value[0]! : (value as number))
+                }
+                className="py-2"
+              />
+              <p className="text-muted-foreground">
+                How close two files must pass to count as meeting. Raise it for files drawn on
+                different maps or recorded by different devices.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function MeetingDistanceCard({
-  toleranceM,
-  junctionCount,
-  trackCount,
-  onChange,
+type Place = { value: string; label: string; m: number; stop?: JunctionStop };
+
+const KIND_VERB = { cross: "Crosses", join: "Joins", split: "Leaves" } as const;
+const KIND_NOUN = {
+  cross: "Crossing",
+  join: "Where they join",
+  split: "Where they split",
+} as const;
+
+/** Shows the place matching `m`, or `fallback` when it matches none (fine-tuned by hand). */
+function PlaceSelect({
+  label,
+  places,
+  m,
+  fallback = `km ${(m / 1000).toFixed(1)} (adjusted)`,
+  onPick,
 }: {
-  toleranceM: number;
-  junctionCount: number;
-  trackCount: number;
-  onChange: (value: number) => void;
+  label: string;
+  places: Place[];
+  m: number;
+  fallback?: string;
+  onPick: (place: Place) => void;
 }) {
+  const current = places.find((place) => Math.abs(place.m - m) < SAME_PLACE_M);
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>Meeting distance</CardTitle>
-        <CardAction className="text-muted-foreground tabular-nums">{toleranceM} m</CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <Slider
-          aria-label="Meeting distance in metres"
-          value={[toleranceM]}
-          min={TOLERANCE_MIN_M}
-          max={TOLERANCE_MAX_M}
-          step={5}
-          onValueChange={(value) => onChange(Array.isArray(value) ? value[0]! : (value as number))}
-          className="py-2"
-        />
-        <p className="text-muted-foreground">
-          How close two files must pass to count as meeting. Raise it for files drawn on different
-          maps or recorded by different devices.
-        </p>
-        {trackCount >= 2 ? (
-          junctionCount ? (
-            <p>
-              {junctionCount} meeting {junctionCount === 1 ? "point" : "points"} found. Tap one on
-              the map to switch there.
-            </p>
-          ) : (
-            <Alert variant="warning">
-              <TriangleAlertIcon />
-              <AlertDescription>
-                These files never come within {toleranceM} m of each other. Raise the meeting
-                distance, or merge anyway: legs that don't meet are joined by a straight line.
-              </AlertDescription>
-            </Alert>
-          )
-        ) : null}
-      </CardContent>
-    </Card>
+    <NativeSelect
+      className="min-w-0 flex-1"
+      aria-label={label}
+      value={current?.value ?? "adjusted"}
+      onChange={(event) => {
+        const place = places.find((candidate) => candidate.value === event.target.value);
+        if (place) onPick(place);
+      }}
+    >
+      {current ? null : (
+        <NativeSelectOption value="adjusted" disabled>
+          {fallback}
+        </NativeSelectOption>
+      )}
+      {places.map((place) => (
+        <NativeSelectOption key={place.value} value={place.value}>
+          {place.label}
+        </NativeSelectOption>
+      ))}
+    </NativeSelect>
   );
 }
 
-function LegsCard({
+function RouteCard({
   tracks,
-  plan,
   route,
   junctions,
-  onLegsChange,
-  onSwitch,
-  onAddLeg,
+  toleranceM,
+  onPatch,
+  onTrack,
+  onSwitchAt,
+  onRemove,
+  onAdd,
   onReset,
 }: {
   tracks: GpxMergeTrack[];
-  plan: GpxMergePlan;
   route: MergedRoute;
   junctions: Junction[];
-  onLegsChange: (update: (legs: MergeLeg[]) => MergeLeg[]) => void;
-  onSwitch: (junction: Junction) => void;
-  onAddLeg: () => void;
+  toleranceM: number;
+  onPatch: (id: string, patch: Partial<MergeLeg>) => void;
+  onTrack: (index: number, trackId: string) => void;
+  onSwitchAt: (index: number, stop: JunctionStop) => void;
+  onRemove: (index: number) => void;
+  onAdd: () => void;
   onReset: () => void;
 }) {
-  const update = (id: string, patch: Partial<MergeLeg>) =>
-    onLegsChange((legs) => legs.map((leg) => (leg.id === id ? { ...leg, ...patch } : leg)));
-  const move = (index: number, by: -1 | 1) =>
-    onLegsChange((legs) => {
-      const next = [...legs];
-      const [leg] = next.splice(index, 1);
-      next.splice(index + by, 0, leg!);
-      return next;
-    });
+  const trackOf = (id: string) => tracks.find((track) => track.id === id);
+  const last = route.legs.at(-1);
+  const lastTrack = last ? trackOf(last.trackId) : undefined;
 
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Legs</CardTitle>
+        <CardTitle>Plan your route</CardTitle>
         <CardAction>
           <Button variant="ghost" size="sm" onClick={onReset}>
             <RotateCcwIcon />
-            Suggest
+            Start over
           </Button>
         </CardAction>
+        <CardDescription>
+          Choose where to switch files below, or tap a meeting point on the map.
+        </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {plan.legs.length === 0 ? (
-          <p className="text-muted-foreground">No legs yet. Add one to start the route.</p>
-        ) : null}
-        {plan.legs.map((leg, index) => {
-          const track = tracks.find((candidate) => candidate.id === leg.trackId);
-          const resolved = route.legs.find((candidate) => candidate.id === leg.id);
-          if (!track || !resolved) return null;
-          return (
-            <LegEditor
-              key={leg.id}
-              index={index}
-              count={plan.legs.length}
-              leg={leg}
-              resolved={resolved}
-              track={track}
+      <CardContent className="flex flex-col gap-1">
+        <ol className="flex flex-col">
+          {route.legs.map((leg, index) => {
+            const track = trackOf(leg.trackId);
+            if (!track) return null;
+            const previous = route.legs[index - 1];
+            return (
+              <RouteStep
+                key={leg.id}
+                index={index}
+                leg={leg}
+                track={track}
+                previous={previous}
+                previousTrack={previous ? trackOf(previous.trackId) : undefined}
+                tracks={tracks}
+                junctions={junctions}
+                toleranceM={toleranceM}
+                onPatch={(patch) => onPatch(leg.id, patch)}
+                onTrack={(trackId) => onTrack(index, trackId)}
+                onSwitchAt={(stop) => onSwitchAt(index, stop)}
+                onRemove={index > 0 ? () => onRemove(index) : undefined}
+              />
+            );
+          })}
+          {last && lastTrack ? (
+            <FinishStep
+              leg={last}
+              track={lastTrack}
               tracks={tracks}
-              toleranceM={plan.toleranceM}
-              stops={junctionStops(junctions, leg.trackId)}
-              onChange={(patch) => update(leg.id, patch)}
-              onMove={(by) => move(index, by)}
-              onRemove={() => onLegsChange((legs) => legs.filter((item) => item.id !== leg.id))}
-              onSwitch={onSwitch}
+              junctions={junctions}
+              toleranceM={toleranceM}
+              onPick={(toM) => onPatch(last.id, { toM })}
             />
-          );
-        })}
-        <Button variant="outline" onClick={onAddLeg}>
+          ) : null}
+        </ol>
+        <Button variant="outline" onClick={onAdd}>
           <PlusIcon />
-          Add leg
+          Add a switch
         </Button>
       </CardContent>
     </Card>
   );
 }
 
-function LegEditor({
+/** One file in the route: where it is joined, how far it is followed, and its fine-tuning. */
+function RouteStep({
   index,
-  count,
   leg,
-  resolved,
   track,
+  previous,
+  previousTrack,
   tracks,
+  junctions,
   toleranceM,
-  stops,
-  onChange,
-  onMove,
+  onPatch,
+  onTrack,
+  onSwitchAt,
   onRemove,
-  onSwitch,
 }: {
   index: number;
-  count: number;
-  leg: MergeLeg;
-  resolved: RouteLeg;
+  leg: RouteLeg;
   track: GpxMergeTrack;
+  previous: RouteLeg | undefined;
+  previousTrack: GpxMergeTrack | undefined;
   tracks: GpxMergeTrack[];
+  junctions: Junction[];
   toleranceM: number;
-  stops: JunctionStop[];
-  onChange: (patch: Partial<MergeLeg>) => void;
-  onMove: (by: -1 | 1) => void;
-  onRemove: () => void;
-  onSwitch: (junction: Junction) => void;
+  onPatch: (patch: Partial<MergeLeg>) => void;
+  onTrack: (trackId: string) => void;
+  onSwitchAt: (stop: JunctionStop) => void;
+  onRemove: (() => void) | undefined;
 }) {
   const length = trackLength(track);
-  const linked = leg.linked && index > 0;
-  const low = Math.min(resolved.fromM, resolved.toM);
-  const high = Math.max(resolved.fromM, resolved.toM);
-  // The junction this leg starts from is no place to switch again.
-  const ahead = stops.filter(
-    (stop) =>
-      stop.m > low &&
-      stop.m < high &&
-      Math.abs(stop.m - resolved.fromM) > toleranceM * 2 &&
-      Math.abs(stop.m - resolved.toM) > toleranceM * 2,
-  );
-  if (resolved.toM < resolved.fromM) ahead.reverse();
-  const trackOf = (id: string) => tracks.find((candidate) => candidate.id === id);
+  const direction = legDirection(leg);
+  const nameOf = (id: string) => tracks.find((candidate) => candidate.id === id)?.name ?? "";
+
+  let where: ReactNode;
+  if (!previous || !previousTrack) {
+    // The first file can start at its own start or at any meeting point along it.
+    const places: Place[] = [
+      { value: "start", label: "Start of file", m: 0 },
+      ...junctionStops(junctions, track.id).map((stop) => ({
+        value: stop.junction.id,
+        label: `${KIND_VERB[stop.junction.kind]} ${nameOf(stop.other.trackId)}, km ${(stop.m / 1000).toFixed(1)}`,
+        m: stop.m,
+      })),
+    ];
+    where = (
+      <StepRow label="from">
+        <PlaceSelect
+          label="Where the route starts"
+          places={places}
+          m={leg.fromM}
+          onPick={({ m }) => {
+            // A start past the finish rides on to the file's end instead of turning back.
+            const pastFinish = (leg.toM - m) * direction <= 0;
+            onPatch(pastFinish ? { fromM: m, toM: direction > 0 ? length : 0 } : { fromM: m });
+          }}
+        />
+      </StepRow>
+    );
+  } else {
+    const stops = junctionStops(junctions, previous.trackId).filter(
+      (stop) => stop.other.trackId === track.id,
+    );
+    const ahead = stopsAhead(stops, previous, switchMargin(toleranceM));
+    // The meeting point it switches at now, even when it is no longer ahead.
+    const here = leg.linked
+      ? stops.find((stop) => Math.abs(stop.m - previous.toM) < SAME_PLACE_M)
+      : undefined;
+    const choices = here && !ahead.includes(here) ? [here, ...ahead] : ahead;
+    const places: Place[] = choices.map((stop) => ({
+      value: stop.junction.id,
+      label: `${KIND_NOUN[stop.junction.kind]}, km ${(stop.m / 1000).toFixed(1)}`,
+      m: stop.m,
+      stop,
+    }));
+    where = choices.length ? (
+      <StepRow label="at">
+        <PlaceSelect
+          label={`Where to switch from ${previousTrack.name} to ${track.name}`}
+          places={places}
+          m={leg.linked ? previous.toM : Number.NaN}
+          fallback={
+            leg.linked
+              ? `km ${(previous.toM / 1000).toFixed(1)} (adjusted)`
+              : "Choose a meeting point"
+          }
+          onPick={({ stop }) => stop && onSwitchAt(stop)}
+        />
+      </StepRow>
+    ) : null;
+  }
+
+  const jump = previous && leg.gapM > toleranceM;
 
   return (
-    <section
-      aria-label={`Leg ${index + 1}`}
-      className="flex flex-col gap-3 rounded-lg border p-3"
-      style={{ borderLeftColor: track.color, borderLeftWidth: 4 }}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground shrink-0 font-semibold tabular-nums">
+    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-x-3">
+      <div className="flex flex-col items-center pt-2">
+        <span
+          aria-hidden
+          className="flex size-5 shrink-0 items-center justify-center rounded-full text-[0.625rem] font-semibold text-white"
+          style={{ backgroundColor: track.color }}
+        >
           {index + 1}
         </span>
-        <NativeSelect
-          className="min-w-0 flex-1"
-          aria-label={`Leg ${index + 1} file`}
-          value={leg.trackId}
-          onChange={(event) => {
-            const next = tracks.find((candidate) => candidate.id === event.target.value);
-            if (next) onChange({ trackId: next.id, fromM: 0, toM: trackLength(next) });
-          }}
-        >
-          {tracks.map((option) => (
-            <NativeSelectOption key={option.id} value={option.id}>
-              {option.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label={`Leg ${index + 1} actions`} />
-            }
+        <span
+          aria-hidden
+          className="my-1 w-1 flex-1 rounded-full opacity-60"
+          style={{ backgroundColor: track.color }}
+        />
+      </div>
+      <Collapsible className="flex min-w-0 flex-col gap-2 pb-4">
+        <StepRow label={index === 0 ? "Start on" : "Switch to"}>
+          <NativeSelect
+            className="min-w-0 flex-1"
+            aria-label={index === 0 ? "File the route starts on" : `File to switch to`}
+            value={track.id}
+            onChange={(event) => onTrack(event.target.value)}
           >
-            <EllipsisVerticalIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuItem
-              onClick={() => onChange({ fromM: resolved.toM, toM: resolved.fromM, linked: false })}
+            {tracks.map((option) => (
+              <NativeSelectOption key={option.id} value={option.id}>
+                {option.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </StepRow>
+        {where}
+        {jump && previousTrack ? (
+          <Alert variant="warning">
+            <TriangleAlertIcon />
+            <AlertDescription>
+              {track.name} doesn't meet {previousTrack.name} ahead, so the route jumps{" "}
+              {formatGap(leg.gapM)} in a straight line here.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        <div className="text-muted-foreground flex min-h-8 items-center gap-2">
+          <p className="min-w-0 flex-1">
+            <span className="text-foreground font-medium tabular-nums">
+              {formatKm(leg.distanceM)}
+            </span>{" "}
+            on {track.name}
+            {direction < 0 ? ", ridden backward" : null}
+          </p>
+          <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+            <SlidersHorizontalIcon />
+            Adjust
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
+          {previous && previousTrack && leg.linked ? (
+            <div className="flex items-center gap-2">
+              <Link2Icon aria-hidden className="text-muted-foreground size-4 shrink-0" />
+              <p className="min-w-0 flex-1">Starts where {previousTrack.name} ends</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onPatch({ linked: false, fromM: leg.fromM })}
+              >
+                <Link2OffIcon />
+                Start elsewhere
+              </Button>
+            </div>
+          ) : (
+            <PositionField
+              label="From"
+              valueM={leg.fromM}
+              lengthM={length}
+              onChange={(fromM) => onPatch({ fromM })}
+              action={
+                previous && previousTrack ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Start where ${previousTrack.name} ends`}
+                    onClick={() => onPatch({ linked: true })}
+                  >
+                    <Link2Icon />
+                  </Button>
+                ) : null
+              }
+            />
+          )}
+          <PositionField
+            label="To"
+            valueM={leg.toM}
+            lengthM={length}
+            onChange={(toM) => onPatch({ toM })}
+          />
+          <p className="text-muted-foreground">Positions are km along {track.name}.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPatch({ fromM: leg.toM, toM: leg.fromM, linked: false })}
             >
               <ArrowRightLeftIcon />
               Reverse direction
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={index === 0} onClick={() => onMove(-1)}>
-              <ArrowUpIcon />
-              Move up
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={index === count - 1} onClick={() => onMove(1)}>
-              <ArrowDownIcon />
-              Move down
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={onRemove}>
-              <Trash2Icon />
-              Remove leg
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {linked ? (
-        <div className="flex items-center gap-2">
-          <Link2Icon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-          <p className="min-w-0 flex-1">
-            From <span className="tabular-nums">{formatKm(resolved.fromM)}</span>, where leg {index}{" "}
-            ends
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onChange({ linked: false, fromM: resolved.fromM })}
-          >
-            <Link2OffIcon />
-            Unlink
-          </Button>
-        </div>
-      ) : (
-        <PositionField
-          label="From"
-          valueM={resolved.fromM}
-          lengthM={length}
-          onChange={(fromM) => onChange({ fromM })}
-          action={
-            index > 0 ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Start where leg ${index} ends`}
-                onClick={() => onChange({ linked: true })}
-              >
-                <Link2Icon />
+            </Button>
+            {onRemove ? (
+              <Button variant="ghost" size="sm" className="text-destructive" onClick={onRemove}>
+                <Trash2Icon />
+                Remove this switch
               </Button>
-            ) : null
-          }
-        />
-      )}
-      <PositionField
-        label="To"
-        valueM={resolved.toM}
-        lengthM={length}
-        onChange={(toM) => onChange({ toM })}
-      />
-
-      <p className="text-muted-foreground flex flex-wrap items-center gap-x-2">
-        <span className="text-foreground font-medium tabular-nums">
-          {formatKm(resolved.distanceM)}
-        </span>
-        {resolved.toM < resolved.fromM ? <span>· ridden backward</span> : null}
-        <span>· file is {formatKm(length)}</span>
-      </p>
-
-      {index > 0 && resolved.gapM > toleranceM ? (
-        <Alert variant="warning">
-          <TriangleAlertIcon />
-          <AlertDescription>
-            Starts {formatGap(resolved.gapM)} from the end of leg {index}, joined by a straight
-            line.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-
-      {ahead.length ? (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-muted-foreground">Switch along the way</p>
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-            {ahead.map((stop) => {
-              const other = trackOf(stop.other.trackId);
-              return (
-                <Button
-                  key={stop.junction.id}
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => onSwitch(stop.junction)}
-                >
-                  <span className="tabular-nums">{formatKm(stop.m)}</span>
-                  <ArrowRightLeftIcon />
-                  {other ? <TrackDot color={other.color} className="size-2" /> : null}
-                  <span className="max-w-28 truncate">{other?.name}</span>
-                </Button>
-              );
-            })}
+            ) : null}
           </div>
-        </div>
-      ) : null}
-    </section>
+        </CollapsibleContent>
+      </Collapsible>
+    </li>
+  );
+}
+
+function FinishStep({
+  leg,
+  track,
+  tracks,
+  junctions,
+  toleranceM,
+  onPick,
+}: {
+  leg: RouteLeg;
+  track: GpxMergeTrack;
+  tracks: GpxMergeTrack[];
+  junctions: Junction[];
+  toleranceM: number;
+  onPick: (toM: number) => void;
+}) {
+  const forward = legDirection(leg) > 0;
+  const nameOf = (id: string) => tracks.find((candidate) => candidate.id === id)?.name ?? "";
+  const ahead = stopsAhead(
+    junctionStops(junctions, track.id),
+    { fromM: leg.fromM, toM: leg.toM },
+    switchMargin(toleranceM),
+  );
+  const places: Place[] = [
+    ...ahead.map((stop) => ({
+      value: stop.junction.id,
+      label: `${KIND_VERB[stop.junction.kind]} ${nameOf(stop.other.trackId)}, km ${(stop.m / 1000).toFixed(1)}`,
+      m: stop.m,
+    })),
+    forward
+      ? { value: "end", label: `End of ${track.name}`, m: trackLength(track) }
+      : { value: "end", label: `Start of ${track.name}`, m: 0 },
+  ];
+
+  return (
+    <li className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-x-3 pb-3">
+      <span aria-hidden className="flex size-5 items-center justify-center">
+        <span className="bg-ds-gray-1000 block size-3.5 rounded-full border-2 border-white shadow" />
+      </span>
+      <StepRow label="Finish at">
+        <PlaceSelect
+          label="Where the route finishes"
+          places={places}
+          m={leg.toM}
+          onPick={({ m }) => onPick(m)}
+        />
+      </StepRow>
+    </li>
+  );
+}
+
+function StepRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-muted-foreground w-16 shrink-0">{label}</span>
+      {children}
+    </div>
   );
 }
 
@@ -909,7 +1052,7 @@ function KmInput({
   );
 }
 
-function ExportCard({
+function DownloadCard({
   tracks,
   plan,
   route,
@@ -955,7 +1098,7 @@ function ExportCard({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Merged route</CardTitle>
+        <CardTitle>Download</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <Input
@@ -980,8 +1123,9 @@ function ExportCard({
           <Alert variant="warning">
             <TriangleAlertIcon />
             <AlertDescription>
-              {jumps.length === 1 ? "One leg doesn't" : `${jumps.length} legs don't`} meet the leg
-              before. The file joins them with a straight line.
+              The route jumps in a straight line{" "}
+              {jumps.length === 1 ? "once" : `${jumps.length} times`} where files don't meet. Check
+              it on the map before riding it.
             </AlertDescription>
           </Alert>
         ) : null}

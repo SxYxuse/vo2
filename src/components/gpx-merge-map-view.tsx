@@ -6,7 +6,12 @@ import type { LineLayerSpecification } from "maplibre-gl";
 import { ArrowRightLeftIcon } from "lucide-react";
 
 import { boundsOf, type LngLat } from "@/services/activity-map.types.ts";
-import type { GpxPoint, Junction, MergedRoute } from "@/services/gpx-merge.ts";
+import {
+  legPassing,
+  type GpxPoint,
+  type Junction,
+  type MergedRoute,
+} from "@/services/gpx-merge.ts";
 import type { GpxMergeTrack } from "@/lib/gpx-merge-draft.ts";
 import { Button } from "@/components/ui/button";
 import {
@@ -163,6 +168,14 @@ export function GpxMergeMapView({
   }, [route]);
 
   const finish = route.points.at(-1);
+  // Which file a tap on the selected meeting point leaves, and which it joins.
+  const passing = selected ? route.legs[legPassing(route, selected)] : undefined;
+  const leaving =
+    passing && selected
+      ? [selected.a, selected.b].find((side) => side.trackId === passing.trackId)
+      : undefined;
+  const joining =
+    leaving && selected ? (leaving === selected.a ? selected.b : selected.a) : undefined;
   const gapPaint = useMemo(
     () => ({
       "line-color": resolveThemeColor("var(--color-ds-red-700)"),
@@ -261,20 +274,53 @@ export function GpxMergeMapView({
                 <span className="text-muted-foreground ml-auto tabular-nums">{km(side.m)}</span>
               </p>
             ))}
-            <Button
-              size="sm"
-              onClick={() => {
-                onSwitch(selected);
-                setSelected(null);
-              }}
-            >
-              <ArrowRightLeftIcon />
-              Switch here
-            </Button>
+            {joining ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  onSwitch(selected);
+                  setSelected(null);
+                }}
+              >
+                <ArrowRightLeftIcon />
+                <span className="truncate">Switch to {trackById.get(joining.trackId)?.name}</span>
+              </Button>
+            ) : (
+              <p className="text-muted-foreground">Your route doesn't pass here.</p>
+            )}
           </div>
         </MapPopup>
       ) : null}
+      <MapLegend jumps={gaps.features.length > 0} />
       <MapControls showZoom showFullscreen position="bottom-right" />
     </MapView>
+  );
+}
+
+/** What the markers mean, since the map is where meeting points are picked. */
+function MapLegend({ jumps }: { jumps: boolean }) {
+  return (
+    <div className="bg-background/90 pointer-events-none absolute top-2 left-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 text-[0.6875rem] shadow-sm">
+      <span className="flex items-center gap-1">
+        <span className="bg-background block size-2.5 rounded-full border-2 border-ds-gray-1000" />
+        Meeting point, tap to switch
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="bg-ds-gray-700 flex size-3.5 items-center justify-center rounded-full text-[0.5rem] font-semibold text-white">
+          1
+        </span>
+        Start, then each switch
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="bg-ds-gray-1000 block size-2.5 rounded-full" />
+        Finish
+      </span>
+      {jumps ? (
+        <span className="flex items-center gap-1">
+          <span className="border-ds-red-700 block w-3 border-t-2 border-dashed" />
+          Straight jump
+        </span>
+      ) : null}
+    </div>
   );
 }

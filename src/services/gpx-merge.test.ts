@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  addLeg,
   buildMergedRoute,
+  changeLegTrack,
   findJunctions,
+  junctionStops,
   makeTrack,
   parseGpx,
+  removeLeg,
   sliceTrack,
+  stopsAhead,
   suggestLegs,
   switchAtJunction,
   toGpx,
@@ -213,6 +218,80 @@ describe("switchAtJunction", () => {
       [{ id: "1", trackId: "a", fromM: 0, toM: 500, linked: false }],
     );
     expect(switchAtJunction(route, [a, b], junctions[0]!, newId)).toBeNull();
+  });
+});
+
+describe("leg editing", () => {
+  // a runs east and crosses b at 1 km and c at 2 km; b and c never meet.
+  const a = track("a", at(0, 0), at(3000, 0));
+  const b = track("b", at(1000, -1000), at(1000, 1000));
+  const c = track("c", at(2000, -1000), at(2000, 1000));
+  const tracks = [a, b, c];
+  const junctions = [...findJunctions(a, b, 20), ...findJunctions(a, c, 20)];
+  const whole = { id: "1", trackId: "a", fromM: 0, toM: trackLength(a), linked: false };
+
+  it("lists meeting points ahead in riding order", () => {
+    const stops = junctionStops(junctions, "a");
+    const forward = stopsAhead(stops, { fromM: 0, toM: 3000 }, 40);
+    expect(forward.map((stop) => stop.other.trackId)).toEqual(["b", "c"]);
+    const backward = stopsAhead(stops, { fromM: 3000, toM: 0 }, 40);
+    expect(backward.map((stop) => stop.other.trackId)).toEqual(["c", "b"]);
+    // The one a leg starts from is skipped.
+    expect(stopsAhead(stops, { fromM: 1000, toM: 3000 }, 40)).toHaveLength(1);
+  });
+
+  it("switches to a new track where it meets the leg before", () => {
+    const route = buildMergedRoute(tracks, [
+      whole,
+      { id: "2", trackId: "b", fromM: 0, toM: trackLength(b), linked: false },
+    ]);
+    const legs = changeLegTrack(route, 1, "c", tracks, junctions, 40);
+    expect(legs[0]!.toM).toBeCloseTo(2000, -1);
+    expect(legs[1]).toMatchObject({ id: "2", trackId: "c", linked: true, toM: trackLength(c) });
+    expect(legs[1]!.fromM).toBeCloseTo(1000, -1);
+  });
+
+  it("jumps to a new track that never meets the leg before", () => {
+    const route = buildMergedRoute(tracks, [
+      { id: "1", trackId: "b", fromM: 0, toM: trackLength(b), linked: false },
+      { id: "2", trackId: "a", fromM: 0, toM: trackLength(a), linked: true },
+    ]);
+    const legs = changeLegTrack(route, 1, "c", tracks, junctions, 40);
+    expect(legs[0]!.toM).toBe(trackLength(b));
+    expect(legs[1]).toMatchObject({ trackId: "c", fromM: 0, linked: false });
+  });
+
+  it("adds a leg at the next meeting point ahead", () => {
+    const route = buildMergedRoute(tracks, [whole]);
+    const legs = addLeg(route, tracks, junctions, 40, newId);
+    expect(legs).toHaveLength(2);
+    expect(legs[0]!.toM).toBeCloseTo(1000, -1);
+    expect(legs[1]).toMatchObject({ trackId: "b", linked: true, toM: trackLength(b) });
+  });
+
+  it("adds a jump to the next track when nothing is ahead", () => {
+    const route = buildMergedRoute(tracks, [{ ...whole, fromM: 2500 }]);
+    const legs = addLeg(route, tracks, junctions, 40, newId);
+    expect(legs[1]).toMatchObject({ trackId: "b", fromM: 0, linked: false });
+  });
+
+  it("rides the leg before to its end when the last leg is removed", () => {
+    const route = buildMergedRoute(tracks, [
+      { ...whole, toM: 1000 },
+      { id: "2", trackId: "b", fromM: 1000, toM: trackLength(b), linked: true },
+    ]);
+    expect(removeLeg(route, 1, tracks)).toEqual([{ ...whole, toM: trackLength(a) }]);
+  });
+
+  it("links the leg after one that is removed", () => {
+    const route = buildMergedRoute(tracks, [
+      { ...whole, toM: 1000 },
+      { id: "2", trackId: "b", fromM: 1000, toM: 1500, linked: true },
+      { id: "3", trackId: "c", fromM: 0, toM: trackLength(c), linked: false },
+    ]);
+    const legs = removeLeg(route, 1, tracks);
+    expect(legs.map((leg) => leg.id)).toEqual(["1", "3"]);
+    expect(legs[1]!.linked).toBe(true);
   });
 });
 
