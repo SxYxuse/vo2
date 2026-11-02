@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchServerSentEvents, indexedDBPersistence, useChat } from "@tanstack/ai-react";
-import type { UIMessage } from "@tanstack/ai-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
+import type { ConnectionAdapter, UIMessage } from "@tanstack/ai-react";
 import {
   ActivityIcon,
   CalendarSearchIcon,
@@ -22,9 +23,11 @@ import {
   TrendingUpIcon,
   TrophyIcon,
   WavesIcon,
+  WifiOffIcon,
   type LucideIcon,
 } from "lucide-react";
 
+import { CoachChatList } from "@/components/coach-chat-list.tsx";
 import { CoachComposer, type MentionableActivity } from "@/components/coach-composer.tsx";
 import { CoachMarkdown, type ActivityLookup } from "@/components/coach-markdown.tsx";
 import { CoachVisual } from "@/components/coach-visual.tsx";
@@ -36,22 +39,10 @@ import {
 import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
 import { applyPlanChangeDef } from "@/services/coach-tools.ts";
-import { homeQueryOptions } from "@/lib/queries.ts";
+import { coachChatQueryKey, coachChatsQueryOptions, homeQueryOptions } from "@/lib/queries.ts";
 import { isSportTypeShown, sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { coachErrorMessage } from "@/lib/coach-errors.ts";
-import { COACH_DATABASE } from "@/lib/coach-storage.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
@@ -351,47 +342,37 @@ function useMentionableActivities() {
   }, [data]);
 }
 
-function NewChatButton({ onConfirm, disabled }: { onConfirm: () => void; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant="outline" size="sm" disabled={disabled} />}>
-        <SquarePenIcon />
-        New chat
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Start a new chat?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This deletes the conversation with the coach on this device. It cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={() => {
-              onConfirm();
-              setOpen(false);
-            }}
-          >
-            Delete and start over
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+/**
+ * Loads the chat from the server (TanStack AI hydration). Offline, it shows the copy saved the
+ * last time this chat was open, so the installed app still reads it with no signal (ADR 0031).
+ */
+function coachConnection(queryClient: QueryClient): ConnectionAdapter {
+  const server = fetchServerSentEvents("/api/coach");
+  return {
+    ...server,
+    async hydrate(threadId, options) {
+      try {
+        return await server.hydrate!(threadId, options);
+      } catch (error) {
+        const saved = queryClient.getQueryData<UIMessage[]>(coachChatQueryKey(threadId));
+        if (!saved) throw error;
+        return { messages: saved, activeRun: null, interrupts: null };
+      }
+    },
+  };
 }
 
 /**
- * The coach chat: one conversation, kept in this browser so it reopens where it was left and
- * still reads offline.
+ * One coach chat. The server keeps it, so the athlete can reopen it later from Chats on any
+ * device; the one open last also reads offline.
  */
 export function CoachChat({
+  threadId,
   initialActivityId,
   onInitialActivitySent,
   planChange = false,
 }: {
+  threadId: string;
   initialActivityId?: string;
   onInitialActivitySent: () => void;
   /** Opened from "Ask the coach to change my plan": offer plan changes to start with. */
@@ -399,9 +380,9 @@ export function CoachChat({
 }) {
   const online = useOnline();
   const { shown, byId } = useMentionableActivities();
-  const [persistence] = useState(() => indexedDBPersistence({ databaseName: COACH_DATABASE }));
   const coach = useCoachAvailable();
-  const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
+  const queryClient = useQueryClient();
+  const [connection] = useState(() => coachConnection(queryClient));
   const {
     messages,
     sendMessage,
@@ -409,15 +390,17 @@ export function CoachChat({
     error,
     stop,
     reload,
-    clear,
     isHydrating,
     interrupts,
     resuming,
   } = useChat({
     connection,
-    // One chat per device: sign-out deletes it, so the next athlete starts fresh.
-    threadId: "coach",
-    persistence,
+    threadId,
+    // Server-authoritative: the transcript is loaded from and saved on the server.
+    persistence: true,
+    // A new chat appears in Chats, and an older one moves to the top.
+    onFinish: () =>
+      void queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey }),
     forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
     // The approval the coach asks for on a plan change binds to this definition.
     tools: [applyPlanChangeDef],
@@ -428,6 +411,16 @@ export function CoachChat({
     const activity = initialActivityId ? byId.get(initialActivityId) : undefined;
     return activity ? [activity] : [];
   }, [byId, initialActivityId]);
+
+  // Keep only the chat open now for offline reading, so the saved copy stays small.
+  useEffect(() => {
+    if (isLoading || isHydrating || !messages.length) return;
+    queryClient.removeQueries({
+      queryKey: ["coach-chat"],
+      predicate: (query) => query.queryKey[1] !== threadId,
+    });
+    queryClient.setQueryData(coachChatQueryKey(threadId), messages);
+  }, [isHydrating, isLoading, messages, queryClient, threadId]);
 
   const lastQuestionId = messages.filter((message) => message.role === "user").at(-1)?.id;
 
@@ -453,11 +446,37 @@ export function CoachChat({
           <SparklesIcon aria-hidden className="size-5" />
           Coach
         </h1>
-        <NewChatButton onConfirm={clear} disabled={!messages.length || isLoading} />
+        <div className="flex items-center gap-2">
+          <CoachChatList currentId={threadId} />
+          {messages.length ? (
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link to="/coach" search={{}} />}
+            >
+              <SquarePenIcon />
+              New chat
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {empty && needsKey ? (
+        {empty && error ? (
+          // Loading the chat failed: offline and never opened here, or the server didn't answer.
+          <Empty className="flex-1">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <WifiOffIcon />
+              </EmptyMedia>
+              <EmptyTitle>This chat didn't load</EmptyTitle>
+              <EmptyDescription>
+                {online ? coachErrorMessage(error) : "It opens once you're back online."}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : empty && needsKey ? (
           <CoachKeyPrompt>
             The coach answers on your own OpenRouter key. Add it once to ask about your training.
           </CoachKeyPrompt>

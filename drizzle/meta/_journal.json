@@ -260,6 +260,13 @@
       "when": 1793606075516,
       "tag": "0036_drop_activity_analyses",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793610977610,
+      "tag": "0037_coach_chats",
+      "breakpoints": true
     }
   ]
 }

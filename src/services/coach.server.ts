@@ -5,6 +5,7 @@ import {
   maxIterations,
   toServerSentEventsResponse,
 } from "@tanstack/ai";
+import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
@@ -23,6 +24,8 @@ import {
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { isBestEfforts } from "./best-efforts.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
+import { NOTE_THREAD_PREFIX } from "./coach-chats.ts";
+import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts";
 import { mockCoachText } from "./coach-mock.ts";
 import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
 import {
@@ -356,6 +359,10 @@ export async function handleCoachChat(request: Request) {
   ]);
   if (coach.kind === "missing") return coachKeyMissing();
   const params = await chatParamsFromRequest(request);
+  const saved = !params.threadId.startsWith(NOTE_THREAD_PREFIX);
+  if (saved && (await chatOwnedByOther(session.user.id, params.threadId))) {
+    return new Response("Not found", { status: 404 });
+  }
   const timeZone = validTimeZone(params.forwardedProps.timeZone);
   const adapter = coach.kind === "mock" ? mockCoachText() : coach.adapter;
   const coachPlan = style === "coachPlan";
@@ -382,7 +389,24 @@ export async function handleCoachChat(request: Request) {
       todayLine(timeZone),
     ],
     agentLoopStrategy: maxIterations(12),
+    // The server keeps the chat, so the athlete can reopen it later on any device.
+    // Snapshots while streaming keep what the coach had said if the athlete leaves mid-reply.
+    middleware: saved
+      ? [withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true })]
+      : [],
   });
 
   return toServerSentEventsResponse(stream);
+}
+
+/** A chat as last saved, for the app to show when it opens it (TanStack AI hydration). */
+export async function handleCoachChatHistory(request: Request) {
+  const session = await getOptionalSession();
+  if (!session) return new Response("Unauthorized", { status: 401 });
+  const { messages, interrupts } = coachChatPersistence(session.user.id).stores;
+  // No run store: the reply streams only to the request that asked, so a reload has no run to
+  // join. A pending plan change is still offered again.
+  return reconstructChat(defineAIPersistence({ stores: { messages, interrupts } }), request, {
+    authorize: async (threadId) => !(await chatOwnedByOther(session.user.id, threadId)),
+  });
 }

@@ -189,7 +189,7 @@ The athlete's own OpenRouter key, which every coach feature runs on. It is saved
 _Avoid_: API key, token, BYOK key
 
 **Coach chat**:
-The one ongoing conversation between the athlete and the coach. It is kept on the device it happened on and still reads offline; starting a new chat deletes it.
+A conversation between the athlete and the coach. The server keeps every chat, so the athlete reopens or deletes any of them from **Chats** on any device; the one opened last still reads offline. Starting a new chat keeps the others.
 _Avoid_: Thread, session (that is planned training), conversation history
 
 **Training week**:

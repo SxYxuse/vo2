@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SendIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NOTE_THREAD_PREFIX } from "@/services/coach-chats.ts";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -24,7 +25,7 @@ const noActivity = () => undefined;
 export function NoteReply({ message }: { message: string }) {
   const online = useOnline();
   const [connection] = useState(() => fetchServerSentEvents("/api/coach"));
-  const [threadId] = useState(() => `plan-note-${crypto.randomUUID()}`);
+  const [threadId] = useState(() => `${NOTE_THREAD_PREFIX}${crypto.randomUUID()}`);
   const { messages, sendMessage, isLoading, error, interrupts, resuming } = useChat({
     connection,
     threadId,
