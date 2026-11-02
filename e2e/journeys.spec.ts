@@ -43,7 +43,7 @@ test("a model picked for a coach feature stays picked on every visit", async ({ 
   await expect(page.getByRole("combobox", { name: "Coach chat" })).toHaveValue(
     "anthropic/claude-sonnet-5.5",
   );
-  await expect(page.getByRole("combobox", { name: "Activity analysis" })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Coach notes" })).toHaveValue(
     "openai/gpt-6-luna",
   );
   // Back to the default, so the other specs see the athlete as the setup left them.
@@ -621,23 +621,8 @@ test("an athlete changes the coach plan from the chat and from a note on a day",
   }
 });
 
-// The mock coach answers without a key, so these prove the client and server still speak the
-// same stream after a TanStack AI upgrade. "Long run" keeps the screenshot activity unanalyzed.
-test("an athlete analyzes an activity and the analysis stays with it", async ({ page }) => {
-  await page.goto("/");
-  await settle(page);
-  // One week on a phone, a month on desktop: the last long run is in the one before either way.
-  await page.getByRole("button", { name: /^Previous / }).click();
-  await page.locator("[data-event-id]").filter({ hasText: "Long run" }).first().click();
-  await expect(page.getByRole("heading", { name: "Long run", level: 1 })).toBeVisible();
-
-  await page.getByRole("button", { name: /^Analyze/ }).click();
-  await expect(page.getByText(/^By Mock coach, saved/)).toBeVisible({ timeout: 30_000 });
-
-  await page.reload();
-  await expect(page.getByText(/^By Mock coach, saved/)).toBeVisible();
-});
-
+// The mock coach answers without a key, so this proves the client and server still speak the
+// same stream after a TanStack AI upgrade.
 test("an athlete asks the coach a question and gets an answer", async ({ page }) => {
   await page.goto("/coach");
   await page.getByRole("button", { name: "How did my last run go?" }).click();

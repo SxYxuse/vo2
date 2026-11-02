@@ -38,12 +38,6 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const ActivityAnalysisCard = lazy(() =>
-  import("@/components/activity-analysis.tsx").then((mod) => ({
-    default: mod.ActivityAnalysisCard,
-  })),
-);
-
 const ActivityStreamCharts = lazy(() =>
   import("@/components/activity-detail-charts.tsx").then((mod) => ({
     default: mod.ActivityStreamCharts,
@@ -136,9 +130,6 @@ function ActivityDetailBody({
       )}
       {detail.heart ? <ActivityHeartAnalysis heart={detail.heart} start={detail.start} /> : null}
       {detail.ride ? <ActivityRideAnalysis ride={detail.ride} /> : null}
-      <Suspense fallback={<Skeleton className="h-48 w-full rounded-lg" />}>
-        <ActivityAnalysisCard activityId={detail.id} hasStreams={detail.hasStreams} />
-      </Suspense>
     </div>
   );
 }
@@ -215,8 +206,6 @@ export function ActivityDetailView({
   diary?: ActivitySearch;
 } & MapState) {
   useEffect(() => {
-    void import("@/components/activity-analysis.tsx");
-    void import("@/components/activity-analysis-live.tsx");
     void import("@/components/activity-detail-charts.tsx");
   }, []);
 

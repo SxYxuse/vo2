@@ -177,16 +177,12 @@ What the athlete tells the coach about a day: a quick choice (can't train, short
 _Avoid_: Comment, feedback, journal
 
 **Coach**:
-The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan, reads coach notes, and writes activity analyses. It runs only on the athlete's OpenRouter key.
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan and reads coach notes. It runs only on the athlete's OpenRouter key.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:
-One of the four things the coach does: activity analysis, reading coach notes in the athlete's own words, coach chat, and writing the coach plan. The athlete picks the model for each one. Quick-choice coach notes are not a coach feature: they need no model.
+One of the three things the coach does: reading coach notes in the athlete's own words, coach chat, and writing the coach plan. The athlete picks the model for each one. Quick-choice coach notes are not a coach feature: they need no model.
 _Avoid_: AI feature
-
-**Activity analysis**:
-The coach's written reading of one activity, saved with the model that wrote it.
-_Avoid_: Summary, insight, AI analysis
 
 **OpenRouter key**:
 The athlete's own OpenRouter key, which every coach feature runs on. It is saved with the athlete's account, so it works on every device, and is never shown again once saved; without it, no coach feature runs.

@@ -24,7 +24,6 @@ import { Route as AppSeasonRouteImport } from './routes/_app.season'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppWeekRouteImport } from './routes/_app.week'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
-import { Route as ApiActivityAnalysisRouteImport } from './routes/api/activity-analysis'
 import { Route as ApiCoachRouteImport } from './routes/api/coach'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
@@ -109,11 +108,6 @@ const AppWeekBucketRoute = AppWeekBucketRouteImport.update({
   path: '/week-bucket',
   getParentRoute: () => AppRoute,
 } as any)
-const ApiActivityAnalysisRoute = ApiActivityAnalysisRouteImport.update({
-  id: '/api/activity-analysis',
-  path: '/api/activity-analysis',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiCoachRoute = ApiCoachRouteImport.update({
   id: '/api/coach',
   path: '/api/coach',
@@ -175,7 +169,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRouteWithChildren
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
-  '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/api/coach': typeof ApiCoachRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
@@ -199,7 +192,6 @@ export interface FileRoutesByTo {
   '/season': typeof AppSeasonRoute
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
-  '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/api/coach': typeof ApiCoachRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
@@ -227,7 +219,6 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/week': typeof AppWeekRoute
   '/_app/week-bucket': typeof AppWeekBucketRoute
-  '/api/activity-analysis': typeof ApiActivityAnalysisRoute
   '/api/coach': typeof ApiCoachRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
@@ -256,7 +247,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/week'
     | '/week-bucket'
-    | '/api/activity-analysis'
     | '/api/coach'
     | '/activities/$activityId'
     | '/settings/$section'
@@ -280,7 +270,6 @@ export interface FileRouteTypes {
     | '/season'
     | '/week'
     | '/week-bucket'
-    | '/api/activity-analysis'
     | '/api/coach'
     | '/'
     | '/activities/$activityId'
@@ -307,7 +296,6 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/week'
     | '/_app/week-bucket'
-    | '/api/activity-analysis'
     | '/api/coach'
     | '/_app/'
     | '/_app/activities/$activityId'
@@ -324,7 +312,6 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
   SignInRoute: typeof SignInRoute
-  ApiActivityAnalysisRoute: typeof ApiActivityAnalysisRoute
   ApiCoachRoute: typeof ApiCoachRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiMockStravaSplatRoute: typeof ApiMockStravaSplatRoute
@@ -437,13 +424,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/week-bucket'
       preLoaderRoute: typeof AppWeekBucketRouteImport
       parentRoute: typeof AppRoute
-    }
-    '/api/activity-analysis': {
-      id: '/api/activity-analysis'
-      path: '/api/activity-analysis'
-      fullPath: '/api/activity-analysis'
-      preLoaderRoute: typeof ApiActivityAnalysisRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/coach': {
       id: '/api/coach'
@@ -567,7 +547,6 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
   SignInRoute: SignInRoute,
-  ApiActivityAnalysisRoute: ApiActivityAnalysisRoute,
   ApiCoachRoute: ApiCoachRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiMockStravaSplatRoute: ApiMockStravaSplatRoute,

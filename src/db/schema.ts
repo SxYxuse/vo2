@@ -52,24 +52,6 @@ export const activities = pgTable(
   (table) => [index("activities_user_start_idx").on(table.userId, table.startDate)],
 );
 
-export const activityAnalyses = pgTable(
-  "activity_analyses",
-  {
-    activityId: text("activity_id")
-      .primaryKey()
-      .references(() => activities.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
-    mocked: boolean("mocked").notNull().default(false),
-    model: text("model"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [index("activity_analyses_user_idx").on(table.userId)],
-);
-
 export const activityStreams = pgTable("activity_streams", {
   activityId: text("activity_id")
     .primaryKey()

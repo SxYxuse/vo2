@@ -19,7 +19,7 @@ export function handleStravaWebhookRequest(request: Request) {
         await removeAthlete(userId);
         logger.info("athlete.deleted_on_strava", { userId });
       },
-      // Streams, analyses and top-effort celebrations cascade from the activity row.
+      // Streams and top-effort celebrations cascade from the activity row.
       removeActivity: async (stravaAthleteId, activityId) => {
         const userId = await userIdForStravaAthlete(stravaAthleteId);
         if (!userId) return;

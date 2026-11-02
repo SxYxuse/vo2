@@ -1,6 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
 
-import { getActivityAnalysis } from "@/services/activity-analysis.ts";
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
@@ -134,15 +133,6 @@ export const coachStatusQueryOptions = queryOptions({
   queryFn: () => getCoachStatus(),
   staleTime: 60_000,
 });
-
-export function activityAnalysisQueryOptions(activityId: string) {
-  return queryOptions({
-    queryKey: ["activity-analysis", activityId] as const,
-    queryFn: () => getActivityAnalysis({ data: { activityId } }),
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
-  });
-}
 
 export function activityDetailQueryOptions(id: string) {
   return queryOptions({

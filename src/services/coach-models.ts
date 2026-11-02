@@ -6,11 +6,6 @@ export const OPENROUTER = "openrouter";
 /** The things the coach does that need a model (ADR 0036). */
 export const COACH_FEATURES = [
   {
-    id: "analysis",
-    label: "Activity analysis",
-    hint: "Reads one activity's streams and writes up the session.",
-  },
-  {
     id: "notes",
     label: "Coach notes",
     hint: "Reads what you write about a day into the week plan.",
@@ -30,8 +25,7 @@ export const COACH_FEATURES = [
 export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
 
 /**
- * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (analysis,
- * chat) and structured JSON output (notes, plan writing), so any of them runs every coach feature.
+ * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (chat) and structured JSON output (notes, plan writing), so any of them runs every coach feature.
  */
 export const COACH_MODELS = [
   { id: "openai/gpt-6-luna", label: "GPT-6 Luna", hint: "OpenAI · quick and cheap" },
@@ -63,7 +57,6 @@ const DEFAULT_PLAN_MODEL: CoachModelId = "anthropic/claude-opus-5.5";
 const coachModelSchema = z.string().min(1).catch(DEFAULT_COACH_MODEL);
 
 export const coachModelsSchema = z.object({
-  analysis: coachModelSchema.default(DEFAULT_COACH_MODEL),
   notes: coachModelSchema.default(DEFAULT_COACH_MODEL),
   chat: coachModelSchema.default(DEFAULT_COACH_MODEL),
   plan: z.string().min(1).catch(DEFAULT_PLAN_MODEL).default(DEFAULT_PLAN_MODEL),
@@ -72,7 +65,6 @@ export const coachModelsSchema = z.object({
 export type CoachModels = z.infer<typeof coachModelsSchema>;
 
 export const DEFAULT_COACH_MODELS: CoachModels = {
-  analysis: DEFAULT_COACH_MODEL,
   notes: DEFAULT_COACH_MODEL,
   chat: DEFAULT_COACH_MODEL,
   plan: DEFAULT_PLAN_MODEL,
@@ -82,7 +74,7 @@ export function isCoachModel(id: string): id is CoachModelId {
   return COACH_MODELS.some((model) => model.id === id);
 }
 
-/** Saved analyses keep the id of whatever wrote them, including models no longer listed. */
+/** A stored choice keeps its id, including models no longer listed. */
 export function coachModelLabel(id: string) {
   if (id === "mock") return "Mock coach";
   return COACH_MODELS.find((model) => model.id === id)?.label ?? id;

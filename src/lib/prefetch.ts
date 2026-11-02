@@ -3,7 +3,6 @@ import { noop } from "@tanstack/react-query";
 import type { RegisteredRouter } from "@tanstack/react-router";
 
 import {
-  activityAnalysisQueryOptions,
   activityDetailQueryOptions,
   coachStatusQueryOptions,
   settingsSnapshotQueryOptions,
@@ -54,7 +53,6 @@ export function warmApp(router: RegisteredRouter, queryClient: QueryClient) {
 export function prefetchActivityDetail(queryClient: QueryClient, id: string) {
   if (!id) return;
   void queryClient.query(activityDetailQueryOptions(id)).catch(noop);
-  void queryClient.query(activityAnalysisQueryOptions(id)).catch(noop);
 }
 
 export function prefetchActivityDetails(queryClient: QueryClient, ids: string[]) {
@@ -67,7 +65,6 @@ export function prefetchActivityDetails(queryClient: QueryClient, ids: string[])
       cursor += 1;
       if (!id) continue;
       await queryClient.query(activityDetailQueryOptions(id)).catch(noop);
-      void queryClient.query(activityAnalysisQueryOptions(id)).catch(noop);
     }
   };
   void Promise.all(Array.from({ length: Math.min(PREFETCH_BATCH, unique.length) }, () => worker()));
