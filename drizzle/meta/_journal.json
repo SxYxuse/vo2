@@ -253,6 +253,13 @@
       "when": 1793535318170,
       "tag": "0035_pace_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793606075516,
+      "tag": "0036_drop_activity_analyses",
+      "breakpoints": true
     }
   ]
 }

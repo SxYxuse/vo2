@@ -51,8 +51,8 @@ export function SettingsDeleteAthlete() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete your VO2 data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes your copied activities and streams, analyses, training plan, and
-              settings, and disconnects VO2 from Strava. It cannot be undone.
+              This removes your copied activities and streams, training plan, and settings, and
+              disconnects VO2 from Strava. It cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deletion.isError ? (
