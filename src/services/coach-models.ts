@@ -45,10 +45,11 @@ export const COACH_MODELS = [
 
 export type CoachModelId = (typeof COACH_MODELS)[number]["id"];
 
+/**
+ * Every feature starts here, plan writing too: it rewrites up to four weeks, so a strong default
+ * there is the expensive one. A plan model already stored stays (ADR 0036).
+ */
 export const DEFAULT_COACH_MODEL: CoachModelId = "openai/gpt-6-luna";
-
-/** Plan writing has the longest prompt and the strictest rules, so it starts on the strongest. */
-const DEFAULT_PLAN_MODEL: CoachModelId = "anthropic/claude-opus-5.5";
 
 /**
  * Stored as chosen: a model later dropped from the list keeps running and shows as no longer
@@ -59,7 +60,7 @@ const coachModelSchema = z.string().min(1).catch(DEFAULT_COACH_MODEL);
 export const coachModelsSchema = z.object({
   notes: coachModelSchema.default(DEFAULT_COACH_MODEL),
   chat: coachModelSchema.default(DEFAULT_COACH_MODEL),
-  plan: z.string().min(1).catch(DEFAULT_PLAN_MODEL).default(DEFAULT_PLAN_MODEL),
+  plan: coachModelSchema.default(DEFAULT_COACH_MODEL),
 });
 
 export type CoachModels = z.infer<typeof coachModelsSchema>;
@@ -67,7 +68,7 @@ export type CoachModels = z.infer<typeof coachModelsSchema>;
 export const DEFAULT_COACH_MODELS: CoachModels = {
   notes: DEFAULT_COACH_MODEL,
   chat: DEFAULT_COACH_MODEL,
-  plan: DEFAULT_PLAN_MODEL,
+  plan: DEFAULT_COACH_MODEL,
 };
 
 export function isCoachModel(id: string): id is CoachModelId {
