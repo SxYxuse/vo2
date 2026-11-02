@@ -42,6 +42,7 @@
     "@tanstack/ai-openrouter": "^1.0.0",
     "@tanstack/ai-persistence": "1.0.0",
     "@tanstack/ai-react": "^1.0.0",
+    "@tanstack/ai-skills": "1.0.0",
     "@tanstack/markdown": "^0.0.13",
     "@tanstack/query-persist-client-core": "5.104.3",
     "@tanstack/react-devtools": "0.10.13",

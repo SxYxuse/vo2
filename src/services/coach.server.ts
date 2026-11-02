@@ -6,6 +6,11 @@ import {
   toServerSentEventsResponse,
 } from "@tanstack/ai";
 import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
+import { inlineSkill, withSkills } from "@tanstack/ai-skills";
+
+import paces from "@/coaching/running/paces.md?raw";
+import principles from "@/coaching/running/principles.md?raw";
+import sessions from "@/coaching/running/sessions.md?raw";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
@@ -61,6 +66,32 @@ import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
 import { loadWeekCoachImpl } from "./week-coach.server.ts";
 
 type CoachRuntime = { userId: string; timeZone: string };
+
+/**
+ * The running knowledge the plan writer reads whole, loaded by the chat only when a question needs
+ * it: about 4,300 words would tax every message. Portable skills run on the athlete's OpenRouter
+ * model; hosted provider skills need Anthropic's or OpenAI's sandbox.
+ */
+const RUNNING_SKILLS = [
+  inlineSkill({
+    name: "running-principles",
+    description:
+      "How VO2 builds a running week: the rules every coach plan is checked against, week templates by runs per week, intensity, the long run, season phases, missed sessions, and B and C races. Load before explaining how a week is built or proposing a plan change.",
+    instructions: principles,
+  }),
+  inlineSkill({
+    name: "running-paces",
+    description:
+      "The five running training paces: where VO2's paces come from, what each is for, how much running at each, and when to target an effort instead. Load before explaining a pace or how hard a session is.",
+    instructions: paces,
+  }),
+  inlineSkill({
+    name: "running-sessions",
+    description:
+      "The running sessions VO2 writes (easy, recovery, long, tempo, cruise intervals, intervals, repetitions, race pace, fartlek, hills, progression), their step format, and how to size them by level and goal. Load before explaining a session or writing one in a plan change.",
+    instructions: sessions,
+  }),
+];
 
 const DAY_MS = 86_400_000;
 const MAX_FITNESS_DAYS = 180;
@@ -391,9 +422,12 @@ export async function handleCoachChat(request: Request) {
     agentLoopStrategy: maxIterations(12),
     // The server keeps the chat, so the athlete can reopen it later on any device.
     // Snapshots while streaming keep what the coach had said if the athlete leaves mid-reply.
-    middleware: saved
-      ? [withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true })]
-      : [],
+    middleware: [
+      withSkills(RUNNING_SKILLS),
+      ...(saved
+        ? [withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true })]
+        : []),
+    ],
   });
 
   return toServerSentEventsResponse(stream);
