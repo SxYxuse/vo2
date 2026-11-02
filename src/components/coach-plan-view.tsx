@@ -118,7 +118,7 @@ function chipBar(run: PlannedRun | undefined, status: string | null) {
   if (!run) return "bg-muted";
   if (status === "done") return "bg-success";
   if (status === "missed") return "bg-destructive";
-  return run.key ? "bg-ds-amber-900" : "bg-ds-amber-500";
+  return "bg-ds-amber-500";
 }
 
 function DayStrip({
@@ -192,7 +192,6 @@ function RunSummary({
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight">
           {run.title}
-          {run.key ? <Badge variant="info">Key</Badge> : null}
           {status === "done" ? <Badge variant="success">Done</Badge> : null}
           {status === "missed" ? <Badge variant="destructive">Missed</Badge> : null}
         </h2>

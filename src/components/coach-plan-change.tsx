@@ -83,7 +83,6 @@ function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
       </span>
       <span className="text-muted-foreground text-xs">
         {sessionKindLabel(side.kind)} · {side.distanceKm} km · about {side.minutes} min
-        {side.key ? " · key" : ""}
       </span>
       {side.steps.map((line, index) => (
         <span key={index} className="text-muted-foreground text-xs">

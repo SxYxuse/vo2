@@ -153,8 +153,6 @@ const blockSchema = z.object({
 export const writtenSessionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   kind: z.enum(SESSION_KIND_IDS),
-  /** The week's key sessions: the quality sessions and the long run. */
-  key: z.boolean(),
   title: z.string().min(1).max(80),
   why: z.string().min(1).max(300),
   blocks: z.array(blockSchema).min(1).max(10),
@@ -204,8 +202,6 @@ export type PlanBasis = {
    * have none, and are not rewritten for it.
    */
   easy?: { from: EasyFrom; secPerKm: number } | null;
-  /** Key sessions already found missed, so each rewrites the plan once. */
-  missed: string[];
 };
 
 export type CoachPlan = {

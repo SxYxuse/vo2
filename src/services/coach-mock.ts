@@ -92,7 +92,6 @@ function easierRun(session: MockSession): WrittenSession {
   return {
     date: session.date,
     kind: "easy",
-    key: false,
     title: `${km} km easy`,
     why: "Shorter and easy, so the day stays light.",
     blocks: [

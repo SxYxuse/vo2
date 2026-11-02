@@ -138,7 +138,6 @@ const sideOf = (session: PlannedRun | undefined): ChangeSide =>
     ? {
         title: session.title,
         kind: session.kind,
-        key: session.key,
         distanceKm: session.distanceKm,
         minutes: session.minutes,
         steps: sessionLines(session),
@@ -173,7 +172,6 @@ export async function coachPlanForCoach(userId: string) {
         }),
         status: done.has(session.id) ? "done" : session.date < inputs.today ? "missed" : "planned",
         kind: session.kind,
-        key: session.key,
         title: session.title,
         why: session.why,
         distanceKm: session.distanceKm,

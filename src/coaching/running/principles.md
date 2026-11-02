@@ -59,7 +59,7 @@ VO2 tells you each week's phase. Shape the sessions to it (guidance):
 
 ## Missed sessions and changes
 
-- A missed session, easy or key, is skipped (rule 8). When VO2 rewrites the plan after a missed key session, write the following days as if it had not been planned: never squeeze its work into them.
+- A missed session is skipped (rule 8): never squeeze its work into the following days.
 - After a short break (up to about three weeks), rebuild over about the same time as the break, with half the hard work at first. After a longer break, restart from easy running and VO2's floor. Guidance ([Outside](https://www.outsideonline.com/health/running/training-advice/running-101/short-break-training?scope=anon), [Laura Norris](https://lauranorrisrunning.com/how-to-start-running-again-after-time-off/)).
 - Illness: fever, chest symptoms, or feeling unwell all over mean rest. When the athlete reports pain that changes their stride, or pain that worsens during a run, write easy running only and suggest they see a professional.
 

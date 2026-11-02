@@ -153,7 +153,6 @@ export function mockCoachPlan(
         sessions.push({
           date,
           kind: "tempo",
-          key: true,
           title: `${work} km at threshold`,
           why: "Threshold running raises the pace you can hold for about an hour.",
           blocks: [
@@ -173,7 +172,6 @@ export function mockCoachPlan(
       sessions.push({
         date,
         kind: long ? "long" : "easy",
-        key: long,
         title: long ? `${km} km long run` : `${km} km easy`,
         why: long
           ? "The long run builds the endurance your race needs."

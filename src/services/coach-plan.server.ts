@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq, gte, lt, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, coachPlans, syncRuns } from "@/db/schema.ts";
+import { activities, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
@@ -79,7 +79,7 @@ async function readRow(userId: string): Promise<Row | null> {
 
 /** Everything the plan is checked and written from, read fresh. */
 export async function gather(userId: string, now = new Date()) {
-  const [row, style, goals, coach, paces, rows, [sync]] = await Promise.all([
+  const [row, style, goals, coach, paces, rows] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
     goalsFor(userId),
@@ -101,11 +101,6 @@ export async function gather(userId: string, now = new Date()) {
           gte(activities.startDate, new Date(now.getTime() - HISTORY_DAYS * 86_400_000)),
         ),
       ),
-    db
-      .select({ status: syncRuns.status, updatedAt: syncRuns.updatedAt })
-      .from(syncRuns)
-      .where(eq(syncRuns.userId, userId))
-      .limit(1),
   ]);
   const timeZone = row?.timeZone ?? "UTC";
   const today = dayKey(now, timeZone);
@@ -129,12 +124,6 @@ export async function gather(userId: string, now = new Date()) {
     now,
     today,
     currentWeek: weekStartKey(now, timeZone),
-    // A sync that copied the newest activities, paused or not finished with the oldest ones:
-    // runs on the days before the day it ended are in the local copy.
-    syncedDay:
-      sync && (sync.status === "complete" || sync.status === "incomplete")
-        ? dayKey(sync.updatedAt, timeZone)
-        : null,
     availability: row ? parseAvailability(row.availability) : null,
     aGoal: coachPlanGoal(goals, today),
     plan: (row?.plan as CoachPlan | null) ?? null,
@@ -232,27 +221,11 @@ function upcomingGoalsKey(goals: unknown, today: string) {
 const vdotPoint = (vdot: number | null) => (vdot == null ? null : Math.floor(vdot));
 
 function basisOf(inputs: Inputs): PlanBasis {
-  const done = matchOf(inputs);
-  // A key session is missed only once a sync ended after its day: before that its run may just
-  // not be copied yet (the app-open sync, a sync paused on Strava's limits).
-  const { syncedDay } = inputs;
-  const missed = (inputs.plan?.weeks ?? [])
-    .flatMap((week) => week.sessions)
-    .filter(
-      (session) =>
-        session.key &&
-        session.date < inputs.today &&
-        syncedDay != null &&
-        session.date < syncedDay &&
-        !done.has(session.id),
-    )
-    .map((session) => session.id);
   return {
     availability: JSON.stringify(inputs.availability),
     goals: planGoals(inputs.goals, inputs.today),
     vdot: vdotOf(inputs),
     easy: easyOf(inputs),
-    missed,
   };
 }
 
@@ -272,8 +245,8 @@ type Due = {
 
 /**
  * Whether the weeks ahead need writing, and from which day: the first plan; the athlete asked
- * (switching back to the coach plan); availability, goals, or paces changed; a key session was
- * missed; or a new week is due. Days before it are frozen.
+ * (switching back to the coach plan); availability, goals, or paces changed; or a new week is
+ * due. A missed run is skipped, never a reason to write. Days before it are frozen.
  */
 /**
  * Whether the easy pace alone moved enough to rewrite. An easy pace read from the VDOT moves with
@@ -318,8 +291,6 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (easyChanged(plan.basis.easy, basis.easy)) {
     return { from: first, reason: "easy pace", trigger: easyStep(basis.easy) };
   }
-  const missed = basis.missed.filter((id) => !plan.basis.missed.includes(id));
-  if (missed.length) return { from: first, reason: "missed", trigger: missed };
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
@@ -452,7 +423,6 @@ function raceSession(goal: Goal): PlannedRun {
     {
       date: goal.date,
       kind: "race",
-      key: true,
       title: goal.name,
       why: `Your ${goal.priority} race.`,
       blocks: [
