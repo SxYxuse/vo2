@@ -7,6 +7,7 @@ import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import type { ConnectionAdapter, UIMessage } from "@tanstack/ai-react";
 import {
   ActivityIcon,
+  BookOpenIcon,
   CalendarSearchIcon,
   ChartLineIcon,
   FlagIcon,
@@ -135,6 +136,11 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
     running: "Reading your coach plan",
     done: "Read your coach plan",
     icon: TargetIcon,
+  },
+  load_skill: {
+    running: "Reading the running guide",
+    done: "Read the running guide",
+    icon: BookOpenIcon,
   },
   propose_plan_change: {
     running: "Checking a change against your plan's rules",
