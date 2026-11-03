@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { formatPaceClock } from "./locomotion.ts";
-import type { PhaseKind } from "./season-phase.ts";
+import type { PhaseKind, SeasonWeek } from "./season-phase.ts";
 import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 import type { Goal } from "./season.types.ts";
 import {
@@ -284,8 +284,10 @@ export type CoachPlanState = {
   status: CoachPlanStatus;
   /** Why the last writing failed, in words for the athlete. */
   error: string | null;
-  /** The weeks from this one to the A goal, with their season phase. */
-  road: { weekStart: string; phase: PhaseKind }[];
+  /** The season week by week, from this one through the last goal ahead. */
+  road: SeasonWeek[];
+  /** The goals ahead, every sport, in date order. */
+  goals: Goal[];
   /** The VDOT of the athlete's training paces, for the predicted race time. */
   vdot: number | null;
 };

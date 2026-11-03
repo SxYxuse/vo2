@@ -117,7 +117,7 @@ How much a goal matters, and what the athlete races it for: A to perform (the pl
 _Avoid_: Main goal, importance, objective
 
 **Season**:
-The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. The season map shows each week's phase and expected hours through the last goal.
+The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. Plan shows the season week by week through the last goal, with each week's phase, the written weeks, and what the plan does for each goal ahead (ADR 0050).
 _Avoid_: Calendar, year, block
 
 **Phase**:
@@ -129,7 +129,7 @@ Every fourth week before the peak, counted back from the goal: 70 % of the usual
 _Avoid_: Rest week, deload, recovery (that follows a goal)
 
 **Guardrail**:
-A limit on how fast load grows: the season map never projects more than 10 % above the last four weeks' average load, eases off when form is low, and holds for two weeks after an A goal. The coach plan's budgets have their own caps per sport (ADR 0037, ADR 0050).
+A limit on how fast load grows: the fitness chart's race-day projection never grows more than 10 % above the last four weeks' average load, eases off when form is low, and holds for two weeks after an A goal. The coach plan's budgets have their own caps per sport (ADR 0037, ADR 0050).
 _Avoid_: Cap, safety limit
 
 **Session status**:

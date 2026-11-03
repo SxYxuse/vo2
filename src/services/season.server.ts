@@ -5,11 +5,9 @@ import { activities, coachPlans, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
-import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
-import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { predictsRaceTime } from "./training-paces.types.ts";
-import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
+import { addDayKey, dayKey } from "./day-key.ts";
 import {
   LEG_SEPARATOR,
   goalSportTypes,
@@ -71,21 +69,6 @@ async function matchPastActivities(
   });
 }
 
-/** Load per hour when the athlete has too little recent history to read their own. */
-const DEFAULT_LOAD_PER_HOUR = 42;
-
-/** The athlete's load per hour over recent days, to turn the season map's load into hours. */
-function recentLoadPerHour(history: { minutes: number; load: number }[]) {
-  let minutes = 0;
-  let load = 0;
-  for (const day of history) {
-    minutes += day.minutes;
-    load += day.load;
-  }
-  if (minutes < 120 || load <= 0) return DEFAULT_LOAD_PER_HOUR;
-  return Math.min(90, Math.max(25, load / (minutes / 60)));
-}
-
 /** The time zone saved with the coach plan's availability, else UTC. */
 export async function athleteTimeZone(userId: string) {
   const [row] = await db
@@ -94,45 +77,6 @@ export async function athleteTimeZone(userId: string) {
     .where(eq(coachPlans.userId, userId))
     .limit(1);
   return row?.timeZone ?? "UTC";
-}
-
-/** Fitness now and the last four weeks' loads, for the season map. */
-export async function seasonContext(userId: string, timeZone: string, weekStart: string) {
-  const rows = await db
-    .select({
-      startDate: activities.startDate,
-      movingTime: activities.movingTime,
-      trainingLoad: activities.trainingLoad,
-      loadSource: activities.loadSource,
-    })
-    .from(activities)
-    .where(eq(activities.userId, userId));
-  const pmc = buildPmc(
-    rows.map((row) =>
-      toFitnessLoad(
-        row.startDate,
-        row.trainingLoad ?? 0,
-        row.loadSource ?? "duration",
-        row.movingTime,
-      ),
-    ),
-    timeZone,
-  );
-  const beforeWeek = [...pmc].reverse().find((point) => point.date < weekStart);
-  const days = rows.map((row) => ({
-    date: dayKey(row.startDate, timeZone),
-    minutes: Math.round(row.movingTime / 60),
-    load: row.trainingLoad ?? 0,
-  }));
-  const weekLoads = weekLoadsBefore(days, weekStart);
-  const history = days.filter(
-    (day) => day.date < weekStart && day.date >= addDayKey(weekStart, -7 * 8),
-  );
-  return {
-    fitness: beforeWeek ? { ctl: beforeWeek.ctl, atl: beforeWeek.atl } : { ctl: 0, atl: 0 },
-    weekLoads,
-    loadPerHour: recentLoadPerHour(history),
-  };
 }
 
 export async function loadSeasonImpl(): Promise<SeasonData> {
@@ -144,7 +88,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
       today: dayKey(new Date(), "UTC"),
       upcoming: [],
       past: [],
-      map: [],
     };
   }
   const userId = session.user.id;
@@ -155,7 +98,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
   ]);
   const now = new Date();
   const today = dayKey(now, timeZone);
-  const weekStart = weekStartKey(now, timeZone);
   const past = all
     .filter((goal) => goal.date < today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
@@ -163,24 +105,10 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
   const predicts = upcoming.some((event) =>
     event.goals.some((goal) => predictsRaceTime(goal.sportType) && goal.distanceM != null),
   );
-  const [matched, context, paces] = await Promise.all([
+  const [matched, paces] = await Promise.all([
     matchPastActivities(userId, past, timeZone),
-    upcoming.length ? seasonContext(userId, timeZone, weekStart) : null,
     predicts ? trainingPacesFor(userId, now) : null,
   ]);
-
-  let map: SeasonData["map"] = [];
-  if (context) {
-    const last = upcoming.at(-1)!.date;
-    map = projectSeason(context.fitness, all, weekStart, addDayKey(last, 7), context.weekLoads).map(
-      (week) => ({
-        weekStart: week.weekStart,
-        kind: week.phase.kind,
-        lighter: week.phase.lighter,
-        hours: Math.round((week.load / context.loadPerHour) * 10) / 10,
-      }),
-    );
-  }
 
   return {
     signedIn: true,
@@ -188,7 +116,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     today,
     upcoming,
     past: matched.reverse(),
-    map,
     ...(paces ? { vdot: paces.source === "none" ? null : paces.vdot } : {}),
   };
 }

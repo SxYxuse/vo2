@@ -63,6 +63,7 @@ import {
 import { loadHeartRateImpl } from "./heart-rate.server.ts";
 import { loadBestsForUser } from "./personal-bests.server.ts";
 import { topEfforts, type BestsPeriod } from "./personal-bests.ts";
+import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
 import { loadFitnessDataImpl } from "./training-load.server.ts";
 import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
@@ -338,11 +339,13 @@ function createCoachTools(coachPlan: boolean) {
     }),
     getSeasonDef.server<CoachRuntime>(async () => {
       const season = await loadSeasonImpl();
+      const goals = season.upcoming.flatMap((event) => event.goals);
+      const last = season.upcoming.at(-1)?.date;
       return {
         today: season.today,
         upcoming: season.upcoming,
         past: season.past,
-        weeks: season.map,
+        weeks: last ? seasonWeeks(goals, season.today, last) : [],
       };
     }),
     getAthleteProfileDef.server<CoachRuntime>(async (_input, { context }) => {

@@ -46,9 +46,8 @@ import {
   predictRaceSeconds,
   predictsRaceTime,
 } from "@/services/training-paces.types.ts";
-import { PhaseBadge, PriorityBadge, SeasonMap, phaseOutlook } from "@/components/season-map.tsx";
+import { PriorityBadge } from "@/components/season-badges.tsx";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -145,7 +144,6 @@ export function SeasonView({ data }: { data: SeasonData }) {
   const [editing, setEditing] = useState<Editing>(null);
   const [pasting, setPasting] = useState(false);
   const open = (goal: Goal | null) => setEditing({ goal });
-  const outlook = phaseOutlook(data.map);
   const allGoals = [...data.upcoming.flatMap((event) => event.goals), ...data.past];
 
   async function copy() {
@@ -195,7 +193,8 @@ export function SeasonView({ data }: { data: SeasonData }) {
             </EmptyMedia>
             <EmptyTitle>No goals ahead</EmptyTitle>
             <EmptyDescription>
-              Add the races and events of your season. Without one, the plan holds your fitness.
+              Add the races and events of your season. Without one, the coach plan holds your
+              fitness.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -207,25 +206,6 @@ export function SeasonView({ data }: { data: SeasonData }) {
         </Empty>
       ) : (
         <>
-          {data.map.length ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2">
-                  Season map
-                  {data.map[0] ? (
-                    <PhaseBadge kind={data.map[0].kind} lighter={data.map[0].lighter} />
-                  ) : null}
-                </CardTitle>
-                <CardDescription>
-                  {outlook}. Bars are the weekly hours if you hit each target; tap one to see its
-                  week.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SeasonMap weeks={data.map} events={data.upcoming} />
-              </CardContent>
-            </Card>
-          ) : null}
           <section className="flex flex-col gap-3" aria-label="Upcoming goals">
             {data.upcoming.map((event) => (
               <EventCard key={event.date} event={event} data={data} onEdit={open} />
@@ -236,7 +216,8 @@ export function SeasonView({ data }: { data: SeasonData }) {
             build, peak, and taper. <span className="text-foreground font-medium">B</span> races are
             to finish well, with lighter days before them.{" "}
             <span className="text-foreground font-medium">C</span> races are to finish, trained
-            through like a hard session. Tap a goal to change it.
+            through like a hard session. Tap a goal to change it. The coach plan's weeks toward them
+            are on Plan.
           </p>
         </>
       )}

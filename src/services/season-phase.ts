@@ -300,38 +300,15 @@ export function mondayOf(key: string) {
   return addDayKey(key, -((weekday + 6) % 7));
 }
 
-export type ProjectedWeek = {
-  weekStart: string;
-  phase: SeasonPhase;
-  load: number;
-  /** Fitness and fatigue at the start of the week. */
-  ctl: number;
-  atl: number;
-};
+/** One week of the season: its phase, and whether it is a lighter week. */
+export type SeasonWeek = { weekStart: string; phase: PhaseKind; lighter: boolean };
 
-/**
- * Week targets from `fromWeek` through `toWeek` if the athlete hits every one, load spread evenly
- * over the days. The guardrails apply as they would each Monday. A guide, not a prediction.
- */
-export function projectSeason(
-  fitness: { ctl: number; atl: number },
-  goals: Goal[],
-  fromWeek: string,
-  toWeek: string,
-  recentWeekLoads: number[] = [],
-): ProjectedWeek[] {
-  let { ctl, atl } = fitness;
-  const loads = [...recentWeekLoads];
-  const weeks: ProjectedWeek[] = [];
-  for (let week = mondayOf(fromWeek); week <= toWeek; week = addDayKey(week, 7)) {
+/** The season week by week, from the week of `fromDay` through the week of `toDay`. */
+export function seasonWeeks(goals: Goal[], fromDay: string, toDay: string): SeasonWeek[] {
+  const weeks: SeasonWeek[] = [];
+  for (let week = mondayOf(fromDay); week <= toDay; week = addDayKey(week, 7)) {
     const phase = seasonPhase(goals, week);
-    const { load } = phaseWeekLoad(phase, { ctl, atl }, rampBaseLoad(loads));
-    weeks.push({ weekStart: week, phase, load, ctl, atl });
-    for (let day = 0; day < 7; day += 1) {
-      ctl += (load / 7 - ctl) / CTL_DAYS;
-      atl += (load / 7 - atl) / ATL_DAYS;
-    }
-    loads.push(load);
+    weeks.push({ weekStart: week, phase: phase.kind, lighter: phase.lighter });
   }
   return weeks;
 }

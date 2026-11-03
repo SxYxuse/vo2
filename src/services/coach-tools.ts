@@ -103,7 +103,7 @@ export const getPersonalBestsDef = toolDefinition({
 export const getSeasonDef = toolDefinition({
   name: "get_season",
   description:
-    "The athlete's goals (upcoming and past, with priority) and each coming week's phase and expected hours.",
+    "The athlete's goals (upcoming and past, with priority) and each coming week's phase through the last goal.",
   inputSchema: z.object({}),
 });
 

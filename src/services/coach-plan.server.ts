@@ -39,7 +39,7 @@ import {
   type PlannedSession,
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
-import { mondayOf, seasonPhase } from "./season-phase.ts";
+import { mondayOf, seasonWeeks } from "./season-phase.ts";
 import { goalsFor } from "./season.server.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
@@ -191,18 +191,16 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   return missing;
 }
 
-/** The weeks from this one to the A race, each with its season phase. */
+/** The goals still ahead, in date order. */
+const upcomingOf = (inputs: Inputs) =>
+  inputs.goals
+    .filter((goal) => goal.date >= inputs.today)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+
+/** The season week by week, from this one through the last goal ahead. */
 function roadOf(inputs: Inputs) {
-  if (!inputs.aGoal) return [];
-  const road = [];
-  for (
-    let week = inputs.currentWeek;
-    week <= mondayOf(inputs.aGoal.date);
-    week = addDayKey(week, 7)
-  ) {
-    road.push({ weekStart: week, phase: seasonPhase(inputs.goals, week).kind });
-  }
-  return road;
+  const last = upcomingOf(inputs).at(-1)?.date;
+  return last ? seasonWeeks(inputs.goals, inputs.currentWeek, last) : [];
 }
 
 /** Goals the plan is written around: upcoming runs and rides, and every upcoming A goal. */
@@ -345,6 +343,7 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
     plan: readCoachPlan(row?.plan),
     ...statusOf(row, inputs.now),
     road: roadOf(inputs),
+    goals: upcomingOf(inputs),
     vdot: vdotOf(inputs),
   };
 }
@@ -637,6 +636,7 @@ const SIGNED_OUT: CoachPlanState = {
   status: "idle",
   error: null,
   road: [],
+  goals: [],
   vdot: null,
 };
 

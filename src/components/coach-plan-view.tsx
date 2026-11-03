@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { format, parseISO } from "date-fns";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -15,20 +14,17 @@ import { useOnline } from "@/hooks/use-online.ts";
 import { useWeekSwipe } from "@/hooks/use-week-swipe.ts";
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
-import { formatDuration } from "@/services/activity-detail.types.ts";
 import { writeCoachPlanAgain } from "@/services/coach-plan.ts";
 import {
   minutesText,
-  planSportOf,
   sessionKindLabel,
   type CoachPlanState,
   type PlanWeek,
   type PlannedSession,
 } from "@/services/coach-plan.types.ts";
-import { PHASES, mondayOf, type PhaseKind } from "@/services/season-phase.ts";
-import { daysBetween } from "@/services/season.types.ts";
-import { canPredict, predictRaceSeconds } from "@/services/training-paces.types.ts";
+import { PHASES, mondayOf } from "@/services/season-phase.ts";
 import { CoachWeekNote } from "@/components/coach-week-note.tsx";
+import { PlanSeason, weekTotals } from "@/components/coach-plan-season.tsx";
 import { CoachPlanMissingAlert } from "@/components/coach-plan-setup.tsx";
 import {
   DoneToggle,
@@ -43,23 +39,9 @@ import { Spinner } from "@/components/ui/spinner";
 
 /*
  * The Plan view for coach-plan athletes: the week shown with arrows to the other written weeks,
- * its runs and rides as one unordered list (ADR 0048: no day, no order), and the road to the A
- * goal. On desktop the road sits beside the week.
+ * its runs and rides as one unordered list (ADR 0048: no day, no order), and the plan against the
+ * season (coach-plan-season.tsx). On desktop the season sits beside the week.
  */
-
-/** "24 km of running · 4 h 30 of riding", leaving out a sport the week doesn't hold. */
-function weekTotals(week: PlanWeek) {
-  const runs = week.sessions.filter((session) => session.sport === "run");
-  const rides = week.sessions.filter((session) => session.sport === "ride");
-  const km = Math.round(runs.reduce((sum, run) => sum + run.distanceKm, 0));
-  const minutes = rides.reduce((sum, ride) => sum + ride.minutes, 0);
-  return [
-    runs.length ? `${km} km running` : null,
-    rides.length ? `${minutesText(Math.round(minutes / 5) * 5)} riding` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 function PlanStatus({ state }: { state: CoachPlanState }) {
   const online = useOnline();
@@ -245,92 +227,6 @@ function WeekHeader({
   );
 }
 
-const PHASE_COLOR: Partial<Record<PhaseKind, string>> = {
-  base: "bg-ds-amber-500",
-  build: "bg-ds-amber-700",
-  peak: "bg-ds-amber-900",
-  taper: "bg-info",
-  race: "bg-info",
-};
-
-/** "Base now, build from 3 Aug, peak from 7 Sep, taper from 21 Sep." */
-function phaseText(road: CoachPlanState["road"]) {
-  const parts: string[] = [];
-  road.forEach((week, index) => {
-    if (index > 0 && road[index - 1].phase === week.phase) return;
-    const label = PHASES[week.phase].label;
-    parts.push(
-      index === 0
-        ? `${label} now`
-        : `${label.toLowerCase()} from ${format(parseISO(week.weekStart), "d MMM")}`,
-    );
-  });
-  return `${parts.join(", ")}.`;
-}
-
-function RoadToRace({ state, weeks }: { state: CoachPlanState; weeks: PlanWeek[] }) {
-  const goal = state.aGoal;
-  if (!goal) return null;
-  const weeksLeft = Math.max(0, Math.floor(daysBetween(mondayOf(state.today), goal.date) / 7));
-  const written = new Set(weeks.map((week) => week.weekStart));
-  // Race times are predicted from running paces only.
-  const running = planSportOf(goal.sportType) === "run";
-  const predicted =
-    running && state.vdot != null && goal.distanceM != null && canPredict(goal.distanceM)
-      ? formatDuration(predictRaceSeconds(state.vdot, goal.distanceM))
-      : null;
-  return (
-    <section
-      aria-labelledby="road"
-      className="flex flex-col gap-2 border-t pt-4 lg:border-t-0 lg:pt-0"
-    >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="road" className="font-semibold">
-          {goal.name}
-        </h2>
-        <span className="text-muted-foreground text-sm">
-          {format(parseISO(goal.date), "d MMM")},{" "}
-          {weeksLeft === 0 ? "this week" : `in ${weeksLeft} week${weeksLeft === 1 ? "" : "s"}`}
-        </span>
-      </div>
-      {state.road.length ? (
-        <>
-          <div aria-hidden className="flex h-5 items-end gap-0.5">
-            {state.road.map((week, index) => (
-              <i
-                key={week.weekStart}
-                className={cn(
-                  "block flex-1 rounded-[2px]",
-                  PHASE_COLOR[week.phase] ?? "bg-muted-foreground",
-                  written.has(week.weekStart) ? "h-5" : "h-3.5 opacity-50",
-                  index === 0 && "outline-info outline-2 outline-offset-1",
-                )}
-              />
-            ))}
-          </div>
-          <p className="text-muted-foreground text-sm">
-            {phaseText(state.road)} The raised weeks are written.
-          </p>
-        </>
-      ) : null}
-      {running ? (
-        <p className="flex flex-wrap items-baseline gap-x-2">
-          {predicted ? (
-            <>
-              <span className="text-xl font-semibold tracking-tight tabular-nums">{predicted}</span>
-              <span className="text-muted-foreground text-sm">predicted today</span>
-            </>
-          ) : (
-            <span className="text-muted-foreground text-sm">
-              No predicted time yet: it needs recent runs or a race result.
-            </span>
-          )}
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 export function CoachPlanView({ week: shown }: { week?: string }) {
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
@@ -410,7 +306,12 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:sticky lg:top-4">
-              <RoadToRace state={state} weeks={weeks} />
+              <PlanSeason
+                state={state}
+                weeks={weeks}
+                shown={week.weekStart}
+                onShow={(weekStart) => void show(weekStart)}
+              />
               <Button
                 variant="outline"
                 className="min-h-11 w-full"
