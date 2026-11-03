@@ -9,11 +9,11 @@ export function isVersionOnlyBump(
   after: Record<string, unknown>,
 ): boolean {
   if (before.version === after.version) return false;
-  const rest = (pkg: Record<string, unknown>) => {
+  const withoutVersion = (pkg: Record<string, unknown>) => {
     const { version: _version, ...others } = pkg;
     return JSON.stringify(others);
   };
-  return rest(before) === rest(after);
+  return withoutVersion(before) === withoutVersion(after);
 }
 
 // CLI: `bun scripts/release-check.ts <before.json> <after.json>` exits 1 unless

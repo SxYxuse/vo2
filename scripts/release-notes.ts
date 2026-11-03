@@ -16,16 +16,16 @@ export function releaseBody({ summary, notes }: { summary: string | null; notes:
 export async function summarizeRelease({
   apiKey,
   notes,
-  fetchFn = fetch,
 }: {
   apiKey: string | undefined;
   notes: string;
-  fetchFn?: (url: string, init: RequestInit) => Promise<Response>;
 }): Promise<string | null> {
   if (!apiKey) return null;
 
-  const response = await fetchFn(OPENROUTER_URL, {
+  const response = await fetch(OPENROUTER_URL, {
     method: "POST",
+    // A hung model call must not hold the release until the job times out.
+    signal: AbortSignal.timeout(30_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
