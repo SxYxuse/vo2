@@ -1,48 +1,27 @@
 "use client";
 
-import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
-import { ChevronRightIcon, FlagIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { cn } from "cn";
 
-import {
-  formatDistanceKm,
-  formatDuration,
-  formatElevation,
-} from "@/services/activity-detail.types.ts";
-import {
-  minutesText,
-  planSportOf,
-  sessionsPerWeek,
-  type CoachPlanState,
-  type PlanWeek,
-} from "@/services/coach-plan.types.ts";
+import { minutesText, type CoachPlanState, type PlanWeek } from "@/services/coach-plan.types.ts";
 import { PHASES, mondayOf, type SeasonWeek } from "@/services/season-phase.ts";
 import {
   daysBetween,
   eventPriority,
-  eventTitle,
-  legLabel,
   seasonEvents,
-  type Goal,
   type SeasonEvent,
 } from "@/services/season.types.ts";
-import { sportGroupFor } from "@/services/sport-groups.ts";
-import { canPredict, predictRaceSeconds } from "@/services/training-paces.types.ts";
 import { weekLabel } from "@/components/coach-run.tsx";
-import { Dot, PhaseBadge, PriorityBadge } from "@/components/season-badges.tsx";
+import { Dot, PhaseBadge } from "@/components/season-badges.tsx";
 import { LEGEND_PHASES, PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
-import { SPORT_STYLE } from "@/components/sport-style.ts";
 
 /*
  * The coach plan against the season, beside the week on Plan: the season week by week through
- * the last goal (phase colours, the written weeks raised, goals marked by priority), the four
- * written weeks with what each holds, and the goals ahead with what the plan does for each. It
- * replaces the Season page's map, which projected hours the coach plan's budgets didn't keep.
+ * the last goal (phase colours, the written weeks raised, goals marked by priority), and the four
+ * written weeks with what each holds. It replaces the Season page's map, which projected hours
+ * the coach plan's budgets didn't keep.
  */
-
-/** How many goals ahead are listed; the rest are on Season. */
-const GOALS_SHOWN = 5;
 
 /** "17 km running · 5 h 20 riding", leaving out a sport the week doesn't hold. */
 export function weekTotals(week: PlanWeek) {
@@ -72,11 +51,6 @@ export function phaseText(road: SeasonWeek[]) {
   });
   return parts.length ? `${parts.join(", ")}.` : "";
 }
-
-const weeksAway = (today: string, date: string) => {
-  const weeks = Math.floor(daysBetween(mondayOf(today), date) / 7);
-  return weeks <= 0 ? "this week" : `in ${weeks} week${weeks === 1 ? "" : "s"}`;
-};
 
 /** The season's weeks as bars: colour is the phase, raised weeks are written, dots are goals. */
 function SeasonStrip({
@@ -216,89 +190,7 @@ function WrittenWeeks({
   );
 }
 
-/** What the coach plan does for a goal, in words. */
-function treatment(goal: Goal, state: CoachPlanState) {
-  const sport = planSportOf(goal.sportType);
-  if (!sport) return "Not planned: the coach plan writes runs and rides.";
-  if (state.availability && sessionsPerWeek(state.availability, sport) === 0) {
-    return `No ${sport === "ride" ? "rides" : "runs"} planned a week: add some in Settings.`;
-  }
-  if (goal.id === state.aGoal?.id) {
-    const predicted =
-      sport === "run" && state.vdot != null && goal.distanceM != null && canPredict(goal.distanceM)
-        ? ` · ${formatDuration(predictRaceSeconds(state.vdot, goal.distanceM))} predicted`
-        : "";
-    return `The plan builds to it: build, peak, and taper${predicted}.`;
-  }
-  if (goal.priority === "A") return "The next build, once the A goal before it is done.";
-  if (goal.priority === "B") return "Raced to finish well, with easy sessions before it.";
-  return "Trained through, as that week's hard session.";
-}
-
-function GoalsAhead({ state }: { state: CoachPlanState }) {
-  const events = seasonEvents(state.goals);
-  if (!events.length) return null;
-  const shown = events.slice(0, GOALS_SHOWN);
-  return (
-    <section aria-labelledby="goals-ahead" className="flex flex-col gap-2">
-      <h3 id="goals-ahead" className="text-sm font-medium">
-        Goals ahead
-      </h3>
-      <ul className="bg-card ring-foreground/10 flex flex-col overflow-hidden rounded-lg ring-1">
-        {shown.map((event) => (
-          <li
-            key={event.date}
-            className="border-foreground/10 flex flex-col gap-1 border-t px-3 py-2 first:border-t-0"
-          >
-            <div className="flex items-center gap-2">
-              <PriorityBadge priority={eventPriority(event)} />
-              <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                {eventTitle(event)}
-              </span>
-              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                {format(parseISO(event.date), "d MMM")}, {weeksAway(state.today, event.date)}
-              </span>
-            </div>
-            {event.goals.map((goal) => {
-              const group = sportGroupFor(goal.sportType)?.id;
-              const Icon = group ? SPORT_STYLE[group].icon : FlagIcon;
-              const leg = legLabel(goal, event);
-              const facts = [
-                leg ?? (group ? SPORT_STYLE[group].label : goal.sportType),
-                goal.distanceM != null ? formatDistanceKm(goal.distanceM) : null,
-                goal.elevationGainM ? `${formatElevation(goal.elevationGainM)} D+` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ");
-              return (
-                <div key={goal.id} className="flex items-start gap-2 text-xs">
-                  <Icon
-                    aria-label={group ? SPORT_STYLE[group].label : goal.sportType}
-                    className={cn("mt-0.5 size-3.5 shrink-0", group ? SPORT_STYLE[group].text : "")}
-                  />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="tabular-nums">{facts}</span>
-                    <span className="text-muted-foreground">{treatment(goal, state)}</span>
-                  </span>
-                </div>
-              );
-            })}
-          </li>
-        ))}
-      </ul>
-      <Link
-        to="/season"
-        className="text-primary self-start text-xs font-medium underline-offset-4 hover:underline max-sm:py-2"
-      >
-        {events.length > GOALS_SHOWN
-          ? `${events.length - GOALS_SHOWN} more in Season`
-          : "Change goals in Season"}
-      </Link>
-    </section>
-  );
-}
-
-/** The plan against the season: the season strip, the written weeks, and the goals ahead. */
+/** The plan against the season: the season strip and the written weeks. */
 export function PlanSeason({
   state,
   weeks,
@@ -337,7 +229,6 @@ export function PlanSeason({
       {weeks.length ? (
         <WrittenWeeks weeks={weeks} state={state} shown={shown} onShow={onShow} />
       ) : null}
-      <GoalsAhead state={state} />
     </section>
   );
 }

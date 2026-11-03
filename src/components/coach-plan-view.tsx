@@ -139,7 +139,7 @@ function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanStat
           )}
         </span>
       </div>
-      <RunShape run={run} height={24} className={cn(run.done && "opacity-60")} />
+      <RunShape run={run} height={16} className={cn(run.done && "opacity-60")} />
       <div className="flex flex-wrap items-start gap-2">
         <DoneToggle run={run} state={state} className="flex-1 sm:flex-none" />
         <Button
@@ -292,7 +292,8 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
                 {home === thisWeek ? "Back to this week" : "Back to the first week"}
               </Button>
             ) : null}
-            <div className="touch-pan-y overflow-hidden">
+            {/* Clipped for the swipe; a pixel of room keeps the cards' rings inside the clip. */}
+            <div className="-m-px touch-pan-y overflow-hidden p-px">
               <div ref={swipe.ref} {...swipe.handlers}>
                 <WeekSessions week={week} state={state} />
               </div>
