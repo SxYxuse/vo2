@@ -120,11 +120,6 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
     done: "Read personal bests",
     icon: TrophyIcon,
   },
-  get_week_plan: {
-    running: "Reading this week's plan",
-    done: "Read this week's plan",
-    icon: TargetIcon,
-  },
   get_season: { running: "Reading the season", done: "Read the season", icon: FlagIcon },
   get_athlete_profile: {
     running: "Reading zones and anchors",

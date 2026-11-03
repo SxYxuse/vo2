@@ -22,9 +22,7 @@ import {
   type SettingsSection,
 } from "@/lib/settings-sections.ts";
 import { saveAthleteSettings } from "@/services/athlete-settings.ts";
-import { planningStyleOf } from "@/services/athlete-settings.types.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import { dayKey, isTrainingPlanComplete } from "@/services/training-plan.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -42,9 +40,7 @@ import {
   CalendarPeriodField,
   CelebrateTopEffortsField,
   PlanningStyleChoice,
-  PlanSummary,
   ProfileFields,
-  TrainingShapeField,
 } from "@/components/settings-fields.tsx";
 import { HeartRateFields } from "@/components/heart-rate-fields.tsx";
 import { CoachPlanSettings } from "@/components/coach-plan-setup.tsx";
@@ -74,7 +70,6 @@ export function SettingsForm({
 }) {
   const queryClient = useQueryClient();
   const { data } = useQuery(settingsSnapshotQueryOptions);
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -84,12 +79,10 @@ export function SettingsForm({
     () =>
       settingsFormDefaults({
         profile: null,
-        training: null,
         sportTypes: {},
         sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
-        timeZone,
       }),
-    [timeZone],
+    [],
   );
   const form = useForm<SettingsFormInput, unknown, SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
@@ -112,20 +105,16 @@ export function SettingsForm({
     form.reset(
       settingsFormDefaults({
         profile: data.profile,
-        training: data.training,
         heartRate: data.heartRate,
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
         celebrateTopEfforts: data.settings.topEffortsSince != null,
-        planningStyle:
-          planningStyleOf(data.settings.planningStyle, isTrainingPlanComplete(data.training)) ??
-          "weekPlanner",
-        timeZone,
+        planningStyle: data.settings.planningStyle ?? "coachPlan",
       }),
       { keepDirtyValues: true, keepErrors: true },
     );
-  }, [data?.profile, data?.training, data?.settings, data?.heartRate, timeZone, form]);
+  }, [data?.profile, data?.settings, data?.heartRate, form]);
 
   // One save at a time, each sending the form as it is when it starts, so the latest edit wins.
   // A plain promise rather than a mutation keeps saving after the form unmounts.
@@ -263,22 +252,8 @@ export function SettingsForm({
                     />
                   )}
                 />
-                {/* Each style keeps its setup while another is chosen; only its settings hide. */}
-                {planningStyle === "weekPlanner" ? (
-                  <>
-                    <FieldSeparator />
-                    <PlanSummary
-                      plan={data.training}
-                      today={dayKey(new Date(), data.training?.timeZone ?? timeZone)}
-                    />
-                    {data.training ? (
-                      <>
-                        <FieldSeparator />
-                        <TrainingShapeField control={form.control} />
-                      </>
-                    ) : null}
-                  </>
-                ) : planningStyle === "coachPlan" ? (
+                {/* Off keeps the coach plan's setup; only its settings hide. */}
+                {planningStyle === "coachPlan" ? (
                   <>
                     <FieldSeparator />
                     <CoachPlanSettings />

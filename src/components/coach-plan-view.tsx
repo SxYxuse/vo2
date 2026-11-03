@@ -18,10 +18,12 @@ import { cn } from "@/lib/utils";
 import { formatDuration } from "@/services/activity-detail.types.ts";
 import { writeCoachPlanAgain } from "@/services/coach-plan.ts";
 import {
+  minutesText,
+  planSportOf,
   sessionKindLabel,
   type CoachPlanState,
   type PlanWeek,
-  type PlannedRun,
+  type PlannedSession,
 } from "@/services/coach-plan.types.ts";
 import { PHASES, mondayOf, type PhaseKind } from "@/services/season-phase.ts";
 import { daysBetween } from "@/services/season.types.ts";
@@ -31,8 +33,8 @@ import { CoachPlanMissingAlert } from "@/components/coach-plan-setup.tsx";
 import {
   DoneToggle,
   RunShape,
-  headlinePace,
-  rangeText,
+  SPORT_ICON,
+  headlineTarget,
   weekLabel,
 } from "@/components/coach-run.tsx";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,12 +43,23 @@ import { Spinner } from "@/components/ui/spinner";
 
 /*
  * The Plan view for coach-plan athletes: the week shown with arrows to the other written weeks,
- * its sessions as one unordered list (ADR 0048: no day, no order), and the road to the race. On
- * desktop the road sits beside the week.
+ * its runs and rides as one unordered list (ADR 0048: no day, no order), and the road to the A
+ * goal. On desktop the road sits beside the week.
  */
 
-const weekKm = (week: PlanWeek) =>
-  Math.round(week.sessions.reduce((sum, run) => sum + run.distanceKm, 0));
+/** "24 km of running · 4 h 30 of riding", leaving out a sport the week doesn't hold. */
+function weekTotals(week: PlanWeek) {
+  const runs = week.sessions.filter((session) => session.sport === "run");
+  const rides = week.sessions.filter((session) => session.sport === "ride");
+  const km = Math.round(runs.reduce((sum, run) => sum + run.distanceKm, 0));
+  const minutes = rides.reduce((sum, ride) => sum + ride.minutes, 0);
+  return [
+    runs.length ? `${km} km running` : null,
+    rides.length ? `${minutesText(Math.round(minutes / 5) * 5)} riding` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function PlanStatus({ state }: { state: CoachPlanState }) {
   const online = useOnline();
@@ -90,7 +103,7 @@ function PlanStatus({ state }: { state: CoachPlanState }) {
       ) : !state.plan && !state.missing.length ? (
         <Alert>
           <AlertTitle>No plan written yet</AlertTitle>
-          <AlertDescription>The coach writes your next four weeks of runs.</AlertDescription>
+          <AlertDescription>The coach writes your next four weeks of sessions.</AlertDescription>
           <AlertAction>
             <Button
               type="button"
@@ -107,22 +120,34 @@ function PlanStatus({ state }: { state: CoachPlanState }) {
   );
 }
 
-function SessionCard({ run, state }: { run: PlannedRun; state: CoachPlanState }) {
-  const pace = headlinePace(run);
+function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanState }) {
+  const target = headlineTarget(run);
+  const { icon: Icon, className: iconClass } = SPORT_ICON[run.sport];
+  const ride = run.sport === "ride";
   return (
     <li
       className={cn("flex flex-col gap-3 rounded-xl border p-3 sm:p-4", run.done && "bg-muted/50")}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="min-w-0 font-semibold tracking-tight">{run.title}</h3>
+        <h3 className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
+          <Icon aria-label={ride ? "Ride" : "Run"} className={cn("size-4 shrink-0", iconClass)} />
+          {run.title}
+        </h3>
         <span className="shrink-0 text-2xl font-semibold tracking-tight tabular-nums">
-          {run.distanceKm}
-          <small className="text-muted-foreground ms-1 text-sm font-medium">km</small>
+          {ride ? (
+            minutesText(run.minutes)
+          ) : (
+            <>
+              {run.distanceKm}
+              <small className="text-muted-foreground ms-1 text-sm font-medium">km</small>
+            </>
+          )}
         </span>
       </div>
       <p className="text-muted-foreground -mt-2 text-sm">
-        {sessionKindLabel(run.kind)} · about {run.minutes} min
-        {pace ? ` · ${rangeText(pace)}` : ""}
+        {sessionKindLabel(run.kind, run.sport)}
+        {ride ? "" : ` · about ${run.minutes} min`}
+        {target ? ` · ${target}` : ""}
       </p>
       <RunShape run={run} height={40} className={cn(run.done && "opacity-60")} />
       <div className="flex flex-wrap items-start gap-2">
@@ -152,13 +177,13 @@ function WeekSessions({ week, state }: { week: PlanWeek; state: CoachPlanState }
   const done = week.sessions.filter((run) => run.done).length;
   const started = week.weekStart <= mondayOf(state.today);
   if (!week.sessions.length) {
-    return <p className="text-muted-foreground text-sm">No runs planned this week.</p>;
+    return <p className="text-muted-foreground text-sm">No sessions planned this week.</p>;
   }
   return (
     <section aria-label="The week's sessions" className="flex flex-col gap-3">
       {started ? (
         <p className="text-muted-foreground text-sm" aria-live="polite">
-          {done} of {week.sessions.length} done. Run them on the days that suit you.
+          {done} of {week.sessions.length} done. Do them on the days that suit you.
         </p>
       ) : null}
       <ul className="flex flex-col gap-2">
@@ -202,7 +227,7 @@ function WeekHeader({
         <span className="text-muted-foreground">
           {" "}
           · {PHASES[week.phase].label}
-          {week.lighter ? ", lighter" : ""} · {weekKm(week)} km
+          {week.lighter ? ", lighter" : ""} · {weekTotals(week)}
         </span>
       </h2>
       <Button
@@ -248,8 +273,10 @@ function RoadToRace({ state, weeks }: { state: CoachPlanState; weeks: PlanWeek[]
   if (!goal) return null;
   const weeksLeft = Math.max(0, Math.floor(daysBetween(mondayOf(state.today), goal.date) / 7));
   const written = new Set(weeks.map((week) => week.weekStart));
+  // Race times are predicted from running paces only.
+  const running = planSportOf(goal.sportType) === "run";
   const predicted =
-    state.vdot != null && goal.distanceM != null && canPredict(goal.distanceM)
+    running && state.vdot != null && goal.distanceM != null && canPredict(goal.distanceM)
       ? formatDuration(predictRaceSeconds(state.vdot, goal.distanceM))
       : null;
   return (
@@ -286,18 +313,20 @@ function RoadToRace({ state, weeks }: { state: CoachPlanState; weeks: PlanWeek[]
           </p>
         </>
       ) : null}
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        {predicted ? (
-          <>
-            <span className="text-xl font-semibold tracking-tight tabular-nums">{predicted}</span>
-            <span className="text-muted-foreground text-sm">predicted today</span>
-          </>
-        ) : (
-          <span className="text-muted-foreground text-sm">
-            No predicted time yet: it needs recent runs or a race result.
-          </span>
-        )}
-      </p>
+      {running ? (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          {predicted ? (
+            <>
+              <span className="text-xl font-semibold tracking-tight tabular-nums">{predicted}</span>
+              <span className="text-muted-foreground text-sm">predicted today</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground text-sm">
+              No predicted time yet: it needs recent runs or a race result.
+            </span>
+          )}
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -306,8 +335,8 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const thisWeek = state.today ? mondayOf(state.today) : "";
-  // A plan written late in the week, on a Sunday with no run left to place, starts this week with
-  // no runs: that week is not shown, rather than read as a written week of 0 km.
+  // A plan written late in the week, on a Sunday with no session left to place, starts this week
+  // with none: that week is not shown, rather than read as an empty written week.
   const weeks = (state.plan?.weeks ?? [])
     .filter(
       (week) => week.weekStart > thisWeek || (week.weekStart === thisWeek && week.sessions.length),

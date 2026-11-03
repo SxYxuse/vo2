@@ -11,11 +11,12 @@ import { saveCoachPlanAvailability } from "@/services/coach-plan.ts";
 import {
   availabilitySchema,
   DEFAULT_AVAILABILITY,
-  MAX_RUNS_PER_WEEK,
-  MIN_RUNS_PER_WEEK,
+  MAX_SESSIONS_PER_SPORT,
+  planSportOf,
   type Availability,
   type CoachPlanMissing,
   type CoachPlanState,
+  type PlanSport,
 } from "@/services/coach-plan.types.ts";
 import { createGoal } from "@/services/season.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -54,9 +55,14 @@ export function availabilityIssue(value: Availability) {
   return parsed.success ? null : (parsed.error.issues[0]?.message ?? "Check your availability.");
 }
 
+const SPORT_FIELDS = [
+  { sport: "run", key: "runsPerWeek", legend: "Runs a week", noun: "runs" },
+  { sport: "ride", key: "ridesPerWeek", legend: "Rides a week", noun: "rides" },
+] as const;
+
 /**
- * Availability (ADR 0048): how many runs a week. The coach writes each week's runs, and the
- * athlete picks the days to run them.
+ * Availability (ADR 0048, ADR 0050): how many runs and rides a week. The coach writes each week's
+ * sessions, and the athlete picks the days to do them. 0 plans none of that sport.
  */
 export function AvailabilityFields({
   value,
@@ -70,40 +76,48 @@ export function AvailabilityFields({
   const issue = availabilityIssue(value);
   return (
     <FieldGroup>
-      <FieldSet>
-        <FieldLegend>Runs a week</FieldLegend>
-        <FieldDescription>
-          The coach writes that many runs each week. You pick the days to run them.
-        </FieldDescription>
-        <ToggleGroup
-          variant="outline"
-          spacing={1}
-          className="grid w-full grid-cols-5"
-          disabled={disabled}
-          value={[String(value.runsPerWeek)]}
-          onValueChange={(next) => {
-            const picked = (next as string[])[0];
-            if (picked != null) onChange({ ...value, runsPerWeek: Number(picked) });
-          }}
-        >
-          {Array.from({ length: MAX_RUNS_PER_WEEK - MIN_RUNS_PER_WEEK + 1 }, (_, index) => {
-            const runs = String(MIN_RUNS_PER_WEEK + index);
-            return (
+      <FieldDescription>
+        The coach writes that many runs and rides each week. You pick the days to do them. 0 plans
+        none of that sport.
+      </FieldDescription>
+      {SPORT_FIELDS.map((field) => (
+        <FieldSet key={field.key}>
+          <FieldLegend variant="label">{field.legend}</FieldLegend>
+          <ToggleGroup
+            variant="outline"
+            spacing={1}
+            className="grid w-full grid-cols-7"
+            disabled={disabled}
+            value={[String(value[field.key])]}
+            onValueChange={(next) => {
+              const picked = (next as string[])[0];
+              if (picked != null) onChange({ ...value, [field.key]: Number(picked) });
+            }}
+          >
+            {Array.from({ length: MAX_SESSIONS_PER_SPORT + 1 }, (_, count) => (
               <ToggleGroupItem
-                key={runs}
-                value={runs}
-                aria-label={`${runs} runs a week`}
+                key={count}
+                value={String(count)}
+                aria-label={`${count} ${field.noun} a week`}
                 className="min-h-11 w-full"
               >
-                {runs}
+                {count}
               </ToggleGroupItem>
-            );
-          })}
-        </ToggleGroup>
-      </FieldSet>
+            ))}
+          </ToggleGroup>
+        </FieldSet>
+      ))}
       {issue ? <FieldError>{issue}</FieldError> : null}
     </FieldGroup>
   );
+}
+
+/** Availability with the A goal's sport planned: a first ride goal asks for rides, not runs. */
+export function availabilityForGoal(value: Availability, goalSportType: string | undefined) {
+  const sport = goalSportType ? planSportOf(goalSportType) : null;
+  if (sport === "ride" && value.ridesPerWeek === 0) return { ...value, ridesPerWeek: 3 };
+  if (sport === "run" && value.runsPerWeek === 0) return { ...value, runsPerWeek: 3 };
+  return value;
 }
 
 const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
@@ -116,7 +130,7 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
     ),
   },
   goal: {
-    text: "The plan builds toward an upcoming A goal: a run with a distance.",
+    text: "The plan builds toward an upcoming A goal: a run or a ride with a distance.",
     link: (
       <Link to="/season" className="underline">
         Add one in Season
@@ -124,10 +138,18 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
     ),
   },
   availability: {
-    text: "The coach needs to know how many times a week you run.",
+    text: "The coach needs to know how many times a week you run and ride.",
     link: (
       <Link to="/settings/$section" params={{ section: "training" }} className="underline">
         Set it in Settings → Training
+      </Link>
+    ),
+  },
+  goalSport: {
+    text: "Your A goal's sport has no sessions a week, so nothing would build toward it.",
+    link: (
+      <Link to="/settings/$section" params={{ section: "training" }} className="underline">
+        Add some in Settings → Training
       </Link>
     ),
   },
@@ -152,32 +174,44 @@ export function CoachPlanMissingAlert({ missing }: { missing: CoachPlanMissing[]
   );
 }
 
-const DISTANCES = [
-  { label: "5 km", metres: 5000 },
-  { label: "10 km", metres: 10_000 },
-  { label: "Half", metres: 21_097.5 },
-  { label: "Marathon", metres: 42_195 },
-] as const;
+const DISTANCES: Record<PlanSport, { label: string; metres: number }[]> = {
+  run: [
+    { label: "5 km", metres: 5000 },
+    { label: "10 km", metres: 10_000 },
+    { label: "Half", metres: 21_097.5 },
+    { label: "Marathon", metres: 42_195 },
+  ],
+  ride: [
+    { label: "50 km", metres: 50_000 },
+    { label: "100 km", metres: 100_000 },
+    { label: "160 km", metres: 160_000 },
+    { label: "200 km", metres: 200_000 },
+  ],
+};
+
+const GOAL_SPORT_TYPE = { run: "Run", ride: "Ride" } as const satisfies Record<PlanSport, string>;
 
 function formatKm(metres: number) {
   return `${Math.round(metres / 100) / 10} km`;
 }
 
 /**
- * The A goal the coach plan builds toward, or a short form to add one: a run, its date and
- * distance. As an A race, it is saved to perform (ADR 0049).
+ * The A goal the coach plan builds toward, or a short form to add one: a run or a ride, its date
+ * and distance. As an A race, it is saved to perform (ADR 0049). Climbing and more goals are
+ * added in Season.
  */
 export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefined }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [date, setDate] = useState("");
-  const [metres, setMetres] = useState<number>(DISTANCES[1].metres);
+  const [sport, setSport] = useState<PlanSport>("run");
+  const [metres, setMetres] = useState<number>(DISTANCES.run[1]!.metres);
   const add = useMutation({
     mutationFn: () =>
       createGoal({
         data: {
           name: name.trim(),
-          sportType: "Run",
+          sportType: GOAL_SPORT_TYPE[sport],
           date,
           distanceM: metres,
           elevationGainM: null,
@@ -203,8 +237,9 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
         <FlagIcon />
         <AlertTitle>{state.aGoal.name}</AlertTitle>
         <AlertDescription>
-          {state.aGoal.date} · {formatKm(state.aGoal.distanceM ?? 0)}. The plan builds toward it.
-          Change it anytime in Season.
+          {state.aGoal.date} · {formatKm(state.aGoal.distanceM ?? 0)}
+          {planSportOf(state.aGoal.sportType) === "ride" ? " ride" : " run"}. The plan builds toward
+          it, and toward the rest of your season. Change it anytime in Season.
         </AlertDescription>
       </Alert>
     );
@@ -214,16 +249,38 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
   return (
     <FieldGroup>
       <FieldDescription>
-        The coach plan builds toward an A race: a run with a distance. Add yours here; you can add
-        more goals in Season later.
+        The coach plan builds toward an A race: a run or a ride with a distance. Add yours here; you
+        can add more goals, of either sport, in Season later.
       </FieldDescription>
+      <FieldSet>
+        <FieldLegend variant="label">Sport</FieldLegend>
+        <ToggleGroup
+          variant="outline"
+          spacing={1}
+          className="grid w-full grid-cols-2"
+          value={[sport]}
+          onValueChange={(next) => {
+            const picked = (next as string[])[0] as PlanSport | undefined;
+            if (!picked) return;
+            setSport(picked);
+            setMetres(DISTANCES[picked][1]!.metres);
+          }}
+        >
+          <ToggleGroupItem value="run" className="min-h-11 w-full">
+            Run
+          </ToggleGroupItem>
+          <ToggleGroupItem value="ride" className="min-h-11 w-full">
+            Ride
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </FieldSet>
       <Field>
         <FieldLabel htmlFor="coach-goal-name">Race name</FieldLabel>
         <Input
           id="coach-goal-name"
           value={name}
           maxLength={120}
-          placeholder="City half marathon"
+          placeholder={sport === "ride" ? "Mountain gran fondo" : "City half marathon"}
           onChange={(event) => setName(event.target.value)}
           className="min-h-10"
         />
@@ -251,7 +308,7 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
             if (picked != null) setMetres(Number(picked));
           }}
         >
-          {DISTANCES.map((distance) => (
+          {DISTANCES[sport].map((distance) => (
             <ToggleGroupItem
               key={distance.label}
               value={String(distance.metres)}
@@ -298,9 +355,11 @@ export function CoachPlanSettings() {
   const { data: state } = useQuery(coachPlanQueryOptions);
   const saved = state?.availability ?? null;
   const [draft, setDraft] = useState<Availability>(saved ?? DEFAULT_AVAILABILITY);
+  const goalSportType = state?.aGoal?.sportType;
   useEffect(() => {
     if (saved) setDraft(saved);
-  }, [saved]);
+    else setDraft((current) => availabilityForGoal(current, goalSportType));
+  }, [saved, goalSportType]);
   const save = useSaveAvailability();
   const changed = useMemo(() => JSON.stringify(draft) !== JSON.stringify(saved), [draft, saved]);
   if (!state) {

@@ -1,11 +1,11 @@
 # VO2
 
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and sets a weekly target with the best use of the time left.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and has the coach plan each week's runs and rides toward the athlete's season.
 
 Sign in with Strava, import every activity and its streams into Postgres, then:
 
 - browse them by training week (four on desktop, one on phones)
-- see time left to reach your **Week target**, and the best session for the time you have today
+- follow a **coach plan**: precise runs and rides for the next four weeks, toward every goal of the season, written by the coach inside budgets VO2 sets and checks
 - plot GPS tracks on a map
 - chart fitness, fatigue, and form
 - inspect sport-specific heart-rate zones

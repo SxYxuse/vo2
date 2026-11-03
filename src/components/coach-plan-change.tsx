@@ -8,7 +8,7 @@ import { ArrowRightIcon, CalendarCogIcon, CheckIcon, XIcon } from "lucide-react"
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
-import { sessionKindLabel } from "@/services/coach-plan.types.ts";
+import { minutesText, sessionKindLabel } from "@/services/coach-plan.types.ts";
 import type {
   ChangeSide,
   PlanChangeApplied,
@@ -64,13 +64,13 @@ export function usePlanChanges(
   }, [messages, interrupts, canAnswer]);
 }
 
-/** One side of a changed session: what the run is, how long, and its steps; or no run. */
+/** One side of a changed session: what it is, how long, and its steps; or no session. */
 function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
   const label = before ? "Before" : "After";
   if (!side) {
     return (
       <div className="flex min-w-0 flex-col" aria-label={label} role="group">
-        <span className="text-muted-foreground font-medium">No run</span>
+        <span className="text-muted-foreground font-medium">No session</span>
       </div>
     );
   }
@@ -80,7 +80,9 @@ function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
         {side.title}
       </span>
       <span className="text-muted-foreground text-xs">
-        {sessionKindLabel(side.kind)} · {side.distanceKm} km · about {side.minutes} min
+        {side.sport === "ride"
+          ? `${sessionKindLabel(side.kind, "ride")} · ${minutesText(side.minutes)}`
+          : `${sessionKindLabel(side.kind)} · ${side.distanceKm} km · about ${side.minutes} min`}
       </span>
       {side.steps.map((line, index) => (
         <span key={index} className="text-muted-foreground text-xs">

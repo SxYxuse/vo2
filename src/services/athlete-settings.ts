@@ -16,7 +16,6 @@ import {
   type HeartRateSettings,
 } from "./heart-rate-settings.ts";
 import type { FitnessLoad } from "./training-load.ts";
-import { trainingPlanSchema, type TrainingPlan } from "./training-plan.types.ts";
 
 export const athleteSettingsSaveSchema = z.object({
   profile: profileSaveSchema,
@@ -24,7 +23,6 @@ export const athleteSettingsSaveSchema = z.object({
   sportGroupShares: z.record(z.string(), z.boolean()),
   calendarPeriod: calendarPeriodSchema.optional(),
   celebrateTopEfforts: z.boolean().optional(),
-  training: trainingPlanSchema.optional(),
   heartRate: heartRateSettingsSchema.optional(),
   planningStyle: planningStyleSchema.optional(),
 });
@@ -34,7 +32,6 @@ export type AthleteSettingsSave = z.infer<typeof athleteSettingsSaveSchema>;
 export type SavedAthleteSettings = {
   profile: ProfileSettings;
   settings: AthleteSettings;
-  training: TrainingPlan | null;
   heartRate: HeartRateSettings;
 };
 

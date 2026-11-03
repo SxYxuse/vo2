@@ -5,7 +5,6 @@ import {
   integer,
   jsonb,
   pgTable,
-  primaryKey,
   real,
   text,
   timestamp,
@@ -95,7 +94,6 @@ export const athleteMetrics = pgTable("athlete_metrics", {
   paceSettings: jsonb("pace_settings"),
   birthDate: date("birth_date", { mode: "string" }),
   weightKg: real("weight_kg"),
-  training: jsonb("training"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -123,7 +121,7 @@ export const syncRuns = pgTable("sync_runs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** A race or event on the athlete's season; goals drive the week target (ADR 0023). */
+/** A race or event on the athlete's season; goals shape the coach plan (ADR 0050). */
 export const goals = pgTable(
   "goals",
   {
@@ -136,32 +134,12 @@ export const goals = pgTable(
     date: date("date", { mode: "string" }).notNull(),
     distanceM: real("distance_m"),
     elevationGainM: real("elevation_gain_m"),
-    /** A: peak and taper for it; B: a few lighter days; C: trained through (ADR 0024). */
+    /** A: peak and taper for it; B: finish well; C: trained through (ADR 0049). */
     priority: text("priority").$type<"A" | "B" | "C">().notNull().default("A"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("goals_user_date_idx").on(table.userId, table.date)],
-);
-
-/**
- * The athlete's notes about this training week and the day plan made from them (ADR 0024).
- * One row per week; re-planned when a sync or a note changes its inputs.
- */
-export const weekCoach = pgTable(
-  "week_coach",
-  {
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    weekStart: date("week_start", { mode: "string" }).notNull(),
-    notes: jsonb("notes").notNull().default([]),
-    plan: jsonb("plan"),
-    /** What the plan was made from; a different key means it is stale. */
-    inputKey: text("input_key"),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.weekStart] })],
 );
 
 /**

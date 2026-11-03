@@ -51,6 +51,7 @@ type MockSession = Omit<WrittenSession, "weekStart"> & {
   id: string;
   status: "open" | "done";
   distanceKm: number;
+  minutes: number;
 };
 type MockCoachPlan = {
   canChange: boolean;
@@ -78,18 +79,36 @@ function askedChange(text: string): Asked | null {
   return kind ? { weekStart: null, kind } : null;
 }
 
-function easierRun(weekStart: string, session: MockSession): WrittenSession {
+function easierSession(weekStart: string, session: MockSession): WrittenSession {
+  const base = { weekStart, sport: session.sport, kind: "easy" as const };
+  const why = "Shorter and easy, so the week stays light.";
+  if (session.sport === "ride") {
+    const minutes = Math.max(30, Math.round(session.minutes / 10) * 5);
+    const step = { part: "work" as const, distanceM: null, durationS: minutes * 60, pace: null };
+    return {
+      ...base,
+      title: `${minutes} min endurance ride`,
+      why,
+      blocks: [{ repeat: 1, steps: [{ ...step, zone: "endurance", effort: null }] }],
+    };
+  }
   const km = Math.max(3, Math.round(session.distanceKm / 2));
   return {
-    weekStart,
-    kind: "easy",
+    ...base,
     title: `${km} km easy`,
-    why: "Shorter and easy, so the week stays light.",
+    why,
     blocks: [
       {
         repeat: 1,
         steps: [
-          { part: "work", distanceM: km * 1000, durationS: null, pace: null, effort: "easy" },
+          {
+            part: "work",
+            distanceM: km * 1000,
+            durationS: null,
+            pace: null,
+            zone: null,
+            effort: "easy",
+          },
         ],
       },
     ],
@@ -98,30 +117,40 @@ function easierRun(weekStart: string, session: MockSession): WrittenSession {
 
 /** The changes the mock coach tries, in order, until one passes VO2's rules. */
 function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["kind"]) {
-  const written = ({ id: _id, status: _s, distanceKm: _km, ...session }: MockSession) => ({
+  const written = ({
+    id: _id,
+    status: _s,
+    distanceKm: _km,
+    minutes: _minutes,
+    ...session
+  }: MockSession) => ({
     ...session,
     weekStart,
   });
   if (kind === "easier") {
     return [
       {
-        summary: "An easier, shorter run this week.",
-        sessions: [{ id: open[0].id, session: easierRun(weekStart, open[0]) }],
+        summary: `An easier, shorter ${open[0].sport} this week.`,
+        sessions: [{ id: open[0].id, session: easierSession(weekStart, open[0]) }],
       },
     ];
   }
   if (kind === "indoor") {
-    const indoor = { ...written(open[0]), title: `${open[0].title} (treadmill)` };
+    const where = open[0].sport === "ride" ? "trainer" : "treadmill";
+    const indoor = { ...written(open[0]), title: `${open[0].title} (${where})` };
     return [
-      { summary: "The same run, on a treadmill.", sessions: [{ id: open[0].id, session: indoor }] },
+      {
+        summary: `The same session, on a ${where}.`,
+        sessions: [{ id: open[0].id, session: indoor }],
+      },
     ];
   }
-  // One run fewer: the long run stays, and of the others the shorter go first.
+  // One session fewer: the long session stays, and of the others the shorter go first.
   const isLong = (session: MockSession) => (session.kind === "long" ? 1 : 0);
   return [...open]
-    .sort((a, b) => isLong(a) - isLong(b) || a.distanceKm - b.distanceKm)
+    .sort((a, b) => isLong(a) - isLong(b) || a.minutes - b.minutes)
     .map((target) => ({
-      summary: `${target.title} is dropped: a missed run is skipped, never made up.`,
+      summary: `${target.title} is dropped: a missed session is skipped, never made up.`,
       sessions: [{ id: target.id, session: null }],
     }));
 }
@@ -152,7 +181,10 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
     (session) => session.status === "open" && session.kind !== "race",
   );
   if (!week || !open.length) {
-    return { kind: "text", text: "There's no open run that week, so your plan needs no change." };
+    return {
+      kind: "text",
+      text: "There's no open session that week, so your plan needs no change.",
+    };
   }
   const proposals = results.filter((result) => result.name === "propose_plan_change");
   const last = proposals.at(-1)?.value as

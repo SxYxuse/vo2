@@ -15,7 +15,7 @@ import {
 } from "@/services/heart-insights.ts";
 import { HR_ZONES, formatZoneBpm } from "@/services/heart-rate.ts";
 import { buildPmc } from "@/services/training-load.ts";
-import { dayKey } from "@/services/training-plan.types.ts";
+import { dayKey } from "@/services/day-key.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Item,

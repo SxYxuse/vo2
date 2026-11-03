@@ -3,39 +3,46 @@ import { createHash } from "node:crypto";
 import { and, eq, gte, lt, ne, or } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, coachPlans } from "@/db/schema.ts";
+import { activities, athleteMetrics, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { coachModelFor } from "./coach-model.server.ts";
-import { weekBudgets, weeklyKm, type RunDay } from "./coach-plan-budget.ts";
+import { weekBudgets, weeklyAmount, type SportDay } from "./coach-plan-budget.ts";
 import type { RuleContext } from "./coach-plan-rules.ts";
 import {
   availabilityText,
   paceText,
   rulesFor,
+  sessionLine,
   weeksText,
   writeSessions,
+  zoneText,
 } from "./coach-plan-writer.server.ts";
 import {
   coachPlanGoal,
   availabilityKey,
   parseAvailability,
-  plannedRun,
+  plannedSession,
+  planSportOf,
+  readCoachPlan,
+  sessionsPerWeek,
   stepSecPerKm,
   type Availability,
+  type PlanAnchors,
   type CoachPlan,
   type CoachPlanMissing,
   type CoachPlanState,
   type CoachPlanStatus,
   type PlanBasis,
   type PlanGoal,
-  type PlannedRun,
+  type PlannedSession,
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonPhase } from "./season-phase.ts";
 import { goalsFor } from "./season.server.ts";
-import { daysBetween, type Goal } from "./season.types.ts";
+import { parseHeartRateSettings } from "./heart-rate-settings.ts";
+import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 
@@ -57,6 +64,8 @@ const PACE_CHANGE_VDOT = 1;
  * written again once its middle moved this far, about what one VDOT point does to easy pace.
  */
 const EASY_CHANGE_SEC_PER_KM = 10;
+/** FTP drifts with every metered ride; the plan is written again once it moved this share. */
+const FTP_CHANGE_SHARE = 0.05;
 
 type Row = typeof coachPlans.$inferSelect;
 type Activity = {
@@ -76,12 +85,22 @@ async function readRow(userId: string): Promise<Row | null> {
 
 /** Everything the plan is checked and written from, read fresh. */
 export async function gather(userId: string, now = new Date()) {
-  const [row, style, goals, coach, paces, rows] = await Promise.all([
+  const [row, style, goals, coach, paces, [metrics], rows] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
     goalsFor(userId),
     coachModelFor(userId, "plan"),
     trainingPacesFor(userId, now),
+    db
+      .select({
+        ftp: athleteMetrics.ftp,
+        cyclingLthr: athleteMetrics.cyclingLthr,
+        lthr: athleteMetrics.lthr,
+        heartRate: athleteMetrics.heartRate,
+      })
+      .from(athleteMetrics)
+      .where(eq(athleteMetrics.userId, userId))
+      .limit(1),
     db
       .select({
         id: activities.id,
@@ -111,7 +130,14 @@ export async function gather(userId: string, now = new Date()) {
     minutes: Math.round(item.movingTime / 60),
   }));
   // Hidden sport types count: hiding changes views, not training (ADR 0018).
-  const runs = all.filter((item) => sportGroupFor(item.sportType)?.id === "running");
+  const runs = all.filter((item) => planSportOf(item.sportType) === "run");
+  const rides = all.filter((item) => planSportOf(item.sportType) === "ride");
+  // A cycling LTHR the athlete set wins over the estimate (ADR 0021).
+  const rideLthr =
+    parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ??
+    metrics?.cyclingLthr ??
+    metrics?.lthr ??
+    null;
   return {
     row,
     style,
@@ -123,10 +149,13 @@ export async function gather(userId: string, now = new Date()) {
     currentWeek: weekStartKey(now, timeZone),
     availability: row ? parseAvailability(row.availability) : null,
     aGoal: coachPlanGoal(goals, today),
-    plan: (row?.plan as CoachPlan | null) ?? null,
-    runs: runs as (RunDay & Activity)[],
+    plan: readCoachPlan(row?.plan),
+    runs: runs as (SportDay & Activity)[],
+    rides: rides as (SportDay & Activity)[],
+    ftp: metrics?.ftp ? Math.round(metrics.ftp) : null,
+    rideLthr: rideLthr ? Math.round(rideLthr) : null,
     all,
-    others: all.filter((item) => sportGroupFor(item.sportType)?.id !== "running"),
+    others: all.filter((item) => planSportOf(item.sportType) == null),
   };
 }
 
@@ -142,11 +171,23 @@ function easyOf(inputs: Inputs): PlanBasis["easy"] {
 export const rangesOf = (inputs: Inputs) =>
   inputs.paces.source === "none" ? null : inputs.paces.paces;
 
+/** What planned steps aim at: paces for runs, FTP and cycling LTHR for rides. */
+export const anchorsOf = (inputs: Inputs): PlanAnchors => ({
+  paces: rangesOf(inputs),
+  ftp: inputs.ftp,
+  rideLthr: inputs.rideLthr,
+});
+
 function missingOf(inputs: Inputs): CoachPlanMissing[] {
   const missing: CoachPlanMissing[] = [];
   if (inputs.coach.kind === "missing") missing.push("key");
   if (!inputs.aGoal) missing.push("goal");
   if (!inputs.availability) missing.push("availability");
+  // An A ride with no rides planned, or an A run with no runs, has nothing building toward it.
+  const goalSport = inputs.aGoal ? planSportOf(inputs.aGoal.sportType) : null;
+  if (inputs.availability && goalSport && sessionsPerWeek(inputs.availability, goalSport) === 0) {
+    missing.push("goalSport");
+  }
   return missing;
 }
 
@@ -164,13 +205,12 @@ function roadOf(inputs: Inputs) {
   return road;
 }
 
-/** Goals the plan is written around: upcoming runs, and every upcoming A goal. */
+/** Goals the plan is written around: upcoming runs and rides, and every upcoming A goal. */
 function planGoals(goals: Goal[], today: string): PlanGoal[] {
   return goals
     .filter(
       (goal) =>
-        goal.date >= today &&
-        (goal.priority === "A" || sportGroupFor(goal.sportType)?.id === "running"),
+        goal.date >= today && (goal.priority === "A" || planSportOf(goal.sportType) != null),
     )
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((goal) => [goal.id, goal.date, goal.distanceM, goal.priority, goal.sportType]);
@@ -195,7 +235,15 @@ function basisOf(inputs: Inputs): PlanBasis {
     goals: planGoals(inputs.goals, inputs.today),
     vdot: vdotOf(inputs),
     easy: easyOf(inputs),
+    ftp: inputs.ftp,
   };
+}
+
+/** Whether FTP moved enough to rewrite. Plans written before FTP was kept aren't rewritten. */
+function ftpChanged(written: PlanBasis["ftp"], now: PlanBasis["ftp"]) {
+  if (written === undefined || (written ?? null) === (now ?? null)) return false;
+  if (written == null || now == null) return true;
+  return Math.abs(now - written) / written >= FTP_CHANGE_SHARE;
 }
 
 type Due = {
@@ -254,6 +302,10 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (easyChanged(plan.basis.easy, basis.easy)) {
     return { fromWeek: first, reason: "easy pace", trigger: easyStep(basis.easy) };
   }
+  // FTP only shapes rides, so a plan without them isn't rewritten for it.
+  if (inputs.availability?.ridesPerWeek && ftpChanged(plan.basis.ftp, basis.ftp)) {
+    return { fromWeek: first, reason: "ftp", trigger: basis.ftp };
+  }
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
@@ -290,7 +342,7 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
         }
       : null,
     missing: missingOf(inputs),
-    plan: (row?.plan as CoachPlan | null) ?? null,
+    plan: readCoachPlan(row?.plan),
     ...statusOf(row, inputs.now),
     road: roadOf(inputs),
     vdot: vdotOf(inputs),
@@ -379,10 +431,13 @@ async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
     );
 }
 
-function raceSession(goal: Goal): PlannedRun {
-  return plannedRun(
+/** A goal as its race session: a run by its distance, a ride by its rough time. */
+function raceSession(goal: Goal): PlannedSession {
+  const sport = planSportOf(goal.sportType) ?? "run";
+  return plannedSession(
     {
       weekStart: mondayOf(goal.date),
+      sport,
       kind: "race",
       title: goal.name,
       why: `Your ${goal.priority} race.`,
@@ -392,21 +447,24 @@ function raceSession(goal: Goal): PlannedRun {
           steps: [
             {
               part: "work",
-              distanceM: goal.distanceM,
-              durationS: null,
+              distanceM: sport === "run" ? goal.distanceM : null,
+              durationS: sport === "ride" ? Math.round(roughGoalHours(goal) * 3600) : null,
               pace: null,
+              zone: null,
               effort: "hard",
             },
           ],
         },
       ],
     },
-    null,
+    { paces: null, ftp: null, rideLthr: null },
   );
 }
 
 /** A race session as the next writing finds it again: its week and the goal's name. */
-const raceKey = (session: PlannedRun) => `${session.weekStart} ${session.title}`;
+const raceKey = (session: PlannedSession) => `${session.weekStart} ${session.title}`;
+
+const tenth = (value: number) => Math.round(value * 10) / 10;
 
 function recentTraining(inputs: Inputs) {
   const since = addDayKey(inputs.today, -30);
@@ -417,17 +475,18 @@ function recentTraining(inputs: Inputs) {
     const group = sportGroupFor(item.sportType)?.label ?? "Other sports";
     otherHours[group] = (otherHours[group] ?? 0) + item.minutes / 60;
   }
+  const recent = (days: SportDay[]) => days.filter((day) => day.date >= since);
   return {
-    weeklyRunKmLast8Weeks: weeklyKm(inputs.runs, inputs.currentWeek, 8).map(
-      (km) => Math.round(km * 10) / 10,
+    weeklyRunKmLast8Weeks: weeklyAmount(inputs.runs, inputs.currentWeek, 8, "run").map(tenth),
+    longestRunLast30DaysKm: tenth(Math.max(0, ...recent(inputs.runs).map((run) => run.km))),
+    weeklyRideHoursLast8Weeks: weeklyAmount(inputs.rides, inputs.currentWeek, 8, "ride").map(
+      (minutes) => tenth(minutes / 60),
     ),
-    longestRunLast30DaysKm:
-      Math.round(
-        Math.max(0, ...inputs.runs.filter((run) => run.date >= since).map((run) => run.km)) * 10,
-      ) / 10,
-    // Rides, swims, and the rest count toward load: the coach sees them, but plans only runs.
+    longestRideLast30DaysMin: Math.max(0, ...recent(inputs.rides).map((ride) => ride.minutes)),
+    // Swims, walks, and the rest count toward load: the coach sees them, but plans only runs and
+    // rides.
     otherSportsHoursLast4Weeks: Object.fromEntries(
-      Object.entries(otherHours).map(([group, hours]) => [group, Math.round(hours * 10) / 10]),
+      Object.entries(otherHours).map(([group, hours]) => [group, tenth(hours)]),
     ),
   };
 }
@@ -448,31 +507,34 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
     }
     const budgets = weekBudgets({
       runs: inputs.runs,
+      rides: inputs.rides,
       goals: inputs.goals,
       aGoal,
       firstWeek: inputs.currentWeek,
       count: WEEKS_AHEAD,
-      runsPerWeek: availability.runsPerWeek,
+      availability,
     });
     const weeks = budgets.filter((week) => week.weekStart >= fromWeek);
     const old = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
-    // In the weeks written, the athlete's runs marked done stay; the open ones are written again.
+    // In the weeks written, the athlete's sessions marked done stay; the open ones are written
+    // again.
     const kept = old.filter(
       (session) => session.weekStart >= fromWeek && session.done && session.kind !== "race",
     );
     // Weeks planned before the ones written, such as the weeks kept when only a new week is added:
-    // they set the longest-run limit of the weeks after them, and count toward no week written.
+    // they set the longest-session limit of the weeks after them, and count toward no week written.
     const neighbours = old.filter(
       (session) => session.weekStart >= inputs.currentWeek && session.weekStart < fromWeek,
     );
     const lastDay = addDayKey(weeks.at(-1)!.weekStart, 6);
     const races = inputs.goals.filter(
       (goal) =>
-        sportGroupFor(goal.sportType)?.id === "running" &&
+        planSportOf(goal.sportType) != null &&
         goal.distanceM != null &&
         goal.date >= fromWeek &&
         goal.date <= lastDay,
     );
+    const anchors = anchorsOf(inputs);
     const ctx: RuleContext = {
       availability,
       weeks,
@@ -480,22 +542,26 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       today: inputs.today,
       frozen: kept,
       runs: inputs.runs,
-      raceWeeks: races.map((goal) => mondayOf(goal.date)),
+      rides: inputs.rides,
+      races: races.map((goal) => ({
+        weekStart: mondayOf(goal.date),
+        sport: planSportOf(goal.sportType)!,
+      })),
       neighbours,
       easySecPerKm: stepSecPerKm(
-        { part: "work", distanceM: 1000, durationS: null, pace: null, effort: "easy" },
-        rangesOf(inputs),
+        { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },
+        anchors.paces,
       ),
     };
-    const ranges = rangesOf(inputs);
     const prompt = {
-      task: `Write the athlete's runs for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their A goal, following the coaching knowledge and every rule below.`,
+      task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their A goal and the rest of their season, following the coaching knowledge and every rule below.`,
       today: inputs.today,
       aGoal: {
         name: aGoal.name,
         date: aGoal.date,
         sportType: aGoal.sportType,
         distanceKm: (aGoal.distanceM ?? 0) / 1000,
+        elevationGainM: aGoal.elevationGainM,
         weeksToGo: Math.floor(daysBetween(inputs.currentWeek, aGoal.date) / 7),
       },
       otherGoals: inputs.goals
@@ -505,18 +571,18 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
           date: goal.date,
           sportType: goal.sportType,
           distanceKm: goal.distanceM == null ? null : goal.distanceM / 1000,
+          elevationGainM: goal.elevationGainM,
           priority: goal.priority,
         })),
       availability: availabilityText(ctx),
-      paces: paceText(ranges),
+      ...(availability.runsPerWeek ? { paces: paceText(anchors.paces) } : {}),
+      ...(availability.ridesPerWeek ? { rideZones: zoneText(anchors) } : {}),
       weeks: weeksText(ctx),
-      plannedBefore: neighbours.map(
-        (session) => `${session.weekStart} ${session.kind} ${session.distanceKm} km`,
-      ),
+      plannedBefore: neighbours.map((session) => `${session.weekStart} ${sessionLine(session)}`),
       recentTraining: recentTraining(inputs),
       rules: rulesFor(ctx),
     };
-    const result = await writeSessions(coach, prompt, ctx, ranges);
+    const result = await writeSessions(coach, prompt, ctx, anchors);
     if (!result.ok) {
       logger.warn("coach_plan.failed", { fromWeek });
       await finish(userId, claimedAt, failedValues(inputs, result.error));
@@ -594,7 +660,10 @@ export async function saveAvailabilityImpl(
     .insert(coachPlans)
     .values({ userId, ...values })
     .onConflictDoUpdate({ target: coachPlans.userId, set: values });
-  logger.info("coach_plan.availability_saved", { runsPerWeek: availability.runsPerWeek });
+  logger.info("coach_plan.availability_saved", {
+    runsPerWeek: availability.runsPerWeek,
+    ridesPerWeek: availability.ridesPerWeek,
+  });
   const inputs = await gather(userId);
   return stateOf(inputs, await startIfDue(userId, inputs));
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { writtenSessionSchema, type SessionKind } from "./coach-plan.types.ts";
+import { writtenSessionSchema, type PlanSport, type SessionKind } from "./coach-plan.types.ts";
 
 /*
  * A plan change (ADR 0038): the coach proposes the sessions it changes, VO2 checks them against
@@ -27,14 +27,14 @@ export const planChangeInputSchema = z.object({
         session: writtenSessionSchema
           .nullable()
           .describe(
-            "The run after the change, in the coach plan's session format, or null to drop the session. A session changed keeps its week.",
+            "The session after the change, in the coach plan's session format, or null to drop the session. A session changed keeps its week and sport.",
           ),
       }),
     )
     .min(1)
     .max(14)
     .describe(
-      "Only the sessions that change. Replace one: its id and the run after. Drop one: its id and null. Add one to a week: null and the run.",
+      "Only the sessions that change. Replace one: its id and the session after. Drop one: its id and null. Add one to a week: null and the session.",
     ),
 });
 
@@ -43,6 +43,7 @@ export type PlanChangeInput = z.infer<typeof planChangeInputSchema>;
 /** A session as the athlete sees it in the change, or null when there is none. */
 export type ChangeSide = {
   title: string;
+  sport: PlanSport;
   kind: SessionKind;
   distanceKm: number;
   minutes: number;
@@ -65,7 +66,7 @@ export type PlanChangeApplied = { applied: true } | { applied: false; reason: st
 export const WEEK_NOTE_CHOICES = [
   { id: "cant", label: "Can't train", text: "I can't train on some days this week." },
   { id: "short", label: "Short on time", text: "I'm short on time this week." },
-  { id: "indoor", label: "Indoor only", text: "I can only run indoors this week." },
+  { id: "indoor", label: "Indoor only", text: "I can only train indoors this week." },
   { id: "easy", label: "Take it easy", text: "I need to take it easy this week." },
 ] as const;
 

@@ -18,7 +18,16 @@ import {
   trainingWeeksOfMonth,
   type DiaryTotals,
 } from "@/services/diary-window.ts";
-import { formatHours } from "@/services/training-plan.types.ts";
+
+/** "45 min", "2h", "1h 30". */
+function formatHours(hours: number) {
+  const totalMinutes = Math.round(Math.max(0, hours) * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, "0")}`;
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

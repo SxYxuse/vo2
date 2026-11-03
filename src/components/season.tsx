@@ -17,7 +17,6 @@ import {
 import { cn } from "cn";
 
 import { afterGoalsChanged } from "@/lib/query-events.ts";
-import { SeasonChangePrompt, notifySeasonCheck } from "@/components/plan-adapt.tsx";
 import {
   formatDistanceKm,
   formatDuration,
@@ -251,7 +250,6 @@ export function SeasonView({ data }: { data: SeasonData }) {
         onClose={() => setEditing(null)}
       />
       <PasteSeasonDialog open={pasting} onClose={() => setPasting(false)} />
-      <SeasonChangePrompt />
     </>
   );
 }
@@ -284,7 +282,7 @@ function PasteSeasonBody({ onDone }: { onDone: () => void }) {
       return pasteSeason({ data: parsed.data });
     },
     onSuccess: async ({ added, skipped }) => {
-      notifySeasonCheck(await afterGoalsChanged(queryClient));
+      await afterGoalsChanged(queryClient);
       toast.add({
         type: "success",
         title: added ? `${added} goals added` : "Nothing new to add",
@@ -627,14 +625,14 @@ function GoalFormBody({
       } else await createGoal({ data });
     },
     onSuccess: async () => {
-      notifySeasonCheck(await afterGoalsChanged(queryClient));
+      await afterGoalsChanged(queryClient);
       onDone();
     },
   });
   const remove = useMutation({
     mutationFn: () => deleteGoal({ data: { id: goal!.id } }),
     onSuccess: async () => {
-      notifySeasonCheck(await afterGoalsChanged(queryClient));
+      await afterGoalsChanged(queryClient);
       onDone();
     },
   });

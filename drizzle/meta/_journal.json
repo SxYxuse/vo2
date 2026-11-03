@@ -281,6 +281,13 @@
       "when": 1793705502881,
       "tag": "0039_goal_priority_replaces_objective",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793707608915,
+      "tag": "0040_week_planner_removed",
+      "breakpoints": true
     }
   ]
 }

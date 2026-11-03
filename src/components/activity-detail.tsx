@@ -26,7 +26,7 @@ import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { isCyclingSport } from "@/services/training-load.ts";
 import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
 import type { BestsReturn } from "@/services/personal-bests.ts";
-import { weekStartKey } from "@/services/training-plan.types.ts";
+import { weekStartKey } from "@/services/day-key.ts";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {

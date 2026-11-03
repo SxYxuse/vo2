@@ -28,7 +28,6 @@ import { Route as ApiCoachRouteImport } from './routes/api/coach'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
-import { Route as AppWeekSessionRouteImport } from './routes/_app.week_.session'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
 import { Route as ApiStravaWebhookSecretRouteImport } from './routes/api/strava-webhook/$secret'
@@ -128,11 +127,6 @@ const AppSettingsSectionRoute = AppSettingsSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => AppSettingsRoute,
 } as any)
-const AppWeekSessionRoute = AppWeekSessionRouteImport.update({
-  id: '/week_/session',
-  path: '/week/session',
-  getParentRoute: () => AppRoute,
-} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -172,7 +166,6 @@ export interface FileRoutesByFullPath {
   '/api/coach': typeof ApiCoachRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
-  '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
@@ -196,7 +189,6 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
-  '/week/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
@@ -223,7 +215,6 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
-  '/_app/week_/session': typeof AppWeekSessionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
@@ -250,7 +241,6 @@ export interface FileRouteTypes {
     | '/api/coach'
     | '/activities/$activityId'
     | '/settings/$section'
-    | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
@@ -274,7 +264,6 @@ export interface FileRouteTypes {
     | '/'
     | '/activities/$activityId'
     | '/settings/$section'
-    | '/week/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
@@ -300,7 +289,6 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/activities/$activityId'
     | '/_app/settings/$section'
-    | '/_app/week_/session'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
@@ -453,13 +441,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsSectionRouteImport
       parentRoute: typeof AppSettingsRoute
     }
-    '/_app/week_/session': {
-      id: '/_app/week_/session'
-      path: '/week/session'
-      fullPath: '/week/session'
-      preLoaderRoute: typeof AppWeekSessionRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -519,7 +500,6 @@ interface AppRouteChildren {
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
   AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
-  AppWeekSessionRoute: typeof AppWeekSessionRoute
   AppWeekRunSessionIdRoute: typeof AppWeekRunSessionIdRoute
 }
 
@@ -537,7 +517,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
   AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,
-  AppWeekSessionRoute: AppWeekSessionRoute,
   AppWeekRunSessionIdRoute: AppWeekRunSessionIdRoute,
 }
 

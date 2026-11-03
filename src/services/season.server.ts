@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, goals } from "@/db/schema.ts";
+import { activities, coachPlans, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
@@ -9,9 +9,7 @@ import { projectSeason, weekLoadsBefore } from "./season-phase.ts";
 import { buildPmc, toFitnessLoad } from "./training-load.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { predictsRaceTime } from "./training-paces.types.ts";
-import { getTrainingPlanForUser } from "./training-plan.server.ts";
-import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
-import { recentLoadPerHour } from "./week-target.ts";
+import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import {
   LEG_SEPARATOR,
   goalSportTypes,
@@ -73,6 +71,31 @@ async function matchPastActivities(
   });
 }
 
+/** Load per hour when the athlete has too little recent history to read their own. */
+const DEFAULT_LOAD_PER_HOUR = 42;
+
+/** The athlete's load per hour over recent days, to turn the season map's load into hours. */
+function recentLoadPerHour(history: { minutes: number; load: number }[]) {
+  let minutes = 0;
+  let load = 0;
+  for (const day of history) {
+    minutes += day.minutes;
+    load += day.load;
+  }
+  if (minutes < 120 || load <= 0) return DEFAULT_LOAD_PER_HOUR;
+  return Math.min(90, Math.max(25, load / (minutes / 60)));
+}
+
+/** The time zone saved with the coach plan's availability, else UTC. */
+export async function athleteTimeZone(userId: string) {
+  const [row] = await db
+    .select({ timeZone: coachPlans.timeZone })
+    .from(coachPlans)
+    .where(eq(coachPlans.userId, userId))
+    .limit(1);
+  return row?.timeZone ?? "UTC";
+}
+
 /** Fitness now and the last four weeks' loads, for the season map. */
 export async function seasonContext(userId: string, timeZone: string, weekStart: string) {
   const rows = await db
@@ -98,7 +121,6 @@ export async function seasonContext(userId: string, timeZone: string, weekStart:
   const beforeWeek = [...pmc].reverse().find((point) => point.date < weekStart);
   const days = rows.map((row) => ({
     date: dayKey(row.startDate, timeZone),
-    family: "other" as const,
     minutes: Math.round(row.movingTime / 60),
     load: row.trainingLoad ?? 0,
   }));
@@ -126,12 +148,11 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
     };
   }
   const userId = session.user.id;
-  const [all, plan, settings] = await Promise.all([
+  const [all, timeZone, settings] = await Promise.all([
     goalsFor(userId),
-    getTrainingPlanForUser(userId),
+    athleteTimeZone(userId),
     getAthleteSettings(userId),
   ]);
-  const timeZone = plan?.timeZone ?? "UTC";
   const now = new Date();
   const today = dayKey(now, timeZone);
   const weekStart = weekStartKey(now, timeZone);

@@ -1,6 +1,6 @@
 # VO2
 
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and plans each training week day by day toward their goals.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and has the coach plan each week's runs and rides toward their goals.
 
 ## People
 
@@ -9,7 +9,7 @@ The person whose training VO2 tracks. One athlete is one Strava account.
 _Avoid_: User, account, client
 
 **Athlete deletion**:
-Permanently removing an athlete and their whole local copy, training plan, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone. Revoking VO2 from Strava's side deletes the athlete too.
+Permanently removing an athlete and their whole local copy, coach plan, and settings, and revoking VO2's access on Strava. It happens at once and cannot be undone. Revoking VO2 from Strava's side deletes the athlete too.
 _Avoid_: Account deletion, deactivation, closing an account
 
 **Athlete settings**:
@@ -40,14 +40,14 @@ _Avoid_: Sport, discipline
 
 **Sport group**:
 A display grouping of related sport types: cycling, running, swimming, or walking. These are the only sports VO2 shows.
-_Avoid_: Sport family (that term is reserved for the week split)
+_Avoid_: Sport family, discipline
 
 **Other sport type**:
-A sport type outside the sport groups, such as WeightTraining, Yoga, or Rowing. Its activities are never shown, except as extras in the week plan, and it can't be a goal, but they still count toward training load and the week target's hours (ADR 0029).
+A sport type outside the sport groups, such as WeightTraining, Yoga, or Rowing. Its activities are never shown and it can't be a goal, but they still count toward training load (ADR 0029).
 _Avoid_: Unsupported sport, hidden sport type (that is the athlete's choice)
 
 **Hidden sport type**:
-A sport type in a sport group that the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form, the week target, and planning's sensor detection (ADR 0015, ADR 0018).
+A sport type in a sport group that the athlete chose not to show. Its activities stay out of the calendar, map, and heart-rate views, but still count toward training load, fitness, fatigue, and form, and the coach plan's budgets (ADR 0015, ADR 0018).
 _Avoid_: Disabled sport, filtered sport, sport selection
 
 **Pace**:
@@ -57,10 +57,6 @@ _Avoid_: Speed
 **Speed**:
 Distance covered per time, in km/h. Used for cycling and for sport types that are not running, walking, or swimming.
 _Avoid_: Pace, velocity, kph
-
-**Sport family**:
-How the week target splits time: running, cycling, or other (swims and walks count as other).
-_Avoid_: Sport group, sport type
 
 **Sync**:
 Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out. While the app is open, it resumes on its own after the pause to finish an incomplete local copy, and checks for new activities when the app opens or returns to the foreground, at most every 15 minutes. The athlete can also sync again by hand.
@@ -73,115 +69,83 @@ _Avoid_: Cache, mirror
 ## Planning
 
 **Planning style**:
-How VO2 plans the athlete's training, chosen in onboarding and settings: off, the week planner, or the coach plan. Off leaves Season and the calendar but plans nothing.
+How VO2 plans the athlete's training, chosen in onboarding and settings: the coach plan, or off. Off leaves Season and the calendar but plans nothing, and keeps the coach plan's setup. The week planner was removed (ADR 0050).
 _Avoid_: Plan type, planning mode
 
-**Week planner**:
-The planning style where VO2's own rules set each week's time per sport and its key sessions, and lay them out on the athlete's free days.
-_Avoid_: Algorithmic plan, classic plan
-
 **Coach plan**:
-The planning style where the coach writes precise sessions for the next four weeks, toward an A goal, inside the weekly distance VO2 allows. Its sessions have no day or order (ADR 0048). For now it plans runs only. It is a coach feature (ADR 0037).
+The planning style where the coach writes precise runs and rides for the next four weeks, toward the season led by an A run or ride, inside the weekly budgets VO2 allows. Its sessions have no day or order (ADR 0048). Swims, walks, and other sports count toward load but aren't planned. It is a coach feature (ADR 0037, ADR 0050).
 _Avoid_: AI plan, Runna plan
 
+**Plan sport**:
+A sport the coach plan writes sessions for: runs (the running sport group) or rides (the cycling sport group). Each session has one (ADR 0050).
+_Avoid_: Sport family, discipline
+
 **The week's sessions**:
-The coach plan's sessions for one training week, shown as one unordered set with each session's sport and length. A session is done when the athlete marks it, otherwise open (ADR 0048).
-_Avoid_: Week plan (that is the week planner's term), schedule, key sessions
+The coach plan's runs and rides for one training week, shown as one unordered set with each session's sport and size: a run's distance, a ride's time. A session is done when the athlete marks it, otherwise open (ADR 0048).
+_Avoid_: Week plan, schedule, key sessions
 
 **Availability**:
-What the athlete gives the coach plan: how many runs a week. It has no days and no time per day (ADR 0041, ADR 0048).
-_Avoid_: Schedule, available days, rest days (that is the week planner's term), week shape
+What the athlete gives the coach plan: how many runs and how many rides a week, 0 to 6 each. It has no days and no time per day (ADR 0041, ADR 0048, ADR 0050).
+_Avoid_: Schedule, available days, rest days, week shape
+
+**Weekly budget**:
+What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running and minutes of riding. Only the sports of the event the week builds toward grow with its phase; the other holds. Lighter weeks, recovery, and the taper shrink both (ADR 0037, ADR 0050).
+_Avoid_: Week target, quota, bucket
 
 **Training paces**:
 The pace ranges the coach plan's sessions target, from easy to repetition, read from a VDOT. The athlete chooses what it comes from: Automatic (the estimate from recent best efforts), one of their best efforts, or a race result. The easy pace comes from the pace they hold in running zone 2 by default, never faster than marathon pace, or from the VDOT (ADR 0042).
 _Avoid_: Zones (those are heart rate), target pace, goal pace
+
+**Cycling zone**:
+The effort a ride step targets, from recovery to sprint: Coggan's levels as a share of FTP, with sweet spot between tempo and threshold. A planned ride shows it in watts from FTP, or in heart rate from cycling LTHR without power (ADR 0050).
+_Avoid_: Power zone, heart-rate zone (that is the five heart-rate bands)
 
 **Predicted race time**:
 The time VO2 expects the athlete to run a goal's distance today, read from their training paces. Goals have no target time; the prediction takes its place.
 _Avoid_: Goal time, target time, race estimate
 
 **Plan change**:
-A change to the coach plan the coach proposes in the chat or from a coach note, shown session by session before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
-_Avoid_: Re-plan (that is the week planner laying the week out again), adaptation, edit
-
-**Training plan**:
-What the athlete built in the plan builder: the week's shape (rest days, long session day, double-session days, sports to plan), the plan goals, when it started, and an optional starting point after a break. Settings → Training edits the shape; rebuilding the plan replaces it all (ADR 0026).
-_Avoid_: Program, schedule, calendar
-
-**Plan builder**:
-The four steps that build or rebuild the training plan: the season, where the athlete is now, when they can train, and a preview. Every answer starts from the athlete's Strava history and the goals on Season; it never adds goals.
-_Avoid_: Onboarding (that is the whole first setup), wizard
-
-**Plan goals**:
-The copy of the athlete's goals the training plan was built or last adapted on. Phases are read from it, not from Season, so a season change shows before it reshapes the week.
-_Avoid_: Season (that is the live list), snapshot
-
-**Season change**:
-A difference between the plan goals and the goals on Season. One that changes a week before the end of the current block (the leading goal and its recovery week) asks the athlete to adapt the plan or keep it; any other is taken into the plan goals at once.
-_Avoid_: Re-plan (that is laying the rest of a week out again), sync
+A change to the coach plan the coach proposes in the chat or from a coach note, shown session by session before and after. A changed session keeps its week and sport. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
+_Avoid_: Re-plan, adaptation, edit
 
 **Goal**:
 A race or event on the athlete's season: name, sport type, date, distance, elevation gain, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
-_Avoid_: Target (that is the week's hours), race (not every goal is one)
+_Avoid_: Target, race (not every goal is one)
 
 **Priority**:
-How much a goal matters, and what the athlete races it for: A to perform (the plan builds, peaks, and fully tapers for it, with a recovery week after), B to finish well (lighter days before it), or C to finish (trained through). The next A event leads the season; without one, the next B event does. The leading goal's priority sets how fast fitness rises and how many key sessions a week: three for A, two for B, one for C (ADR 0024, ADR 0026, ADR 0049).
+How much a goal matters, and what the athlete races it for: A to perform (the plan builds, peaks, and fully tapers for it, with a recovery week after), B to finish well, or C to finish (trained through). The next A event leads the season; without one, the next B event does. The leading goal's priority sets how fast fitness rises (ADR 0024, ADR 0049).
 _Avoid_: Main goal, importance, objective
 
 **Season**:
-The athlete's goals in date order. The plan works toward the next A goal. The season map shows each week's phase and expected hours through the last goal.
+The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. The season map shows each week's phase and expected hours through the last goal.
 _Avoid_: Calendar, year, block
 
 **Phase**:
-Where the week sits on the way to the next A goal, read at the start of Monday: base, build (or maintain when the last goal was close or ended under two weeks ago), peak, taper, race week, recovery, or hold without a goal. It sets the ramp, the key session types, and the sport split (ADR 0021, 0022).
+Where the week sits on the way to the next A goal, read at the start of Monday: base, build (or maintain when the last goal was close or ended under two weeks ago), peak, taper, race week, recovery, or hold without a goal. It sets how the coach plan's budgets grow and what sessions the coach writes (ADR 0021, 0022).
 _Avoid_: Build pace, block, training phase (that is read from fitness)
 
 **Lighter week**:
-Every fourth week before the peak, counted back from the goal: 70 % of the usual load and one key session, so the work of the three weeks before sinks in.
+Every fourth week before the peak, counted back from the goal: 70 % of the usual budgets, so the work of the three weeks before sinks in.
 _Avoid_: Rest week, deload, recovery (that follows a goal)
 
 **Guardrail**:
-A limit on the phase's ramp: never more than 10 % above the last four weeks' average load, eased off when form is low, and no ramp in the two weeks after an A goal. The week target says when one held it back.
-_Avoid_: Cap (that is the hours the athlete has), safety limit
-
-**Rest days**:
-The weekdays the athlete never trains, one to four of them. The plan puts no session on them; a race on one still shows.
-_Avoid_: Off days, recovery days
-
-**Long session day**:
-The training day the long session goes on when the week has one. Read from the weekday of the athlete's longest activities.
-_Avoid_: Weekend ride, long run day
-
-**Double-session day**:
-A training day the plan may put two sessions on. The athlete sets how many a week; the second session is always easy, never on the long session's day or a key session's day, and is used when the week's time does not fit in one session a day or a sport would get no time otherwise.
-_Avoid_: Brick (a brick is one specific double: a run straight after a ride), double day
-
-**Key session**:
-A precise session the week planner generates each week: intervals, time in zone, or a long Z2. The coach plan has none (ADR 0047). How many follows the leading goal's priority within the phase's limit and half the training days; the type follows the phase and priority (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
-_Avoid_: Workout, quality session, planned session
-
-**Easy session**:
-A planned session in zone 2 that is not a key session, at least 45 minutes on a bike or 30 on foot. Easy time is the week target minus key sessions and races, shared over the training days left. Any ride, run, swim, or walk of 20 minutes or more on its day fills one.
-_Avoid_: Filler, recovery (recovery is a shorter, zone 1 session when the athlete asks to take it easy while tired)
-
-**Week plan**:
-The training week laid out Monday to Sunday: key, easy, and second sessions, rest days, races and openers. Laid out by the algorithm the first time the week is opened; the days after today are laid out again when a key session is missed or done elsewhere, a coach note arrives, the week's shape changes, or the plan adapts to the season. Days behind keep what was planned.
-_Avoid_: Schedule, calendar (that shows activities), day plan
+A limit on how fast load grows: the season map never projects more than 10 % above the last four weeks' average load, eases off when form is low, and holds for two weeks after an A goal. The coach plan's budgets have their own caps per sport (ADR 0037, ADR 0050).
+_Avoid_: Cap, safety limit
 
 **Session status**:
-How a planned session stands. On the week planner, against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned; an activity that fills no planned session is extra. On the coach plan, done when the athlete marks it, otherwise open, with no day, no missed state, and no automatic match (ADR 0048).
+How a coach-plan session stands: done when the athlete marks it, otherwise open, with no day, no missed state, and no automatic match (ADR 0048).
 _Avoid_: Completed, compliance
 
 **Coach note**:
-What the athlete tells the coach: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them for a day; on the coach plan, a note asks the coach for a change to the week's sessions, with no day (ADR 0048).
+What the athlete tells the coach about a week of the coach plan: a quick choice (can't train, short on time, indoor only, take it easy) or their own words. It asks the coach for a change to that week's sessions, with no day (ADR 0048).
 _Avoid_: Comment, feedback, journal
 
 **Coach**:
-The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the training plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan and reads coach notes. It runs only on the athlete's OpenRouter key.
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan. It runs only on the athlete's OpenRouter key.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:
-One of the three things the coach does: reading coach notes in the athlete's own words, coach chat, and writing the coach plan. The athlete picks the model for each one. Quick-choice coach notes are not a coach feature: they need no model.
+One of the two things the coach does: coach chat (which also answers coach notes) and writing the coach plan. The athlete picks the model for each one.
 _Avoid_: AI feature
 
 **OpenRouter key**:
@@ -193,16 +157,8 @@ A conversation between the athlete and the coach. The server keeps every chat, s
 _Avoid_: Thread, session (that is planned training), conversation history
 
 **Training week**:
-Monday through Sunday in the athlete's timezone. The week target is scoped to the current week, not a season.
+Monday through Sunday in the athlete's timezone. The coach plan's budgets are per training week.
 _Avoid_: Microcycle, calendar week
-
-**Week target**:
-The hours (and training load) the athlete aims for this training week. Set from fitness at the start of Monday and the phase within the guardrails. Without history it is 45 minutes per training day; after a break it grows from the athlete's starting point by at most 10 % a week. Every activity counts toward it.
-_Avoid_: Bucket, quota, goal (that is a race or event)
-
-**Hard time**:
-Minutes at heart-rate zone 3 or above. Estimated from load per hour when an activity has no heart-rate stream. Used to keep the day after hard work easy.
-_Avoid_: Intensity minutes, quality time
 
 ## Load and form
 

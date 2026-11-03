@@ -1,5 +1,7 @@
 # The coach chat loads running knowledge as skills
 
+Extended by [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md): the chat also loads the cycling and season knowledge as skills.
+
 The coach chat answered and proposed plan changes from the written plan, the pace ranges, and the numbered rules alone. The running knowledge the plan writer reads (`principles.md`, `paces.md`, `sessions.md` in `src/coaching/running/`) never reached it, so a change could pass every rule and still be an odd session.
 
 The chat now gets those three files as portable skills (`@tanstack/ai-skills`): one skill per file, a one-line catalog in the system prompt, and a `load_skill` tool. The model loads a file only when a question needs it: explaining a session, how a week is built, or a plan change. About 4,300 words in every message would cost more than most questions need.

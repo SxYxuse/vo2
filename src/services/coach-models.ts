@@ -6,11 +6,6 @@ export const OPENROUTER = "openrouter";
 /** The things the coach does that need a model (ADR 0036). */
 export const COACH_FEATURES = [
   {
-    id: "notes",
-    label: "Coach notes",
-    hint: "Reads what you write about a day into the week plan.",
-  },
-  {
     id: "chat",
     label: "Coach chat",
     hint: "Answers your questions about your training.",
@@ -18,14 +13,14 @@ export const COACH_FEATURES = [
   {
     id: "plan",
     label: "Plan writing",
-    hint: "Writes the coach plan's runs, four weeks ahead.",
+    hint: "Writes the coach plan's rides and runs, four weeks ahead.",
   },
 ] as const;
 
 export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
 
 /**
- * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (chat) and structured JSON output (notes, plan writing), so any of them runs every coach feature.
+ * Curated, not OpenRouter's whole catalog: each one is checked to support tool calls (chat) and structured JSON output (plan writing), so any of them runs every coach feature.
  */
 export const COACH_MODELS = [
   { id: "openai/gpt-6-luna", label: "GPT-6 Luna", hint: "OpenAI · quick and cheap" },
@@ -58,7 +53,6 @@ export const DEFAULT_COACH_MODEL: CoachModelId = "openai/gpt-6-luna";
 const coachModelSchema = z.string().min(1).catch(DEFAULT_COACH_MODEL);
 
 export const coachModelsSchema = z.object({
-  notes: coachModelSchema.default(DEFAULT_COACH_MODEL),
   chat: coachModelSchema.default(DEFAULT_COACH_MODEL),
   plan: coachModelSchema.default(DEFAULT_COACH_MODEL),
 });
@@ -66,7 +60,6 @@ export const coachModelsSchema = z.object({
 export type CoachModels = z.infer<typeof coachModelsSchema>;
 
 export const DEFAULT_COACH_MODELS: CoachModels = {
-  notes: DEFAULT_COACH_MODEL,
   chat: DEFAULT_COACH_MODEL,
   plan: DEFAULT_COACH_MODEL,
 };

@@ -1,5 +1,4 @@
 import type { AthleteSettings } from "./athlete-settings.types.ts";
-import type { TrainingPlan } from "./training-plan.types.ts";
 
 export type CalendarActivity = {
   id: string;
@@ -27,5 +26,4 @@ export type HomeData = {
   activities: CalendarActivity[];
   goals: CalendarGoal[];
   settings: AthleteSettings;
-  training: TrainingPlan | null;
 };
