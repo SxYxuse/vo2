@@ -22,8 +22,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  # actions: read lets the CI check list runs for the commit. Without it the
-  # check gets 403 and the release stops before anything is pushed.
   actions: read
   contents: write
 
