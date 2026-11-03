@@ -6,6 +6,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
   CalendarDaysIcon,
+  ChevronRightIcon,
   FlagIcon,
   TargetIcon,
   HeartPulseIcon,
@@ -26,6 +27,7 @@ import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 import {
   isSettingsPath,
+  SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
   showsSettingsSection,
 } from "@/lib/settings-sections.ts";
@@ -41,6 +43,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -69,20 +72,111 @@ const TRAINING_NAV_ITEMS = [
  */
 const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 
-const NAV_ITEMS = [
-  { title: "Map", to: "/map", icon: MapIcon },
-  { title: "Merge GPX", to: "/merge-gpx", icon: RouteIcon },
-  { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
-  { title: "Bests", to: "/bests", icon: TrophyIcon },
-  { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
+const COLLAPSIBLE_NAV_GROUPS = [
+  {
+    id: "progress",
+    label: "Progress",
+    items: [
+      { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
+      { title: "Bests", to: "/bests", icon: TrophyIcon },
+      { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
+    ],
+  },
+  {
+    id: "routes",
+    label: "Routes",
+    items: [
+      { title: "Map", to: "/map", icon: MapIcon },
+      { title: "Merge GPX", to: "/merge-gpx", icon: RouteIcon },
+    ],
+  },
 ] as const;
+
+type NavItem =
+  | (typeof TRAINING_NAV_ITEMS)[number]
+  | (typeof COLLAPSIBLE_NAV_GROUPS)[number]["items"][number];
+
+const CLOSED_GROUPS_KEY = "vo2.sidebar.closed";
+
+function readClosedGroups(): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(CLOSED_GROUPS_KEY) ?? "[]");
+    return Array.isArray(value) ? value.filter((id) => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeClosedGroups(ids: string[]) {
+  try {
+    window.localStorage.setItem(CLOSED_GROUPS_KEY, JSON.stringify(ids));
+  } catch {
+    // Private mode or full storage: the choice still holds until the app is closed.
+  }
+}
+
+/**
+ * A nav group the athlete can fold away, remembered on this device. The group holding the
+ * current page always shows, so a link never lands on a page hidden in the sidebar; in the
+ * desktop icon rail the labels are gone, so every group shows its icons.
+ */
+function CollapsibleNavGroup({
+  group,
+  pathname,
+  onLinkClick,
+}: {
+  group: (typeof COLLAPSIBLE_NAV_GROUPS)[number];
+  pathname: string;
+  onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+}) {
+  const { isMobile, state } = useSidebar();
+  const [closed, setClosed] = useState(false);
+  // Read after mount: the server render has no storage, and both must match.
+  useEffect(() => setClosed(readClosedGroups().includes(group.id)), [group.id]);
+  const holdsCurrentPage = group.items.some((item) => isActiveNavItem(item, pathname));
+  const iconRail = !isMobile && state === "collapsed";
+  const open = iconRail || holdsCurrentPage || !closed;
+
+  const onOpenChange = (next: boolean) => {
+    setClosed(!next);
+    const others = readClosedGroups().filter((id) => id !== group.id);
+    writeClosedGroups(next ? others : [...others, group.id]);
+  };
+
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange} render={<SidebarGroup />}>
+      <SidebarGroupLabel
+        render={<CollapsibleTrigger />}
+        className={cn(
+          "group/label w-full cursor-pointer justify-between hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:pointer-events-none",
+          isMobile && "h-[2.75rem] text-sm",
+        )}
+      >
+        {group.label}
+        <ChevronRightIcon
+          aria-hidden
+          className="transition-transform group-data-panel-open/label:rotate-90"
+        />
+      </SidebarGroupLabel>
+      <CollapsibleContent render={<SidebarGroupContent />}>
+        <SidebarNavMenu items={group.items} pathname={pathname} onLinkClick={onLinkClick} />
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function isActiveNavItem(item: NavItem, pathname: string) {
+  return item.to === "/"
+    ? pathname === "/" || pathname.startsWith("/activities/")
+    : pathname === item.to;
+}
 
 function SidebarNavMenu({
   items,
   pathname,
   onLinkClick,
 }: {
-  items: ReadonlyArray<(typeof TRAINING_NAV_ITEMS)[number] | (typeof NAV_ITEMS)[number]>;
+  items: ReadonlyArray<NavItem>;
   pathname: string;
   onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
@@ -91,11 +185,7 @@ function SidebarNavMenu({
       {items.map((item) => (
         <SidebarMenuItem key={item.to}>
           <SidebarMenuButton
-            isActive={
-              item.to === "/"
-                ? pathname === "/" || pathname.startsWith("/activities/")
-                : pathname === item.to
-            }
+            isActive={isActiveNavItem(item, pathname)}
             tooltip={item.title}
             render={<Link to={item.to} preload="viewport" onClick={onLinkClick} />}
           >
@@ -120,24 +210,35 @@ function SettingsNavMenu({
   const sections = SETTINGS_SECTIONS.filter((item) =>
     showsSettingsSection(item.id, data?.settings.sportTypes),
   );
-  return (
-    <SidebarMenu>
-      {sections.map((item) => (
-        <SidebarMenuItem key={item.id}>
-          <SidebarMenuButton
-            isActive={pathname === `/settings/${item.id}`}
-            tooltip={item.label}
-            render={
-              <Link to="/settings/$section" params={{ section: item.id }} onClick={onLinkClick} />
-            }
-          >
-            <item.icon />
-            <span>{item.label}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ))}
-    </SidebarMenu>
-  );
+  return SETTINGS_GROUPS.map((group) => (
+    <SidebarGroup key={group.id}>
+      <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {sections
+            .filter((item) => item.group === group.id)
+            .map((item) => (
+              <SidebarMenuItem key={item.id}>
+                <SidebarMenuButton
+                  isActive={pathname === `/settings/${item.id}`}
+                  tooltip={item.label}
+                  render={
+                    <Link
+                      to="/settings/$section"
+                      params={{ section: item.id }}
+                      onClick={onLinkClick}
+                    />
+                  }
+                >
+                  <item.icon />
+                  <span>{item.label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  ));
 }
 
 /** Remembers the last page outside settings so Back can return to it. */
@@ -220,12 +321,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {inSettings ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>Settings</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
         ) : (
           <>
             <SidebarGroup>
@@ -238,11 +334,14 @@ export function AppSidebar() {
                 />
               </SidebarGroupContent>
             </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarNavMenu items={NAV_ITEMS} pathname={pathname} onLinkClick={onLinkClick} />
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {COLLAPSIBLE_NAV_GROUPS.map((group) => (
+              <CollapsibleNavGroup
+                key={group.id}
+                group={group}
+                pathname={pathname}
+                onLinkClick={onLinkClick}
+              />
+            ))}
           </>
         )}
       </SidebarContent>
