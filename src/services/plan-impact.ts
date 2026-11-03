@@ -36,7 +36,6 @@ function fingerprint(goal: Goal) {
     goal.date,
     goal.sportType,
     goal.priority,
-    goal.objective,
     goal.distanceM ?? "",
     goal.elevationGainM ?? "",
   ].join("|");
@@ -75,7 +74,7 @@ function signature(phase: SeasonPhase, around: Goal[], trainingDays: number) {
 
 function keyCount(phase: SeasonPhase, trainingDays: number) {
   return keySessionCountFor({
-    objective: phase.anchor.length ? phase.objective : null,
+    priority: phase.anchor.length ? phase.priority : null,
     phaseMax: phase.maxKeySessions,
     trainingDays,
   });

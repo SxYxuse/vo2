@@ -15,7 +15,6 @@ import {
   roughGoalHours,
   seasonEvents,
   type Goal,
-  type GoalObjective,
   type GoalPriority,
 } from "./season.types.ts";
 
@@ -58,7 +57,8 @@ export type SeasonPhase = {
   anchor: Goal[];
   /** Days from the start of the week to the anchor. */
   daysToAnchor: number | null;
-  objective: GoalObjective | null;
+  /** The anchor event's priority: how fast fitness rises and how many key sessions (ADR 0049). */
+  priority: GoalPriority | null;
   /** A B goal (not the anchor) falls this week: a few lighter days and one key session. */
   tuneUp: Goal[];
   /** C goals this week: trained through. */
@@ -99,24 +99,24 @@ export type GoalSessions = {
 /** The athlete's usual speed and climbing per sport group, from recent activities. */
 export type GroupPace = { kmh: number; climbPerKm: number };
 
-const RAMP: Record<"base" | "build" | "peak", Record<GoalObjective, number>> = {
-  base: { finish: 3, finishWell: 3, perform: 5 },
-  build: { finish: 3, finishWell: 5, perform: 7 },
-  peak: { finish: 3, finishWell: 5, perform: 5 },
+const RAMP: Record<"base" | "build" | "peak", Record<GoalPriority, number>> = {
+  base: { C: 3, B: 3, A: 5 },
+  build: { C: 3, B: 5, A: 7 },
+  peak: { C: 3, B: 5, A: 5 },
 };
 
-const ROTATION: Record<"base" | "build" | "peak" | "sharpen", Record<GoalObjective, BuildPace>> = {
-  base: { finish: "hold", finishWell: "hold", perform: "slow" },
-  build: { finish: "slow", finishWell: "steady", perform: "fast" },
-  peak: { finish: "steady", finishWell: "steady", perform: "overreach" },
-  sharpen: { finish: "steady", finishWell: "fast", perform: "fast" },
+const ROTATION: Record<"base" | "build" | "peak" | "sharpen", Record<GoalPriority, BuildPace>> = {
+  base: { C: "hold", B: "hold", A: "slow" },
+  build: { C: "slow", B: "steady", A: "fast" },
+  peak: { C: "steady", B: "steady", A: "overreach" },
+  sharpen: { C: "steady", B: "fast", A: "fast" },
 };
 
 const HOLD: SeasonPhase = {
   kind: "hold",
   anchor: [],
   daysToAnchor: null,
-  objective: null,
+  priority: null,
   tuneUp: [],
   trainThrough: [],
   lighter: false,
@@ -142,13 +142,6 @@ export function goalFamilyShares(goals: Goal[]): Record<SportFamily, number> | n
   };
 }
 
-/** The more demanding objective wins when a multisport event mixes them. */
-function objectiveOf(goals: Goal[]): GoalObjective {
-  if (goals.some((goal) => goal.objective === "perform")) return "perform";
-  if (goals.some((goal) => goal.objective === "finishWell")) return "finishWell";
-  return "finish";
-}
-
 /**
  * The week's phase from the season, read at the start of the week so it holds all week.
  * The plan builds toward the next A event (else the next B one); B goals ease off their week
@@ -172,8 +165,8 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     return justRaced ? { ...recoveryPhase(lastA!.goals), trainThrough } : { ...HOLD, trainThrough };
   }
   const anchor = anchorAhead.goals;
-  const anchorIsA = eventPriority(anchorAhead) === "A";
-  const objective = objectiveOf(anchor);
+  const priority = eventPriority(anchorAhead);
+  const anchorIsA = priority === "A";
   const daysToAnchor = daysBetween(weekStart, anchorAhead.date);
   const weeksLeft = Math.floor(daysToAnchor / 7);
   const tuneUp = ahead
@@ -195,7 +188,7 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
       kind: "race",
       // A B goal leading the season gets a few lighter days, not a full taper.
       loadFactor: anchorIsA ? 0.5 : 0.85,
-      rotation: ROTATION.sharpen[objective],
+      rotation: ROTATION.sharpen[priority],
       maxKeySessions: 1,
     };
   } else if (weeksLeft === 1 && anchorIsA) {
@@ -203,32 +196,32 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
       ...HOLD,
       kind: "taper",
       loadFactor: 0.75,
-      rotation: ROTATION.sharpen[objective],
+      rotation: ROTATION.sharpen[priority],
       maxKeySessions: 1,
     };
   } else if (weeksLeft <= PEAK_WEEKS) {
     phase = {
       ...HOLD,
       kind: "peak",
-      ramp: RAMP.peak[objective],
-      rotation: ROTATION.peak[objective],
+      ramp: RAMP.peak[priority],
+      rotation: ROTATION.peak[priority],
     };
   } else if (weeksLeft <= BASE_WEEKS) {
     const rebuilding = sinceLast != null && sinceLast + daysToAnchor < REBUILD_WEEKS * 7;
     phase = rebuilding
-      ? { ...HOLD, kind: "maintain", rotation: ROTATION.build[objective] }
+      ? { ...HOLD, kind: "maintain", rotation: ROTATION.build[priority] }
       : {
           ...HOLD,
           kind: "build",
-          ramp: RAMP.build[objective],
-          rotation: ROTATION.build[objective],
+          ramp: RAMP.build[priority],
+          rotation: ROTATION.build[priority],
         };
   } else {
     phase = {
       ...HOLD,
       kind: "base",
-      ramp: RAMP.base[objective],
-      rotation: ROTATION.base[objective],
+      ramp: RAMP.base[priority],
+      rotation: ROTATION.base[priority],
     };
   }
 
@@ -238,7 +231,7 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     sinceLast <= NO_RAMP_AFTER_A_DAYS &&
     (phase.kind === "base" || phase.kind === "build" || phase.kind === "peak")
   ) {
-    phase = { ...phase, kind: "maintain", ramp: 0, rotation: ROTATION.build[objective] };
+    phase = { ...phase, kind: "maintain", ramp: 0, rotation: ROTATION.build[priority] };
   }
 
   // Every fourth week before the peak is lighter, counted back from the goal so the
@@ -262,24 +255,12 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     ...phase,
     anchor,
     daysToAnchor,
-    objective,
+    priority,
     tuneUp,
     trainThrough,
     goalShares: early ? seasonShares : anchorShares,
     goalWeight: phase.kind === "recovery" ? 0 : early ? 0.5 : 0.7,
   };
-  // A B goal raced to perform takes its whole week down a notch (ADR 0026); to finish or
-  // finish well, only the days around it go easy (goalDay).
-  const performTuneUp = tuneUp.some((goal) => goal.objective === "perform");
-  if (performTuneUp && phase.kind !== "race" && phase.kind !== "recovery") {
-    phase = {
-      ...phase,
-      tuneUp,
-      ramp: Math.min(phase.ramp, 0),
-      loadFactor: Math.min(phase.loadFactor ?? 1, 0.85),
-      maxKeySessions: Math.min(phase.maxKeySessions ?? 1, 1),
-    };
-  }
   return phase;
 }
 
@@ -288,7 +269,7 @@ function recoveryPhase(raced: Goal[]): SeasonPhase {
     ...HOLD,
     kind: "recovery",
     anchor: raced,
-    objective: objectiveOf(raced),
+    priority: "A",
     loadFactor: 0.6,
     maxKeySessions: 0,
   };
@@ -568,26 +549,14 @@ export function projectRaceDay(
 type AroundGoal = { easyBefore: number; opener: boolean; easyAfter: number };
 
 /**
- * How each goal shapes the days around it, by priority and objective (ADR 0026). An A goal's
+ * How each goal shapes the days around it, by priority (ADR 0026, ADR 0049). An A goal's
  * build, taper, and recovery week come from its phases; here it adds the opener and two easy
  * days after. Easy days before an opener are counted beyond it.
  */
-export const AROUND_GOAL: Record<GoalPriority, Record<GoalObjective, AroundGoal>> = {
-  A: {
-    finish: { easyBefore: 0, opener: true, easyAfter: 2 },
-    finishWell: { easyBefore: 0, opener: true, easyAfter: 2 },
-    perform: { easyBefore: 0, opener: true, easyAfter: 2 },
-  },
-  B: {
-    finish: { easyBefore: 1, opener: false, easyAfter: 0 },
-    finishWell: { easyBefore: 2, opener: true, easyAfter: 1 },
-    perform: { easyBefore: 3, opener: true, easyAfter: 2 },
-  },
-  C: {
-    finish: { easyBefore: 0, opener: false, easyAfter: 0 },
-    finishWell: { easyBefore: 1, opener: false, easyAfter: 0 },
-    perform: { easyBefore: 1, opener: false, easyAfter: 1 },
-  },
+export const AROUND_GOAL: Record<GoalPriority, AroundGoal> = {
+  A: { easyBefore: 0, opener: true, easyAfter: 2 },
+  B: { easyBefore: 2, opener: true, easyAfter: 1 },
+  C: { easyBefore: 0, opener: false, easyAfter: 0 },
 };
 
 export type GoalDay = {
@@ -608,7 +577,7 @@ export function goalDay(goals: Goal[], date: string): GoalDay {
       day.race.push(goal);
       continue;
     }
-    const around = AROUND_GOAL[goal.priority][goal.objective];
+    const around = AROUND_GOAL[goal.priority];
     if (days === 1 && around.opener) day.opener ??= goal;
     else if (days > 0 && days <= around.easyBefore + (around.opener ? 1 : 0)) day.easy ??= goal;
     else if (days < 0 && -days <= around.easyAfter) day.easy ??= goal;

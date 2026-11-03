@@ -190,22 +190,19 @@ export function suggestedShape(stats: HistoryStats, goals: Goal[]): WeekShape {
   };
 }
 
-const OBJECTIVE_WORDS = {
-  finish: "finish",
-  finishWell: "finish well",
-  perform: "perform",
-} as const;
+/** What each priority races for (ADR 0049). */
+const AIM = { A: "perform", B: "finish well", C: "finish" } as const;
 
-/** How one goal shapes the plan, in words, by its priority and objective (ADR 0026). */
+/** How one goal shapes the plan, in words, by its priority (ADR 0026, ADR 0049). */
 export function goalEffect(goal: Goal, leads: boolean) {
-  const around = AROUND_GOAL[goal.priority][goal.objective];
+  const around = AROUND_GOAL[goal.priority];
   if (leads) {
-    const keys = keySessionCountFor({ objective: goal.objective, phaseMax: null, trainingDays: 7 });
+    const keys = keySessionCountFor({ priority: goal.priority, phaseMax: null, trainingDays: 7 });
     const build =
       goal.priority === "A"
         ? "Base, build, peak, and taper toward it"
         : "The plan builds toward it";
-    return `${build}, with ${keys} key session${keys === 1 ? "" : "s"} a week to ${OBJECTIVE_WORDS[goal.objective]}.`;
+    return `${build}, with ${keys} key session${keys === 1 ? "" : "s"} a week to ${AIM[goal.priority]}.`;
   }
   if (goal.priority === "A")
     return "Its own build, peak, and taper once the goal before it is done.";
@@ -219,8 +216,7 @@ export function goalEffect(goal: Goal, leads: boolean) {
   if (around.easyAfter)
     parts.push(`${around.easyAfter} easy day${around.easyAfter === 1 ? "" : "s"} after`);
   const lead = goal.priority === "C" ? "Trained through: it counts as a hard session" : "A tune-up";
-  const week = goal.priority === "B" && goal.objective === "perform" ? ", in a week at 85 %" : "";
-  return parts.length ? `${lead}; ${parts.join(", ")}${week}.` : `${lead}.`;
+  return parts.length ? `${lead}; ${parts.join(", ")}.` : `${lead}.`;
 }
 
 /** What the builder sends to preview or start a plan. */
@@ -244,7 +240,6 @@ export function planGoalsFrom(goals: Goal[]): PlanGoal[] {
     date: goal.date,
     distanceM: goal.distanceM,
     elevationGainM: goal.elevationGainM,
-    objective: goal.objective,
     priority: goal.priority,
   }));
 }

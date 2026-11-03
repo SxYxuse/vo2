@@ -274,6 +274,13 @@
       "when": 1793696425736,
       "tag": "0038_coach_plan_sessions_have_no_day",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1793705502881,
+      "tag": "0039_goal_priority_replaces_objective",
+      "breakpoints": true
     }
   ]
 }

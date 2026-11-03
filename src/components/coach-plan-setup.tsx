@@ -165,7 +165,7 @@ function formatKm(metres: number) {
 
 /**
  * The A goal the coach plan builds toward, or a short form to add one: a run, its date and
- * distance. Objective is left out: with the coach plan goals are saved as perform.
+ * distance. As an A race, it is saved to perform (ADR 0049).
  */
 export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefined }) {
   const queryClient = useQueryClient();
@@ -181,7 +181,6 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           date,
           distanceM: metres,
           elevationGainM: null,
-          objective: "perform",
           priority: "A",
         },
       }),

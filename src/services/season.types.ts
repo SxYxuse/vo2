@@ -10,19 +10,26 @@ type StravaSportType = components["schemas"]["SportType"];
 /** Only sport-group types can be a goal: other sport types are never shown (ADR 0029). */
 export const GOAL_SPORT_TYPES = SPORT_GROUPS.flatMap((group) => group.members) as StravaSportType[];
 
-export const GOAL_OBJECTIVES = [
-  { id: "finish", label: "Finish", hint: "Reach the line in good shape." },
-  { id: "finishWell", label: "Finish well", hint: "Hold a strong, even effort to the end." },
-  { id: "perform", label: "Perform", hint: "Race for a time or a place." },
-] as const;
-
-export type GoalObjective = (typeof GOAL_OBJECTIVES)[number]["id"];
-
-/** How much a goal matters: the plan peaks for A, eases off for B, and trains through C (ADR 0024). */
+/**
+ * How much a goal matters, and so what the athlete wants from it: the plan peaks for A to perform,
+ * eases off for B to finish well, and trains through C to finish (ADR 0024, ADR 0049).
+ */
 export const GOAL_PRIORITIES = [
-  { id: "A", label: "A race", hint: "What the season is for: full build, peak, and taper." },
-  { id: "B", label: "B race", hint: "A few lighter days before it, no recovery week after." },
-  { id: "C", label: "C race", hint: "Trained through, like a hard session." },
+  {
+    id: "A",
+    label: "A race · Perform",
+    hint: "Race for a time or a place: full build, peak, and taper.",
+  },
+  {
+    id: "B",
+    label: "B race · Finish well",
+    hint: "A strong, even effort: a few lighter days before it, no recovery week after.",
+  },
+  {
+    id: "C",
+    label: "C race · Finish",
+    hint: "Reach the line: trained through, like a hard session.",
+  },
 ] as const;
 
 export type GoalPriority = (typeof GOAL_PRIORITIES)[number]["id"];
@@ -43,7 +50,6 @@ export const goalInputSchema = z.object({
     .min(0)
     .max(50_000, { error: "50,000 m at most." })
     .nullable(),
-  objective: z.enum(["finish", "finishWell", "perform"]),
   priority: z.enum(["A", "B", "C"]).default("A"),
 });
 
@@ -64,7 +70,6 @@ export function seasonCopy(goals: Goal[]): z.input<typeof seasonCopySchema> {
       date: goal.date,
       distanceM: goal.distanceM,
       elevationGainM: goal.elevationGainM,
-      objective: goal.objective,
       priority: goal.priority,
     })),
   };

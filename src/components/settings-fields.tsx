@@ -17,7 +17,7 @@ import {
 } from "@/services/athlete-settings.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
-  GOAL_OBJECTIVES,
+  GOAL_PRIORITIES,
   anchorEvent,
   daysBetween,
   eventTitle,
@@ -251,15 +251,15 @@ export function PlanSummary({ plan, today }: { plan: TrainingPlan | null; today:
     lead && plan.startWeek
       ? Math.floor(daysBetween(plan.startWeek, mondayOf(lead.date)) / 7) + 1
       : null;
-  const objective = lead
-    ? GOAL_OBJECTIVES.find((item) => item.id === lead.goals[0]!.objective)?.label
+  const priority = lead
+    ? GOAL_PRIORITIES.find((item) => item.id === lead.goals[0]!.priority)
     : null;
   return (
     <FieldSet>
       <FieldLegend>Your plan</FieldLegend>
       <div className="bg-muted/50 flex flex-col gap-1 rounded-lg border p-3">
         <span className="font-medium">
-          {lead ? `${eventTitle(lead)} · ${objective}` : "Holding your fitness"}
+          {lead ? `${eventTitle(lead)} · ${priority?.label}` : "Holding your fitness"}
         </span>
         <span className="text-muted-foreground text-sm">
           {weeksIn != null && weeksTotal != null

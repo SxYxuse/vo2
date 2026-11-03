@@ -67,7 +67,7 @@ function inputKeyOf(
     weekStart: data.weekStart,
     shape: [training.restWeekdays, training.longWeekday, training.doubleDays, training.sports],
     goals: [data.season.kind, data.season.lighter, data.nearbyGoals.map((goal) => goal.id)],
-    anchor: data.season.anchor.map((goal) => [goal.id, goal.date, goal.objective]),
+    anchor: data.season.anchor.map((goal) => [goal.id, goal.date, goal.priority]),
     target: summary.target.minutes,
     pinned: training.keySessionSports,
     paused: summary.paused,
@@ -128,8 +128,7 @@ function promptFor(data: Planned, summary: WeekSummary, notes: CoachNote[], plan
         ? {
             name: phase.anchor.map((goal) => goal.name).join(" + "),
             date: phase.anchor[0]!.date,
-            priority: phase.anchor[0]!.priority,
-            objective: phase.objective,
+            priority: phase.priority,
           }
         : null,
     },
