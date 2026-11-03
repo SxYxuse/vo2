@@ -16,6 +16,7 @@ import {
   headlineTarget,
   weekLabel,
 } from "@/components/coach-run.tsx";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,7 +59,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
   const ahead = run.weekStart > mondayOf(state.today);
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Button
           variant="ghost"
@@ -84,24 +85,17 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 tabular-nums sm:grid-cols-3">
-        {ride ? null : (
-          <div className="flex flex-col">
-            <dt className="text-muted-foreground text-xs">Distance</dt>
-            <dd className="text-xl font-semibold">{run.distanceKm} km</dd>
-          </div>
-        )}
-        <div className="flex flex-col">
-          <dt className="text-muted-foreground text-xs">{ride ? "Time" : "Estimated time"}</dt>
-          <dd className="text-xl font-semibold">{minutesText(run.minutes)}</dd>
-        </div>
-        <div className={cn("flex flex-col", !ride && "col-span-2 sm:col-span-1")}>
-          <dt className="text-muted-foreground text-xs">{ride ? "Target" : "Pace"}</dt>
-          <dd className="text-xl font-semibold">{target ?? "By feel"}</dd>
-        </div>
-      </dl>
+      <StatGrid className="sm:grid-cols-3">
+        {ride ? null : <StatCard label="Distance" value={`${run.distanceKm} km`} />}
+        <StatCard label={ride ? "Time" : "Estimated time"} value={minutesText(run.minutes)} />
+        <StatCard
+          label={ride ? "Target" : "Pace"}
+          value={target ?? "By feel"}
+          className={ride ? undefined : "col-span-2 sm:col-span-1"}
+        />
+      </StatGrid>
 
-      <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Shape</CardTitle>
@@ -110,17 +104,17 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <RunShape run={run} height={96} />
+            <RunShape run={run} height={64} />
             <RunSteps run={run} />
           </CardContent>
         </Card>
-        <div className="flex flex-col gap-3 sm:gap-6">
+        <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Why</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed">{run.why}</p>
+              <p className="text-xs/relaxed">{run.why}</p>
             </CardContent>
           </Card>
           <Card>

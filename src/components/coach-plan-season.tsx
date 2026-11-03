@@ -33,7 +33,6 @@ import { weekLabel } from "@/components/coach-run.tsx";
 import { Dot, PhaseBadge, PriorityBadge } from "@/components/season-badges.tsx";
 import { LEGEND_PHASES, PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
 import { SPORT_STYLE } from "@/components/sport-style.ts";
-import { Button } from "@/components/ui/button";
 
 /*
  * The coach plan against the season, beside the week on Plan: the season week by week through
@@ -120,13 +119,13 @@ function SeasonStrip({
           );
         })}
       </div>
-      <div aria-hidden className="flex h-8 items-end gap-0.5">
+      <div aria-hidden className="flex h-6 items-end gap-0.5">
         {road.map((week) => (
           <i
             key={week.weekStart}
             className={cn(
               "block min-w-0 flex-1 rounded-[2px]",
-              written.has(week.weekStart) ? "h-8" : "h-4 opacity-60",
+              written.has(week.weekStart) ? "h-6" : "h-3 opacity-60",
               week.lighter && "opacity-40",
               week.weekStart === shown && "outline-foreground outline-2 outline-offset-1",
             )}
@@ -170,25 +169,28 @@ function WrittenWeeks({
   onShow: (weekStart: string) => void;
 }) {
   return (
-    <ol className="flex flex-col" aria-label="Written weeks">
+    <ol
+      className="bg-card ring-foreground/10 flex flex-col overflow-hidden rounded-lg ring-1"
+      aria-label="Written weeks"
+    >
       {weeks.map((week) => {
         const goals = state.goals.filter((goal) => mondayOf(goal.date) === week.weekStart);
         const done = week.sessions.filter((session) => session.done).length;
         const started = week.weekStart <= mondayOf(state.today);
         const current = week.weekStart === shown;
         return (
-          <li key={week.weekStart} className="border-t first:border-t-0">
+          <li key={week.weekStart} className="border-foreground/10 border-t first:border-t-0">
             <button
               type="button"
               aria-current={current ? "true" : undefined}
               onClick={() => onShow(week.weekStart)}
               className={cn(
-                "hover:bg-muted/50 flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-2 text-start",
+                "hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-start max-sm:min-h-11",
                 current && "bg-muted",
               )}
             >
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                   <b className="font-medium">{weekLabel(week.weekStart, state.today)}</b>
                   <PhaseBadge kind={week.phase} lighter={week.lighter} />
                 </span>
@@ -239,15 +241,18 @@ function GoalsAhead({ state }: { state: CoachPlanState }) {
   const shown = events.slice(0, GOALS_SHOWN);
   return (
     <section aria-labelledby="goals-ahead" className="flex flex-col gap-2">
-      <h3 id="goals-ahead" className="text-sm font-semibold">
+      <h3 id="goals-ahead" className="text-sm font-medium">
         Goals ahead
       </h3>
-      <ul className="flex flex-col gap-2">
+      <ul className="bg-card ring-foreground/10 flex flex-col overflow-hidden rounded-lg ring-1">
         {shown.map((event) => (
-          <li key={event.date} className="flex flex-col gap-1 rounded-lg border px-3 py-2">
+          <li
+            key={event.date}
+            className="border-foreground/10 flex flex-col gap-1 border-t px-3 py-2 first:border-t-0"
+          >
             <div className="flex items-center gap-2">
               <PriorityBadge priority={eventPriority(event)} />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">
                 {eventTitle(event)}
               </span>
               <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
@@ -281,16 +286,14 @@ function GoalsAhead({ state }: { state: CoachPlanState }) {
           </li>
         ))}
       </ul>
-      <Button
-        variant="link"
-        className="min-h-11 self-start px-0"
-        nativeButton={false}
-        render={<Link to="/season" />}
+      <Link
+        to="/season"
+        className="text-primary self-start text-xs font-medium underline-offset-4 hover:underline max-sm:py-2"
       >
         {events.length > GOALS_SHOWN
           ? `${events.length - GOALS_SHOWN} more in Season`
           : "Change goals in Season"}
-      </Button>
+      </Link>
     </section>
   );
 }
@@ -312,21 +315,21 @@ export function PlanSeason({
   return (
     <section
       aria-labelledby="plan-season"
-      className="flex flex-col gap-4 border-t pt-4 lg:border-t-0 lg:pt-0"
+      className="flex flex-col gap-3 border-t pt-4 lg:border-t-0 lg:pt-0"
     >
       <div className="flex flex-col gap-2">
-        <h2 id="plan-season" className="font-semibold">
+        <h2 id="plan-season" className="text-sm font-medium">
           Your season
         </h2>
         {state.road.length ? (
           <>
             <SeasonStrip road={state.road} events={events} written={written} shown={shown} />
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-xs">
               {phaseText(state.road)} The raised weeks are written.
             </p>
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-xs">
             No goals ahead: the plan holds your fitness.
           </p>
         )}

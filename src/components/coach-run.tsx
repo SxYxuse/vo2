@@ -166,7 +166,7 @@ export function RunSteps({ run }: { run: Pick<PlannedSession, "blocks" | "sport"
               LEVEL_BG[run.sport][level(block.steps)],
             )}
           />
-          <div className="flex min-w-0 flex-col gap-0.5 text-sm">
+          <div className="flex min-w-0 flex-col gap-0.5 text-xs">
             {block.repeat > 1 ? (
               <span className="font-medium">
                 {block.repeat} × {block.steps.map((step) => stepText(step, run.sport)).join(", ")}
@@ -224,7 +224,6 @@ export function DoneToggle({
         type="button"
         variant={done ? "secondary" : "outline"}
         aria-pressed={done}
-        className="min-h-11 sm:min-h-9"
         disabled={!online || mark.isPending || state.status === "writing"}
         onClick={() => mark.mutate(!done)}
       >

@@ -61,7 +61,7 @@ export function CoachWeekNote({
             key={choice.id}
             size="sm"
             variant="outline"
-            className="min-h-11 sm:min-h-8"
+
             disabled={reason != null}
             onClick={() => send(choice.text)}
           >
@@ -84,13 +84,12 @@ export function CoachWeekNote({
           rows={1}
           disabled={reason != null}
           onChange={(event) => setText(event.target.value)}
-          className="min-h-11 flex-1 sm:min-h-9"
+          className="min-h-7 flex-1 py-1 max-sm:min-h-10 max-sm:py-2"
         />
         <Button
           type="submit"
           size="icon"
           aria-label="Send the note"
-          className="size-11 sm:size-9"
           disabled={reason != null || !text.trim()}
         >
           <SendIcon />
@@ -111,7 +110,7 @@ export function CoachWeekNote({
             </Suspense>
           ) : null}
           <ResponsiveDialogFooter>
-            <ResponsiveDialogClose render={<Button variant="outline" className="min-h-11" />}>
+            <ResponsiveDialogClose render={<Button variant="outline" />}>
               Close
             </ResponsiveDialogClose>
           </ResponsiveDialogFooter>

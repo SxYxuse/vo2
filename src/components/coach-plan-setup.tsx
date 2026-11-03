@@ -99,7 +99,7 @@ export function AvailabilityFields({
                 key={count}
                 value={String(count)}
                 aria-label={`${count} ${field.noun} a week`}
-                className="min-h-11 w-full"
+                className="w-full"
               >
                 {count}
               </ToggleGroupItem>
@@ -266,10 +266,10 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
             setMetres(DISTANCES[picked][1]!.metres);
           }}
         >
-          <ToggleGroupItem value="run" className="min-h-11 w-full">
+          <ToggleGroupItem value="run" className="w-full">
             Run
           </ToggleGroupItem>
-          <ToggleGroupItem value="ride" className="min-h-11 w-full">
+          <ToggleGroupItem value="ride" className="w-full">
             Ride
           </ToggleGroupItem>
         </ToggleGroup>
@@ -282,7 +282,6 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           maxLength={120}
           placeholder={sport === "ride" ? "Mountain gran fondo" : "City half marathon"}
           onChange={(event) => setName(event.target.value)}
-          className="min-h-10"
         />
       </Field>
       <Field>
@@ -293,7 +292,6 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           min={today}
           value={date}
           onChange={(event) => setDate(event.target.value)}
-          className="min-h-10"
         />
       </Field>
       <FieldSet>
@@ -312,7 +310,7 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
             <ToggleGroupItem
               key={distance.label}
               value={String(distance.metres)}
-              className="min-h-11 w-full"
+              className="w-full"
             >
               {distance.label}
             </ToggleGroupItem>
@@ -382,7 +380,6 @@ export function CoachPlanSettings() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Button
           type="button"
-          className="min-h-10 sm:min-h-8"
           disabled={!online || !changed || availabilityIssue(draft) != null || save.isPending}
           onClick={() => save.mutate(draft)}
         >
@@ -393,7 +390,7 @@ export function CoachPlanSettings() {
           )}
           {saved ? "Save and rewrite plan" : "Save availability"}
         </Button>
-        <p className="text-muted-foreground text-sm" aria-live="polite">
+        <p className="text-muted-foreground text-xs" aria-live="polite">
           {!online
             ? "Offline: availability can't be saved."
             : save.error

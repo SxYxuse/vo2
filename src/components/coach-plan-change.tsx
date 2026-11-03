@@ -158,7 +158,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
             {proposal.sessions.map((change, index) => (
               <li
                 key={index}
-                className="flex flex-col gap-1.5 border-t py-2 text-sm first:border-t-0"
+                className="flex flex-col gap-1.5 border-t py-2 text-xs first:border-t-0"
               >
                 <b className="font-medium">Week of {format(parseISO(change.weekStart), "d MMM")}</b>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
@@ -174,7 +174,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
           <div className="flex gap-2">
             {proposal ? (
               <Button
-                className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+                className="flex-1 sm:flex-none"
                 disabled={!canAnswer}
                 onClick={() => approval.resolveInterrupt(true)}
               >
@@ -184,7 +184,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
             ) : null}
             <Button
               variant="outline"
-              className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+              className="flex-1 sm:flex-none"
               disabled={!canAnswer}
               onClick={() => approval.resolveInterrupt(false)}
             >

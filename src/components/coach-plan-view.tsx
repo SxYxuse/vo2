@@ -108,35 +108,43 @@ function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanStat
   const ride = run.sport === "ride";
   return (
     <li
-      className={cn("flex flex-col gap-3 rounded-xl border p-3 sm:p-4", run.done && "bg-muted/50")}
+      className={cn(
+        "bg-card ring-foreground/10 flex flex-col gap-2 rounded-lg p-3 ring-1",
+        run.done && "bg-muted/50",
+      )}
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="flex min-w-0 items-center gap-2 font-semibold tracking-tight">
-          <Icon aria-label={ride ? "Ride" : "Run"} className={cn("size-4 shrink-0", iconClass)} />
-          {run.title}
-        </h3>
-        <span className="shrink-0 text-2xl font-semibold tracking-tight tabular-nums">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+            <Icon
+              aria-label={ride ? "Ride" : "Run"}
+              className={cn("size-3.5 shrink-0", iconClass)}
+            />
+            <span className="truncate">{run.title}</span>
+          </h3>
+          <p className="text-muted-foreground text-xs">
+            {sessionKindLabel(run.kind, run.sport)}
+            {ride ? "" : ` · about ${run.minutes} min`}
+            {target ? ` · ${target}` : ""}
+          </p>
+        </div>
+        <span className="shrink-0 text-xl leading-tight font-semibold tracking-tight tabular-nums">
           {ride ? (
             minutesText(run.minutes)
           ) : (
             <>
               {run.distanceKm}
-              <small className="text-muted-foreground ms-1 text-sm font-medium">km</small>
+              <small className="text-muted-foreground ms-1 text-xs font-medium">km</small>
             </>
           )}
         </span>
       </div>
-      <p className="text-muted-foreground -mt-2 text-sm">
-        {sessionKindLabel(run.kind, run.sport)}
-        {ride ? "" : ` · about ${run.minutes} min`}
-        {target ? ` · ${target}` : ""}
-      </p>
-      <RunShape run={run} height={40} className={cn(run.done && "opacity-60")} />
+      <RunShape run={run} height={24} className={cn(run.done && "opacity-60")} />
       <div className="flex flex-wrap items-start gap-2">
         <DoneToggle run={run} state={state} className="flex-1 sm:flex-none" />
         <Button
           variant="ghost"
-          className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+          className="flex-1 sm:flex-none"
           nativeButton={false}
           // Marked, so the session's "Plan" button goes back here rather than adding an entry.
           render={
@@ -159,12 +167,12 @@ function WeekSessions({ week, state }: { week: PlanWeek; state: CoachPlanState }
   const done = week.sessions.filter((run) => run.done).length;
   const started = week.weekStart <= mondayOf(state.today);
   if (!week.sessions.length) {
-    return <p className="text-muted-foreground text-sm">No sessions planned this week.</p>;
+    return <p className="text-muted-foreground text-xs">No sessions planned this week.</p>;
   }
   return (
     <section aria-label="The week's sessions" className="flex flex-col gap-3">
       {started ? (
-        <p className="text-muted-foreground text-sm" aria-live="polite">
+        <p className="text-muted-foreground text-xs" aria-live="polite">
           {done} of {week.sessions.length} done. Do them on the days that suit you.
         </p>
       ) : null}
@@ -190,14 +198,12 @@ function WeekHeader({
   canStepBack: boolean;
   canStepForward: boolean;
 }) {
-  const arrow = "size-[2.75rem] shrink-0 [&_svg]:size-5";
   return (
     <div className="flex items-center gap-1">
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        className={arrow}
         aria-label="Previous week"
         disabled={!canStepBack}
         onClick={() => onStep(-1)}
@@ -216,7 +222,6 @@ function WeekHeader({
         type="button"
         variant="ghost"
         size="icon"
-        className={arrow}
         aria-label="Next week"
         disabled={!canStepForward}
         onClick={() => onStep(1)}
@@ -267,7 +272,7 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
     <div className="flex flex-col gap-3 sm:gap-4">
       <PlanStatus state={state} />
       {week ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-x-8">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-x-6">
           <div className="flex min-w-0 flex-col gap-3">
             <WeekHeader
               week={week}
@@ -279,7 +284,7 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
             {week.weekStart !== home ? (
               <Button
                 variant="link"
-                className="min-h-11 self-start px-0"
+                className="self-start px-0"
                 nativeButton={false}
                 render={<Link to="/week" search={{}} replace resetScroll={false} />}
               >
@@ -314,7 +319,7 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
               />
               <Button
                 variant="outline"
-                className="min-h-11 w-full"
+                className="w-full"
                 nativeButton={false}
                 render={<Link to="/coach" search={{ change: true }} />}
               >
