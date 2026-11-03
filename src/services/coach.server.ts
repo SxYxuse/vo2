@@ -33,7 +33,6 @@ import {
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { isBestEfforts } from "./best-efforts.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
-import { NOTE_THREAD_PREFIX } from "./coach-chats.ts";
 import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts";
 import { mockCoachText } from "./coach-mock.ts";
 import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
@@ -396,8 +395,7 @@ export async function handleCoachChat(request: Request) {
   ]);
   if (coach.kind === "missing") return coachKeyMissing();
   const params = await chatParamsFromRequest(request);
-  const saved = !params.threadId.startsWith(NOTE_THREAD_PREFIX);
-  if (saved && (await chatOwnedByOther(session.user.id, params.threadId))) {
+  if (await chatOwnedByOther(session.user.id, params.threadId)) {
     return new Response("Not found", { status: 404 });
   }
   const timeZone = validTimeZone(params.forwardedProps.timeZone);
@@ -430,9 +428,7 @@ export async function handleCoachChat(request: Request) {
     // Snapshots while streaming keep what the coach had said if the athlete leaves mid-reply.
     middleware: [
       withSkills(COACHING_SKILLS),
-      ...(saved
-        ? [withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true })]
-        : []),
+      withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true }),
     ],
   });
 

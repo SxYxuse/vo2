@@ -23,7 +23,6 @@ import {
   type PlannedSession,
 } from "@/services/coach-plan.types.ts";
 import { PHASES, mondayOf } from "@/services/season-phase.ts";
-import { CoachWeekNote } from "@/components/coach-week-note.tsx";
 import { PlanSeason, weekTotals } from "@/components/coach-plan-season.tsx";
 import { CoachPlanMissingAlert } from "@/components/coach-plan-setup.tsx";
 import {
@@ -298,17 +297,6 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
                 <WeekSessions week={week} state={state} />
               </div>
             </div>
-            {week.sessions.some((run) => !run.done && run.kind !== "race") ? (
-              <CoachWeekNote
-                weekStart={week.weekStart}
-                title={weekLabel(week.weekStart, state.today)}
-                disabledReason={
-                  state.status === "writing"
-                    ? "Your plan is being written again: send a note once it's written."
-                    : undefined
-                }
-              />
-            ) : null}
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:sticky lg:top-4">
