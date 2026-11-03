@@ -96,12 +96,10 @@ async function onboardWithCoachPlan(page: Page) {
   await expect(page.getByText("Autumn half")).toBeVisible();
   await next.click();
 
-  await expect(page.getByRole("heading", { name: "When can you run?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How often can you run?" })).toBeVisible();
   await page.getByRole("button", { name: "4 runs a week" }).click();
-  await expect(next).toBeDisabled();
-  await page.getByRole("button", { name: "Saturday", exact: true }).click();
-  // Runs a week, days, and the long run day: no time per day (ADR 0041).
-  await expect(page.getByText("Time you have")).toHaveCount(0);
+  // Runs a week only: no days, no long run day (ADR 0048), no time per day (ADR 0041).
+  await expect(page.getByText("Days you can run")).toHaveCount(0);
   await expect(page.getByRole("combobox")).toHaveCount(0);
   await next.click();
 

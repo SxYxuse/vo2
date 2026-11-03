@@ -1,5 +1,7 @@
 # The coach plan is written by the coach inside a budget VO2 sets
 
+Partly superseded by [0048](0048-the-coach-plans-sessions-have-no-day-or-order.md): the coach plan's sessions have no day, and a session is marked done by hand.
+
 The athlete picks a planning style in onboarding and in Settings → Training: off, the week planner (ADR 0026, unchanged), or the coach plan. Each style keeps its own setup, so switching back restores it. Off keeps Season and the calendar and plans nothing.
 
 The coach plan starts with running. It needs an upcoming A running goal with a distance and the athlete's OpenRouter key, since writing the plan is a coach feature with its own model choice (ADR 0036). The athlete sets how many runs a week (two to six), the days they can run, the time they have each day (dropped in [0041](0041-coach-plan-availability-has-no-time-per-day.md)), and the long run day. The coach writes precise sessions for the next four weeks: steps by distance or time, each with a pace range or effort, and repeats. It writes one new week each Monday. Written weeks are written again from the first day affected when the athlete changes availability or goals, asks the coach, misses a key session, or their paces change. Weeks gone by stay as they were. Rides, swims, and other sports still count toward load and are given to the coach as context, but only runs are planned.

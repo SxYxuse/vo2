@@ -27,14 +27,14 @@ import {
 import { RouteError } from "@/components/route-states.tsx";
 
 type WeekSearch = {
-  /** The coach plan's selected day, when not today. */
-  day?: string;
+  /** The coach plan's week shown, by its Monday, when not the first one. */
+  week?: string;
 };
 
 export const Route = createFileRoute("/_app/week")({
   validateSearch: (search: Record<string, unknown>): WeekSearch =>
-    typeof search.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.day)
-      ? { day: search.day }
+    typeof search.week === "string" && /^\d{4}-\d{2}-\d{2}$/.test(search.week)
+      ? { week: search.week }
       : {},
   loader: async ({ context }) => {
     const style = await planningStyleOf(context);
@@ -68,7 +68,7 @@ function WeekTargetHeading({
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         {coach
-          ? "Your coach plan: the runs of the next four weeks, day by day, toward your A goal."
+          ? "Your coach plan: each week's runs for the next four weeks, toward your A goal. Run them on the days that suit you."
           : planned
             ? "Your week day by day, built from your season, your rest days, and your form."
             : "No week is planned while planning is off."}
@@ -79,13 +79,13 @@ function WeekTargetHeading({
 
 function WeekTargetPage() {
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
-  const { day } = Route.useSearch();
+  const { week } = Route.useSearch();
   if (shell.planningStyle === "off") return <PlanningOff />;
   if (shell.planningStyle === "coachPlan") {
     return (
       <>
         <WeekTargetHeading coach />
-        <CoachPlanView day={day} />
+        <CoachPlanView week={week} />
       </>
     );
   }

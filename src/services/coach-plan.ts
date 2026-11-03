@@ -38,15 +38,10 @@ export const writeCoachPlanAgain = createServerFn({ method: "POST" }).handler(
   },
 );
 
-/** Links a run to a coach-plan session, or unlinks its run with `activityId: null`. */
-export const linkCoachPlanRun = createServerFn({ method: "POST" })
-  .validator(
-    z.object({
-      sessionId: z.string().min(1).max(64),
-      activityId: z.string().min(1).max(32).nullable(),
-    }),
-  )
+/** Marks a coach-plan session done, or open again with `done: false` (ADR 0048). */
+export const markCoachPlanSession = createServerFn({ method: "POST" })
+  .validator(z.object({ sessionId: z.string().min(1).max(64), done: z.boolean() }))
   .handler(async ({ data }): Promise<CoachPlanState> => {
-    const { linkRunImpl } = await import("./coach-plan.server.ts");
-    return linkRunImpl(data.sessionId, data.activityId);
+    const { markSessionImpl } = await import("./coach-plan.server.ts");
+    return markSessionImpl(data.sessionId, data.done);
   });

@@ -1,6 +1,6 @@
 # Running: session library
 
-Sessions to build the coach plan from. Pick a session type for each run, then size it from the week's distance budget, the goal distance, the phase, and the day's available time. Every session must also pass the rules in `principles.md`.
+Sessions to build the coach plan from. Pick a session type for each run, then size it from the week's distance budget, the goal distance, and the phase. Every session must also pass the rules in `principles.md`.
 
 Sources: numbers marked **(Daniels)** are via [Coach Ray](https://www.coachray.nz/2023/05/03/jack-daniels-running-intensity/); **(ctyeh)** via the [ctyeh interval guide](https://ctyeh.com/articles/728?lang=en), a secondary summary; **(McMillan)** via [McMillan Running](https://www.mcmillanrunning.com/?p=181). Everything else is coaching convention: guidance, not rule.
 
@@ -80,7 +80,7 @@ Aerobic base and volume; most of the week. No pace below E.
 
 ## Recovery run
 
-The day after a hard session or long run, when the athlete runs every day. Shorter and slower than an easy run.
+For weeks with many runs, as the light one. Shorter and slower than an easy run.
 
 ```
 30 min easy, slower than E
@@ -284,5 +284,5 @@ Cool-down: 1 km E
 ## Taper and lighter weeks
 
 - Keep the same session types, sized from the lighter week's own budget: the caps shrink with it.
-- Race week: one short session 3–4 days before the race, such as 4 × 200 m R or 2 × 1 km at race effort, with full recovery, still within that week's caps. The rest easy and short.
+- Race week: one short session, such as 4 × 200 m R or 2 × 1 km at race effort, with full recovery, still within that week's caps. The rest easy and short.
 - Never a new kind of session in a taper.

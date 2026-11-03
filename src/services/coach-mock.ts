@@ -46,54 +46,45 @@ function resultsThisTurn(messages: ModelMessage[]) {
 
 // ----- Plan changes on the coach plan (ADR 0038) -----
 
-type MockSession = WrittenSession & { distanceKm: number };
+/** A session as get_coach_plan gives it: no week of its own, and no day (ADR 0048). */
+type MockSession = Omit<WrittenSession, "weekStart"> & {
+  id: string;
+  status: "open" | "done";
+  distanceKm: number;
+};
 type MockCoachPlan = {
   canChange: boolean;
   message?: string;
-  firstChangeableDay: string;
-  availability: { days: string[] };
   weeks: { weekStart: string; sessions: MockSession[] }[];
 };
+type Asked = { weekStart: string | null; kind: "fewer" | "indoor" | "easier" };
 
-const WEEKDAY_NAMES = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
-const weekdayOf = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
-
-/**
- * What the athlete asked, for the phrasings the mock coach knows: a day note ("Note on my plan for
- * Thursday 2026-06-18: …") or "I can't run on Thursday" in the chat.
- */
-function askedChange(text: string) {
-  const note = /Note on my plan for \w+ (\d{4}-\d{2}-\d{2}): (.*)/s.exec(text);
-  if (note) {
-    const kind = /can't (?:train|run)/i.test(note[2])
-      ? "cant"
-      : /indoors/i.test(note[2])
-        ? "indoor"
-        : "easier";
-    return { date: note[1], weekday: null, kind } as const;
-  }
-  const cant = /can'?t (?:run|train)(?: on)? (\w+day)/i.exec(text);
-  const weekday = cant ? WEEKDAY_NAMES.indexOf(cant[1].toLowerCase()) : -1;
-  if (weekday >= 0) return { date: null, weekday, kind: "cant" } as const;
-  if (/too hard|take it easy/i.test(text)) return { date: null, weekday: null, kind: "easier" };
+/** Each kind of change, from the words of a week note or a chat message. */
+function kindOf(text: string): Asked["kind"] | null {
+  if (/can'?t (?:run|train)|only run (?:once|twice|\w+ times)/i.test(text)) return "fewer";
+  if (/indoors|treadmill/i.test(text)) return "indoor";
+  if (/too hard|take it easy|short on time/i.test(text)) return "easier";
   return null;
 }
 
-function easierRun(session: MockSession): WrittenSession {
+/**
+ * What the athlete asked, for the phrasings the mock coach knows: a week note ("Note on my plan
+ * for the week of 2026-06-15: …") or "I can only run twice this week" in the chat.
+ */
+function askedChange(text: string): Asked | null {
+  const note = /Note on my plan for the week of (\d{4}-\d{2}-\d{2}): (.*)/s.exec(text);
+  if (note) return { weekStart: note[1], kind: kindOf(note[2]) ?? "easier" };
+  const kind = kindOf(text);
+  return kind ? { weekStart: null, kind } : null;
+}
+
+function easierRun(weekStart: string, session: MockSession): WrittenSession {
   const km = Math.max(3, Math.round(session.distanceKm / 2));
   return {
-    date: session.date,
+    weekStart,
     kind: "easy",
     title: `${km} km easy`,
-    why: "Shorter and easy, so the day stays light.",
+    why: "Shorter and easy, so the week stays light.",
     blocks: [
       {
         repeat: 1,
@@ -106,50 +97,33 @@ function easierRun(session: MockSession): WrittenSession {
 }
 
 /** The changes the mock coach tries, in order, until one passes VO2's rules. */
-function candidateChanges(plan: MockCoachPlan, target: MockSession, kind: string) {
-  const { date: _date, distanceKm: _km, ...written } = target;
-  const day = weekdayOf(target.date);
+function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["kind"]) {
+  const written = ({ id: _id, status: _s, distanceKm: _km, ...session }: MockSession) => ({
+    ...session,
+    weekStart,
+  });
   if (kind === "easier") {
     return [
       {
-        summary: "An easier, shorter run that day.",
-        days: [{ date: target.date, session: easierRun(target) }],
+        summary: "An easier, shorter run this week.",
+        sessions: [{ id: open[0].id, session: easierRun(weekStart, open[0]) }],
       },
     ];
   }
   if (kind === "indoor") {
-    const indoor = { ...written, date: target.date, title: `${target.title} (treadmill)` };
+    const indoor = { ...written(open[0]), title: `${open[0].title} (treadmill)` };
     return [
-      { summary: "The same run, on a treadmill.", days: [{ date: target.date, session: indoor }] },
+      { summary: "The same run, on a treadmill.", sessions: [{ id: open[0].id, session: indoor }] },
     ];
   }
-  const week = plan.weeks.find((item) => item.sessions.includes(target))!;
-  const open = plan.availability.days.map((text) => WEEKDAY_NAMES.indexOf(text.toLowerCase()));
-  const moves = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(Date.parse(`${week.weekStart}T12:00:00Z`) + index * 86_400_000);
-    return date.toISOString().slice(0, 10);
-  })
-    .filter(
-      (date) =>
-        date >= plan.firstChangeableDay &&
-        date !== target.date &&
-        open.includes(weekdayOf(date)) &&
-        !week.sessions.some((session) => session.date === date),
-    )
-    .map((date) => ({
-      summary: `${target.title} moves from ${WEEKDAY_NAMES[day]} to ${WEEKDAY_NAMES[weekdayOf(date)]}.`,
-      days: [
-        { date: target.date, session: null },
-        { date, session: { ...written, date } },
-      ],
-    }));
-  return [
-    ...moves,
-    {
+  // One run fewer: the long run stays, and of the others the shorter go first.
+  const isLong = (session: MockSession) => (session.kind === "long" ? 1 : 0);
+  return [...open]
+    .sort((a, b) => isLong(a) - isLong(b) || a.distanceKm - b.distanceKm)
+    .map((target) => ({
       summary: `${target.title} is dropped: a missed run is skipped, never made up.`,
-      days: [{ date: target.date, session: null }],
-    },
-  ];
+      sessions: [{ id: target.id, session: null }],
+    }));
 }
 
 function appliedText(result: unknown) {
@@ -171,17 +145,14 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
   if (!plan.canChange) return { kind: "text", text: plan.message ?? "The plan can't change now." };
   const applied = results.find((result) => result.name === "apply_plan_change");
   if (applied) return { kind: "text", text: appliedText(applied.value) };
-  const ahead = plan.weeks
-    .flatMap((week) => week.sessions)
-    .filter((session) => session.date >= plan.firstChangeableDay && session.kind !== "race");
-  const target =
-    asked.date != null
-      ? ahead.find((session) => session.date === asked.date)
-      : asked.weekday != null
-        ? ahead.find((session) => weekdayOf(session.date) === asked.weekday)
-        : ahead[0];
-  if (!target) {
-    return { kind: "text", text: "There's no run planned then, so your plan needs no change." };
+  const week = asked.weekStart
+    ? plan.weeks.find((item) => item.weekStart === asked.weekStart)
+    : plan.weeks[0];
+  const open = (week?.sessions ?? []).filter(
+    (session) => session.status === "open" && session.kind !== "race",
+  );
+  if (!week || !open.length) {
+    return { kind: "text", text: "There's no open run that week, so your plan needs no change." };
   }
   const proposals = results.filter((result) => result.name === "propose_plan_change");
   const last = proposals.at(-1)?.value as
@@ -193,7 +164,7 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
       calls: [{ name: "apply_plan_change", input: { proposalId: last.proposalId } }],
     };
   }
-  const candidates = candidateChanges(plan, target, asked.kind);
+  const candidates = candidateChanges(week.weekStart, open, asked.kind);
   const next = candidates[proposals.length];
   if (!next) {
     return {

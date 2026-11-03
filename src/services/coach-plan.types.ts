@@ -13,66 +13,31 @@ import {
 
 /*
  * The coach plan (ADR 0037): the athlete's availability, the structured session format the coach
- * writes in, and the written plan as stored. Shared by the server and the app.
+ * writes in, and the written plan as stored. Shared by the server and the app. Sessions belong to
+ * a week and have no day or order (ADR 0048): the athlete picks when to run them.
  */
 
 export const MIN_RUNS_PER_WEEK = 2;
 export const MAX_RUNS_PER_WEEK = 6;
 
-const weekdaySchema = z.number().int().min(0).max(6);
-
 /**
- * A running day: its weekday. Availability saved before ADR 0041 stored each day as
- * `{ weekday, minutes }`; those still parse, and the minutes are dropped.
+ * How much the athlete can run: runs a week (ADR 0048). Availability saved before it also had
+ * days and a long run day; those still parse, and the extra keys are dropped.
  */
-const daySchema = z.preprocess(
-  (day) => (typeof day === "object" && day != null && "weekday" in day ? day.weekday : day),
-  weekdaySchema,
-);
-
-/** How much the athlete can run: runs a week, the days they can run, and the long run day. */
-export const availabilitySchema = z
-  .object({
-    runsPerWeek: z.number().int().min(MIN_RUNS_PER_WEEK).max(MAX_RUNS_PER_WEEK),
-    days: z.array(daySchema).max(7),
-    longRunDay: weekdaySchema,
-  })
-  .superRefine((value, ctx) => {
-    const weekdays = value.days;
-    if (new Set(weekdays).size !== weekdays.length) {
-      ctx.addIssue({ code: "custom", path: ["days"], message: "A day is listed twice." });
-    }
-    if (weekdays.length < value.runsPerWeek) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["days"],
-        message: `Pick at least ${value.runsPerWeek} days for ${value.runsPerWeek} runs a week.`,
-      });
-    }
-    if (!weekdays.includes(value.longRunDay)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["longRunDay"],
-        message: "Pick one of your running days for the long run.",
-      });
-    }
-  });
+export const availabilitySchema = z.object({
+  runsPerWeek: z.number().int().min(MIN_RUNS_PER_WEEK).max(MAX_RUNS_PER_WEEK),
+});
 
 export type Availability = z.infer<typeof availabilitySchema>;
 
-/** A starting point: three runs on Tuesday, Thursday, and Sunday. */
-export const DEFAULT_AVAILABILITY: Availability = {
-  runsPerWeek: 3,
-  days: [2, 4, 0],
-  longRunDay: 0,
-};
+export const DEFAULT_AVAILABILITY: Availability = { runsPerWeek: 3 };
 
 export function parseAvailability(value: unknown): Availability | null {
   const parsed = availabilitySchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
-/** An availability as plan bases compare it, so one saved with minutes reads as without. */
+/** An availability as plan bases compare it, so one saved with days reads as without. */
 export function availabilityKey(value: unknown) {
   return JSON.stringify(parseAvailability(value));
 }
@@ -95,7 +60,7 @@ export const SESSION_KINDS = [
 export type SessionKind = (typeof SESSION_KINDS)[number]["id"];
 const SESSION_KIND_IDS = SESSION_KINDS.map((kind) => kind.id) as [SessionKind, ...SessionKind[]];
 
-/** Sessions with threshold, interval, repetition, or race-pace work: hard days for rule 3. */
+/** Sessions with threshold, interval, repetition, or race-pace work: quality sessions (rule 4). */
 const QUALITY_KINDS = new Set<SessionKind>([
   "tempo",
   "intervals",
@@ -151,7 +116,8 @@ const blockSchema = z.object({
 });
 
 export const writtenSessionSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** The Monday of the session's week: a session has no day (ADR 0048). */
+  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   kind: z.enum(SESSION_KIND_IDS),
   title: z.string().min(1).max(80),
   why: z.string().min(1).max(300),
@@ -176,6 +142,8 @@ export type PlannedRun = Omit<WrittenSession, "blocks"> & {
   blocks: { repeat: number; steps: PlannedStep[] }[];
   distanceKm: number;
   minutes: number;
+  /** Marked done by the athlete (ADR 0048). Plans stored before it have none: open. */
+  done?: boolean;
 };
 
 export type PlanWeek = {
@@ -229,96 +197,11 @@ export type CoachPlanState = {
   status: CoachPlanStatus;
   /** Why the last writing failed, in words for the athlete. */
   error: string | null;
-  /** The athlete's activities over the plan's weeks, each with the session it did, if any. */
-  activities: PlanActivity[];
   /** The weeks from this one to the A race, with their season phase. */
   road: { weekStart: string; phase: PhaseKind }[];
   /** The VDOT of the athlete's training paces, for the predicted race time. */
   vdot: number | null;
 };
-
-// ----- Done matching -----
-
-/** A run on the session's day covering this share of its distance counts as doing it. */
-export const DONE_SHARE = 0.7;
-
-/** Runs the athlete linked to sessions by hand, and runs they said did none (ADR 0037). */
-export type SessionLinks = {
-  /** Session id to the activity the athlete linked to it. */
-  linked: Record<string, string>;
-  /** Activities the athlete unlinked: never matched to a session automatically again. */
-  unlinked: string[];
-};
-
-export function parseLinks(value: unknown): SessionLinks {
-  const links = (value ?? {}) as Partial<SessionLinks>;
-  return { linked: links.linked ?? {}, unlinked: links.unlinked ?? [] };
-}
-
-/** An activity on a day of the plan, with the session it did. */
-export type PlanActivity = {
-  id: string;
-  date: string;
-  name: string;
-  sportType: string;
-  km: number;
-  seconds: number;
-  /** The session it did, or null for an extra. Only runs do sessions. */
-  sessionId: string | null;
-  /** Linked by the athlete rather than matched. */
-  manual: boolean;
-};
-
-type MatchRun = { id: string; date: string; km: number };
-
-/**
- * Which run did each session: the athlete's link first, else the longest run on the session's day
- * covering 70 % of its distance that no other session took and the athlete didn't unlink.
- */
-export function matchSessions(
-  sessions: Pick<PlannedRun, "id" | "date" | "distanceKm">[],
-  runs: MatchRun[],
-  links: SessionLinks,
-  today: string,
-) {
-  const matched = new Map<string, { runId: string; manual: boolean }>();
-  const used = new Set<string>();
-  for (const session of sessions) {
-    const runId = links.linked[session.id];
-    if (runId && runs.some((run) => run.id === runId) && !used.has(runId)) {
-      matched.set(session.id, { runId, manual: true });
-      used.add(runId);
-    }
-  }
-  const unlinked = new Set(links.unlinked);
-  for (const session of sessions) {
-    if (matched.has(session.id) || session.date > today) continue;
-    const run = runs
-      .filter(
-        (item) =>
-          item.date === session.date &&
-          !used.has(item.id) &&
-          !unlinked.has(item.id) &&
-          item.km >= session.distanceKm * DONE_SHARE,
-      )
-      .sort((a, b) => b.km - a.km)[0];
-    if (!run) continue;
-    matched.set(session.id, { runId: run.id, manual: false });
-    used.add(run.id);
-  }
-  return matched;
-}
-
-export type SessionStatus = "done" | "missed" | "planned";
-
-export function sessionStatus(
-  session: Pick<PlannedRun, "id" | "date">,
-  activities: PlanActivity[],
-  today: string,
-): SessionStatus {
-  if (activities.some((item) => item.sessionId === session.id)) return "done";
-  return session.date < today ? "missed" : "planned";
-}
 
 /** The A goal the coach plan builds toward: the next A run with a distance. */
 export function coachPlanGoal(goals: Goal[], today: string): Goal | null {
@@ -388,10 +271,14 @@ export function sessionSize(
   return { distanceKm: Math.round(metres / 100) / 10, minutes: Math.round(seconds / 60) };
 }
 
-/** A written session as stored: sized, and each pace step given its range. */
+/**
+ * A written session as stored: sized, each pace step given its range, and open. Its id is new
+ * unless it replaces a session, which keeps that one's id so a link to it still opens it.
+ */
 export function plannedRun(
   session: WrittenSession,
   paces: Record<PaceType, PaceRange> | null,
+  id: string = crypto.randomUUID(),
 ): PlannedRun {
   const blocks = session.blocks.map((block) => ({
     repeat: block.repeat,
@@ -400,12 +287,7 @@ export function plannedRun(
       range: step.pace && paces ? paces[step.pace] : null,
     })),
   }));
-  return {
-    ...session,
-    id: `${session.date}-${session.kind}`,
-    blocks,
-    ...sessionSize(session.blocks, paces),
-  };
+  return { ...session, id, blocks, ...sessionSize(session.blocks, paces), done: false };
 }
 
 /** "800 m", "2.5 km", "90 s", "20 min". */

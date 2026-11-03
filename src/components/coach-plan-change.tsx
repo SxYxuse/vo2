@@ -64,15 +64,13 @@ export function usePlanChanges(
   }, [messages, interrupts, canAnswer]);
 }
 
-/** One side of a changed day: what the run is, how long, and its steps; or a rest day. */
+/** One side of a changed session: what the run is, how long, and its steps; or no run. */
 function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
   const label = before ? "Before" : "After";
   if (!side) {
     return (
       <div className="flex min-w-0 flex-col" aria-label={label} role="group">
-        <span className={cn("font-medium", before && "text-muted-foreground line-through")}>
-          Rest day
-        </span>
+        <span className="text-muted-foreground font-medium">No run</span>
       </div>
     );
   }
@@ -130,8 +128,9 @@ function Outcome({ call }: { call: ToolCall }) {
 }
 
 /**
- * The change the coach offers with apply_plan_change, day by day, with Apply and Decline. It shows
- * only a change VO2 checked in this conversation: an id the checker never answered gets no diff.
+ * The change the coach offers with apply_plan_change, session by session under its week, with
+ * Apply and Decline. It shows only a change VO2 checked in this conversation: an id the checker
+ * never answered gets no diff.
  */
 export function PlanChangeCard({ call }: { call: ToolCall }) {
   const { proposals, approvals, canAnswer } = use(PlanChangeContext);
@@ -154,16 +153,16 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
       <CardContent className="flex flex-col gap-3">
         {proposal ? (
           <ul className="flex flex-col">
-            {proposal.days.map((day) => (
+            {proposal.sessions.map((change, index) => (
               <li
-                key={day.date}
+                key={index}
                 className="flex flex-col gap-1.5 border-t py-2 text-sm first:border-t-0"
               >
-                <b className="font-medium">{format(parseISO(day.date), "EEE d MMM")}</b>
+                <b className="font-medium">Week of {format(parseISO(change.weekStart), "d MMM")}</b>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
-                  <Side side={day.before} before />
+                  <Side side={change.before} before />
                   <ArrowRightIcon aria-label="becomes" className="mt-1 size-3.5" />
-                  <Side side={day.after} />
+                  <Side side={change.after} />
                 </div>
               </li>
             ))}

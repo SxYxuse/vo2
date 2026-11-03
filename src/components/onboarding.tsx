@@ -116,8 +116,8 @@ const STEP_LIST = [
   },
   {
     id: "availability",
-    title: "When can you run?",
-    description: "The coach writes your runs on these days, the long one on your long run day.",
+    title: "How often can you run?",
+    description: "The coach writes that many runs each week. You pick the days to run them.",
   },
   {
     id: "paces",

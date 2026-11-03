@@ -1,5 +1,7 @@
 # Coach plan availability has no time per day
 
+Superseded in part by [0048](0048-the-coach-plans-sessions-have-no-day-or-order.md): availability is now only how many runs a week, with no days.
+
 Supersedes, in part, [0037](0037-the-coach-plan-is-written-by-the-coach-inside-a-budget-vo2-sets.md) (the time the athlete has each day) and [0040](0040-the-coach-plan-is-written-when-the-app-asks-and-short-weeks-allow-a-bigger-long-run-share.md) (the floor's estimate of what the days allow).
 
 With the coach plan, availability is how many runs a week, the days the athlete can run, and the long run day. The time per day is gone from onboarding, Settings → Training, the writer's prompt, and the rules. Availability saved with minutes still reads, and the minutes are ignored; a plan written from it is not rewritten for that alone. Sessions are limited only by the coach plan's rules: the long run at most 2 h 30 and its share of the week, no run more than 10 % over the longest of the last 30 days, and the rest of ADR 0037. The week planner keeps its own time per day.

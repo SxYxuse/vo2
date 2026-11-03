@@ -18,7 +18,6 @@ import {
   type CoachPlanState,
 } from "@/services/coach-plan.types.ts";
 import { createGoal } from "@/services/season.ts";
-import { WEEKDAYS } from "@/services/training-plan.types.ts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,8 +55,8 @@ export function availabilityIssue(value: Availability) {
 }
 
 /**
- * Availability (ADR 0041): runs a week, the days the athlete can run, and the long run day. The
- * plan picks which of the days to use.
+ * Availability (ADR 0048): how many runs a week. The coach writes each week's runs, and the
+ * athlete picks the days to run them.
  */
 export function AvailabilityFields({
   value,
@@ -68,20 +67,14 @@ export function AvailabilityFields({
   onChange: (next: Availability) => void;
   disabled?: boolean;
 }) {
-  const chosen = WEEKDAYS.filter((day) => value.days.includes(day.id));
   const issue = availabilityIssue(value);
-  const setDays = (weekdays: number[]) => {
-    const days = WEEKDAYS.filter((day) => weekdays.includes(day.id)).map((day) => day.id);
-    const longRunDay = weekdays.includes(value.longRunDay)
-      ? value.longRunDay
-      : (days.at(-1) ?? value.longRunDay);
-    onChange({ ...value, days, longRunDay });
-  };
-
   return (
     <FieldGroup>
       <FieldSet>
         <FieldLegend>Runs a week</FieldLegend>
+        <FieldDescription>
+          The coach writes that many runs each week. You pick the days to run them.
+        </FieldDescription>
         <ToggleGroup
           variant="outline"
           spacing={1}
@@ -108,61 +101,6 @@ export function AvailabilityFields({
           })}
         </ToggleGroup>
       </FieldSet>
-
-      <FieldSet>
-        <FieldLegend>Days you can run</FieldLegend>
-        <FieldDescription>
-          Pick at least as many days as runs. The coach chooses which of them to use.
-        </FieldDescription>
-        <ToggleGroup
-          multiple
-          variant="outline"
-          spacing={1}
-          className="grid w-full grid-cols-7"
-          disabled={disabled}
-          value={chosen.map((day) => String(day.id))}
-          onValueChange={(next) => setDays((next as string[]).map(Number))}
-        >
-          {WEEKDAYS.map((day) => (
-            <ToggleGroupItem
-              key={day.id}
-              value={String(day.id)}
-              aria-label={day.label}
-              className="min-h-11 w-full px-0"
-            >
-              {day.label.slice(0, 2)}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </FieldSet>
-
-      {chosen.length ? (
-        <FieldSet>
-          <FieldLegend>Long run day</FieldLegend>
-          <ToggleGroup
-            variant="outline"
-            spacing={1}
-            className="flex-wrap"
-            disabled={disabled}
-            value={[String(value.longRunDay)]}
-            onValueChange={(next) => {
-              const picked = (next as string[])[0];
-              if (picked != null) onChange({ ...value, longRunDay: Number(picked) });
-            }}
-          >
-            {chosen.map((day) => (
-              <ToggleGroupItem
-                key={day.id}
-                value={String(day.id)}
-                aria-label={`Long run on ${day.label}`}
-                className="min-h-11"
-              >
-                {day.label.slice(0, 3)}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </FieldSet>
-      ) : null}
       {issue ? <FieldError>{issue}</FieldError> : null}
     </FieldGroup>
   );
@@ -186,7 +124,7 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
     ),
   },
   availability: {
-    text: "The coach needs to know when you can run.",
+    text: "The coach needs to know how many times a week you run.",
     link: (
       <Link to="/settings/$section" params={{ section: "training" }} className="underline">
         Set it in Settings → Training

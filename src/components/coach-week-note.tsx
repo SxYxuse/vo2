@@ -1,12 +1,11 @@
 "use client";
 
 import { Suspense, lazy, useState } from "react";
-import { format, parseISO } from "date-fns";
 import { SendIcon } from "lucide-react";
 
 import { useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
-import { DAY_NOTE_CHOICES, dayNoteMessage } from "@/services/coach-plan-change.ts";
+import { WEEK_NOTE_CHOICES, weekNoteMessage } from "@/services/coach-plan-change.ts";
 import {
   ResponsiveDialog,
   ResponsiveDialogClose,
@@ -26,10 +25,20 @@ const NoteReply = lazy(() =>
 );
 
 /**
- * A note on a day of the coach plan (GLOSSARY: Coach note): a quick choice or the athlete's own
- * words, sent to the coach, who proposes a plan change the athlete applies (ADR 0038).
+ * A note on a week of the coach plan (GLOSSARY: Coach note): a quick choice or the athlete's own
+ * words, sent to the coach, who proposes a change to the week's sessions the athlete applies
+ * (ADR 0038). It names the week, not a day: the sessions have none (ADR 0048).
  */
-export function CoachDayNote({ date, disabledReason }: { date: string; disabledReason?: string }) {
+export function CoachWeekNote({
+  weekStart,
+  title,
+  disabledReason,
+}: {
+  weekStart: string;
+  /** "This week", or "Week of 22 Jun". */
+  title: string;
+  disabledReason?: string;
+}) {
   const online = useOnline();
   const { needsKey } = useCoachAvailable();
   const [text, setText] = useState("");
@@ -39,16 +48,15 @@ export function CoachDayNote({ date, disabledReason }: { date: string; disabledR
     : needsKey
       ? "Add your OpenRouter key in Settings → Coach to send the coach a note."
       : disabledReason;
-  const weekday = format(parseISO(date), "EEEE");
   const send = (note: string) => {
-    setSent(dayNoteMessage(date, weekday, note));
+    setSent(weekNoteMessage(weekStart, note));
     setText("");
   };
   return (
     <section aria-label="Note for the coach" className="flex flex-col gap-2 border-t pt-3">
       <p className="text-muted-foreground text-xs">Something changed? Tell the coach</p>
       <div className="flex flex-wrap gap-1.5">
-        {DAY_NOTE_CHOICES.map((choice) => (
+        {WEEK_NOTE_CHOICES.map((choice) => (
           <Button
             key={choice.id}
             size="sm"
@@ -70,7 +78,7 @@ export function CoachDayNote({ date, disabledReason }: { date: string; disabledR
       >
         <Textarea
           aria-label="Your note"
-          placeholder={`Or in your own words, about ${weekday}`}
+          placeholder="Or in your own words"
           value={text}
           maxLength={500}
           rows={1}
@@ -92,7 +100,7 @@ export function CoachDayNote({ date, disabledReason }: { date: string; disabledR
       <ResponsiveDialog open={sent != null} onOpenChange={(open) => !open && setSent(null)}>
         <ResponsiveDialogContent className="sm:max-w-lg" showCloseButton={false}>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>{format(parseISO(date), "EEEE d MMMM")}</ResponsiveDialogTitle>
+            <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
               The coach proposes a change; nothing changes until you apply it.
             </ResponsiveDialogDescription>

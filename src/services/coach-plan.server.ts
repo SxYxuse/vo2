@@ -19,10 +19,8 @@ import {
 } from "./coach-plan-writer.server.ts";
 import {
   coachPlanGoal,
-  matchSessions,
   availabilityKey,
   parseAvailability,
-  parseLinks,
   plannedRun,
   stepSecPerKm,
   type Availability,
@@ -31,7 +29,6 @@ import {
   type CoachPlanState,
   type CoachPlanStatus,
   type PlanBasis,
-  type PlanActivity,
   type PlanGoal,
   type PlannedRun,
 } from "./coach-plan.types.ts";
@@ -127,7 +124,6 @@ export async function gather(userId: string, now = new Date()) {
     availability: row ? parseAvailability(row.availability) : null,
     aGoal: coachPlanGoal(goals, today),
     plan: (row?.plan as CoachPlan | null) ?? null,
-    links: parseLinks(row?.links),
     runs: runs as (RunDay & Activity)[],
     all,
     others: all.filter((item) => sportGroupFor(item.sportType)?.id !== "running"),
@@ -152,33 +148,6 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   if (!inputs.aGoal) missing.push("goal");
   if (!inputs.availability) missing.push("availability");
   return missing;
-}
-
-/** Which run did each session: the athlete's links win over the 70 % match. */
-export function matchOf(inputs: Pick<Inputs, "plan" | "runs" | "links" | "today">) {
-  const sessions = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
-  return matchSessions(sessions, inputs.runs, inputs.links, inputs.today);
-}
-
-/** The activities over the plan's weeks, each with the session it did. */
-function planActivities(inputs: Inputs): PlanActivity[] {
-  const from = inputs.plan?.weeks[0]?.weekStart ?? inputs.currentWeek;
-  const bySession = new Map(
-    [...matchOf(inputs)].map(([sessionId, match]) => [match.runId, { sessionId, ...match }]),
-  );
-  return inputs.all
-    .filter((item) => item.date >= from)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((item) => ({
-      id: item.id,
-      date: item.date,
-      name: item.name,
-      sportType: item.sportType,
-      km: Math.round(item.km * 100) / 100,
-      seconds: item.seconds,
-      sessionId: bySession.get(item.id)?.sessionId ?? null,
-      manual: bySession.get(item.id)?.manual ?? false,
-    }));
 }
 
 /** The weeks from this one to the A race, each with its season phase. */
@@ -229,75 +198,68 @@ function basisOf(inputs: Inputs): PlanBasis {
   };
 }
 
-/** Today, or tomorrow once the athlete ran today: a run done is not written again. */
-export function firstDay(inputs: Inputs) {
-  return inputs.runs.some((run) => run.date === inputs.today)
-    ? addDayKey(inputs.today, 1)
-    : inputs.today;
-}
-
 type Due = {
-  from: string;
+  /** The first week written: weeks before it are kept, and in it only done sessions are. */
+  fromWeek: string;
   reason: string;
   /** What set the writing off, so a failed one is tried again only when that changes. */
   trigger: unknown;
 };
 
-/**
- * Whether the weeks ahead need writing, and from which day: the first plan; the athlete asked
- * (switching back to the coach plan); availability, goals, or paces changed; or a new week is
- * due. A missed run is skipped, never a reason to write. Days before it are frozen.
- */
-/**
- * Whether the easy pace alone moved enough to rewrite. An easy pace read from the VDOT moves with
- * it, so the VDOT point covers it; only one from heart rate, before or now, is checked here.
- */
 /** The easy pace in steps of EASY_CHANGE_SEC_PER_KM, so a failed writing waits as the VDOT's does. */
 const easyStep = (easy: PlanBasis["easy"]) =>
   easy ? Math.round(easy.secPerKm / EASY_CHANGE_SEC_PER_KM) : null;
 
+/**
+ * Whether the easy pace alone moved enough to rewrite. An easy pace read from the VDOT moves with
+ * it, so the VDOT point covers it; only one from heart rate, before or now, is checked here.
+ */
 function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
   if (written === undefined || written == null || now == null) return false;
   if (written.from !== "heartRate" && now.from !== "heartRate") return false;
   return Math.abs(written.secPerKm - now.secPerKm) >= EASY_CHANGE_SEC_PER_KM;
 }
 
+/**
+ * Whether the weeks ahead need writing, and from which week: the first plan; the athlete asked
+ * (switching back to the coach plan); availability, goals, or paces changed; or a new week is
+ * due. A missed run is skipped, never a reason to write. Sessions marked done are kept.
+ */
 export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
-  const first = firstDay(inputs);
+  const first = inputs.currentWeek;
   const { plan, row, today } = inputs;
   const goals = upcomingGoalsKey(basis.goals, today);
   if (!plan) {
     return {
-      from: first,
+      fromWeek: first,
       reason: "first",
       trigger: [basis.availability, goals, vdotPoint(basis.vdot)],
     };
   }
   if (row?.requestedFrom) {
-    const from = row.requestedFrom > first ? row.requestedFrom : first;
-    return { from, reason: "asked", trigger: row.requestedFrom };
+    const asked = mondayOf(row.requestedFrom);
+    return { fromWeek: asked > first ? asked : first, reason: "asked", trigger: row.requestedFrom };
   }
   // Read through the schema, so a plan written when availability had minutes isn't rewritten.
   if (availabilityKey(JSON.parse(plan.basis.availability)) !== basis.availability) {
-    return { from: first, reason: "availability", trigger: basis.availability };
+    return { fromWeek: first, reason: "availability", trigger: basis.availability };
   }
   if (upcomingGoalsKey(plan.basis.goals, today) !== goals) {
-    return { from: first, reason: "goals", trigger: goals };
+    return { fromWeek: first, reason: "goals", trigger: goals };
   }
   const pacesChanged =
     (plan.basis.vdot == null) !== (basis.vdot == null) ||
     Math.abs((plan.basis.vdot ?? 0) - (basis.vdot ?? 0)) >= PACE_CHANGE_VDOT;
-  if (pacesChanged) return { from: first, reason: "paces", trigger: vdotPoint(basis.vdot) };
+  if (pacesChanged) return { fromWeek: first, reason: "paces", trigger: vdotPoint(basis.vdot) };
   if (easyChanged(plan.basis.easy, basis.easy)) {
-    return { from: first, reason: "easy pace", trigger: easyStep(basis.easy) };
+    return { fromWeek: first, reason: "easy pace", trigger: easyStep(basis.easy) };
   }
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
-    const from = lastWeek && next > first ? next : first;
-    // Keyed on the week being added, not the day: a plan fallen behind would otherwise try again
-    // each day after a failure.
-    return { from, reason: "new week", trigger: next };
+    // Keyed on the week being added: a plan fallen behind would otherwise try again each day
+    // after a failure.
+    return { fromWeek: lastWeek && next > first ? next : first, reason: "new week", trigger: next };
   }
   return null;
 }
@@ -330,7 +292,6 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
     missing: missingOf(inputs),
     plan: (row?.plan as CoachPlan | null) ?? null,
     ...statusOf(row, inputs.now),
-    activities: planActivities(inputs),
     road: roadOf(inputs),
     vdot: vdotOf(inputs),
   };
@@ -376,7 +337,7 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   const basis = basisOf(inputs);
   const due =
     dueWrite(inputs, basis) ??
-    (force ? { from: firstDay(inputs), reason: "again", trigger: null } : null);
+    (force ? { fromWeek: inputs.currentWeek, reason: "again", trigger: null } : null);
   if (!due) return row;
   const attemptKey = attemptKeyOf(due);
   // Only a failed writing waits for "Try again" (shown with its reason). One that succeeded and is
@@ -395,9 +356,9 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
     )
     .returning();
   if (!claimed) return row;
-  logger.info("coach_plan.writing", { from: due.from, reason: due.reason });
+  logger.info("coach_plan.writing", { fromWeek: due.fromWeek, reason: due.reason });
   // Not awaited: the writing outlives the request, so closing the app doesn't stop it.
-  void writePlan(userId, due.from, claimed.statusAt);
+  void writePlan(userId, due.fromWeek, claimed.statusAt);
   return claimed;
 }
 
@@ -421,7 +382,7 @@ async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
 function raceSession(goal: Goal): PlannedRun {
   return plannedRun(
     {
-      date: goal.date,
+      weekStart: mondayOf(goal.date),
       kind: "race",
       title: goal.name,
       why: `Your ${goal.priority} race.`,
@@ -443,6 +404,9 @@ function raceSession(goal: Goal): PlannedRun {
     null,
   );
 }
+
+/** A race session as the next writing finds it again: its week and the goal's name. */
+const raceKey = (session: PlannedRun) => `${session.weekStart} ${session.title}`;
 
 function recentTraining(inputs: Inputs) {
   const since = addDayKey(inputs.today, -30);
@@ -468,8 +432,11 @@ function recentTraining(inputs: Inputs) {
   };
 }
 
-/** Writes the weeks from `from`, keeps the days before it, and stores the plan if it passes. */
-async function writePlan(userId: string, from: string, claimedAt: Date) {
+/**
+ * Writes the weeks from `fromWeek`, keeps the weeks before it and the sessions marked done in it,
+ * and stores the plan if it passes.
+ */
+async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
   let gathered: Inputs | null = null;
   try {
     const inputs = await gather(userId);
@@ -487,17 +454,17 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
       count: WEEKS_AHEAD,
       runsPerWeek: availability.runsPerWeek,
     });
-    const fromWeek = weekStartKey(new Date(`${from}T12:00:00Z`), "UTC");
     const weeks = budgets.filter((week) => week.weekStart >= fromWeek);
-    const old = inputs.plan?.weeks ?? [];
-    const kept = old
-      .flatMap((week) => week.sessions)
-      .filter((session) => session.date >= fromWeek && session.date < from);
-    // Planned days around the ones written, such as the weeks kept when only a new week is added:
-    // neighbours for the longest run and hard days, counted toward no week written.
-    const neighbours = old
-      .flatMap((week) => week.sessions)
-      .filter((session) => session.date >= addDayKey(inputs.today, -1) && session.date < fromWeek);
+    const old = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
+    // In the weeks written, the athlete's runs marked done stay; the open ones are written again.
+    const kept = old.filter(
+      (session) => session.weekStart >= fromWeek && session.done && session.kind !== "race",
+    );
+    // Weeks planned before the ones written, such as the weeks kept when only a new week is added:
+    // they set the longest-run limit of the weeks after them, and count toward no week written.
+    const neighbours = old.filter(
+      (session) => session.weekStart >= inputs.currentWeek && session.weekStart < fromWeek,
+    );
     const lastDay = addDayKey(weeks.at(-1)!.weekStart, 6);
     const races = inputs.goals.filter(
       (goal) =>
@@ -509,11 +476,11 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     const ctx: RuleContext = {
       availability,
       weeks,
-      from,
+      fromWeek,
       today: inputs.today,
-      frozen: kept.filter((session) => session.kind !== "race"),
+      frozen: kept,
       runs: inputs.runs,
-      raceDays: races.map((goal) => goal.date),
+      raceWeeks: races.map((goal) => mondayOf(goal.date)),
       neighbours,
       easySecPerKm: stepSecPerKm(
         { part: "work", distanceM: 1000, durationS: null, pace: null, effort: "easy" },
@@ -522,7 +489,7 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
     };
     const ranges = rangesOf(inputs);
     const prompt = {
-      task: `Write the athlete's runs from ${from} to ${lastDay}, toward their A goal, following the coaching knowledge and every rule below.`,
+      task: `Write the athlete's runs for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their A goal, following the coaching knowledge and every rule below.`,
       today: inputs.today,
       aGoal: {
         name: aGoal.name,
@@ -544,37 +511,36 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
       paces: paceText(ranges),
       weeks: weeksText(ctx),
       plannedBefore: neighbours.map(
-        (session) => `${session.date} ${session.kind} ${session.distanceKm} km`,
+        (session) => `${session.weekStart} ${session.kind} ${session.distanceKm} km`,
       ),
       recentTraining: recentTraining(inputs),
       rules: rulesFor(ctx),
     };
     const result = await writeSessions(coach, prompt, ctx, ranges);
     if (!result.ok) {
-      logger.warn("coach_plan.failed", { from });
+      logger.warn("coach_plan.failed", { fromWeek });
       await finish(userId, claimedAt, failedValues(inputs, result.error));
       return;
     }
+    // A race is added again each writing; one the athlete marked done stays done.
+    const doneRaces = new Set(
+      old.filter((session) => session.kind === "race" && session.done).map(raceKey),
+    );
     const added = [
       ...kept,
       ...result.sessions,
-      ...races.filter((goal) => goal.date >= from).map(raceSession),
+      ...races.map(raceSession).map((race) => ({ ...race, done: doneRaces.has(raceKey(race)) })),
     ];
     const plan: CoachPlan = {
       weeks: [
-        ...old.filter(
+        ...(inputs.plan?.weeks ?? []).filter(
           (week) =>
             week.weekStart < fromWeek &&
             week.weekStart >= addDayKey(inputs.currentWeek, -7 * KEEP_PAST_WEEKS),
         ),
         ...weeks.map((week) => ({
           ...week,
-          sessions: added
-            .filter(
-              (session) =>
-                session.date >= week.weekStart && session.date <= addDayKey(week.weekStart, 6),
-            )
-            .sort((a, b) => a.date.localeCompare(b.date)),
+          sessions: added.filter((session) => session.weekStart === week.weekStart),
         })),
       ],
       basis: basisOf(inputs),
@@ -582,7 +548,7 @@ async function writePlan(userId: string, from: string, claimedAt: Date) {
       model: coach.model,
     };
     await finish(userId, claimedAt, { plan, status: "idle", error: null, requestedFrom: null });
-    logger.info("coach_plan.written", { from, sessions: result.sessions.length });
+    logger.info("coach_plan.written", { fromWeek, sessions: result.sessions.length });
   } catch (error) {
     logger.error("coach_plan.crashed", {
       error: error instanceof Error ? error.message : String(error),
@@ -604,7 +570,6 @@ const SIGNED_OUT: CoachPlanState = {
   plan: null,
   status: "idle",
   error: null,
-  activities: [],
   road: [],
   vdot: null,
 };
@@ -655,43 +620,39 @@ export async function requestCoachPlanRewrite(userId: string) {
 }
 
 /**
- * The athlete links a run to a session ("Link a run": one of that week's runs) or unlinks the one
- * matched ("Not this run", which then stays an extra). Their choice wins over the 70 % match.
+ * The athlete marks a session done, or open again (ADR 0048). Only from its week on: a week ahead
+ * may still be written again. Not while a writing runs, since the writing would store the plan it
+ * read and drop the mark.
  */
-export async function linkRunImpl(
-  sessionId: string,
-  activityId: string | null,
-): Promise<CoachPlanState> {
+export async function markSessionImpl(sessionId: string, done: boolean): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const userId = session.user.id;
   const inputs = await gather(userId);
-  const planned = inputs.plan?.weeks
-    .flatMap((week) => week.sessions)
-    .find((s) => s.id === sessionId);
-  if (!inputs.row || !planned) throw new Error("That session is no longer in your plan.");
-  const { linked, unlinked } = inputs.links;
-  if (activityId == null) {
-    const current = matchOf(inputs).get(sessionId);
-    if (current) {
-      delete linked[sessionId];
-      if (!unlinked.includes(current.runId)) unlinked.push(current.runId);
-    }
-  } else {
-    // A session still ahead may be written again as another kind, which drops its link.
-    if (planned.date > inputs.today) throw new Error("A run can be linked from the session's day.");
-    const weekStart = mondayOf(planned.date);
-    const run = inputs.runs.find((item) => item.id === activityId);
-    if (!run || mondayOf(run.date) !== weekStart) {
-      throw new Error("Only a run from the session's week can be linked.");
-    }
-    for (const [id, runId] of Object.entries(linked)) if (runId === activityId) delete linked[id];
-    linked[sessionId] = activityId;
-    inputs.links.unlinked = unlinked.filter((id) => id !== activityId);
+  const { plan, row } = inputs;
+  const planned = plan?.weeks.flatMap((week) => week.sessions).find((s) => s.id === sessionId);
+  if (!row || !plan || !planned) throw new Error("That session is no longer in your plan.");
+  if (planned.weekStart > inputs.currentWeek) {
+    throw new Error("A session can be marked done from its week on.");
   }
-  await db
+  const next: CoachPlan = {
+    ...plan,
+    weeks: plan.weeks.map((week) => ({
+      ...week,
+      sessions: week.sessions.map((item) => (item.id === sessionId ? { ...item, done } : item)),
+    })),
+  };
+  const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
+  const [saved] = await db
     .update(coachPlans)
-    .set({ links: inputs.links, updatedAt: new Date() })
-    .where(eq(coachPlans.userId, userId));
-  logger.info("coach_plan.run_linked", { linked: activityId != null });
-  return stateOf(inputs, inputs.row);
+    .set({ plan: next, updatedAt: new Date() })
+    .where(
+      and(
+        eq(coachPlans.userId, userId),
+        or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale)),
+      ),
+    )
+    .returning();
+  if (!saved) throw new Error("Your plan is being written again: mark it once it's written.");
+  logger.info("coach_plan.session_marked", { done });
+  return stateOf({ ...inputs, plan: next }, saved);
 }
