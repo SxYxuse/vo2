@@ -36,6 +36,8 @@ test("activity screen", async ({ page }) => {
   await settle(page);
   await page.locator("[data-event-id]").filter({ hasText: "Lunch run" }).first().click();
   await page.waitForURL(/\/activities\//);
+  // The charts load in their own chunk, and their skeleton can show after the page settled.
+  await expect(page.getByRole("button", { name: "Pace", exact: true })).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot("activity.png", {
     fullPage: true,
