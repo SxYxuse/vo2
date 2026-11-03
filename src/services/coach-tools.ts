@@ -100,17 +100,10 @@ export const getPersonalBestsDef = toolDefinition({
   }),
 });
 
-export const getWeekPlanDef = toolDefinition({
-  name: "get_week_plan",
-  description:
-    "This training week's plan, Monday to Sunday: each day's planned sessions, rest days, the week's note, and the athlete's coach notes. Says planningOff instead when the athlete plans nothing.",
-  inputSchema: z.object({}),
-});
-
 export const getSeasonDef = toolDefinition({
   name: "get_season",
   description:
-    "The athlete's goals (upcoming and past, with priority) and each coming week's phase and expected hours.",
+    "The athlete's goals (upcoming and past, with priority) and each coming week's phase through the last goal.",
   inputSchema: z.object({}),
 });
 

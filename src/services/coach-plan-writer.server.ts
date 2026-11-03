@@ -2,25 +2,36 @@ import { chat, type ModelMessage } from "@tanstack/ai";
 import { scrubSecrets } from "@tanstack/ai/byok";
 
 // Server-only: imported from handlers alone, so the coaching knowledge stays out of the app.
+import rideZones from "@/coaching/cycling/zones.md?raw";
+import ridePrinciples from "@/coaching/cycling/principles.md?raw";
+import rideSessions from "@/coaching/cycling/sessions.md?raw";
 import paces from "@/coaching/running/paces.md?raw";
 import principles from "@/coaching/running/principles.md?raw";
 import sessions from "@/coaching/running/sessions.md?raw";
+import season from "@/coaching/season.md?raw";
 import { logger } from "@/lib/logger.server.ts";
 import type { CoachModel } from "./coach-model.server.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
 import {
   checkPlan,
   MAX_LONG_MINUTES,
+  MAX_LONG_RIDE_MINUTES,
+  MAX_QUALITY_ACROSS_SPORTS,
+  maxLongRideShare,
   maxLongShare,
   maxQualitySessions,
-  runsAvailable,
+  sessionsAvailable,
   type RuleBreak,
   type RuleContext,
 } from "./coach-plan-rules.ts";
 import {
-  plannedRun,
+  bandText,
+  plannedSession,
+  plannedSports,
+  RIDE_ZONES,
   writtenPlanSchema,
-  type PlannedRun,
+  type PlanAnchors,
+  type PlannedSession,
   type WrittenPlan,
 } from "./coach-plan.types.ts";
 import { formatPaceClock } from "./locomotion.ts";
@@ -37,32 +48,83 @@ const MODEL_TIMEOUT_MS = 150_000;
 /** Paced like a real model, so the app's "writing" state shows in development and e2e. */
 const MOCK_PAUSE_MS = 1500;
 
-const SYSTEM_PROMPT = [
-  "You are the running coach writing an athlete's coach plan in VO2. VO2 sets the weekly budget and checks every plan in code; you write precise sessions inside it. Answer only with the requested JSON.",
-  "Sessions have no day: you write each week's runs, and the athlete picks the days to run them. Never name a weekday or date in a title or why.",
-  "Each session: weekStart (the Monday of its week, YYYY-MM-DD), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
-  "Each step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; leave the other null. Never write a pace number: VO2 fills in the athlete's ranges.",
-  "VO2 works out each session's distance and time from its steps, counting time steps at the middle of their pace. Those numbers are what the rules check.",
-  "The coaching knowledge you write from follows.",
-  principles,
-  paces,
-  sessions,
+const FORMAT = [
+  "You are the endurance coach writing an athlete's coach plan in VO2. VO2 sets each week's budgets and checks every plan in code; you write precise sessions inside them. Answer only with the requested JSON.",
+  "Sessions have no day: you write each week's sessions, and the athlete picks the days. Never name a weekday or date in a title or why.",
+  "Each session: weekStart (the Monday of its week, YYYY-MM-DD), sport (run or ride), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
+  "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace is null. Never write a pace, watts, or heart rate number: VO2 fills in the athlete's own.",
+  "Kinds for runs: easy, recovery, long, tempo, intervals, repetitions, hills, fartlek, marathonPace. Kinds for rides: easy (endurance), recovery, long, tempo (threshold), intervals (VO2 max), hills (climbing), sweetSpot, sprints.",
+  "VO2 works out each run's distance and time from its steps, counting time steps at the middle of their pace, and each ride's time. Those numbers are what the rules check.",
 ].join("\n\n");
+
+/** The knowledge the coach writes from: each planned sport's files, and the season's when both. */
+function systemPrompt(ctx: RuleContext) {
+  const sports = plannedSports(ctx.availability);
+  return [
+    FORMAT,
+    "The coaching knowledge you write from follows.",
+    ...(sports.length > 1 ? [season] : []),
+    ...(sports.includes("run") ? [principles, paces, sessions] : []),
+    ...(sports.includes("ride") ? [ridePrinciples, rideZones, rideSessions] : []),
+  ].join("\n\n");
+}
 
 export type PlanPrompt = Record<string, unknown>;
 
 /** The rules in numbers for this athlete, so the coach can size sessions to pass them. */
 export function rulesFor(ctx: RuleContext) {
-  const { runsPerWeek } = ctx.availability;
-  return [
-    "1. Each week's total distance stays at or under its budgetKm (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of it: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
-    "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
-    `4. At most ${maxQualitySessions(runsPerWeek)} quality session(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A race counts as one.`,
-    `5. One long run a week. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % when only 3 runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all the week's runs, and at most ${MAX_LONG_MINUTES} minutes.`,
-    "6. Lighter weeks and 7. taper weeks: stay inside their smaller budget.",
-    "8. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs a week at most, and no more than each week's runs (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
+  const { runsPerWeek, ridesPerWeek } = ctx.availability;
+  const sports = plannedSports(ctx.availability);
+  const rules = [
+    "1. Each week's running distance stays at or under its budgetKm and its riding time at or under its budgetMinutes (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of each: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
   ];
+  if (sports.includes("run")) {
+    rules.push(
+      "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
+      `4. At most ${maxQualitySessions(runsPerWeek)} quality run(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A running race counts as one.`,
+      `5. One long run a week. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's running (${Math.round(maxLongShare(3) * 100)} % when only 3 runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all the week's runs, and at most ${MAX_LONG_MINUTES} minutes.`,
+    );
+  }
+  if (sports.includes("ride")) {
+    rules.push(
+      "2. No ride more than 15 % longer than the longest ride of the 30 days before its week (recentTraining.longestRideLast30DaysMin, at least 90 minutes, then plannedBefore and your rides in earlier weeks).",
+      `4. At most ${maxQualitySessions(ridesPerWeek)} quality ride(s) a week (tempo, intervals, hills, sweetSpot, sprints). A cycling race counts as one.`,
+      `5. One long ride a week. The week's longest ride is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's riding (${Math.round(maxLongRideShare(3) * 100)} % when only 3 rides fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_RIDE_MINUTES} minutes.`,
+    );
+  }
+  if (sports.length > 1) {
+    rules.push(
+      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across runs and rides, races included.`,
+    );
+  }
+  rules.push(
+    "6. Lighter weeks and 7. taper weeks: stay inside their smaller budgets.",
+    "8. A missed session is skipped, never made up.",
+    `Availability: ${runsPerWeek} runs and ${ridesPerWeek} rides a week at most, and no more than each week's runs and rides (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
+  );
+  return rules;
+}
+
+/** The zones in the athlete's numbers: watts from FTP, else heart rate from cycling LTHR. */
+export function zoneText(anchors: PlanAnchors) {
+  const { ftp, rideLthr } = anchors;
+  if (!ftp && !rideLthr) return "No FTP or cycling LTHR yet: target zones by feel.";
+  return Object.fromEntries(
+    RIDE_ZONES.map((zone) => {
+      const watts =
+        zone.ftp && ftp
+          ? bandText([Math.round(ftp * zone.ftp[0]), Math.round(ftp * zone.ftp[1])], "W")
+          : null;
+      const bpm =
+        zone.lthr && rideLthr
+          ? bandText(
+              [Math.round(rideLthr * zone.lthr[0]), Math.round(rideLthr * zone.lthr[1])],
+              "bpm",
+            )
+          : null;
+      return [zone.id, [watts, bpm].filter(Boolean).join(", ") || "by feel"];
+    }),
+  );
 }
 
 export function paceText(ranges: Record<PaceType, PaceRange> | null) {
@@ -75,30 +137,40 @@ export function paceText(ranges: Record<PaceType, PaceRange> | null) {
   );
 }
 
+/** A kept or planned session in a line: "ride long 180 min" or "run easy 8 km". */
+export const sessionLine = (session: PlannedSession) =>
+  `${session.sport} ${session.kind} ${session.sport === "ride" ? `${session.minutes} min` : `${session.distanceKm} km`}`;
+
 export function weeksText(ctx: RuleContext) {
+  const sports = plannedSports(ctx.availability);
   return ctx.weeks.map((week) => ({
     weekStart: week.weekStart,
     phase: PHASES[week.phase].label,
     lighter: week.lighter,
     taper: week.taper,
-    budgetKm: week.budgetKm,
-    runs: runsAvailable(week, ctx),
+    ...(sports.includes("run")
+      ? { budgetKm: week.budgetKm, runs: sessionsAvailable(week, ctx, "run") }
+      : {}),
+    ...(sports.includes("ride")
+      ? { budgetMinutes: week.budgetMinutes, rides: sessionsAvailable(week, ctx, "ride") }
+      : {}),
     kept: ctx.frozen
       .filter((session) => session.weekStart === week.weekStart)
-      .map((session) => `${session.kind} ${session.distanceKm} km, done`),
-    races: ctx.raceWeeks.filter((weekStart) => weekStart === week.weekStart).length,
+      .map((session) => `${sessionLine(session)}, done`),
+    races: ctx.races.filter((race) => race.weekStart === week.weekStart).map((race) => race.sport),
   }));
 }
 
 export const availabilityText = (ctx: RuleContext) => ({
   runsPerWeek: ctx.availability.runsPerWeek,
+  ridesPerWeek: ctx.availability.ridesPerWeek,
 });
 
 function breaksText(breaks: RuleBreak[]) {
   return breaks.map((item) => `- ${item.rule}: ${item.message}`).join("\n");
 }
 
-export type WriteResult = { ok: true; sessions: PlannedRun[] } | { ok: false; error: string };
+export type WriteResult = { ok: true; sessions: PlannedSession[] } | { ok: false; error: string };
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -110,13 +182,13 @@ export async function writeSessions(
   coach: Exclude<CoachModel, { kind: "missing" }>,
   prompt: PlanPrompt,
   ctx: RuleContext,
-  ranges: Record<PaceType, PaceRange> | null,
+  anchors: PlanAnchors,
 ): Promise<WriteResult> {
   const plan = (written: WrittenPlan) =>
-    written.sessions.map((session) => plannedRun(session, ranges));
+    written.sessions.map((session) => plannedSession(session, anchors));
   if (coach.kind === "mock") {
     await pause(MOCK_PAUSE_MS);
-    const sessions = plan({ sessions: mockCoachPlan(ctx, ranges) });
+    const sessions = plan({ sessions: mockCoachPlan(ctx, anchors.paces) });
     const breaks = checkPlan(sessions, ctx);
     if (breaks.length) return { ok: false, error: breaksText(breaks) };
     return { ok: true, sessions };
@@ -131,7 +203,7 @@ export async function writeSessions(
       written = (await chat({
         adapter: coach.adapter,
         threadId: crypto.randomUUID(),
-        systemPrompts: [SYSTEM_PROMPT],
+        systemPrompts: [systemPrompt(ctx)],
         messages,
         outputSchema: writtenPlanSchema,
         abortController: abort,

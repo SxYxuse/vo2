@@ -14,7 +14,7 @@ import {
 } from "@/services/heart-insights.ts";
 import type { HeartRateSport } from "@/services/heart-rate.ts";
 import { buildPmc, type FitnessPeriod } from "@/services/training-load.ts";
-import { addDayKey, weekStartKey } from "@/services/training-plan.types.ts";
+import { addDayKey, weekStartKey } from "@/services/day-key.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

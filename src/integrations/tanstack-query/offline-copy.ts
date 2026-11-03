@@ -18,8 +18,6 @@ import { del, get, set } from "idb-keyval";
 export const OFFLINE_QUERY_KEYS = [
   "app-shell",
   "home",
-  "week-target",
-  "week-coach",
   "coach-plan",
   "season",
   "fitness",

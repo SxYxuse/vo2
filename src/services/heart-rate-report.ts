@@ -1,6 +1,6 @@
 import { HR_ZONES, type HeartRateSession } from "./heart-rate.ts";
 import type { FitnessPeriod } from "./training-load.ts";
-import { addDayKey, dayKey, weekStartKey } from "./training-plan.types.ts";
+import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 
 export type ReportBucketSize = "day" | "week" | "month";
 

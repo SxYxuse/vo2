@@ -24,14 +24,6 @@ import {
   type HeartRateSettings,
 } from "@/services/heart-rate-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
-import {
-  defaultLongWeekday,
-  trainingPlanFields,
-  trainingPlanSchema,
-  withWeekShapeIssues,
-  type TrainingPlan,
-} from "@/services/training-plan.types.ts";
-import { NO_HISTORY_REST_WEEKDAYS } from "@/services/plan-builder.types.ts";
 
 // Age checks the max-HR anchor against spikes, and weight is used for watts per
 // kilogram on personal bests, so every athlete gives both.
@@ -57,12 +49,6 @@ export const profileFormSchema = z.object({
       });
     }),
 });
-
-// Settings → Training edits the week's shape; the rest of the plan rides along unchanged and
-// the server keeps its own copy of the plan goals (ADR 0026).
-const trainingFormFields = z.object(trainingPlanFields);
-
-export const trainingFormSchema = withWeekShapeIssues(trainingFormFields);
 
 const sportsFormFields = {
   sportTypes: shownSportTypesSchema,
@@ -119,7 +105,6 @@ const heartRateFormFields = {
 const heartRateFormSchema = z.object(heartRateFormFields);
 
 export const settingsFormSchema = profileFormSchema
-  .extend(trainingFormFields.shape)
   .extend(sportsFormFields)
   .extend(heartRateFormFields)
   .extend({
@@ -131,8 +116,6 @@ export const settingsFormSchema = profileFormSchema
 export const onboardingFormSchema = profileFormSchema.extend(sportsFormFields);
 
 export type ProfileFormValues = z.input<typeof profileFormSchema>;
-export type TrainingFormValues = z.output<typeof trainingFormSchema>;
-export type TrainingFormInput = z.input<typeof trainingFormSchema>;
 export type SettingsFormValues = z.output<typeof settingsFormSchema>;
 export type SettingsFormInput = z.input<typeof settingsFormSchema>;
 export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
@@ -159,28 +142,6 @@ export function profileFromForm(values: ProfileFormValues): ProfileSave {
   // Phones in comma-decimal locales type "72,5".
   const weightKg = Math.round(Number(values.weightKg.replace(",", ".")) * 10) / 10;
   return profileSaveSchema.parse({ birthDate: values.birthDate, weightKg });
-}
-
-export function trainingFormDefaults(
-  plan: TrainingPlan | null,
-  timeZone: string,
-): TrainingFormInput {
-  if (plan) return { ...plan, timeZone: plan.timeZone || timeZone };
-  return {
-    restWeekdays: NO_HISTORY_REST_WEEKDAYS,
-    longWeekday: defaultLongWeekday(NO_HISTORY_REST_WEEKDAYS),
-    doubleDays: 0,
-    sports: ["cycling", "running"],
-    goals: null,
-    startWeek: null,
-    baselineMinutes: null,
-    keySessionSports: {},
-    timeZone,
-  };
-}
-
-export function trainingFromForm(values: TrainingFormValues): TrainingPlan {
-  return trainingPlanSchema.parse(values);
 }
 
 function bpmString(value: number | null) {
@@ -242,7 +203,6 @@ export function settingsSaveFromForm(
   saved: SavedAthleteSettings & { heartRateEstimates?: HeartRateEstimates },
 ): AthleteSettingsSave | null {
   const profile = profileFormSchema.safeParse(values);
-  const training = trainingFormSchema.safeParse(values);
   const sports = sportsFormSchema.safeParse(values);
   const savedProfile = profileSaveSchema.safeParse(saved.profile);
   const profileSave = profile.success
@@ -265,12 +225,6 @@ export function settingsSaveFromForm(
     calendarPeriod: values.calendarPeriod,
     celebrateTopEfforts: values.celebrateTopEfforts,
     planningStyle: values.planningStyle,
-    // Only a built plan has a shape to edit; the plan builder creates it.
-    training: saved.training
-      ? training.success
-        ? trainingFromForm(training.data)
-        : saved.training
-      : undefined,
     heartRate: heartRateValid ? heartRate : saved.heartRate,
   };
 }
@@ -287,23 +241,20 @@ function sportsFormDefaults(
 
 export function settingsFormDefaults(input: {
   profile: ProfileSettings | null;
-  training: TrainingPlan | null;
   heartRate?: HeartRateSettings;
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
   celebrateTopEfforts?: boolean;
   planningStyle?: PlanningStyle;
-  timeZone: string;
 }): SettingsFormInput {
   return {
     ...profileFormDefaults(input.profile),
-    ...trainingFormDefaults(input.training, input.timeZone),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
     calendarPeriod: input.calendarPeriod ?? "month",
     celebrateTopEfforts: input.celebrateTopEfforts ?? false,
-    planningStyle: input.planningStyle ?? "weekPlanner",
+    planningStyle: input.planningStyle ?? "coachPlan",
   };
 }
 

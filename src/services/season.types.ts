@@ -2,7 +2,6 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import { z } from "zod";
 
 import type { components } from "@/integrations/strava/strava.types.ts";
-import type { PhaseKind } from "./season-phase.ts";
 import { SPORT_GROUPS, sportGroupFor } from "./sport-groups.ts";
 
 type StravaSportType = components["schemas"]["SportType"];
@@ -99,14 +98,6 @@ export type SeasonEvent = { date: string; goals: Goal[] };
 
 export type PastGoal = Goal & { activityId: string | null };
 
-/** One week of the season map: its phase and the hours the plan expects. */
-export type SeasonWeek = {
-  weekStart: string;
-  kind: PhaseKind;
-  lighter: boolean;
-  hours: number;
-};
-
 export type SeasonData = {
   signedIn: boolean;
   /** Sport types the athlete shows in Settings, in picker order; every type when none is set. */
@@ -115,8 +106,6 @@ export type SeasonData = {
   today: string;
   upcoming: SeasonEvent[];
   past: PastGoal[];
-  /** Weeks from this one through the last goal, if every week hits its target. */
-  map: SeasonWeek[];
   /**
    * The VDOT of the athlete's training paces, for predicted race times; null without running
    * history, and undefined when no upcoming goal has a time to predict.

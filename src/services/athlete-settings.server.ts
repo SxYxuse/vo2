@@ -32,7 +32,6 @@ import {
 } from "./heart-rate-settings.ts";
 import { toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
-import { getTrainingPlanForUser } from "./training-plan.server.ts";
 
 async function storedAthleteSettings(userId: string) {
   const [row] = await db
@@ -150,15 +149,13 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
       fitnessLoads: [],
       profile: DEFAULT_PROFILE_SETTINGS,
       settings: DEFAULT_ATHLETE_SETTINGS,
-      training: null,
       heartRate: DEFAULT_HEART_RATE_SETTINGS,
       heartRateEstimates: NO_ESTIMATES,
     };
   }
-  const [profile, settings, training, heartRate, estimates, loadRows] = await Promise.all([
+  const [profile, settings, heartRate, estimates, loadRows] = await Promise.all([
     getAthleteProfile(session.user.id),
     getAthleteSettings(session.user.id),
-    getTrainingPlanForUser(session.user.id),
     getHeartRateSettings(session.user.id),
     heartRateEstimates(session.user.id),
     db
@@ -175,7 +172,6 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
     signedIn: true,
     profile,
     settings,
-    training,
     heartRate,
     heartRateEstimates: estimates,
     fitnessLoads: loadRows.map((row) =>
@@ -221,21 +217,6 @@ export async function saveAthleteSettingsImpl(
   if (!parsed) throw new Error("Invalid athlete settings");
   const settings = mergeAthleteSettings(parsed, [...sportTypes, ...Object.keys(value.sportTypes)]);
 
-  // Settings edit the week's shape only: the plan goals and starting point stay as the plan
-  // builder or the last adapt left them (ADR 0026).
-  const storedTraining = value.training ? await getTrainingPlanForUser(userId) : null;
-  const training =
-    value.training && storedTraining
-      ? {
-          ...storedTraining,
-          restWeekdays: value.training.restWeekdays,
-          longWeekday: value.training.longWeekday,
-          doubleDays: value.training.doubleDays,
-          sports: value.training.sports,
-          keySessionSports: value.training.keySessionSports,
-        }
-      : value.training;
-
   const updatedAt = new Date();
   await db.transaction(async (tx) => {
     await tx
@@ -244,7 +225,6 @@ export async function saveAthleteSettingsImpl(
         userId,
         birthDate: value.profile.birthDate,
         weightKg: value.profile.weightKg,
-        training,
         heartRate,
         updatedAt,
       })
@@ -253,7 +233,6 @@ export async function saveAthleteSettingsImpl(
         set: {
           birthDate: value.profile.birthDate,
           weightKg: value.profile.weightKg,
-          ...(training ? { training } : {}),
           heartRate,
           updatedAt,
         },
@@ -287,12 +266,8 @@ export async function saveAthleteSettingsImpl(
     await refreshTrainingLoadsForUser(userId);
   }
 
-  const saved = training ?? (await getTrainingPlanForUser(userId));
-  logger.info("settings.saved", {
-    hasTraining: Boolean(saved),
-    planningStyle: settings.planningStyle,
-  });
-  return { profile: value.profile, settings, training: saved, heartRate };
+  logger.info("settings.saved", { planningStyle: settings.planningStyle });
+  return { profile: value.profile, settings, heartRate };
 }
 
 export async function saveProfileImpl(value: ProfileSave): Promise<void> {

@@ -3,17 +3,16 @@ import { expect, type Page } from "@playwright/test";
 import { E2E_NOW } from "./env.ts";
 
 /**
- * Connects mock Strava, copies the training, and finishes onboarding, ending on Plan, or on
- * the calendar with planning off. Shared by the e2e setup, the teardown, and the signed-in
- * Lighthouse run (scripts/lighthouse.ts).
+ * Connects mock Strava, copies the training, and finishes onboarding, ending on the calendar with
+ * planning off, or on Plan with the coach plan written. Shared by the e2e setup, the teardown,
+ * and the signed-in Lighthouse run (scripts/lighthouse.ts).
  */
 export async function onboardNewAthlete(
   page: Page,
   {
     onPlanningStyle,
-    planningOff = false,
     coachPlan = false,
-  }: { onPlanningStyle?: () => Promise<void>; planningOff?: boolean; coachPlan?: boolean } = {},
+  }: { onPlanningStyle?: () => Promise<void>; coachPlan?: boolean } = {},
 ) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
@@ -39,40 +38,24 @@ export async function onboardNewAthlete(
   await next.click();
 
   await expect(page.getByRole("heading", { name: "Planning style" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: /Week planner/ })).toBeChecked();
+  // The coach plan is the only planning style (ADR 0050), and the default.
+  await expect(page.getByRole("radio", { name: /^Coach plan/ })).toBeChecked();
+  await expect(page.getByRole("radio")).toHaveCount(2);
   await onPlanningStyle?.();
   if (coachPlan) {
     await onboardWithCoachPlan(page);
     return;
   }
-  if (planningOff) {
-    // Off saves the setup at once and skips the plan builder; the key step still follows.
-    await page.getByRole("radio", { name: /^Off/ }).click();
-    await next.click();
-    await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
-    await page.getByRole("button", { name: "Skip for now" }).click();
-    await expect(page.getByText(/^Planning is off:/)).toBeVisible();
-    await page.getByRole("button", { name: "Open the calendar" }).click();
-    await page.waitForURL("/");
-    await expect(page.getByRole("heading", { name: "Activity calendar" })).toBeVisible();
-    return;
-  }
+  // Off saves the setup at once; the key step still follows.
+  await page.getByRole("radio", { name: /^Off/ }).click();
   await next.click();
-
-  await expect(page.getByRole("heading", { name: "Your season" })).toBeVisible();
-  await next.click();
-  await expect(page.getByRole("heading", { name: "Where you're starting" })).toBeVisible();
-  await page.getByRole("button", { name: "Looks right" }).click();
-  await expect(page.getByRole("heading", { name: "When can you train?" })).toBeVisible();
-  await next.click();
-  await page.getByRole("button", { name: "Start my plan" }).click();
   // The OpenRouter key is optional: mock Strava's mock coach answers without one.
   await expect(page.getByRole("heading", { name: "Add your OpenRouter key" })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
-  await page.getByRole("button", { name: "Open Plan" }).click();
-
-  await page.waitForURL("/week");
-  await expect(page.getByRole("heading", { name: "Plan", level: 1 })).toBeVisible();
+  await expect(page.getByText(/^Planning is off:/)).toBeVisible();
+  await page.getByRole("button", { name: "Open the calendar" }).click();
+  await page.waitForURL("/");
+  await expect(page.getByRole("heading", { name: "Activity calendar" })).toBeVisible();
 }
 
 /**
@@ -96,9 +79,15 @@ async function onboardWithCoachPlan(page: Page) {
   await expect(page.getByText("Autumn half")).toBeVisible();
   await next.click();
 
-  await expect(page.getByRole("heading", { name: "How often can you run?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How often can you train?" })).toBeVisible();
+  // A run goal starts on runs; rides are added beside them (ADR 0050).
+  await expect(page.getByRole("button", { name: "3 runs a week" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await page.getByRole("button", { name: "4 runs a week" }).click();
-  // Runs a week only: no days, no long run day (ADR 0048), no time per day (ADR 0041).
+  await page.getByRole("button", { name: "2 rides a week" }).click();
+  // Sessions a week only: no days, no long run day (ADR 0048), no time per day (ADR 0041).
   await expect(page.getByText("Days you can run")).toHaveCount(0);
   await expect(page.getByRole("combobox")).toHaveCount(0);
   await next.click();
@@ -108,7 +97,7 @@ async function onboardWithCoachPlan(page: Page) {
   await expect(page.getByText(/^Your coach is writing your next four weeks/)).toBeVisible();
   await page.getByRole("button", { name: "Open Plan" }).click();
   await page.waitForURL("/week");
-  await expect(page.getByRole("heading", { name: / · \d+ km$/ })).toBeVisible({
+  await expect(page.getByRole("heading", { name: / · \d+ km running · .+ riding$/ })).toBeVisible({
     timeout: 30_000,
   });
 }

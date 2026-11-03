@@ -12,13 +12,9 @@ import { loadBests } from "@/services/personal-bests.ts";
 import { loadProgress } from "@/services/progress.ts";
 import { loadSeason } from "@/services/season.ts";
 import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
-import { loadWeekCoach } from "@/services/week-coach.ts";
-import { loadPlanBuilder } from "@/services/plan-builder.ts";
-import type { PlanImpact } from "@/services/plan-impact.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadTrainingPaces } from "@/services/training-paces.ts";
-import { loadWeekTarget } from "@/services/week-target.ts";
 
 // Apart so the sign-in page can read the app shell without loading every service's validators.
 export { appShellQueryOptions, loaderQuery, planningStyleOf } from "./app-shell-query.ts";
@@ -71,18 +67,6 @@ export const topEffortCelebrationsQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-export const weekTargetQueryOptions = queryOptions({
-  queryKey: ["week-target"],
-  queryFn: () => loadWeekTarget(),
-  staleTime: 60_000,
-});
-
-export const weekCoachQueryOptions = queryOptions({
-  queryKey: ["week-coach"],
-  queryFn: () => loadWeekCoach(),
-  staleTime: 60_000,
-});
-
 /**
  * The coach plan. It changes on the server by itself (writing finishes, a new week is due), so
  * the saved copy shows at once and is checked again on every visit, and every few seconds while
@@ -99,22 +83,6 @@ export const seasonQueryOptions = queryOptions({
   queryKey: ["season"],
   queryFn: () => loadSeason(),
   staleTime: 60_000,
-});
-
-/** The builder's starting point: Season's goals and the last 12 weeks. */
-export function planBuilderQueryOptions(timeZone: string) {
-  return queryOptions({
-    queryKey: ["plan-builder", timeZone],
-    queryFn: () => loadPlanBuilder({ data: { timeZone } }),
-    staleTime: 30_000,
-  });
-}
-
-/** A season change waiting for the athlete, set right after a goal changes. Client-only. */
-export const seasonChangeQueryOptions = queryOptions({
-  queryKey: ["season-change"],
-  queryFn: (): PlanImpact | null => null,
-  staleTime: Number.POSITIVE_INFINITY,
 });
 
 export const heartRateQueryOptions = queryOptions({

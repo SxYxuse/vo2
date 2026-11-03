@@ -8,7 +8,6 @@ import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { goalsFor } from "./season.server.ts";
 import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
 import type { CalendarActivity, HomeData } from "./home-data.types.ts";
-import { getTrainingPlanForUser } from "./training-plan.server.ts";
 
 function toCalendarActivity(
   row: {
@@ -45,11 +44,10 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       activities: [],
       goals: [],
       settings: DEFAULT_ATHLETE_SETTINGS,
-      training: null,
     };
   }
 
-  const [rows, settings, training, streamedWithoutFlag, goals] = await Promise.all([
+  const [rows, settings, streamedWithoutFlag, goals] = await Promise.all([
     db
       .select({
         id: activities.id,
@@ -66,7 +64,6 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
       .where(eq(activities.userId, session.user.id))
       .orderBy(activities.startDate),
     getAthleteSettings(session.user.id),
-    getTrainingPlanForUser(session.user.id),
     db
       .select({ activityId: activityStreams.activityId })
       .from(activities)
@@ -94,7 +91,6 @@ export async function loadHomeDataImpl(): Promise<HomeData> {
     signedIn: true,
     activities: calendarActivities,
     goals: goals.map(({ id, name, sportType, date }) => ({ id, name, sportType, date })),
-    training,
     settings,
   };
 }

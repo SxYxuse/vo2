@@ -37,7 +37,7 @@ test("an athlete who revokes VO2 on Strava is signed out and starts over", async
 test("an athlete who onboards with planning off lands on the calendar with no week", async ({
   page,
 }) => {
-  await onboardNewAthlete(page, { planningOff: true });
+  await onboardNewAthlete(page);
   await page.getByRole("button", { name: "Toggle Sidebar" }).click();
   await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Plan", exact: true })).toHaveCount(0);

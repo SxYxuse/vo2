@@ -5,16 +5,26 @@ import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { coachPlanProposals, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
-import { checkPlan, runsAvailable, type RuleBreak, type RuleContext } from "./coach-plan-rules.ts";
-import { availabilityText, paceText, rulesFor } from "./coach-plan-writer.server.ts";
-import { gather, rangesOf, statusOf, type Inputs } from "./coach-plan.server.ts";
 import {
-  plannedRun,
+  checkPlan,
+  sessionsAvailable,
+  type RuleBreak,
+  type RuleContext,
+} from "./coach-plan-rules.ts";
+import { availabilityText, paceText, rulesFor, zoneText } from "./coach-plan-writer.server.ts";
+import { anchorsOf, gather, rangesOf, statusOf, type Inputs } from "./coach-plan.server.ts";
+import {
+  PLAN_SPORTS,
+  plannedSession,
+  readCoachPlan,
   sessionLines,
   stepSecPerKm,
   type CoachPlan,
-  type PlannedRun,
+  type PlanSport,
+  type PlanWeek,
+  type PlannedSession,
 } from "./coach-plan.types.ts";
+import type { WeekBudget } from "./coach-plan-budget.ts";
 import type {
   ChangeSide,
   ChangedSession,
@@ -37,7 +47,7 @@ const WRITING =
  * A checked change: the ids of the sessions it replaces or drops, the sessions after it (a
  * replacement keeps its id), and the change as the athlete sees it.
  */
-type StoredChange = { ids: string[]; sessions: PlannedRun[]; changes: ChangedSession[] };
+type StoredChange = { ids: string[]; sessions: PlannedSession[]; changes: ChangedSession[] };
 
 /** The plan as read from the database, hashed: a proposal applies only onto the same plan. */
 const planKeyOf = (plan: unknown) =>
@@ -58,6 +68,12 @@ function blocker(inputs: Inputs): string | null {
   return null;
 }
 
+/** A written week's budgets, as the rules read them; weeks written before rides have none. */
+const budgetOf = ({ sessions: _sessions, ...week }: PlanWeek): WeekBudget => ({
+  ...week,
+  budgetMinutes: week.budgetMinutes ?? 0,
+});
+
 /** The written weeks from this one on: what a change may touch. */
 const weeksAhead = (inputs: Inputs, plan: CoachPlan) =>
   plan.weeks.filter((week) => week.weekStart >= inputs.currentWeek);
@@ -71,17 +87,18 @@ function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
   const sessions = weeks.flatMap((week) => week.sessions);
   return {
     availability: inputs.availability!,
-    weeks: weeks.map(({ sessions: _sessions, ...budget }) => budget),
+    weeks: weeks.map(budgetOf),
     fromWeek: inputs.currentWeek,
     today: inputs.today,
     frozen: sessions.filter((session) => session.kind !== "race" && session.done),
     runs: inputs.runs,
-    raceWeeks: sessions
+    rides: inputs.rides,
+    races: sessions
       .filter((session) => session.kind === "race")
-      .map((session) => session.weekStart),
+      .map((session) => ({ weekStart: session.weekStart, sport: session.sport })),
     neighbours: [],
     easySecPerKm: stepSecPerKm(
-      { part: "work", distanceM: 1000, durationS: null, pace: null, effort: "easy" },
+      { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },
       rangesOf(inputs),
     ),
     allowShort: true,
@@ -111,19 +128,23 @@ const breakKey = (item: RuleBreak) => `${item.rule}|${breakWeek(item)}`;
  * worse.
  */
 function newBreaks(
-  before: PlannedRun[],
-  after: PlannedRun[],
+  before: PlannedSession[],
+  after: PlannedSession[],
   changed: Set<string>,
   ctx: RuleContext,
 ) {
-  const longestBefore: Record<string, number> = {};
-  for (const week of ctx.weeks) {
-    longestBefore[week.weekStart] = Math.max(
-      0,
-      ...[...ctx.frozen, ...before]
-        .filter((session) => session.weekStart === week.weekStart)
-        .map((session) => session.distanceKm),
-    );
+  const longestBefore: Partial<Record<PlanSport, Record<string, number>>> = {};
+  for (const { id: sport } of PLAN_SPORTS) {
+    const byWeek: Record<string, number> = {};
+    for (const week of ctx.weeks) {
+      byWeek[week.weekStart] = Math.max(
+        0,
+        ...[...ctx.frozen, ...before]
+          .filter((session) => session.weekStart === week.weekStart && session.sport === sport)
+          .map((session) => (sport === "run" ? session.distanceKm : session.minutes)),
+      );
+    }
+    longestBefore[sport] = byWeek;
   }
   const checked = { ...ctx, longestBefore };
   const had = new Set(checkPlan(before, checked).map(breakKey));
@@ -132,10 +153,11 @@ function newBreaks(
   );
 }
 
-const sideOf = (session: PlannedRun | undefined): ChangeSide =>
+const sideOf = (session: PlannedSession | undefined): ChangeSide =>
   session
     ? {
         title: session.title,
+        sport: session.sport,
         kind: session.kind,
         distanceKm: session.distanceKm,
         minutes: session.minutes,
@@ -155,16 +177,20 @@ export async function coachPlanForCoach(userId: string) {
     today: inputs.today,
     availability: availabilityText(ctx),
     paces: paceText(rangesOf(inputs)),
+    rideZones: zoneText(anchorsOf(inputs)),
     weeks: weeksAhead(inputs, plan).map((week) => ({
       weekStart: week.weekStart,
       phase: PHASES[week.phase].label,
       lighter: week.lighter,
       taper: week.taper,
       budgetKm: week.budgetKm,
-      runs: runsAvailable(week, ctx),
+      budgetMinutes: week.budgetMinutes ?? 0,
+      runs: sessionsAvailable(budgetOf(week), ctx, "run"),
+      rides: sessionsAvailable(budgetOf(week), ctx, "ride"),
       sessions: week.sessions.map((session) => ({
         id: session.id,
         status: session.done ? "done" : "open",
+        sport: session.sport,
         kind: session.kind,
         title: session.title,
         why: session.why,
@@ -178,7 +204,7 @@ export async function coachPlanForCoach(userId: string) {
     })),
     rules: [
       ...rulesFor(ctx),
-      "A change may leave a week under 90 % of its budget: less running is fine when the athlete is ill, away, or tired.",
+      "A change may leave a week under 90 % of its budgets: less training is fine when the athlete is ill, away, or tired.",
       "Sessions marked done and races can't change.",
     ],
   };
@@ -206,8 +232,8 @@ export async function proposePlanChange(
   const ids = input.sessions.flatMap((change) => (change.id ? [change.id] : []));
   const broken: string[] = [];
   if (new Set(ids).size !== ids.length) broken.push("sessions: list each session once.");
-  const ranges = rangesOf(inputs);
-  const sessions: PlannedRun[] = [];
+  const anchors = anchorsOf(inputs);
+  const sessions: PlannedSession[] = [];
   const changes: ChangedSession[] = [];
   for (const change of input.sessions) {
     const before = change.id ? byId.get(change.id) : undefined;
@@ -216,10 +242,11 @@ export async function proposePlanChange(
     } else if (before?.done || before?.kind === "race") {
       broken.push(`sessions: "${before.title}" is ${before.done ? "done" : "a race"}.`);
     } else if (before || change.session) {
-      // A session changed stays in its week.
+      // A session changed stays in its week and its sport.
       const weekStart = before?.weekStart ?? change.session!.weekStart;
+      const sport = before?.sport ?? change.session!.sport;
       const after = change.session
-        ? plannedRun({ ...change.session, weekStart }, ranges, before?.id)
+        ? plannedSession({ ...change.session, weekStart, sport }, anchors, before?.id)
         : undefined;
       if (after) sessions.push(after);
       if (JSON.stringify(sideOf(before)) !== JSON.stringify(sideOf(after))) {
@@ -318,7 +345,7 @@ export async function applyPlanChange(
     if (statusOf(row, new Date()).status === "writing") return WRITING;
     await tx
       .update(coachPlans)
-      .set({ plan: applied(row.plan as CoachPlan, change), updatedAt: new Date() })
+      .set({ plan: applied(readCoachPlan(row.plan)!, change), updatedAt: new Date() })
       .where(eq(coachPlans.userId, userId));
     // Every other proposal was checked against the plan as it was.
     await tx.delete(coachPlanProposals).where(eq(coachPlanProposals.userId, userId));

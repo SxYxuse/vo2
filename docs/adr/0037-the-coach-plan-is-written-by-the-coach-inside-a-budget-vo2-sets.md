@@ -1,6 +1,6 @@
 # The coach plan is written by the coach inside a budget VO2 sets
 
-Partly superseded by [0048](0048-the-coach-plans-sessions-have-no-day-or-order.md): the coach plan's sessions have no day, and a session is marked done by hand.
+Partly superseded by [0048](0048-the-coach-plans-sessions-have-no-day-or-order.md): the coach plan's sessions have no day, and a session is marked done by hand. Partly superseded by [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md): the week planner is removed, and the coach plan plans rides beside runs, toward an A run or ride.
 
 The athlete picks a planning style in onboarding and in Settings → Training: off, the week planner (ADR 0026, unchanged), or the coach plan. Each style keeps its own setup, so switching back restores it. Off keeps Season and the calendar and plans nothing.
 

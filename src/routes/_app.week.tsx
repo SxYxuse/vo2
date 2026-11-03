@@ -4,15 +4,13 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { Settings2Icon, TargetIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
-import { WeekView, WeekViewSkeleton, WeeksAhead } from "@/components/week-view.tsx";
 import { CoachPlanView } from "@/components/coach-plan-view.tsx";
+import { PanelSkeleton } from "@/components/route-states.tsx";
 import {
   appShellQueryOptions,
   coachPlanQueryOptions,
   planningStyleOf,
   loaderQuery,
-  weekCoachQueryOptions,
-  weekTargetQueryOptions,
 } from "@/lib/queries.ts";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
@@ -37,15 +35,8 @@ export const Route = createFileRoute("/_app/week")({
       ? { week: search.week }
       : {},
   loader: async ({ context }) => {
-    const style = await planningStyleOf(context);
-    if (style === "off") return;
-    if (style === "coachPlan") {
-      await context.queryClient.query(loaderQuery(coachPlanQueryOptions));
-      return;
-    }
-    // The stored week plan fills in when ready; the week's activities do not wait for it.
-    void context.queryClient.prefetchQuery(weekCoachQueryOptions);
-    await context.queryClient.query(loaderQuery(weekTargetQueryOptions));
+    if ((await planningStyleOf(context)) !== "coachPlan") return;
+    await context.queryClient.query(loaderQuery(coachPlanQueryOptions));
   },
   pendingMs: 200,
   pendingComponent: WeekTargetPending,
@@ -53,13 +44,7 @@ export const Route = createFileRoute("/_app/week")({
   component: WeekTargetPage,
 });
 
-function WeekTargetHeading({
-  planned = true,
-  coach = false,
-}: {
-  planned?: boolean;
-  coach?: boolean;
-}) {
+function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
@@ -67,11 +52,9 @@ function WeekTargetHeading({
         Plan
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
-        {coach
-          ? "Your coach plan: each week's runs for the next four weeks, toward your A goal. Run them on the days that suit you."
-          : planned
-            ? "Your week day by day, built from your season, your rest days, and your form."
-            : "No week is planned while planning is off."}
+        {planned
+          ? "Your coach plan: each week's rides and runs for the next four weeks, toward your season. Do them on the days that suit you."
+          : "No week is planned while planning is off."}
       </p>
     </div>
   );
@@ -80,19 +63,17 @@ function WeekTargetHeading({
 function WeekTargetPage() {
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   const { week } = Route.useSearch();
-  if (shell.planningStyle === "off") return <PlanningOff />;
-  if (shell.planningStyle === "coachPlan") {
-    return (
-      <>
-        <WeekTargetHeading coach />
-        <CoachPlanView week={week} />
-      </>
-    );
-  }
-  return <PlannedWeek />;
+  if (!shell.signedIn) return <SignedOut />;
+  if (shell.planningStyle !== "coachPlan") return <PlanningOff />;
+  return (
+    <>
+      <WeekTargetHeading />
+      <CoachPlanView week={week} />
+    </>
+  );
 }
 
-/** The way back from off: the week planner's plan is still saved, one choice away. */
+/** The way back from off: the coach plan's setup is still saved, one choice away. */
 function PlanningOff() {
   return (
     <>
@@ -122,52 +103,22 @@ function PlanningOff() {
   );
 }
 
-function PlannedWeek() {
-  const { data } = useSuspenseQuery(weekTargetQueryOptions);
-  const { plan } = data;
-
+function SignedOut() {
   return (
     <>
       <WeekTargetHeading />
-      {!data.signedIn ? (
-        <>
-          <Empty className="min-h-64 border">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <TargetIcon />
-              </EmptyMedia>
-              <EmptyTitle>Sign in to see your week</EmptyTitle>
-              <EmptyDescription>
-                Connect Strava so your plan starts from what you already do.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-          <SignInPanel />
-        </>
-      ) : plan ? (
-        <>
-          <WeekView data={{ ...data, plan }} />
-          <WeeksAhead weeks={data.ahead} today={data.today} />
-        </>
-      ) : (
-        <Empty className="min-h-64 border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <TargetIcon />
-            </EmptyMedia>
-            <EmptyTitle>Build your plan</EmptyTitle>
-            <EmptyDescription>
-              Four steps from your season and your last 12 weeks, and every week is laid out day by
-              day.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button nativeButton={false} render={<Link to="/plan" />}>
-              Build your plan
-            </Button>
-          </EmptyContent>
-        </Empty>
-      )}
+      <Empty className="min-h-64 border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <TargetIcon />
+          </EmptyMedia>
+          <EmptyTitle>Sign in to see your plan</EmptyTitle>
+          <EmptyDescription>
+            Connect Strava so your plan starts from what you already do.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+      <SignInPanel />
     </>
   );
 }
@@ -176,7 +127,7 @@ function WeekTargetPending() {
   return (
     <>
       <WeekTargetHeading />
-      <WeekViewSkeleton />
+      <PanelSkeleton bodyClassName="h-64" />
     </>
   );
 }

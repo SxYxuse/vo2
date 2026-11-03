@@ -8,9 +8,13 @@ import {
 import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
 import { inlineSkill, withSkills } from "@tanstack/ai-skills";
 
+import ridePrinciples from "@/coaching/cycling/principles.md?raw";
+import rideSessions from "@/coaching/cycling/sessions.md?raw";
+import rideZones from "@/coaching/cycling/zones.md?raw";
 import paces from "@/coaching/running/paces.md?raw";
 import principles from "@/coaching/running/principles.md?raw";
 import sessions from "@/coaching/running/sessions.md?raw";
+import season from "@/coaching/season.md?raw";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
@@ -51,7 +55,6 @@ import {
   getFitnessDef,
   getPersonalBestsDef,
   getSeasonDef,
-  getWeekPlanDef,
   measureActivityDef,
   proposePlanChangeDef,
   showVisualDef,
@@ -60,19 +63,19 @@ import {
 import { loadHeartRateImpl } from "./heart-rate.server.ts";
 import { loadBestsForUser } from "./personal-bests.server.ts";
 import { topEfforts, type BestsPeriod } from "./personal-bests.ts";
+import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
 import { loadFitnessDataImpl } from "./training-load.server.ts";
 import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
-import { loadWeekCoachImpl } from "./week-coach.server.ts";
 
 type CoachRuntime = { userId: string; timeZone: string };
 
 /**
- * The running knowledge the plan writer reads whole, loaded by the chat only when a question needs
- * it: about 4,300 words would tax every message. Portable skills run on the athlete's OpenRouter
- * model; hosted provider skills need Anthropic's or OpenAI's sandbox.
+ * The running, cycling, and season knowledge the plan writer reads, loaded by the chat only when a
+ * question needs it: about 8,000 words would tax every message. Portable skills run on the
+ * athlete's OpenRouter model; hosted provider skills need Anthropic's or OpenAI's sandbox.
  */
-const RUNNING_SKILLS = [
+const COACHING_SKILLS = [
   inlineSkill({
     name: "running-principles",
     description:
@@ -90,6 +93,30 @@ const RUNNING_SKILLS = [
     description:
       "The running sessions VO2 writes (easy, recovery, long, tempo, cruise intervals, intervals, repetitions, race pace, fartlek, hills, progression), their step format, and how to size them by level and goal. Load before explaining a session or writing one in a plan change.",
     instructions: sessions,
+  }),
+  inlineSkill({
+    name: "cycling-principles",
+    description:
+      "How VO2 builds a riding week: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, and B and C events. Load before explaining how rides are planned or proposing a change to a ride.",
+    instructions: ridePrinciples,
+  }),
+  inlineSkill({
+    name: "cycling-zones",
+    description:
+      "The cycling zones rides target (recovery to sprint) as a share of FTP and of cycling LTHR, what each is for, and where FTP comes from. Load before explaining a ride's target or how hard it is.",
+    instructions: rideZones,
+  }),
+  inlineSkill({
+    name: "cycling-sessions",
+    description:
+      "The ride sessions VO2 writes (endurance, long, sweet spot, threshold, VO2 max, climbing, sprints), their step format, work by event type, and sizing by weekly hours. Load before explaining a ride or writing one in a plan change.",
+    instructions: rideSessions,
+  }),
+  inlineSkill({
+    name: "season-multisport",
+    description:
+      "How VO2 plans a season of runs and rides: which sport builds, how the other holds, the shared quality limit, B and C goals of the other sport, and triathlon and duathlon. Load before explaining how runs and rides share the week.",
+    instructions: season,
   }),
 ];
 
@@ -131,31 +158,9 @@ async function loadStreams(activityId: string, userId: string) {
   return row;
 }
 
-function weekPlanTool() {
-  return getWeekPlanDef.server<CoachRuntime>(async (_input, { context }) => {
-    // Without this the empty week would read as a week of rest.
-    if ((await storedPlanningStyle(context.userId)) === "off") {
-      return {
-        planningOff: true,
-        message:
-          "The athlete turned planning off: VO2 plans no week, so there are no planned sessions or rest days. They can pick a planning style in Settings → Training.",
-      };
-    }
-    const state = await loadWeekCoachImpl();
-    return {
-      planningOff: false,
-      weekStart: state.weekStart,
-      days: state.plan?.days ?? [],
-      note: state.plan?.note ?? null,
-      droppedKeySessions: state.plan?.dropped ?? [],
-      coachNotes: state.notes,
-    };
-  });
-}
-
 /**
- * The coach plan replaces the week plan: the chat reads it, and may change it only through a
- * checked proposal the athlete applies (ADR 0038). Other planning styles never get these tools.
+ * The chat reads the coach plan, and may change it only through a checked proposal the athlete
+ * applies (ADR 0038). With planning off, the chat never gets these tools.
  */
 function coachPlanTools() {
   return [
@@ -332,14 +337,15 @@ function createCoachTools(coachPlan: boolean) {
           .filter((board) => board.top.length),
       };
     }),
-    ...(coachPlan ? [] : [weekPlanTool()]),
     getSeasonDef.server<CoachRuntime>(async () => {
       const season = await loadSeasonImpl();
+      const goals = season.upcoming.flatMap((event) => event.goals);
+      const last = season.upcoming.at(-1)?.date;
       return {
         today: season.today,
         upcoming: season.upcoming,
         past: season.past,
-        weeks: season.map,
+        weeks: last ? seasonWeeks(goals, season.today, last) : [],
       };
     }),
     getAthleteProfileDef.server<CoachRuntime>(async (_input, { context }) => {
@@ -423,7 +429,7 @@ export async function handleCoachChat(request: Request) {
     // The server keeps the chat, so the athlete can reopen it later on any device.
     // Snapshots while streaming keep what the coach had said if the athlete leaves mid-reply.
     middleware: [
-      withSkills(RUNNING_SKILLS),
+      withSkills(COACHING_SKILLS),
       ...(saved
         ? [withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true })]
         : []),

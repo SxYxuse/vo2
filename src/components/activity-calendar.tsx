@@ -49,7 +49,7 @@ import {
   stepDiaryWeek,
   type DiarySearch,
 } from "@/services/diary-window.ts";
-import { weekStartKey } from "@/services/training-plan.types.ts";
+import { weekStartKey } from "@/services/day-key.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,

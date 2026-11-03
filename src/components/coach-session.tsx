@@ -2,19 +2,21 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowLeftIcon, FootprintsIcon } from "lucide-react";
+import { ArrowLeftIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
-import { sessionKindLabel } from "@/services/coach-plan.types.ts";
+import { minutesText, sessionKindLabel } from "@/services/coach-plan.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
   DoneToggle,
   RunShape,
   RunSteps,
-  headlinePace,
-  rangeText,
+  SPORT_ICON,
+  headlineTarget,
   weekLabel,
 } from "@/components/coach-run.tsx";
+import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +28,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
-/** The session page of a coach-plan run: its shape, steps, why, and whether it's done. */
+/** The session page of a coach-plan run or ride: its shape, steps, why, and whether it's done. */
 export function CoachSession({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const navigate = useNavigate();
@@ -39,7 +41,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
         <EmptyHeader>
           <EmptyTitle>Session not found</EmptyTitle>
           <EmptyDescription>
-            This run is no longer in your coach plan. Pick one from Plan.
+            This session is no longer in your coach plan. Pick one from Plan.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
@@ -51,11 +53,13 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
     );
   }
 
-  const pace = headlinePace(run);
+  const target = headlineTarget(run);
+  const ride = run.sport === "ride";
+  const { icon: Icon, className: iconClass } = SPORT_ICON[run.sport];
   const ahead = run.weekStart > mondayOf(state.today);
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Button
           variant="ghost"
@@ -72,48 +76,45 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           Plan
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <FootprintsIcon aria-hidden className="text-ds-amber-700 size-5" />
+          <Icon aria-label={ride ? "Ride" : "Run"} className={cn("size-5", iconClass)} />
           {run.title}
           {run.done ? <Badge variant="success">Done</Badge> : null}
         </h1>
         <p className="text-muted-foreground text-sm">
-          {sessionKindLabel(run.kind)} · {weekLabel(run.weekStart, state.today)}
+          {sessionKindLabel(run.kind, run.sport)} · {weekLabel(run.weekStart, state.today)}
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 tabular-nums sm:grid-cols-3">
-        <div className="flex flex-col">
-          <dt className="text-muted-foreground text-xs">Distance</dt>
-          <dd className="text-xl font-semibold">{run.distanceKm} km</dd>
-        </div>
-        <div className="flex flex-col">
-          <dt className="text-muted-foreground text-xs">Estimated time</dt>
-          <dd className="text-xl font-semibold">{run.minutes} min</dd>
-        </div>
-        <div className="col-span-2 flex flex-col sm:col-span-1">
-          <dt className="text-muted-foreground text-xs">Pace</dt>
-          <dd className="text-xl font-semibold">{pace ? rangeText(pace) : "By feel"}</dd>
-        </div>
-      </dl>
+      <StatGrid className="sm:grid-cols-3">
+        {ride ? null : <StatCard label="Distance" value={`${run.distanceKm} km`} />}
+        <StatCard label={ride ? "Time" : "Estimated time"} value={minutesText(run.minutes)} />
+        <StatCard
+          label={ride ? "Target" : "Pace"}
+          value={target ?? "By feel"}
+          className={ride ? undefined : "col-span-2 sm:col-span-1"}
+        />
+      </StatGrid>
 
-      <div className="grid grid-cols-1 gap-3 sm:gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Shape</CardTitle>
-            <CardDescription>Width is distance, height and colour are effort.</CardDescription>
+            <CardDescription>
+              Width is {ride ? "time" : "distance"}, height and colour are effort.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <RunShape run={run} height={96} />
+            <RunShape run={run} height={64} />
             <RunSteps run={run} />
           </CardContent>
         </Card>
-        <div className="flex flex-col gap-3 sm:gap-6">
+        <div className="flex flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Why</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed">{run.why}</p>
+              <p className="text-xs/relaxed">{run.why}</p>
             </CardContent>
           </Card>
           <Card>
@@ -122,7 +123,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
               <CardDescription>
                 {ahead
                   ? "You can mark it done from its week on."
-                  : "Run it on a day that suits you, then mark it done."}
+                  : "Do it on a day that suits you, then mark it done."}
               </CardDescription>
             </CardHeader>
             {ahead ? null : (

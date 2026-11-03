@@ -35,13 +35,10 @@ import {
 } from "@/services/athlete-settings.types.ts";
 import { DEFAULT_AVAILABILITY, type Availability } from "@/services/coach-plan.types.ts";
 import { onboardingSyncStep } from "@/services/onboarding-sync.ts";
-import { startPlan } from "@/services/plan-builder.ts";
-import type { PlanDraft } from "@/services/plan-builder.types.ts";
 import { IconStack } from "@/components/reui/icon-stack";
 import { OnboardingSyncStepPanel } from "@/components/onboarding-sync-step.tsx";
 import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { BirthDateField, PlanningStyleChoice, WeightField } from "@/components/settings-fields.tsx";
-import { PlanBuilder } from "@/components/plan-builder.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
@@ -54,14 +51,10 @@ import {
 } from "@/components/ui/empty";
 import { FieldDescription, FieldError } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  SETUP_CARD,
-  SETUP_FOOTER,
-  SETUP_PLAN_STEP,
-  SetupProgress,
-} from "@/components/onboarding-shell.tsx";
+import { SETUP_CARD, SETUP_FOOTER, SetupProgress } from "@/components/onboarding-shell.tsx";
 import { CoachKeyField, useCoachAvailable } from "@/components/coach-key.tsx";
 import {
+  availabilityForGoal,
   availabilityIssue,
   AvailabilityFields,
   CoachPlanGoalField,
@@ -93,11 +86,6 @@ const STEP_LIST = [
     description: "Pick how VO2 plans your training. Change it anytime in Settings → Training.",
   },
   {
-    id: "plan",
-    title: "Your plan",
-    description: "Built from your season and your last 12 weeks.",
-  },
-  {
     id: "coach",
     title: "Add your OpenRouter key",
     description:
@@ -112,18 +100,19 @@ const STEP_LIST = [
   {
     id: "goal",
     title: "Your A race",
-    description: "The coach plan builds toward one race: an upcoming A goal that is a run.",
+    description:
+      "The coach plan builds toward your season, led by an upcoming A goal: a run or a ride.",
   },
   {
     id: "availability",
-    title: "How often can you run?",
-    description: "The coach writes that many runs each week. You pick the days to run them.",
+    title: "How often can you train?",
+    description: "The coach writes that many runs and rides each week. You pick the days.",
   },
   {
     id: "paces",
     title: "Your paces",
     description:
-      "Sessions are written at these paces. Pick a best effort or set a race result if your runs undersell you, or skip it.",
+      "Runs are written at these paces. Pick a best effort or set a race result if your runs undersell you, or skip it.",
   },
   {
     id: "ready",
@@ -138,8 +127,8 @@ const STEP = Object.fromEntries(STEP_LIST.map((step) => [step.id, step])) as Rec
   (typeof STEP_LIST)[number]
 >;
 
-/** The week planner's setup, also taken with planning off (which skips the plan). */
-const WEEK_PLANNER_FLOW: StepId[] = ["sync", "about", "sports", "style", "plan", "coach", "ready"];
+/** With planning off, the setup is saved after the style; the key step stays optional. */
+const OFF_FLOW: StepId[] = ["sync", "about", "sports", "style", "coach", "ready"];
 /** The coach plan needs the key first, then its A race, availability, and paces. */
 const COACH_PLAN_FLOW: StepId[] = [
   "sync",
@@ -184,9 +173,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const { data } = useSuspenseQuery(settingsSnapshotQueryOptions);
   const [stepIndex, setStepIndex] = useState(0);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [planningStyle, setPlanningStyle] = useState<PlanningStyle>("weekPlanner");
+  const [planningStyle, setPlanningStyle] = useState<PlanningStyle>("coachPlan");
   const [availability, setAvailability] = useState<Availability>(DEFAULT_AVAILABILITY);
-  const flow = planningStyle === "coachPlan" ? COACH_PLAN_FLOW : WEEK_PLANNER_FLOW;
+  const flow = planningStyle === "coachPlan" ? COACH_PLAN_FLOW : OFF_FLOW;
   const defaults = useMemo(
     () =>
       onboardingFormDefaults({
@@ -228,11 +217,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
     activityCount: syncStatus?.activityCount ?? 0,
   });
 
-  // The week planner's plan first, then the profile, sports, and planning style: the app opens
-  // once they are saved. With planning off there is no plan to start.
+  // The profile, sports, and planning style: the app opens once they are saved.
   const save = useMutation({
-    mutationFn: async ({ draft, values }: { draft?: PlanDraft; values: OnboardingFormValues }) => {
-      if (draft) await startPlan({ data: draft });
+    mutationFn: async ({ values }: { values: OnboardingFormValues }) => {
       const saved = await saveAthleteSettings({
         data: {
           profile: profileFromForm(values),
@@ -292,21 +279,25 @@ export function OnboardingForm({ userName }: { userName: string }) {
       await startWith();
       return;
     }
+    // The A goal's sport starts with sessions, so a ride goal doesn't open on runs only.
+    if (step.id === "goal") {
+      setAvailability((current) => availabilityForGoal(current, coachPlan.data?.aGoal?.sportType));
+    }
     if (step.id === "coach" || canContinueCoachPlan) setStepIndex((current) => current + 1);
   }
 
-  async function startWith(draft?: PlanDraft) {
+  async function startWith() {
     const ok = await form.trigger([...PROFILE_FIELDS, ...SPORTS_FIELDS]);
     if (!ok) {
       setSaveError("Check your birthday, weight, and sports in the steps before.");
       return;
     }
-    await form.handleSubmit((values) => save.mutate({ draft, values }))();
+    await form.handleSubmit((values) => save.mutate({ values }))();
   }
 
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const isReady = step.id === "ready";
-  // The plan is saved by now, so the steps before it stay closed.
+  // The setup is saved by now, so the steps before it stay closed.
   const planSaved = step.id === "coach" || isReady;
   const coachKey = useCoachAvailable();
   const copyUnfinished = syncStatus?.status !== "complete";
@@ -318,22 +309,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
     (step.id === "goal" && coachPlan.data?.aGoal != null) ||
     (step.id === "availability" && availabilityIssue(availability) == null);
   const progress = progressOf(flow, stepIndex);
-
-  if (step.id === "plan") {
-    return (
-      <PlanBuilder
-        onStart={(draft) => void startWith(draft)}
-        starting={save.isPending}
-        error={saveError}
-        onExit={() => {
-          setSaveError(null);
-          setStepIndex((current) => current - 1);
-        }}
-        exitLabel="Back"
-        onboarding
-      />
-    );
-  }
 
   return (
     <form
@@ -352,7 +327,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
             titles={flow === COACH_PLAN_FLOW ? COACH_PLAN_TITLES : undefined}
             onSelect={goToStep}
             locked={planSaved}
-            skipped={planningStyle === "off" ? SETUP_PLAN_STEP : undefined}
           />
           <h1 className="text-xl font-semibold tracking-tight">
             {step.id === "sync" ? `Welcome, ${firstName}` : step.title}
@@ -413,8 +387,8 @@ export function OnboardingForm({ userName }: { userName: string }) {
                 <CoachKeyField idPrefix="onboard" />
                 {coachKey.needsKey ? (
                   <FieldDescription>
-                    The coach plan can't be written without a key. Add it above, or go back and pick
-                    the week planner.
+                    The coach plan can't be written without a key. Add it above, or go back and turn
+                    planning off.
                   </FieldDescription>
                 ) : null}
               </>
@@ -436,9 +410,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   <EmptyDescription>
                     {planningStyle === "off"
                       ? "Planning is off: the calendar, Season, and fitness are ready. Pick a planning style anytime in Settings."
-                      : planningStyle === "coachPlan"
-                        ? "Your coach is writing your next four weeks. They show under Plan when they're ready, even if you close the app now."
-                        : "Your plan is set: open Plan to see your days. Change your week or rebuild the plan from Settings."}
+                      : "Your coach is writing your next four weeks. They show under Plan when they're ready, even if you close the app now."}
                     {copyUnfinished
                       ? " Older history and streams keep copying while VO2 is open, and the copy picks up again on its own after a Strava pause."
                       : null}

@@ -70,17 +70,12 @@ export const CALENDAR_PERIODS = [
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
-/** How VO2 plans the athlete's training (ADR 0037). */
+/** How VO2 plans the athlete's training (ADR 0037, ADR 0050). */
 export const PLANNING_STYLES = [
-  {
-    id: "weekPlanner",
-    label: "Week planner",
-    hint: "VO2 sets each week's time per sport and its key sessions, and lays them out on your free days.",
-  },
   {
     id: "coachPlan",
     label: "Coach plan",
-    hint: "The coach writes precise runs for the next four weeks toward your A running goal, on your OpenRouter key.",
+    hint: "The coach writes precise rides and runs for the next four weeks toward your season, on your OpenRouter key.",
   },
   {
     id: "off",
@@ -89,19 +84,14 @@ export const PLANNING_STYLES = [
   },
 ] as const;
 
-export const planningStyleSchema = z.enum(["off", "weekPlanner", "coachPlan"]);
+export const planningStyleSchema = z.enum(["off", "coachPlan"]);
 export type PlanningStyle = z.infer<typeof planningStyleSchema>;
 
-/**
- * The athlete's planning style. Athletes who built a plan before the choice existed keep the
- * week planner; null means not chosen yet, so onboarding is unfinished.
- */
-export function planningStyleOf(
-  stored: PlanningStyle | null,
-  hasTrainingPlan: boolean,
-): PlanningStyle | null {
-  return stored ?? (hasTrainingPlan ? "weekPlanner" : null);
-}
+/** The week planner is gone (ADR 0050): a style saved as it reads as the coach plan. */
+const storedPlanningStyleSchema = z.preprocess(
+  (value) => (value === "weekPlanner" ? "coachPlan" : value),
+  planningStyleSchema,
+);
 
 const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
@@ -111,8 +101,8 @@ const athleteSettingsSchema = z.object({
   topEffortsSince: z.iso.datetime().nullable().default(null),
   /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */
   coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
-  /** Null until chosen; see planningStyleOf. Each style keeps its own setup elsewhere. */
-  planningStyle: planningStyleSchema.nullable().default(null),
+  /** Null until chosen in onboarding, which is unfinished until then. */
+  planningStyle: storedPlanningStyleSchema.nullable().default(null),
 });
 
 export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";

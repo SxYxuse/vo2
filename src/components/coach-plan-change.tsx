@@ -8,7 +8,7 @@ import { ArrowRightIcon, CalendarCogIcon, CheckIcon, XIcon } from "lucide-react"
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
-import { sessionKindLabel } from "@/services/coach-plan.types.ts";
+import { minutesText, sessionKindLabel } from "@/services/coach-plan.types.ts";
 import type {
   ChangeSide,
   PlanChangeApplied,
@@ -64,13 +64,13 @@ export function usePlanChanges(
   }, [messages, interrupts, canAnswer]);
 }
 
-/** One side of a changed session: what the run is, how long, and its steps; or no run. */
+/** One side of a changed session: what it is, how long, and its steps; or no session. */
 function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
   const label = before ? "Before" : "After";
   if (!side) {
     return (
       <div className="flex min-w-0 flex-col" aria-label={label} role="group">
-        <span className="text-muted-foreground font-medium">No run</span>
+        <span className="text-muted-foreground font-medium">No session</span>
       </div>
     );
   }
@@ -80,7 +80,9 @@ function Side({ side, before }: { side: ChangeSide; before?: boolean }) {
         {side.title}
       </span>
       <span className="text-muted-foreground text-xs">
-        {sessionKindLabel(side.kind)} · {side.distanceKm} km · about {side.minutes} min
+        {side.sport === "ride"
+          ? `${sessionKindLabel(side.kind, "ride")} · ${minutesText(side.minutes)}`
+          : `${sessionKindLabel(side.kind)} · ${side.distanceKm} km · about ${side.minutes} min`}
       </span>
       {side.steps.map((line, index) => (
         <span key={index} className="text-muted-foreground text-xs">
@@ -156,7 +158,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
             {proposal.sessions.map((change, index) => (
               <li
                 key={index}
-                className="flex flex-col gap-1.5 border-t py-2 text-sm first:border-t-0"
+                className="flex flex-col gap-1.5 border-t py-2 text-xs first:border-t-0"
               >
                 <b className="font-medium">Week of {format(parseISO(change.weekStart), "d MMM")}</b>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
@@ -172,7 +174,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
           <div className="flex gap-2">
             {proposal ? (
               <Button
-                className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+                className="flex-1 sm:flex-none"
                 disabled={!canAnswer}
                 onClick={() => approval.resolveInterrupt(true)}
               >
@@ -182,7 +184,7 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
             ) : null}
             <Button
               variant="outline"
-              className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+              className="flex-1 sm:flex-none"
               disabled={!canAnswer}
               onClick={() => approval.resolveInterrupt(false)}
             >

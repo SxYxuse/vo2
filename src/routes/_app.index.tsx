@@ -60,7 +60,7 @@ function CalendarHeading() {
       <p className="text-muted-foreground hidden text-sm sm:block">
         {shell?.planningStyle === "off"
           ? "Completed Strava activities."
-          : "Completed Strava activities. Time left lives on the Plan page."}
+          : "Completed Strava activities. Your planned sessions live on the Plan page."}
       </p>
     </>
   );

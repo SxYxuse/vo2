@@ -92,13 +92,12 @@ export function NoteReply({ message }: { message: string }) {
             rows={1}
             disabled={!canReply}
             onChange={(event) => setReply(event.target.value)}
-            className="min-h-11 flex-1 sm:min-h-9"
+            className="min-h-7 flex-1 py-1 max-sm:min-h-10 max-sm:py-2"
           />
           <Button
             type="submit"
             size="icon"
             aria-label="Send the reply"
-            className="size-11 sm:size-9"
             disabled={!canReply || !reply.trim()}
           >
             <SendIcon />

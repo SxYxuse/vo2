@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
-import { Link } from "@tanstack/react-router";
-import { CalendarIcon, RefreshCwIcon, SparklesIcon, WeightIcon } from "lucide-react";
-import { Controller, useController, useWatch, type Control, type FieldPath } from "react-hook-form";
+import { CalendarIcon, WeightIcon } from "lucide-react";
+import { Controller, useWatch, type Control, type FieldPath } from "react-hook-form";
 
 import {
   ageFromBirthDate,
@@ -15,23 +14,7 @@ import {
   planningStyleSchema,
   type PlanningStyle,
 } from "@/services/athlete-settings.types.ts";
-import { mondayOf } from "@/services/season-phase.ts";
-import {
-  GOAL_PRIORITIES,
-  anchorEvent,
-  daysBetween,
-  eventTitle,
-  formatDaysLeft,
-  seasonEvents,
-  type Goal,
-} from "@/services/season.types.ts";
-import type { KeySport, TrainingPlan, WeekShape } from "@/services/training-plan.types.ts";
-import { WeekShapeFields } from "@/components/week-shape-fields.tsx";
-import type {
-  ProfileFormValues,
-  SettingsFormInput,
-  TrainingFormInput,
-} from "@/lib/settings-form.ts";
+import type { ProfileFormValues, SettingsFormInput } from "@/lib/settings-form.ts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -190,104 +173,7 @@ export function WeightField<T extends ProfileFormValues>({
 }
 
 /** Settings → Training: the week's shape, saved as the athlete edits it (ADR 0026). */
-export function TrainingShapeField<T extends TrainingFormInput>({
-  control,
-}: {
-  control: Control<T>;
-}) {
-  const rest = useController({ control, name: "restWeekdays" as FieldPath<T> });
-  const long = useController({ control, name: "longWeekday" as FieldPath<T> });
-  const doubles = useController({ control, name: "doubleDays" as FieldPath<T> });
-  const sports = useController({ control, name: "sports" as FieldPath<T> });
-  const value: WeekShape = {
-    restWeekdays: rest.field.value as number[],
-    longWeekday: long.field.value as number,
-    doubleDays: doubles.field.value as number,
-    sports: sports.field.value as KeySport[],
-  };
-  return (
-    <WeekShapeFields
-      value={value}
-      onChange={(next) => {
-        // One change event per field that moved, so the settings save sees each of them.
-        if (JSON.stringify(next.restWeekdays) !== JSON.stringify(value.restWeekdays)) {
-          rest.field.onChange(next.restWeekdays);
-        }
-        if (next.longWeekday !== value.longWeekday) long.field.onChange(next.longWeekday);
-        if (next.doubleDays !== value.doubleDays) doubles.field.onChange(next.doubleDays);
-        if (JSON.stringify(next.sports) !== JSON.stringify(value.sports)) {
-          sports.field.onChange(next.sports);
-        }
-      }}
-    />
-  );
-}
-
-/** The plan at a glance, with the way to rebuild it. Without a plan, the way to build one. */
-export function PlanSummary({ plan, today }: { plan: TrainingPlan | null; today: string }) {
-  if (!plan || !plan.goals) {
-    return (
-      <FieldSet>
-        <FieldLegend>Your plan</FieldLegend>
-        <FieldDescription>
-          {plan
-            ? "Your plan was set up before the plan builder. Build it again to plan your weeks around your season, rest days, and long session day."
-            : "Build your plan to get each week laid out day by day."}
-        </FieldDescription>
-        <Button className="self-start" nativeButton={false} render={<Link to="/plan" />}>
-          <SparklesIcon data-icon="inline-start" />
-          Build your plan
-        </Button>
-      </FieldSet>
-    );
-  }
-  const goals = plan.goals as Goal[];
-  const lead = anchorEvent(seasonEvents(goals.filter((goal) => goal.date >= today)));
-  const weekStart = mondayOf(today);
-  const weeksIn = plan.startWeek
-    ? Math.max(1, Math.floor(daysBetween(plan.startWeek, weekStart) / 7) + 1)
-    : null;
-  const weeksTotal =
-    lead && plan.startWeek
-      ? Math.floor(daysBetween(plan.startWeek, mondayOf(lead.date)) / 7) + 1
-      : null;
-  const priority = lead
-    ? GOAL_PRIORITIES.find((item) => item.id === lead.goals[0]!.priority)
-    : null;
-  return (
-    <FieldSet>
-      <FieldLegend>Your plan</FieldLegend>
-      <div className="bg-muted/50 flex flex-col gap-1 rounded-lg border p-3">
-        <span className="font-medium">
-          {lead ? `${eventTitle(lead)} · ${priority?.label}` : "Holding your fitness"}
-        </span>
-        <span className="text-muted-foreground text-sm">
-          {weeksIn != null && weeksTotal != null
-            ? `Week ${Math.min(weeksIn, weeksTotal)} of ${weeksTotal}`
-            : weeksIn != null
-              ? `Week ${weeksIn}`
-              : null}
-          {lead ? ` · ${formatDaysLeft(daysBetween(today, lead.date)).toLowerCase()}` : ""}
-          {!lead ? "Add a goal on Season and VO2 will offer to adapt the plan." : ""}
-        </span>
-      </div>
-      <FieldDescription>
-        Rebuilding starts from your goals on Season and your last 12 weeks again.
-      </FieldDescription>
-      <Button
-        variant="outline"
-        className="self-start"
-        nativeButton={false}
-        render={<Link to="/plan" />}
-      >
-        <RefreshCwIcon data-icon="inline-start" />
-        Rebuild plan
-      </Button>
-    </FieldSet>
-  );
-}
-
-/** Off, the week planner, or the coach plan; the coach plan shows, not yet selectable (#137). */
+/** The coach plan or off (ADR 0050). */
 export function PlanningStyleChoice({
   idPrefix,
   value,
@@ -307,8 +193,8 @@ export function PlanningStyleChoice({
       <FieldLegend className={titled ? undefined : "sr-only"}>Planning style</FieldLegend>
       {titled ? (
         <FieldDescription>
-          How VO2 plans your training. Switching keeps each style's setup, so you can come back to
-          it.
+          How VO2 plans your training. Turning planning off keeps the coach plan's setup, so you can
+          come back to it.
         </FieldDescription>
       ) : null}
       <RadioGroup

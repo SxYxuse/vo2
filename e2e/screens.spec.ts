@@ -6,8 +6,6 @@ import { test, expect, settle, syncButton } from "./test.ts";
 
 const SCREENS = [
   { name: "calendar", path: "/", heading: "Activity calendar" },
-  { name: "week", path: "/week", heading: "Plan" },
-  { name: "plan", path: "/plan", heading: null },
   { name: "fitness", path: "/fitness", heading: null },
   { name: "season", path: "/season", heading: null },
   { name: "bests", path: "/bests", heading: null },
@@ -38,6 +36,8 @@ test("activity screen", async ({ page }) => {
   await settle(page);
   await page.locator("[data-event-id]").filter({ hasText: "Lunch run" }).first().click();
   await page.waitForURL(/\/activities\//);
+  // The charts load in their own chunk, and their skeleton can show after the page settled.
+  await expect(page.getByRole("button", { name: "Pace", exact: true })).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot("activity.png", {
     fullPage: true,

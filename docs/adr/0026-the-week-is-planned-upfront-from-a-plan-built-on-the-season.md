@@ -1,5 +1,7 @@
 # The week is planned upfront from a plan built on the season
 
+Superseded by [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md): the week planner, its plan builder, and its training plan are removed.
+
 The athlete builds a plan once, in four steps: their season, where they are now, when they can train, and a preview. Every answer starts from their Strava history and the goals already on the Season page; the builder never creates goals. The plan stores the week's shape (rest days, a long session day, how many days can take two sessions, and which sports to plan) and a copy of the goals it was built on. Settings → Training edits the same shape and can rebuild the plan. The week mix, the hours cap, and the single preferred rest day go away.
 
 Each training week is laid out Monday to Sunday the first time it is opened, with one or more sessions on each training day and nothing on rest days; days of that week already gone by then are left unplanned and show only what was done. Days already behind stay as they were planned, so the week reads as planned, done, missed, or extra. The rest of the week is planned again only when something changes it: a key session missed or done on another day, a note to the coach, a change to the week's shape, or adapting to the season. Missed easy sessions are not made up. The language model no longer lays out days: it reads the athlete's words into the same day constraints (can't train, short on time, indoor only, take it easy) and writes a short note, and the algorithm does the layout.
