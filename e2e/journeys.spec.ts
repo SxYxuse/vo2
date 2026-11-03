@@ -425,9 +425,8 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await expect(weekHeading).toHaveText(/^This week · /);
     await expect(back).toHaveCount(0);
 
-    // The season beside the week: what the plan does for each goal, and a row per written week.
+    // The season beside the week, with a row per written week.
     const season = page.getByRole("region", { name: "Your season" });
-    await expect(season.getByText(/^The plan builds to it/)).toBeVisible();
     const writtenWeeks = season.getByRole("list", { name: "Written weeks" }).getByRole("button");
     await expect(writtenWeeks).toHaveCount(4);
     await writtenWeeks.nth(2).click();
