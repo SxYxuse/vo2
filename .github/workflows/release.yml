@@ -1,0 +1,93 @@
+name: Release
+
+# Cuts a release from the latest commit on main. The tag push deploys prod
+# through Dokploy, so this runs only on demand, and only after CI is green on
+# the commit being released. Staging deploys from main on its own.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Which part of the version to increase"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+# One release at a time; a second run waits instead of racing the first.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          node-version: "22"
+          cache: true
+
+      - name: Require green CI on the commit being released
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(git rev-parse HEAD)
+          conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$head&status=completed" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          echo "CI on $head: $conclusion"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "Release needs a passing CI run on main's HEAD." >&2
+            exit 1
+          fi
+
+      - name: Bump the version and tag it
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git show HEAD:package.json > "$RUNNER_TEMP/before.json"
+          bun pm version "$BUMP" --message "chore(release): %s"
+          bun scripts/release-check.ts "$RUNNER_TEMP/before.json" package.json
+
+      # Notes are written before anything is pushed: the tag push deploys prod,
+      # so a failure here must not leave prod deployed with no release page.
+      - name: Write the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          tag="v$(node -p 'require("./package.json").version')"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          previous=$(git describe --tags --abbrev=0 HEAD~1)
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$tag" -f previous_tag_name="$previous" \
+            --jq .body > "$RUNNER_TEMP/generated.md"
+          bun scripts/release-notes.ts "$RUNNER_TEMP/generated.md" > "$RUNNER_TEMP/body.md"
+
+      - name: Push the bump and the tag
+        run: |
+          git push origin HEAD:main
+          git push origin "$TAG"
+
+      # If this step fails after the push, prod is live without a release page.
+      # To recover by hand: gh release create <tag> --verify-tag --generate-notes.
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --verify-tag --title "VO2 $TAG" \
+            --notes-file "$RUNNER_TEMP/body.md"
