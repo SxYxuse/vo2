@@ -609,7 +609,7 @@ export function summarizeWeek(
 
   const generated = generateKeySessions({
     count: keySessionCountFor({
-      objective: data.season.anchor.length ? data.season.objective : null,
+      priority: data.season.anchor.length ? data.season.priority : null,
       phaseMax: data.season.maxKeySessions,
       trainingDays,
     }),

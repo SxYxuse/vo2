@@ -136,7 +136,6 @@ export const goals = pgTable(
     date: date("date", { mode: "string" }).notNull(),
     distanceM: real("distance_m"),
     elevationGainM: real("elevation_gain_m"),
-    objective: text("objective").$type<"finish" | "finishWell" | "perform">().notNull(),
     /** A: peak and taper for it; B: a few lighter days; C: trained through (ADR 0024). */
     priority: text("priority").$type<"A" | "B" | "C">().notNull().default("A"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

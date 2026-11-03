@@ -18,7 +18,6 @@ import {
 } from "@/services/plan-builder.types.ts";
 import { updateGoal } from "@/services/season.ts";
 import {
-  GOAL_OBJECTIVES,
   GOAL_PRIORITIES,
   anchorEvent,
   daysBetween,
@@ -345,7 +344,7 @@ function GoalRow({
 }) {
   const queryClient = useQueryClient();
   const save = useMutation({
-    mutationFn: (patch: Partial<Pick<Goal, "priority" | "objective">>) => {
+    mutationFn: (patch: Partial<Pick<Goal, "priority">>) => {
       const { id, ...input } = { ...goal, ...patch };
       return updateGoal({ data: { ...input, id } });
     },
@@ -392,23 +391,6 @@ function GoalRow({
           {GOAL_PRIORITIES.map((item) => (
             <ToggleGroupItem key={item.id} value={item.id} aria-label={item.label}>
               {item.id}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <ToggleGroup
-          variant="outline"
-          size="sm"
-          spacing={0}
-          value={[goal.objective]}
-          aria-label="Objective"
-          onValueChange={(next) => {
-            const objective = (next as Goal["objective"][])[0];
-            if (objective && objective !== goal.objective) save.mutate({ objective });
-          }}
-        >
-          {GOAL_OBJECTIVES.map((item) => (
-            <ToggleGroupItem key={item.id} value={item.id}>
-              {item.label}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>

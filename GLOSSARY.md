@@ -121,16 +121,12 @@ A difference between the plan goals and the goals on Season. One that changes a 
 _Avoid_: Re-plan (that is laying the rest of a week out again), sync
 
 **Goal**:
-A race or event on the athlete's season: name, sport type, date, distance, elevation gain, objective, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
+A race or event on the athlete's season: name, sport type, date, distance, elevation gain, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
 _Avoid_: Target (that is the week's hours), race (not every goal is one)
 
-**Objective**:
-What the athlete wants from a goal: finish, finish well, or perform. On the goal the plan leads to, it sets how fast fitness rises and how many key sessions a week (one, two, or three); on a B or C goal it sets how many easy days go around it (ADR 0026). Only the week planner uses it; with the coach plan it is hidden and every goal is perform.
-_Avoid_: Priority, ambition
-
 **Priority**:
-How much a goal matters: A (the plan builds, peaks, and fully tapers for it, with a recovery week after), B (lighter days before it, by its objective), or C (trained through, with easy days around it to finish well or perform). The next A event leads the season; without one, the next B event does (ADR 0024, ADR 0026).
-_Avoid_: Main goal, importance, A/B race when meaning the objective
+How much a goal matters, and what the athlete races it for: A to perform (the plan builds, peaks, and fully tapers for it, with a recovery week after), B to finish well (lighter days before it), or C to finish (trained through). The next A event leads the season; without one, the next B event does. The leading goal's priority sets how fast fitness rises and how many key sessions a week: three for A, two for B, one for C (ADR 0024, ADR 0026, ADR 0049).
+_Avoid_: Main goal, importance, objective
 
 **Season**:
 The athlete's goals in date order. The plan works toward the next A goal. The season map shows each week's phase and expected hours through the last goal.
@@ -161,7 +157,7 @@ A training day the plan may put two sessions on. The athlete sets how many a wee
 _Avoid_: Brick (a brick is one specific double: a run straight after a ride), double day
 
 **Key session**:
-A precise session the week planner generates each week: intervals, time in zone, or a long Z2. The coach plan has none (ADR 0047). How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
+A precise session the week planner generates each week: intervals, time in zone, or a long Z2. The coach plan has none (ADR 0047). How many follows the leading goal's priority within the phase's limit and half the training days; the type follows the phase and priority (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:

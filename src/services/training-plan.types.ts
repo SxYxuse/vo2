@@ -43,22 +43,22 @@ export const keySessionSchema = z.object({
 export type KeySession = z.infer<typeof keySessionSchema>;
 export type KeySessionKind = KeySession["kind"];
 
-/** Generated key sessions are capped here whatever the objective asks. */
+/** Generated key sessions are capped here whatever the goal asks. */
 export const MAX_KEY_SESSIONS = 4;
 
-/** Key sessions a week by the leading goal's objective (ADR 0026); one while holding fitness. */
-const KEY_SESSIONS_BY_OBJECTIVE = { finish: 1, finishWell: 2, perform: 3 } as const;
+/** Key sessions a week by the leading goal's priority (ADR 0049); one while holding fitness. */
+const KEY_SESSIONS_BY_PRIORITY = { C: 1, B: 2, A: 3 } as const;
 
 /**
- * This week's key sessions: the objective's count, within the phase's own limit and half the
+ * This week's key sessions: the leading goal's count, within the phase's own limit and half the
  * training days, so hard days never have to sit back to back.
  */
 export function keySessionCountFor(input: {
-  objective: keyof typeof KEY_SESSIONS_BY_OBJECTIVE | null;
+  priority: keyof typeof KEY_SESSIONS_BY_PRIORITY | null;
   phaseMax: number | null;
   trainingDays: number;
 }) {
-  const wanted = input.objective ? KEY_SESSIONS_BY_OBJECTIVE[input.objective] : 1;
+  const wanted = input.priority ? KEY_SESSIONS_BY_PRIORITY[input.priority] : 1;
   return Math.max(
     0,
     Math.min(
@@ -181,7 +181,6 @@ export const planGoalSchema = z.object({
   date: dateKeySchema,
   distanceM: z.number().nullable(),
   elevationGainM: z.number().nullable(),
-  objective: z.enum(["finish", "finishWell", "perform"]),
   priority: z.enum(["A", "B", "C"]),
 });
 

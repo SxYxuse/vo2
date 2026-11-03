@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { addYears, format, parseISO } from "date-fns";
 import {
@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 
-import { appShellQueryOptions } from "@/lib/queries.ts";
 import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { SeasonChangePrompt, notifySeasonCheck } from "@/components/plan-adapt.tsx";
 import {
@@ -27,7 +26,6 @@ import {
 import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { createEvent, createGoal, deleteGoal, pasteSeason, updateGoal } from "@/services/season.ts";
 import {
-  GOAL_OBJECTIVES,
   GOAL_PRIORITIES,
   LEG_SEPARATOR,
   daysBetween,
@@ -109,19 +107,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const objectiveLabel = (id: Goal["objective"]) =>
-  GOAL_OBJECTIVES.find((objective) => objective.id === id)?.label ?? id;
-
 const formatGoalDate = (key: string) => format(parseISO(key), "EEE d MMM yyyy");
 
 /** Metres of climbing per km from which a goal reads as hilly, as the plan treats it. */
 const HILLY_M_PER_KM = 15;
-
-/** With the coach plan goals have no objective: they're saved as perform (ADR 0037). */
-function useHidesObjective() {
-  const { data } = useQuery(appShellQueryOptions);
-  return data?.planningStyle === "coachPlan";
-}
 
 function goalFacts(goal: Goal) {
   return [
@@ -244,11 +233,11 @@ export function SeasonView({ data }: { data: SeasonData }) {
             ))}
           </section>
           <p className="text-muted-foreground text-xs">
-            <span className="text-foreground font-medium">A</span> races get the full build, peak,
-            and taper. <span className="text-foreground font-medium">B</span> races get lighter days
-            before them, more when you race to perform.{" "}
-            <span className="text-foreground font-medium">C</span> races are trained through, with
-            easy days around them to finish well or perform. Tap a goal to change it.
+            <span className="text-foreground font-medium">A</span> races are to perform: the full
+            build, peak, and taper. <span className="text-foreground font-medium">B</span> races are
+            to finish well, with lighter days before them.{" "}
+            <span className="text-foreground font-medium">C</span> races are to finish, trained
+            through like a hard session. Tap a goal to change it.
           </p>
         </>
       )}
@@ -359,7 +348,6 @@ function EventCard({
   onEdit: (goal: Goal) => void;
 }) {
   const priority = eventPriority(event);
-  const hidesObjective = useHidesObjective();
   // Each leg opens on its own, so only a single-leg event can make the whole card its button.
   const whole = event.goals.length === 1;
 
@@ -377,10 +365,7 @@ function EventCard({
           {formatDaysLeft(daysBetween(data.today, event.date))}
         </span>
       </div>
-      <p className="text-muted-foreground text-xs tabular-nums">
-        {formatGoalDate(event.date)}
-        {hidesObjective ? null : ` · ${objectiveLabel(event.goals[0]!.objective)}`}
-      </p>
+      <p className="text-muted-foreground text-xs tabular-nums">{formatGoalDate(event.date)}</p>
       <ul className="-mx-2 flex flex-col">
         {event.goals.map((goal) => {
           const group = sportGroupFor(goal.sportType)?.id;
@@ -529,7 +514,6 @@ type LegForm = { sportType: string; distanceKm: string; elevationGainM: string }
 type GoalForm = LegForm & {
   name: string;
   date: string;
-  objective: Goal["objective"];
   priority: Goal["priority"];
   /** Further sports on the same day, for a new multisport event. */
   legs: LegForm[];
@@ -542,7 +526,6 @@ function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
     date: goal?.date ?? "",
     distanceKm: goal?.distanceM != null ? String(goal.distanceM / 1000) : "",
     elevationGainM: goal?.elevationGainM != null ? String(goal.elevationGainM) : "",
-    objective: goal?.objective ?? "finishWell",
     priority: goal?.priority ?? "A",
     legs: [],
   };
@@ -564,7 +547,6 @@ function toInput(form: GoalForm, leg: LegForm = form, name = form.name) {
     date: form.date,
     distanceM: distanceKm == null ? null : distanceKm * 1000,
     elevationGainM: parseOptionalNumber(leg.elevationGainM),
-    objective: form.objective,
     priority: form.priority,
   });
 }
@@ -614,7 +596,6 @@ function GoalFormBody({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
-  const hidesObjective = useHidesObjective();
   // A goal keeps its sport even after the athlete hides it in Settings.
   const sportOptions =
     goal && !sportTypes.includes(goal.sportType) ? [goal.sportType, ...sportTypes] : sportTypes;
@@ -880,32 +861,6 @@ function GoalFormBody({
                           <FieldContent>
                             <FieldTitle>{priority.label}</FieldTitle>
                             <FieldDescription>{priority.hint}</FieldDescription>
-                          </FieldContent>
-                        </Field>
-                      </FieldLabel>
-                    );
-                  })}
-                </RadioGroup>
-              </FieldSet>
-              <FieldSet hidden={hidesObjective}>
-                <FieldLegend variant="label">Objective</FieldLegend>
-                <RadioGroup
-                  name="goal-objective"
-                  value={form.objective}
-                  onValueChange={(next) => {
-                    if (next) set({ objective: next as Goal["objective"] });
-                  }}
-                  className="gap-2"
-                >
-                  {GOAL_OBJECTIVES.map((objective) => {
-                    const id = `goal-objective-${objective.id}`;
-                    return (
-                      <FieldLabel key={objective.id} htmlFor={id} className="w-full">
-                        <Field orientation="horizontal" className="items-start p-3">
-                          <RadioGroupItem value={objective.id} id={id} />
-                          <FieldContent>
-                            <FieldTitle>{objective.label}</FieldTitle>
-                            <FieldDescription>{objective.hint}</FieldDescription>
                           </FieldContent>
                         </Field>
                       </FieldLabel>

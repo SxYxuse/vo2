@@ -192,7 +192,6 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
             date: raceDay,
             distanceM: 10_000,
             elevationGainM: null,
-            objective: "perform",
             priority: "C",
           },
         ],
@@ -397,7 +396,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await page.goto("/week");
     await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
 
-    // With the coach plan, goals have no objective: new ones are saved as perform.
     await addRaceAndWritePlan(page);
     await settle(page);
     await expect(page).toHaveScreenshot("week-coach-plan.png", {
@@ -477,17 +475,14 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
 /** The A race the coach plan needs, then availability; ends on Plan with the plan written. */
 async function addRaceAndWritePlan(page: Page) {
   const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
-  // With the coach plan, goals have no objective: new ones are saved as perform.
   await pasteGoal(page, {
     name: "Autumn half",
     sportType: "Run",
     date: raceDay,
     distanceM: 21_097.5,
     elevationGainM: null,
-    objective: "finish",
     priority: "A",
   });
-  await expect(page.getByText(/· Finish/)).toHaveCount(0);
 
   await page.goto("/settings/training");
   await settle(page);
