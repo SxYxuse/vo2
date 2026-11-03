@@ -61,16 +61,3 @@ export type PlanChangeProposal =
 
 /** What apply_plan_change answers once the athlete tapped Apply. */
 export type PlanChangeApplied = { applied: true } | { applied: false; reason: string };
-
-/** The quick choices of a note on a week of the coach plan (GLOSSARY: Coach note). */
-export const WEEK_NOTE_CHOICES = [
-  { id: "cant", label: "Can't train", text: "I can't train on some days this week." },
-  { id: "short", label: "Short on time", text: "I'm short on time this week." },
-  { id: "indoor", label: "Indoor only", text: "I can only train indoors this week." },
-  { id: "easy", label: "Take it easy", text: "I need to take it easy this week." },
-] as const;
-
-/** The message a week note sends to the coach: the week, then the athlete's note. */
-export function weekNoteMessage(weekStart: string, note: string) {
-  return `Note on my plan for the week of ${weekStart}: ${note.trim()} Please propose a change to that week's sessions.`;
-}

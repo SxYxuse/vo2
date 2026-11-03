@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-/** A note's reply on a day of the plan: it stays in memory and is never saved as a chat. */
-export const NOTE_THREAD_PREFIX = "plan-note-";
-
 export type CoachChatSummary = { id: string; title: string; updatedAt: string };
 
 /** The athlete's coach chats, most recently active first. */

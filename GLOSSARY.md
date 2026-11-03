@@ -105,7 +105,7 @@ The time VO2 expects the athlete to run a goal's distance today, read from their
 _Avoid_: Goal time, target time, race estimate
 
 **Plan change**:
-A change to the coach plan the coach proposes in the chat or from a coach note, shown session by session before and after. A changed session keeps its week and sport. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
+A change to the coach plan the coach proposes in the coach chat, shown session by session before and after. A changed session keeps its week and sport. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
 _Avoid_: Re-plan, adaptation, edit
 
 **Goal**:
@@ -136,16 +136,12 @@ _Avoid_: Cap, safety limit
 How a coach-plan session stands: done when the athlete marks it, otherwise open, with no day, no missed state, and no automatic match (ADR 0048).
 _Avoid_: Completed, compliance
 
-**Coach note**:
-What the athlete tells the coach about a week of the coach plan: a quick choice (can't train, short on time, indoor only, take it easy) or their own words. It asks the coach for a change to that week's sessions, with no day (ADR 0048).
-_Avoid_: Comment, feedback, journal
-
 **Coach**:
 The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan. It runs only on the athlete's OpenRouter key.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:
-One of the two things the coach does: coach chat (which also answers coach notes) and writing the coach plan. The athlete picks the model for each one.
+One of the two things the coach does: coach chat (which proposes plan changes) and writing the coach plan. The athlete picks the model for each one.
 _Avoid_: AI feature
 
 **OpenRouter key**:

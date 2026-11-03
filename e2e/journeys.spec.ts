@@ -561,19 +561,7 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
 
     await page.goto("/week");
     await expect(weekSessions(page)).toHaveCount(3);
-
-    // A note on the week goes the same way, without the chat.
-    await page.getByRole("button", { name: "Indoor only" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
-    await settle(page);
-    await expect(dialog).toHaveScreenshot("plan-change-note.png");
-    await dialog.getByRole("button", { name: "Apply" }).click();
-    await expect(dialog).toContainText("Applied to your plan");
-    // The athlete can answer the coach without opening the chat.
-    await expect(dialog.getByRole("textbox", { name: "Reply to the coach" })).toBeEnabled();
-    await dialog.getByRole("button", { name: "Close" }).click();
-    await expect(page.getByRole("heading", { name: /\(treadmill\)/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Indoor only" })).toHaveCount(0);
   } finally {
     await leaveCoachPlan(page);
   }
