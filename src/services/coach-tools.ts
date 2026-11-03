@@ -136,21 +136,21 @@ export const showVisualDef = toolDefinition({
 export const getCoachPlanDef = toolDefinition({
   name: "get_coach_plan",
   description:
-    "The athlete's coach plan from this week on: each written week's budget and phase, and each day's run in the plan's session format with its status, plus availability, paces, the rules every change must keep, and the first day a change may touch.",
+    "The athlete's coach plan from this week on: each written week's budget, phase, and runs that fit, and its sessions (no day) in the plan's session format with their id and status (open or done), plus availability, paces, and the rules every change must keep.",
   inputSchema: z.object({}),
 });
 
 export const proposePlanChangeDef = toolDefinition({
   name: "propose_plan_change",
   description:
-    "Check a change to the coach plan before offering it. Send only the days that change, each with its run after the change (the same session format the plan is written in) or null for a rest day. VO2 checks the result against every coach plan rule and the athlete's availability, and answers with either a proposalId and the change day by day, or the rules it breaks: then fix them and propose again. Changes nothing by itself.",
+    "Check a change to the coach plan before offering it. Send only the sessions that change, each by id with its run after the change (the same session format the plan is written in) or null to drop it, or with a null id to add a run to a week. VO2 checks the result against every coach plan rule and the athlete's availability, and answers with either a proposalId and the change session by session, or the rules it breaks: then fix them and propose again. Changes nothing by itself.",
   inputSchema: planChangeInputSchema,
 });
 
 export const applyPlanChangeDef = toolDefinition({
   name: "apply_plan_change",
   description:
-    "Offer a checked change to the athlete: the chat shows it day by day with Apply and Decline. Takes the proposalId propose_plan_change returned. Saved only if the athlete applies it and the plan hasn't changed since; a decline changes nothing.",
+    "Offer a checked change to the athlete: the chat shows it session by session with Apply and Decline. Takes the proposalId propose_plan_change returned. Saved only if the athlete applies it and the plan hasn't changed since; a decline changes nothing.",
   inputSchema: z.object({ proposalId: z.string().min(1).max(64) }),
   needsApproval: true,
 });

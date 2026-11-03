@@ -19,39 +19,32 @@ import { formatDuration } from "@/services/activity-detail.types.ts";
 import { writeCoachPlanAgain } from "@/services/coach-plan.ts";
 import {
   sessionKindLabel,
-  sessionStatus,
   type CoachPlanState,
-  type PlanActivity,
   type PlanWeek,
   type PlannedRun,
 } from "@/services/coach-plan.types.ts";
-import { addDayKey } from "@/services/day-key.ts";
 import { PHASES, mondayOf, type PhaseKind } from "@/services/season-phase.ts";
 import { daysBetween } from "@/services/season.types.ts";
 import { canPredict, predictRaceSeconds } from "@/services/training-paces.types.ts";
-import { CoachDayNote } from "@/components/coach-day-note.tsx";
+import { CoachWeekNote } from "@/components/coach-week-note.tsx";
 import { CoachPlanMissingAlert } from "@/components/coach-plan-setup.tsx";
 import {
-  ActivityLine,
-  PlannedVsActual,
+  DoneToggle,
   RunShape,
-  RunSteps,
   headlinePace,
-  longDayLabel,
   rangeText,
+  weekLabel,
 } from "@/components/coach-run.tsx";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 /*
- * The Plan view for coach-plan athletes (#134, mockup A2): the week shown with arrows to the
- * other written weeks, a strip of its days, the selected day in full, and the road to the race.
- * On desktop the same pieces in two columns, the selected day on the right.
+ * The Plan view for coach-plan athletes: the week shown with arrows to the other written weeks,
+ * its sessions as one unordered list (ADR 0048: no day, no order), and the road to the race. On
+ * desktop the road sits beside the week.
  */
 
-const days = (weekStart: string) => Array.from({ length: 7 }, (_, i) => addDayKey(weekStart, i));
 const weekKm = (week: PlanWeek) =>
   Math.round(week.sessions.reduce((sum, run) => sum + run.distanceKm, 0));
 
@@ -114,88 +107,15 @@ function PlanStatus({ state }: { state: CoachPlanState }) {
   );
 }
 
-function chipBar(run: PlannedRun | undefined, status: string | null) {
-  if (!run) return "bg-muted";
-  if (status === "done") return "bg-success";
-  if (status === "missed") return "bg-destructive";
-  return "bg-ds-amber-500";
-}
-
-function DayStrip({
-  week,
-  state,
-  selected,
-  onSelect,
-}: {
-  week: PlanWeek;
-  state: CoachPlanState;
-  selected: string;
-  onSelect: (date: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-7 gap-1 sm:gap-1.5" role="group" aria-label="Days of the week">
-      {days(week.weekStart).map((date) => {
-        const run = week.sessions.find((session) => session.date === date);
-        const status = run ? sessionStatus(run, state.activities, state.today) : null;
-        const extras = state.activities.some((item) => item.date === date && !item.sessionId);
-        const on = date === selected;
-        const today = date === state.today;
-        return (
-          <button
-            key={date}
-            type="button"
-            aria-pressed={on}
-            aria-label={`${format(parseISO(date), "EEEE d MMMM")}${today ? ", today" : ""}: ${
-              run
-                ? `${run.title}, ${run.distanceKm} km${status === "planned" ? "" : `, ${status}`}`
-                : "rest day"
-            }`}
-            onClick={() => onSelect(date)}
-            className={cn(
-              "flex min-h-16 min-w-0 flex-col items-center gap-0.5 rounded-xl border px-0.5 pt-1.5 pb-2 text-[11px] leading-tight transition-colors",
-              on
-                ? "bg-foreground text-background border-foreground"
-                : today
-                  ? "border-info text-info"
-                  : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {format(parseISO(date), "EEE")}
-            <b className={cn("text-[15px]", on ? "text-background" : "text-foreground")}>
-              {format(parseISO(date), "d")}
-            </b>
-            <span className="tabular-nums">{run ? `${run.distanceKm} km` : "rest"}</span>
-            <span className="flex items-center gap-0.5">
-              <span className={cn("h-1 w-6 rounded-full", chipBar(run, status))} />
-              {extras ? <span className="bg-muted-foreground size-1 rounded-full" /> : null}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function RunSummary({
-  run,
-  state,
-  actual,
-}: {
-  run: PlannedRun;
-  state: CoachPlanState;
-  actual: PlanActivity | undefined;
-}) {
+function SessionCard({ run, state }: { run: PlannedRun; state: CoachPlanState }) {
   const pace = headlinePace(run);
-  const status = sessionStatus(run, state.activities, state.today);
   return (
-    <div className="flex flex-col gap-3">
+    <li
+      className={cn("flex flex-col gap-3 rounded-xl border p-3 sm:p-4", run.done && "bg-muted/50")}
+    >
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight">
-          {run.title}
-          {status === "done" ? <Badge variant="success">Done</Badge> : null}
-          {status === "missed" ? <Badge variant="destructive">Missed</Badge> : null}
-        </h2>
-        <span className="shrink-0 text-3xl font-semibold tracking-tight tabular-nums">
+        <h3 className="min-w-0 font-semibold tracking-tight">{run.title}</h3>
+        <span className="shrink-0 text-2xl font-semibold tracking-tight tabular-nums">
           {run.distanceKm}
           <small className="text-muted-foreground ms-1 text-sm font-medium">km</small>
         </span>
@@ -204,114 +124,61 @@ function RunSummary({
         {sessionKindLabel(run.kind)} · about {run.minutes} min
         {pace ? ` · ${rangeText(pace)}` : ""}
       </p>
-      <RunShape run={run} height={56} />
-      <RunSteps run={run} />
-      <p className="text-sm leading-relaxed">{run.why}</p>
-      {actual ? <PlannedVsActual run={run} actual={actual} /> : null}
-      {status === "missed" ? (
-        <p className="text-muted-foreground text-sm">
-          No run on this day covered {Math.round(run.distanceKm * 0.7 * 10) / 10} km. Link one on
-          the session page if it was done.
-        </p>
-      ) : null}
-      <Button
-        className="min-h-11 w-full sm:w-auto sm:self-start"
-        nativeButton={false}
-        // Marked, so the session's "Plan" button goes back here rather than adding an entry.
-        render={
-          <Link
-            to="/week/run/$sessionId"
-            params={{ sessionId: run.id }}
-            state={(prev) => ({ ...prev, planSessionPushed: true })}
-          />
-        }
-      >
-        Open the full session
-      </Button>
-      {status !== "done" && run.kind !== "race" && run.date >= state.today ? (
-        <CoachDayNote
-          date={run.date}
-          disabledReason={
-            state.status === "writing"
-              ? "Your plan is being written again: send a note once it's written."
-              : undefined
+      <RunShape run={run} height={40} className={cn(run.done && "opacity-60")} />
+      <div className="flex flex-wrap items-start gap-2">
+        <DoneToggle run={run} state={state} className="flex-1 sm:flex-none" />
+        <Button
+          variant="ghost"
+          className="min-h-11 flex-1 sm:min-h-9 sm:flex-none"
+          nativeButton={false}
+          // Marked, so the session's "Plan" button goes back here rather than adding an entry.
+          render={
+            <Link
+              to="/week/run/$sessionId"
+              params={{ sessionId: run.id }}
+              state={(prev) => ({ ...prev, planSessionPushed: true })}
+            />
           }
-        />
-      ) : null}
-    </div>
+        >
+          Open the session
+          <ChevronRightIcon data-icon="inline-end" />
+        </Button>
+      </div>
+    </li>
   );
 }
 
-function DayDetail({
-  date,
-  state,
-  weeks,
-  onSelect,
-}: {
-  date: string;
-  state: CoachPlanState;
-  weeks: PlanWeek[];
-  onSelect: (date: string) => void;
-}) {
-  const sessions = weeks.flatMap((week) => week.sessions);
-  const run = sessions.find((session) => session.date === date);
-  const onDay = state.activities.filter((item) => item.date === date);
-  const extras = onDay.filter((item) => !item.sessionId);
-  const actual = run ? onDay.find((item) => item.sessionId === run.id) : undefined;
-  const next = run ? null : sessions.find((session) => session.date > date);
+function WeekSessions({ week, state }: { week: PlanWeek; state: CoachPlanState }) {
+  const done = week.sessions.filter((run) => run.done).length;
+  const started = week.weekStart <= mondayOf(state.today);
+  if (!week.sessions.length) {
+    return <p className="text-muted-foreground text-sm">No runs planned this week.</p>;
+  }
   return (
-    <section aria-label="Selected day" className="flex flex-col gap-3">
-      <p
-        className={cn(
-          "text-sm font-semibold",
-          date === state.today ? "text-info" : "text-muted-foreground",
-        )}
-      >
-        {date === state.today ? "Today, " : ""}
-        {longDayLabel(date)}
-      </p>
-      {run ? (
-        <RunSummary run={run} state={state} actual={actual} />
-      ) : (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">
-            {extras.length ? "No run planned" : "Rest day"}
-          </h2>
-          {next ? (
-            <Button
-              variant="outline"
-              className="min-h-11 justify-between sm:self-start"
-              onClick={() => onSelect(next.date)}
-            >
-              Next run: {format(parseISO(next.date), "EEE d MMM")}, {next.title}
-              <ChevronRightIcon data-icon="inline-end" />
-            </Button>
-          ) : null}
-        </div>
-      )}
-      {extras.length ? (
-        <div className="flex flex-col gap-1.5 border-t pt-3">
-          <p className="text-muted-foreground text-xs">
-            {run ? "Also on this day" : "Done on this day"}
-          </p>
-          {extras.map((item) => (
-            <ActivityLine key={item.id} activity={item} />
-          ))}
-        </div>
+    <section aria-label="The week's sessions" className="flex flex-col gap-3">
+      {started ? (
+        <p className="text-muted-foreground text-sm" aria-live="polite">
+          {done} of {week.sessions.length} done. Run them on the days that suit you.
+        </p>
       ) : null}
+      <ul className="flex flex-col gap-2">
+        {week.sessions.map((run) => (
+          <SessionCard key={run.id} run={run} state={state} />
+        ))}
+      </ul>
     </section>
   );
 }
 
 function WeekHeader({
   week,
-  thisWeek,
+  today,
   onStep,
   canStepBack,
   canStepForward,
 }: {
   week: PlanWeek;
-  thisWeek: string;
+  today: string;
   onStep: (direction: 1 | -1) => void;
   canStepBack: boolean;
   canStepForward: boolean;
@@ -331,11 +198,7 @@ function WeekHeader({
         <ChevronLeftIcon />
       </Button>
       <h2 aria-live="polite" className="min-w-0 flex-1 text-center text-sm text-balance">
-        <b className="font-medium">
-          {week.weekStart === thisWeek
-            ? "This week"
-            : `Week of ${format(parseISO(week.weekStart), "d MMM")}`}
-        </b>
+        <b className="font-medium">{weekLabel(week.weekStart, today)}</b>
         <span className="text-muted-foreground">
           {" "}
           · {PHASES[week.phase].label}
@@ -390,7 +253,10 @@ function RoadToRace({ state, weeks }: { state: CoachPlanState; weeks: PlanWeek[]
       ? formatDuration(predictRaceSeconds(state.vdot, goal.distanceM))
       : null;
   return (
-    <section aria-labelledby="road" className="flex flex-col gap-2 border-t pt-4">
+    <section
+      aria-labelledby="road"
+      className="flex flex-col gap-2 border-t pt-4 lg:border-t-0 lg:pt-0"
+    >
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="road" className="font-semibold">
           {goal.name}
@@ -436,35 +302,28 @@ function RoadToRace({ state, weeks }: { state: CoachPlanState; weeks: PlanWeek[]
   );
 }
 
-export function CoachPlanView({ day }: { day?: string }) {
+export function CoachPlanView({ week: shown }: { week?: string }) {
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const thisWeek = state.today ? mondayOf(state.today) : "";
-  // A plan written late in the week, on a Sunday without a run, starts this week with no day left
-  // to place a run on: that week is not shown, rather than read as a written week of 0 km.
+  // A plan written late in the week, on a Sunday with no run left to place, starts this week with
+  // no runs: that week is not shown, rather than read as a written week of 0 km.
   const weeks = (state.plan?.weeks ?? [])
     .filter(
       (week) => week.weekStart > thisWeek || (week.weekStart === thisWeek && week.sessions.length),
     )
     .slice(0, 4);
-  const inPlan = (date: string | undefined) =>
-    date != null && weeks.some((week) => week.weekStart === mondayOf(date));
-  // The week the view opens on: this week, or the first written one when the plan starts later (a
-  // first plan written on a Sunday after a run starts on Monday). This week opens on today, any
-  // other week on its first run.
+  // The week the view opens on: this week, or the first written one when the plan starts later.
   const home = weeks[0]?.weekStart ?? thisWeek;
-  const openingDay = (target: PlanWeek) =>
-    target.weekStart === thisWeek ? state.today : (target.sessions[0]?.date ?? target.weekStart);
-  const selected = inPlan(day) ? day! : weeks[0] ? openingDay(weeks[0]) : state.today;
   const index = Math.max(
     0,
-    weeks.findIndex((week) => week.weekStart === mondayOf(selected)),
+    weeks.findIndex((week) => week.weekStart === shown),
   );
   const week = weeks[index];
-  const select = (date: string) =>
+  const show = (weekStart: string) =>
     navigate({
       to: "/week",
-      search: weeks[0] && date === openingDay(weeks[0]) ? {} : { day: date },
+      search: weekStart === home ? {} : { week: weekStart },
       replace: true,
       resetScroll: false,
     });
@@ -475,7 +334,7 @@ export function CoachPlanView({ day }: { day?: string }) {
     canStepBack,
     onStep: async (direction) => {
       const target = weeks[index + direction];
-      if (target) await select(openingDay(target));
+      if (target) await show(target.weekStart);
     },
   });
 
@@ -483,20 +342,15 @@ export function CoachPlanView({ day }: { day?: string }) {
     <div className="flex flex-col gap-3 sm:gap-4">
       <PlanStatus state={state} />
       {week ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:gap-x-8">
-          <div className="flex flex-col gap-2 lg:col-start-1 lg:row-start-1">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-x-8">
+          <div className="flex min-w-0 flex-col gap-3">
             <WeekHeader
               week={week}
-              thisWeek={thisWeek}
+              today={state.today}
               canStepBack={canStepBack}
               canStepForward={canStepForward}
               onStep={(direction) => void swipe.slide(direction)}
             />
-            <div className="touch-pan-y overflow-hidden">
-              <div ref={swipe.ref} {...swipe.handlers}>
-                <DayStrip week={week} state={state} selected={selected} onSelect={select} />
-              </div>
-            </div>
             {week.weekStart !== home ? (
               <Button
                 variant="link"
@@ -508,23 +362,36 @@ export function CoachPlanView({ day }: { day?: string }) {
                 {home === thisWeek ? "Back to this week" : "Back to the first week"}
               </Button>
             ) : null}
-          </div>
-          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <div className="lg:sticky lg:top-4">
-              <DayDetail date={selected} state={state} weeks={weeks} onSelect={select} />
+            <div className="touch-pan-y overflow-hidden">
+              <div ref={swipe.ref} {...swipe.handlers}>
+                <WeekSessions week={week} state={state} />
+              </div>
             </div>
+            {week.sessions.some((run) => !run.done && run.kind !== "race") ? (
+              <CoachWeekNote
+                weekStart={week.weekStart}
+                title={weekLabel(week.weekStart, state.today)}
+                disabledReason={
+                  state.status === "writing"
+                    ? "Your plan is being written again: send a note once it's written."
+                    : undefined
+                }
+              />
+            ) : null}
           </div>
-          <div className="flex flex-col gap-3 lg:col-start-1 lg:row-start-2">
-            <RoadToRace state={state} weeks={weeks} />
-            <Button
-              variant="outline"
-              className="min-h-11 w-full"
-              nativeButton={false}
-              render={<Link to="/coach" search={{ change: true }} />}
-            >
-              <SparklesIcon data-icon="inline-start" />
-              Ask the coach to change my plan
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+              <RoadToRace state={state} weeks={weeks} />
+              <Button
+                variant="outline"
+                className="min-h-11 w-full"
+                nativeButton={false}
+                render={<Link to="/coach" search={{ change: true }} />}
+              >
+                <SparklesIcon data-icon="inline-start" />
+                Ask the coach to change my plan
+              </Button>
+            </div>
           </div>
         </div>
       ) : null}

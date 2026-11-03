@@ -267,6 +267,13 @@
       "when": 1793610977610,
       "tag": "0037_coach_chats",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793696425736,
+      "tag": "0038_coach_plan_sessions_have_no_day",
+      "breakpoints": true
     }
   ]
 }

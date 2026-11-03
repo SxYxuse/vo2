@@ -1,23 +1,28 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
+import { CheckIcon, CircleIcon } from "lucide-react";
 
+import { useOnline } from "@/hooks/use-online.ts";
+import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
+import { markCoachPlanSession } from "@/services/coach-plan.ts";
 import { formatPaceClock } from "@/services/locomotion.ts";
 import {
   EFFORTS,
   stepAmountText,
   stepSecPerKm,
-  type PlanActivity,
+  type CoachPlanState,
   type PlannedRun,
   type PlannedStep,
 } from "@/services/coach-plan.types.ts";
+import { mondayOf } from "@/services/season-phase.ts";
 import { PACE_TYPES, type PaceRange } from "@/services/training-paces.types.ts";
-import { SPORT_STYLE } from "@/components/sport-style.ts";
-import { sportGroupFor } from "@/services/sport-groups.ts";
-import { formatDuration } from "@/services/activity-detail.types.ts";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 
 /*
  * Pieces of a coach-plan run shared by the Plan view and the session page: its shape (width is
- * distance, height and amber depth are effort), its steps with repeats, and planned vs actual.
+ * distance, height and amber depth are effort), its steps with repeats, and marking it done.
  */
 
 type Level = 1 | 2 | 3 | 4 | 5;
@@ -141,60 +146,63 @@ export function RunSteps({ run }: { run: Pick<PlannedRun, "blocks"> }) {
   );
 }
 
-export const paceOf = (activity: Pick<PlanActivity, "km" | "seconds">) =>
-  activity.km > 0 ? `${formatPaceClock(activity.seconds / activity.km)}/km` : "—";
+/** "This week", or "Week of 22 Jun". */
+export const weekLabel = (weekStart: string, today: string) =>
+  weekStart === mondayOf(today) ? "This week" : `Week of ${format(parseISO(weekStart), "d MMM")}`;
 
-/** Planned against what the run that did it shows: distance and average pace. */
-export function PlannedVsActual({ run, actual }: { run: PlannedRun; actual: PlanActivity }) {
-  // The plan's average is its time over its distance, steps and recoveries together.
-  const rows = [
-    { label: "Distance", planned: `${run.distanceKm} km`, actual: `${actual.km.toFixed(1)} km` },
-    {
-      label: "Average pace",
-      planned: paceOf({ km: run.distanceKm, seconds: run.minutes * 60 }),
-      actual: paceOf(actual),
-    },
-  ];
+/**
+ * Marks a session done, or open again (ADR 0048). Shown from the session's week on; a week ahead
+ * may still be written again. Off while offline, and while the plan is being written, since the
+ * writing would store the plan it read and drop the mark.
+ */
+export function DoneToggle({
+  run,
+  state,
+  className,
+}: {
+  run: PlannedRun;
+  state: CoachPlanState;
+  className?: string;
+}) {
+  const online = useOnline();
+  const queryClient = useQueryClient();
+  const mark = useMutation({
+    mutationFn: (done: boolean) => markCoachPlanSession({ data: { sessionId: run.id, done } }),
+    onSuccess: (next) => queryClient.setQueryData(coachPlanQueryOptions.queryKey, next),
+  });
+  if (run.weekStart > mondayOf(state.today)) return null;
+  const done = run.done === true;
+  const reason = !online
+    ? "Offline: it can be marked once you're back online."
+    : state.status === "writing"
+      ? "Your plan is being written again: mark it once it's written."
+      : mark.error
+        ? "Could not save. Nothing was saved."
+        : null;
   return (
-    <table className="w-full text-sm tabular-nums">
-      <thead className="text-muted-foreground text-xs">
-        <tr>
-          <th className="py-1 text-start font-normal">
-            <span className="sr-only">Measure</span>
-          </th>
-          <th className="py-1 text-end font-normal">Planned</th>
-          <th className="py-1 text-end font-normal">Actual</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.label} className="border-t">
-            <th scope="row" className="py-1.5 text-start font-normal">
-              {row.label}
-            </th>
-            <td className="py-1.5 text-end">{row.planned}</td>
-            <td className="py-1.5 text-end font-medium">{row.actual}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className={cn("flex flex-col gap-1", className)}>
+      <Button
+        type="button"
+        variant={done ? "secondary" : "outline"}
+        aria-pressed={done}
+        className="min-h-11 sm:min-h-9"
+        disabled={!online || mark.isPending || state.status === "writing"}
+        onClick={() => mark.mutate(!done)}
+      >
+        {mark.isPending ? (
+          <Spinner data-icon="inline-start" />
+        ) : done ? (
+          <CheckIcon data-icon="inline-start" className="text-success" />
+        ) : (
+          <CircleIcon data-icon="inline-start" />
+        )}
+        {done ? "Done" : "Mark done"}
+      </Button>
+      {reason ? (
+        <p className={cn("text-xs", mark.error ? "text-destructive" : "text-muted-foreground")}>
+          {reason}
+        </p>
+      ) : null}
+    </div>
   );
 }
-
-/** An activity on a day: a run that did no session, a ride, a swim. */
-export function ActivityLine({ activity }: { activity: PlanActivity }) {
-  const style = SPORT_STYLE[sportGroupFor(activity.sportType)?.id ?? "other"];
-  const Icon = style.icon;
-  return (
-    <span className="flex min-w-0 items-center gap-2 text-sm">
-      <Icon aria-hidden className={cn("size-4 shrink-0", style.text)} />
-      <span className="truncate">{activity.name}</span>
-      <span className="text-muted-foreground shrink-0 tabular-nums">
-        {activity.km > 0 ? `${activity.km.toFixed(1)} km · ` : ""}
-        {formatDuration(activity.seconds)}
-      </span>
-    </span>
-  );
-}
-
-export const longDayLabel = (date: string) => format(parseISO(date), "EEEE d MMMM");

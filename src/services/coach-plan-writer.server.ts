@@ -13,6 +13,7 @@ import {
   MAX_LONG_MINUTES,
   maxLongShare,
   maxQualitySessions,
+  runsAvailable,
   type RuleBreak,
   type RuleContext,
 } from "./coach-plan-rules.ts";
@@ -22,7 +23,6 @@ import {
   type PlannedRun,
   type WrittenPlan,
 } from "./coach-plan.types.ts";
-import { addDayKey } from "./day-key.ts";
 import { formatPaceClock } from "./locomotion.ts";
 import { PHASES } from "./season-phase.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
@@ -37,11 +37,10 @@ const MODEL_TIMEOUT_MS = 150_000;
 /** Paced like a real model, so the app's "writing" state shows in development and e2e. */
 const MOCK_PAUSE_MS = 1500;
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 const SYSTEM_PROMPT = [
   "You are the running coach writing an athlete's coach plan in VO2. VO2 sets the weekly budget and checks every plan in code; you write precise sessions inside it. Answer only with the requested JSON.",
-  "Each session: date (YYYY-MM-DD), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
+  "Sessions have no day: you write each week's runs, and the athlete picks the days to run them. Never name a weekday or date in a title or why.",
+  "Each session: weekStart (the Monday of its week, YYYY-MM-DD), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
   "Each step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; leave the other null. Never write a pace number: VO2 fills in the athlete's ranges.",
   "VO2 works out each session's distance and time from its steps, counting time steps at the middle of their pace. Those numbers are what the rules check.",
   "The coaching knowledge you write from follows.",
@@ -57,13 +56,12 @@ export function rulesFor(ctx: RuleContext) {
   const { runsPerWeek } = ctx.availability;
   return [
     "1. Each week's total distance stays at or under its budgetKm (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of it: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
-    "2. No run more than 10 % longer than the longest run of the 30 days before it (recentTraining.longestRunLast30DaysKm, then plannedBefore and your own planned runs).",
-    "3. Never two hard days in a row, never the long run the day after a hard day, also across plannedBefore. Races are hard days.",
+    "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
     `4. At most ${maxQualitySessions(runsPerWeek)} quality session(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A race counts as one.`,
-    `5. One long run a week, on the long run day. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % when only 3 of the athlete's runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all ${runsPerWeek} runs, and at most ${MAX_LONG_MINUTES} minutes.`,
+    `5. One long run a week. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's distance (${Math.round(maxLongShare(3) * 100)} % when only 3 runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all the week's runs, and at most ${MAX_LONG_MINUTES} minutes.`,
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budget.",
-    "8. One run a day at most. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs a week at most, only on the athlete's days. Write sessions from ${ctx.from} on; days before are kept. Write nothing on race days.`,
+    "8. A missed session is skipped, never made up.",
+    `Availability: ${runsPerWeek} runs a week at most, and no more than each week's runs (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
   ];
 }
 
@@ -84,25 +82,17 @@ export function weeksText(ctx: RuleContext) {
     lighter: week.lighter,
     taper: week.taper,
     budgetKm: week.budgetKm,
+    runs: runsAvailable(week, ctx),
     kept: ctx.frozen
-      .filter(
-        (session) => session.date >= week.weekStart && session.date < addDayKey(week.weekStart, 7),
-      )
-      .map((session) => `${session.date} ${session.kind} ${session.distanceKm} km`),
-    races: ctx.raceDays.filter(
-      (date) => date >= week.weekStart && date < addDayKey(week.weekStart, 7),
-    ),
+      .filter((session) => session.weekStart === week.weekStart)
+      .map((session) => `${session.kind} ${session.distanceKm} km, done`),
+    races: ctx.raceWeeks.filter((weekStart) => weekStart === week.weekStart).length,
   }));
 }
 
-export function availabilityText(ctx: RuleContext) {
-  const { availability } = ctx;
-  return {
-    runsPerWeek: availability.runsPerWeek,
-    days: availability.days.map((day) => WEEKDAYS[day]),
-    longRunDay: WEEKDAYS[availability.longRunDay],
-  };
-}
+export const availabilityText = (ctx: RuleContext) => ({
+  runsPerWeek: ctx.availability.runsPerWeek,
+});
 
 function breaksText(breaks: RuleBreak[]) {
   return breaks.map((item) => `- ${item.rule}: ${item.message}`).join("\n");
@@ -173,7 +163,7 @@ export async function writeSessions(
       { role: "assistant", content: JSON.stringify(written) },
       {
         role: "user",
-        content: `VO2 checked the plan and it breaks these rules:\n${breaksText(breaks)}\nWrite the whole plan again for the same days, fixing every one.`,
+        content: `VO2 checked the plan and it breaks these rules:\n${breaksText(breaks)}\nWrite the whole plan again for the same weeks, fixing every one.`,
       },
     );
   }

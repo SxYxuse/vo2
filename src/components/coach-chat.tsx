@@ -81,9 +81,9 @@ const STARTERS = [
 
 /** Offered when the athlete came from "Ask the coach to change my plan". */
 const PLAN_STARTERS = [
-  "I can't run on Thursday this week",
+  "I can only run twice this week",
   "This week feels too hard",
-  "Can I swap my long run to Saturday?",
+  "I can only run on a treadmill this week",
 ];
 
 const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
