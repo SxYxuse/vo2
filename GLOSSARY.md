@@ -101,7 +101,7 @@ The time VO2 expects the athlete to run a goal's distance today, read from their
 _Avoid_: Goal time, target time, race estimate
 
 **Plan change**:
-A change to the coach plan the coach proposes in the chat or from a note on a day, shown session by session before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
+A change to the coach plan the coach proposes in the chat or from a coach note, shown session by session before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
 _Avoid_: Re-plan (that is the week planner laying the week out again), adaptation, edit
 
 **Training plan**:
@@ -177,7 +177,7 @@ How a planned session stands. On the week planner, against the copied activities
 _Avoid_: Completed, compliance
 
 **Coach note**:
-What the athlete tells the coach about a day: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them; on the coach plan, a note asks the coach for a plan change.
+What the athlete tells the coach: a quick choice (can't train, short on time, indoor only, take it easy) or their own words, which the model reads into those same constraints. The week plan honours them for a day; on the coach plan, a note asks the coach for a change to the week's sessions, with no day (ADR 0048).
 _Avoid_: Comment, feedback, journal
 
 **Coach**:
