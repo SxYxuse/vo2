@@ -12,17 +12,27 @@ import {
 
 import { SPORT_GROUPS } from "@/services/sport-groups.ts";
 
-export const SETTINGS_SECTIONS = [
-  { id: "profile", label: "Profile", icon: UserIcon },
-  { id: "training", label: "Training", icon: TargetIcon },
-  { id: "sports", label: "Sports", icon: ActivityIcon },
-  { id: "heart-rate", label: "Heart rate", icon: HeartPulseIcon },
-  { id: "paces", label: "Paces", icon: GaugeIcon },
-  { id: "calendar", label: "Calendar", icon: CalendarDaysIcon },
-  { id: "bests", label: "Bests", icon: TrophyIcon },
-  { id: "coach", label: "Coach", icon: SparklesIcon },
-  { id: "sync", label: "Sync", icon: RefreshCwIcon },
+export const SETTINGS_GROUPS = [
+  { id: "you", label: "You" },
+  { id: "training", label: "Training" },
+  { id: "app", label: "App" },
 ] as const;
+
+export const SETTINGS_SECTIONS = [
+  { id: "profile", label: "Profile", icon: UserIcon, group: "you" },
+  { id: "heart-rate", label: "Heart rate", icon: HeartPulseIcon, group: "you" },
+  { id: "paces", label: "Paces", icon: GaugeIcon, group: "you" },
+  { id: "training", label: "Training", icon: TargetIcon, group: "training" },
+  { id: "sports", label: "Sports", icon: ActivityIcon, group: "training" },
+  { id: "calendar", label: "Calendar", icon: CalendarDaysIcon, group: "training" },
+  { id: "bests", label: "Bests", icon: TrophyIcon, group: "training" },
+  { id: "coach", label: "Coach", icon: SparklesIcon, group: "app" },
+  { id: "sync", label: "Sync", icon: RefreshCwIcon, group: "app" },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  group: (typeof SETTINGS_GROUPS)[number]["id"];
+  [key: string]: unknown;
+}>;
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["id"];
 
