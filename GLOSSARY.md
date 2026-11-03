@@ -81,12 +81,16 @@ The planning style where VO2's own rules set each week's time per sport and its 
 _Avoid_: Algorithmic plan, classic plan
 
 **Coach plan**:
-The planning style where the coach writes precise sessions for the next four weeks on the athlete's availability, toward an A goal, inside the weekly distance VO2 allows. For now it plans runs only. It is a coach feature (ADR 0037).
+The planning style where the coach writes precise sessions for the next four weeks, toward an A goal, inside the weekly distance VO2 allows. Its sessions have no day or order (ADR 0048). For now it plans runs only. It is a coach feature (ADR 0037).
 _Avoid_: AI plan, Runna plan
 
+**The week's sessions**:
+The coach plan's sessions for one training week, shown as one unordered set with each session's sport and length. A session is done when the athlete marks it, otherwise open (ADR 0048).
+_Avoid_: Week plan (that is the week planner's term), schedule, key sessions
+
 **Availability**:
-What the athlete gives the coach plan: how many runs a week, the days they can run, and the long run day. It has no time per day (ADR 0041).
-_Avoid_: Schedule, rest days (that is the week planner's term), week shape
+What the athlete gives the coach plan: how many runs a week. It has no days and no time per day (ADR 0041, ADR 0048).
+_Avoid_: Schedule, available days, rest days (that is the week planner's term), week shape
 
 **Training paces**:
 The pace ranges the coach plan's sessions target, from easy to repetition, read from a VDOT. The athlete chooses what it comes from: Automatic (the estimate from recent best efforts), one of their best efforts, or a race result. The easy pace comes from the pace they hold in running zone 2 by default, never faster than marathon pace, or from the VDOT (ADR 0042).
@@ -97,7 +101,7 @@ The time VO2 expects the athlete to run a goal's distance today, read from their
 _Avoid_: Goal time, target time, race estimate
 
 **Plan change**:
-A change to the coach plan the coach proposes in the chat or from a note on a day, shown day by day before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
+A change to the coach plan the coach proposes in the chat or from a note on a day, shown session by session before and after. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
 _Avoid_: Re-plan (that is the week planner laying the week out again), adaptation, edit
 
 **Training plan**:
@@ -157,7 +161,7 @@ A training day the plan may put two sessions on. The athlete sets how many a wee
 _Avoid_: Brick (a brick is one specific double: a run straight after a ride), double day
 
 **Key session**:
-A precise session VO2 generates each week: intervals, time in zone, or a long Z2. How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
+A precise session the week planner generates each week: intervals, time in zone, or a long Z2. The coach plan has none (ADR 0047). How many follows the leading goal's objective within the phase's limit and half the training days; the type follows the phase and objective (the main one always, the others rotating week to week), reps and length follow fitness, and key sessions never take more than 60 % of the week target. Toward a goal, the main and long sessions go on the goal's sport (ride, run, swim, or walk), the long session leads in base and comes second from build on, grows toward the goal's expected time at the athlete's own pace, and is shortened rather than dropped when the week is short; a hilly goal puts intervals on a climb. Intervals are ticked off when one ride, run, swim, or walk spends at least 80 % of its work time at or above its zone; a goal's long session only on the goal's sport.
 _Avoid_: Workout, quality session, planned session
 
 **Easy session**:
@@ -169,7 +173,7 @@ The training week laid out Monday to Sunday: key, easy, and second sessions, res
 _Avoid_: Schedule, calendar (that shows activities), day plan
 
 **Session status**:
-How a planned session stands against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned. An activity that fills no planned session is extra. In the coach plan, a run linked or unlinked by the athlete wins over the automatic match.
+How a planned session stands. On the week planner, against the copied activities: done, missed (its day passed without it), moved (a missed key session planned again later), or planned; an activity that fills no planned session is extra. On the coach plan, done when the athlete marks it, otherwise open, with no day, no missed state, and no automatic match (ADR 0048).
 _Avoid_: Completed, compliance
 
 **Coach note**:

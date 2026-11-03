@@ -1,0 +1,7 @@
+# The coach plan's sessions have no day or order, and an athlete marks one done by hand
+
+Supersedes, for the coach plan, [0037](0037-the-coach-plan-is-written-by-the-coach-inside-a-budget-vo2-sets.md) (sessions written with a date, the rule against two hard days in a row, and runs matched to a session by date) and [0041](0041-coach-plan-availability-has-no-time-per-day.md) (availability with days and a long run day). It extends [0047](0047-the-coach-plan-has-no-key-sessions.md): the sessions are not ordered either.
+
+The coach plan showed each session on its date, ordered them, and checked neighbouring days. Matching a run to a session by date and distance was hard to get right, so for now a session is done when the athlete marks it. Without dates there are no neighbouring days to check, so the rule against two hard days in a row goes, from the rules and the writer's prompt. Availability is now only how many runs a week. The week's sessions show as one unordered set, with each session's sport and length, and no key or order labels. A missed session has no status: it is done or open.
+
+Keeping the date and hiding it on screen was the main alternative. The date would still drive matching and the hard-day rule, so the athlete would see one thing while the code ran on another. Removing it everywhere is the cost of a simpler model: the coach plan can no longer say which day to run, and the week planner still does. Stored plans keep their sessions, with dates and links removed by a migration.
