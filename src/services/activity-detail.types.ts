@@ -46,6 +46,8 @@ export type ActivityDetail = {
   ride: RideSummary | null;
   /** Zones, decoupling, and efficiency against the athlete's anchors. Null without heart rate. */
   heart: ActivityHeart | null;
+  /** The ride's imported FIT file, for its power analysis (ADR 0056). */
+  powerFileId: string | null;
 };
 
 export type ActivityChartPreview = {

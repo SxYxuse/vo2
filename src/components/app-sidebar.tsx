@@ -17,6 +17,7 @@ import {
   SparklesIcon,
   TrendingUpIcon,
   TrophyIcon,
+  ZapIcon,
 } from "lucide-react";
 
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
@@ -80,6 +81,7 @@ const COLLAPSIBLE_NAV_GROUPS = [
       { title: "Fitness", to: "/fitness", icon: TrendingUpIcon },
       { title: "Bests", to: "/bests", icon: TrophyIcon },
       { title: "Heart rate", to: "/heart-rate", icon: HeartPulseIcon },
+      { title: "Power", to: "/power", icon: ZapIcon },
     ],
   },
   {
@@ -166,9 +168,9 @@ function CollapsibleNavGroup({
 }
 
 function isActiveNavItem(item: NavItem, pathname: string) {
-  return item.to === "/"
-    ? pathname === "/" || pathname.startsWith("/activities/")
-    : pathname === item.to;
+  if (item.to === "/") return pathname === "/" || pathname.startsWith("/activities/");
+  // A power file's analysis belongs to Power.
+  return pathname === item.to || (item.to === "/power" && pathname.startsWith("/power/"));
 }
 
 function SidebarNavMenu({

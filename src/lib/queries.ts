@@ -9,6 +9,7 @@ import { loadCoachPlan } from "@/services/coach-plan.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData } from "@/services/home-data.ts";
 import { loadBests } from "@/services/personal-bests.ts";
+import { getPowerFile, listPowerFiles } from "@/services/power-file.ts";
 import { loadProgress } from "@/services/progress.ts";
 import { loadSeason } from "@/services/season.ts";
 import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
@@ -122,6 +123,23 @@ export function activityDetailQueryOptions(id: string) {
   return queryOptions({
     queryKey: ["activity", id] as const,
     queryFn: () => getActivityDetail({ data: { id } }),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+}
+
+/** Imported FIT files, newest ride first; saved on the device like the other lists. */
+export const powerFilesQueryOptions = queryOptions({
+  queryKey: ["power-files"],
+  queryFn: () => listPowerFiles(),
+  staleTime: 60_000,
+});
+
+/** One file's analysis. Like an activity's streams it is large, so it is not kept offline. */
+export function powerFileQueryOptions(id: string) {
+  return queryOptions({
+    queryKey: ["power-file", id] as const,
+    queryFn: () => getPowerFile({ data: { id } }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
   });

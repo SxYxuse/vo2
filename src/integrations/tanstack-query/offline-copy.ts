@@ -12,8 +12,8 @@ import { del, get, set } from "idb-keyval";
  */
 
 /**
- * Views worth reading with no signal. Activity details (streams), the map (needs tiles), and
- * top-effort celebrations (marked seen on the server) stay out.
+ * Views worth reading with no signal. Activity details and power file analyses (streams), the
+ * map (needs tiles), and top-effort celebrations (marked seen on the server) stay out.
  */
 export const OFFLINE_QUERY_KEYS = [
   "app-shell",
@@ -24,6 +24,7 @@ export const OFFLINE_QUERY_KEYS = [
   "progress",
   "bests",
   "heart-rate",
+  "power-files",
   "training-paces",
   "settings-snapshot",
   "coach-chats",

@@ -295,6 +295,13 @@
       "when": 1793779867054,
       "tag": "0041_goal_effort",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1793816913553,
+      "tag": "0042_power_files",
+      "breakpoints": true
     }
   ]
 }

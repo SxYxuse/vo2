@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -8,6 +9,7 @@ import {
   real,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema.ts";
@@ -283,5 +285,36 @@ export const coachChatInterrupts = pgTable(
   (table) => [
     index("coach_chat_interrupts_thread_idx").on(table.threadId, table.requestedAt),
     index("coach_chat_interrupts_run_idx").on(table.runId, table.requestedAt),
+  ],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
+
+/**
+ * Ride FIT files the athlete imported for power analysis (ADR 0056). The file is kept so a newer
+ * analysis can read it again; Postgres compresses it. Never part of load, fitness, or bests.
+ */
+export const powerFiles = pgTable(
+  "power_files",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    /** SHA-256 of the FIT bytes: importing the same ride again opens the first import. */
+    fileHash: text("file_hash").notNull(),
+    file: bytea("file").notNull(),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    /** What the list shows, so it never reads the analyses. */
+    summary: jsonb("summary").notNull(),
+    analysis: jsonb("analysis").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("power_files_user_hash_idx").on(table.userId, table.fileHash),
+    index("power_files_user_start_idx").on(table.userId, table.startDate),
   ],
 );

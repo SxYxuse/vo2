@@ -63,7 +63,7 @@ Copying new and missing activities and their streams from Strava into VO2. It pa
 _Avoid_: Import, fetch, refresh
 
 **Power file**:
-A ride's FIT file the athlete imported from their head unit, for what Strava's streams leave out: each leg's share of power, platform center offset, power phase, seated and standing, and gears. It is linked to the synced ride that started within five minutes of it and never counts toward training load, fitness, or bests (ADR 0053).
+A ride's FIT file the athlete imported from their head unit, for what Strava's streams leave out: each leg's share of power, platform center offset, power phase, seated and standing, and gears. It is linked to the synced ride that started within five minutes of it and never counts toward training load, fitness, or bests (ADR 0056).
 _Avoid_: Upload, imported activity, FIT activity
 
 **Local copy**:
