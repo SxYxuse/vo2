@@ -113,8 +113,20 @@ A race or event on the athlete's season: name, sport type, date, distance, eleva
 _Avoid_: Target, race (not every goal is one)
 
 **Priority**:
-How much a goal matters, and what the athlete races it for: A to perform (the plan builds, peaks, and fully tapers for it, with a recovery week after), B to finish well, or C to finish (trained through). The next A event leads the season; without one, the next B event does. The leading goal's priority sets how fast fitness rises (ADR 0024, ADR 0049).
-_Avoid_: Main goal, importance, objective
+Whether a goal is a main goal or a supporting race. The next main goal leads the season: the plan builds, peaks, and fully tapers for it, with a recovery week after. A supporting race never leads, and takes an effort (ADR 0052).
+_Avoid_: Importance, objective, C race, race intent
+
+**Main goal**:
+A goal with priority A, raced to perform at 100 %. Several can be planned, each with its own build, taper, and recovery.
+_Avoid_: Target, A race
+
+**Supporting race**:
+A goal with priority B, run at an effort: fun, steady, or all out. It never leads the season, and the week's other runs stay easy.
+_Avoid_: B race, tune-up
+
+**Effort**:
+How a supporting race is run: fun (easy pace, minimal impact on the plan), steady (70–80 %), or all out. Set when the athlete adds the race (ADR 0052).
+_Avoid_: Intensity, intent, objective
 
 **Season**:
 The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. Plan shows the season week by week through the last goal, with each week's phase, the written weeks, and what the plan does for each goal ahead (ADR 0050).
