@@ -25,13 +25,16 @@ import {
 import { formatSportType } from "@/services/athlete-settings.types.ts";
 import { createEvent, createGoal, deleteGoal, pasteSeason, updateGoal } from "@/services/season.ts";
 import {
+  GOAL_EFFORTS,
   GOAL_PRIORITIES,
   LEG_SEPARATOR,
   daysBetween,
+  eventEffort,
   eventPriority,
   eventTitle,
   formatDaysLeft,
   goalInputSchema,
+  otherLegs,
   seasonCopy,
   seasonCopySchema,
   type Goal,
@@ -40,6 +43,7 @@ import {
   type SeasonData,
   type SeasonEvent,
 } from "@/services/season.types.ts";
+import { supportingRaceBlock } from "@/services/season-phase.ts";
 import { sportGroupFor } from "@/services/sport-groups.ts";
 import {
   canPredict,
@@ -212,12 +216,12 @@ export function SeasonView({ data }: { data: SeasonData }) {
             ))}
           </section>
           <p className="text-muted-foreground text-xs">
-            <span className="text-foreground font-medium">A</span> races are to perform: the full
-            build, peak, and taper. <span className="text-foreground font-medium">B</span> races are
-            to finish well, with lighter days before them.{" "}
-            <span className="text-foreground font-medium">C</span> races are to finish, trained
-            through like a hard session. Tap a goal to change it. The coach plan's weeks toward them
-            are on Plan.
+            <span className="text-foreground font-medium">Main</span> goals are raced to perform:
+            the full build, peak, and taper. Supporting races are run{" "}
+            <span className="text-foreground font-medium">for fun</span>,{" "}
+            <span className="text-foreground font-medium">steady</span>, or{" "}
+            <span className="text-foreground font-medium">all out</span>, and only change the weeks
+            around them. Tap a goal to change it. The coach plan's weeks toward them are on Plan.
           </p>
         </>
       )}
@@ -226,6 +230,7 @@ export function SeasonView({ data }: { data: SeasonData }) {
 
       <GoalDialog
         editing={editing}
+        goals={allGoals}
         today={data.today}
         sportTypes={data.sportTypes}
         onClose={() => setEditing(null)}
@@ -326,7 +331,6 @@ function EventCard({
   data: SeasonData;
   onEdit: (goal: Goal) => void;
 }) {
-  const priority = eventPriority(event);
   // Each leg opens on its own, so only a single-leg event can make the whole card its button.
   const whole = event.goals.length === 1;
 
@@ -338,7 +342,7 @@ function EventCard({
       )}
     >
       <div className="flex min-h-8 items-center gap-2">
-        <PriorityBadge priority={priority} />
+        <PriorityBadge priority={eventPriority(event)} effort={eventEffort(event)} />
         <h2 className="min-w-0 flex-1 truncate font-medium">{eventTitle(event)}</h2>
         <span className="shrink-0 text-sm font-semibold tabular-nums">
           {formatDaysLeft(daysBetween(data.today, event.date))}
@@ -494,6 +498,7 @@ type GoalForm = LegForm & {
   name: string;
   date: string;
   priority: Goal["priority"];
+  effort: Goal["effort"];
   /** Further sports on the same day, for a new multisport event. */
   legs: LegForm[];
 };
@@ -506,6 +511,7 @@ function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
     distanceKm: goal?.distanceM != null ? String(goal.distanceM / 1000) : "",
     elevationGainM: goal?.elevationGainM != null ? String(goal.elevationGainM) : "",
     priority: goal?.priority ?? "A",
+    effort: goal?.effort ?? null,
     legs: [],
   };
 }
@@ -527,6 +533,7 @@ function toInput(form: GoalForm, leg: LegForm = form, name = form.name) {
     distanceM: distanceKm == null ? null : distanceKm * 1000,
     elevationGainM: parseOptionalNumber(leg.elevationGainM),
     priority: form.priority,
+    effort: form.effort,
   });
 }
 
@@ -537,11 +544,13 @@ function legName(form: GoalForm, leg: LegForm) {
 
 function GoalDialog({
   editing,
+  goals,
   today,
   sportTypes,
   onClose,
 }: {
   editing: Editing;
+  goals: Goal[];
   today: string;
   sportTypes: string[];
   onClose: () => void;
@@ -553,6 +562,7 @@ function GoalDialog({
           <GoalFormBody
             key={editing.goal?.id ?? "new"}
             goal={editing.goal}
+            goals={goals}
             today={today}
             sportTypes={sportTypes}
             onDone={onClose}
@@ -565,11 +575,13 @@ function GoalDialog({
 
 function GoalFormBody({
   goal,
+  goals,
   today,
   sportTypes,
   onDone,
 }: {
   goal: Goal | null;
+  goals: Goal[];
   today: string;
   sportTypes: string[];
   onDone: () => void;
@@ -589,6 +601,14 @@ function GoalFormBody({
         parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]),
       );
   const errorFor = (key: keyof GoalInput) => (submitted ? issues[key] : undefined);
+  // The same rule the server holds: no supporting race in a main goal's taper (ADR 0052).
+  const block = form.date
+    ? supportingRaceBlock(
+        goals,
+        form,
+        goal ? [goal.id, ...otherLegs(goal, goals).map((leg) => leg.id)] : [],
+      )
+    : null;
   const set = (next: Partial<GoalForm>) => setForm((current) => ({ ...current, ...next }));
   const setLeg = (index: number, next: Partial<LegForm>) =>
     setForm((current) => ({
@@ -623,7 +643,7 @@ function GoalFormBody({
     setSubmitted(true);
     if (!parsed.success) return;
     if (step === "details") setStep("priority");
-    else save.mutate(parsed.data);
+    else if (!block) save.mutate(parsed.data);
   }
 
   return (
@@ -633,7 +653,7 @@ function GoalFormBody({
         <ResponsiveDialogDescription>
           {step === "details"
             ? "Step 1 of 2 · The race or event: what, when, and how far."
-            : "Step 2 of 2 · How much it matters. The plan builds toward your next A race."}
+            : "Step 2 of 2 · How much it matters. The plan builds toward your next main goal."}
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
       <div key={step} className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
@@ -827,7 +847,8 @@ function GoalFormBody({
                   name="goal-priority"
                   value={form.priority}
                   onValueChange={(next) => {
-                    if (next) set({ priority: next as Goal["priority"] });
+                    if (next === "A") set({ priority: "A", effort: null });
+                    else if (next === "B") set({ priority: "B", effort: form.effort ?? "steady" });
                   }}
                   className="gap-2"
                 >
@@ -847,6 +868,40 @@ function GoalFormBody({
                   })}
                 </RadioGroup>
               </FieldSet>
+              {block ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{block}</AlertDescription>
+                </Alert>
+              ) : null}
+              {form.priority === "B" ? (
+                <FieldSet data-invalid={errorFor("effort") != null}>
+                  <FieldLegend variant="label">Effort</FieldLegend>
+                  <RadioGroup
+                    name="goal-effort"
+                    value={form.effort ?? ""}
+                    onValueChange={(next) => {
+                      if (next) set({ effort: next as Goal["effort"] });
+                    }}
+                    className="gap-2"
+                  >
+                    {GOAL_EFFORTS.map((effort) => {
+                      const id = `goal-effort-${effort.id}`;
+                      return (
+                        <FieldLabel key={effort.id} htmlFor={id} className="w-full">
+                          <Field orientation="horizontal" className="items-start p-3">
+                            <RadioGroupItem value={effort.id} id={id} />
+                            <FieldContent>
+                              <FieldTitle>{effort.label}</FieldTitle>
+                              <FieldDescription>{effort.hint}</FieldDescription>
+                            </FieldContent>
+                          </Field>
+                        </FieldLabel>
+                      );
+                    })}
+                  </RadioGroup>
+                  <FieldError>{errorFor("effort")}</FieldError>
+                </FieldSet>
+              ) : null}
             </>
           )}
           {save.error || remove.error ? (
@@ -857,7 +912,7 @@ function GoalFormBody({
         </FieldGroup>
       </div>
       <ResponsiveDialogFooter>
-        <Button type="submit" disabled={save.isPending}>
+        <Button type="submit" disabled={save.isPending || (step === "priority" && block != null)}>
           {save.isPending ? <Spinner data-icon="inline-start" /> : null}
           {step === "details" ? "Next" : goal ? "Save" : "Add goal"}
         </Button>

@@ -7,6 +7,7 @@ import { coachPlanProposals, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import {
   checkPlan,
+  raceWeeks,
   sessionsAvailable,
   type RuleBreak,
   type RuleContext,
@@ -25,6 +26,7 @@ import {
   type PlannedSession,
 } from "./coach-plan.types.ts";
 import type { WeekBudget } from "./coach-plan-budget.ts";
+import { addDayKey } from "./day-key.ts";
 import type {
   ChangeSide,
   ChangedSession,
@@ -93,9 +95,11 @@ function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
     frozen: sessions.filter((session) => session.kind !== "race" && session.done),
     runs: inputs.runs,
     rides: inputs.rides,
-    races: sessions
-      .filter((session) => session.kind === "race")
-      .map((session) => ({ weekStart: session.weekStart, sport: session.sport })),
+    races: raceWeeks(
+      inputs.goals,
+      inputs.currentWeek,
+      addDayKey(weeks.at(-1)?.weekStart ?? inputs.currentWeek, 6),
+    ).map(({ race }) => race),
     neighbours: [],
     easySecPerKm: stepSecPerKm(
       { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },

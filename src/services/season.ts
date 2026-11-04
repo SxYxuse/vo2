@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { goalInputSchema, seasonCopySchema, type SeasonData } from "./season.types.ts";
+import {
+  goalInputSchema,
+  goalUpdateSchema,
+  seasonCopySchema,
+  type SeasonData,
+} from "./season.types.ts";
 
 const idSchema = z.object({ id: z.string() });
 
@@ -20,7 +25,7 @@ export const createGoal = createServerFn({ method: "POST" })
   });
 
 export const updateGoal = createServerFn({ method: "POST" })
-  .validator(goalInputSchema.extend(idSchema.shape))
+  .validator(goalUpdateSchema)
   .handler(async ({ data }): Promise<void> => {
     const { updateGoalImpl } = await import("./season.server.ts");
     await updateGoalImpl(data);

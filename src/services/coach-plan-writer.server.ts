@@ -21,6 +21,7 @@ import {
   maxLongShare,
   maxQualitySessions,
   sessionsAvailable,
+  type RaceEffort,
   type RuleBreak,
   type RuleContext,
 } from "./coach-plan-rules.ts";
@@ -81,20 +82,20 @@ export function rulesFor(ctx: RuleContext) {
   if (sports.includes("run")) {
     rules.push(
       "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
-      `4. At most ${maxQualitySessions(runsPerWeek)} quality run(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A running race counts as one.`,
+      `4. At most ${maxQualitySessions(runsPerWeek)} quality run(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A running race counts as one, unless it is run for fun: then it is one of the week's runs, an easy one. In the week of a steady running race, every other run is easy.`,
       `5. One long run a week. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's running (${Math.round(maxLongShare(3) * 100)} % when only 3 runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all the week's runs, and at most ${MAX_LONG_MINUTES} minutes.`,
     );
   }
   if (sports.includes("ride")) {
     rules.push(
       "2. No ride more than 15 % longer than the longest ride of the 30 days before its week (recentTraining.longestRideLast30DaysMin, at least 90 minutes, then plannedBefore and your rides in earlier weeks).",
-      `4. At most ${maxQualitySessions(ridesPerWeek)} quality ride(s) a week (tempo, intervals, hills, sweetSpot, sprints). A cycling race counts as one.`,
+      `4. At most ${maxQualitySessions(ridesPerWeek)} quality ride(s) a week (tempo, intervals, hills, sweetSpot, sprints). A cycling race counts as one, unless it is ridden for fun: then it is one of the week's rides, an easy one. In the week of a steady cycling race, every other ride is easy.`,
       `5. One long ride a week. The week's longest ride is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's riding (${Math.round(maxLongRideShare(3) * 100)} % when only 3 rides fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_RIDE_MINUTES} minutes.`,
     );
   }
   if (sports.length > 1) {
     rules.push(
-      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across runs and rides, races included.`,
+      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across runs and rides, races included (but not races for fun).`,
     );
   }
   rules.push(
@@ -141,6 +142,14 @@ export function paceText(ranges: Record<PaceType, PaceRange> | null) {
 export const sessionLine = (session: PlannedSession) =>
   `${session.sport} ${session.kind} ${session.sport === "ride" ? `${session.minutes} min` : `${session.distanceKm} km`}`;
 
+/** A race as the coach reads it in its week (ADR 0052). */
+const RACE_EFFORT_TEXT: Record<RaceEffort, string> = {
+  perform: "main goal, raced to perform",
+  fun: "supporting race for fun: it is one of the week's easy sessions, not a quality one",
+  steady: "supporting race, strong and steady: the sport's other sessions this week are easy",
+  allOut: "supporting race, all out",
+};
+
 export function weeksText(ctx: RuleContext) {
   const sports = plannedSports(ctx.availability);
   return ctx.weeks.map((week) => ({
@@ -157,7 +166,9 @@ export function weeksText(ctx: RuleContext) {
     kept: ctx.frozen
       .filter((session) => session.weekStart === week.weekStart)
       .map((session) => `${sessionLine(session)}, done`),
-    races: ctx.races.filter((race) => race.weekStart === week.weekStart).map((race) => race.sport),
+    races: ctx.races
+      .filter((race) => race.weekStart === week.weekStart)
+      .map((race) => `${race.sport}, ${RACE_EFFORT_TEXT[race.effort]}`),
   }));
 }
 

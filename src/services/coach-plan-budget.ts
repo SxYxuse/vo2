@@ -1,5 +1,5 @@
 import { planSportOf, type Availability, type PlanSport } from "./coach-plan.types.ts";
-import { LIGHTER_LOAD_FACTOR, seasonPhase, type PhaseKind } from "./season-phase.ts";
+import { seasonPhase, type PhaseKind } from "./season-phase.ts";
 import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
 import { addDayKey } from "./day-key.ts";
 
@@ -127,7 +127,8 @@ export type WeekBudget = {
  * level (the average of the best three of the last four weeks) and never exceeds its cap over the
  * biggest of the four weeks before it, actual or planned, unless the floor is higher. Only the
  * sports of the event the week builds toward grow with its phase; the other sport holds where it
- * is (ADR 0050). Lighter weeks keep 70 %, and the taper its share; the level grows on underneath.
+ * is (ADR 0050). Lighter weeks keep 70 %, the taper its share, and the weeks around a supporting
+ * race what its effort keeps (ADR 0052); the level grows on underneath.
  */
 export function weekBudgets(input: {
   runs: SportDay[];
@@ -160,13 +161,8 @@ export function weekBudgets(input: {
     const growing = new Set(phase.anchor.map((goal) => planSportOf(goal.sportType)));
     const weeksLeft = Math.floor(daysBetween(weekStart, aGoal.date) / 7);
     const taper = weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
-    const share =
-      taper ??
-      (phase.lighter
-        ? LIGHTER_LOAD_FACTOR
-        : phase.kind === "recovery"
-          ? (phase.loadFactor ?? 1)
-          : 1);
+    // The phase's share: a lighter week, a recovery week, and the weeks a supporting race changes.
+    const share = taper ?? phase.loadFactor ?? 1;
     const sized = {} as Record<PlanSport, number>;
     for (const sport of Object.keys(sports) as PlanSport[]) {
       const sportState = state[sport];
@@ -184,7 +180,7 @@ export function weekBudgets(input: {
       budgetMinutes: Math.round(sized.ride / 5) * 5,
       phase: phase.kind,
       lighter: phase.lighter && taper == null,
-      taper: taper != null,
+      taper: taper != null || phase.kind === "taper" || phase.kind === "race",
     });
   }
   return budgets;

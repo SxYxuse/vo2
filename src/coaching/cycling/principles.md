@@ -12,7 +12,7 @@ Evidence tags: **rule** means VO2 checks it in code. **Guidance** means coaching
 4. **Quality rides per week:** 1 for 2–3 rides, 2 for 4–5, at most 3 for 6. Across runs and rides together, at most 3 quality sessions a week. Races count.
 5. **The long ride is the week's longest ride:** at most 40 % of the week's riding (50 % with three rides, 60 % with two), and at most 6 hours. Sample plans put a 3–5 h long ride in an 8–12 h week, 35–50 % of it.
 6. **Every fourth week is lighter, about 70 % of the usual week.** Masters riders often do better with a lighter week every third week ([TrainingPeaks, Friel's over-50 plan](https://www.trainingpeaks.com/training-plans/cycling/road-cycling/tp-2590/bike-road-racing-base-plan-over-50-8-13hpw-power-meter-12-weeks)); VO2 keeps four for everyone for now.
-7. **Taper before an A ride:** two weeks before an event of five hours or more (85 % then 60 % of the usual week, 50 % in race week), one week before shorter ones (75 %, then 50 %). Cut volume, keep intensity and frequency (Bosquet 2007 meta-analysis: two weeks, volume cut 41–60 %, [PubMed](https://pubmed.ncbi.nlm.nih.gov/17762369/)).
+7. **Taper before a main goal ride:** two weeks before an event of five hours or more (85 % then 60 % of the usual week, 50 % in race week), one week before shorter ones (75 %, then 50 %). Cut volume, keep intensity and frequency (Bosquet 2007 meta-analysis: two weeks, volume cut 41–60 %, [PubMed](https://pubmed.ncbi.nlm.nih.gov/17762369/)).
 8. **A missed session is skipped.** Never add its time to another ride or add a ride to make it up.
 
 Ride steps are written by time only, never by distance.
@@ -50,17 +50,20 @@ VO2 tells you each week's phase. Shape the rides to it (guidance):
 - **Peak:** the most event-like work and the longest long rides.
 - **Taper:** cut time as the budget says; keep one or two short threshold or VO2 max touches with fewer repeats. Nothing new.
 - **Lighter week:** the same kinds of ride, fewer repeats, a shorter long ride; drop a quality ride if the week has two.
-- **Recovery** (after the A goal): endurance and recovery rides only.
+- **Recovery** (after the main goal or an all-out ride): endurance and recovery rides only.
 
 ## Indoor rides
 
 An hour on a trainer has no coasting: it is denser than an hour outside, often counted as 1.2–1.5 outdoor hours ([Roadman](https://roadmancycling.com/compare/indoor-vs-outdoor-training)). When the athlete can only ride indoors, an endurance ride may be about three quarters of its outdoor length. Intervals stay the same.
 
-## B and C rides
+## Supporting rides
 
-- **C ride:** ride it as training. It replaces that week's quality ride. No taper.
-- **B ride:** it replaces that week's quality ride; keep the other rides easy, and the two days before it easy. No taper.
-- **A ride:** the taper above. VO2 adds the event to its week.
+- **For fun:** an easy ride. It is one of the week's rides, an easy one: write one ride fewer, and keep the week's quality rides. It is not a quality ride for rule 4.
+- **Strong and steady (70–80 %):** every other ride that week is easy. VO2 trims race week to 85 % and makes the week after lighter.
+- **All out:** VO2 gives it the main event's taper and a recovery week after, but no build of its own.
+- **Main goal:** the taper above. VO2 adds the event to its week.
+
+Every race but one ridden for fun counts as a quality ride for rule 4.
 
 ## Writing for the athlete
 

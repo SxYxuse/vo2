@@ -10,32 +10,69 @@ type StravaSportType = components["schemas"]["SportType"];
 export const GOAL_SPORT_TYPES = SPORT_GROUPS.flatMap((group) => group.members) as StravaSportType[];
 
 /**
- * How much a goal matters, and so what the athlete wants from it: the plan peaks for A to perform,
- * eases off for B to finish well, and trains through C to finish (ADR 0024, ADR 0049).
+ * Whether a goal is a main goal the plan builds, peaks, and tapers for (A), or a supporting race
+ * run at an effort (B) (ADR 0052).
  */
 export const GOAL_PRIORITIES = [
   {
     id: "A",
-    label: "A race · Perform",
-    hint: "Race for a time or a place: full build, peak, and taper.",
+    label: "Main goal · Perform, 100 %",
+    hint: "Race for a time or a place: full build, peak, and taper, then a recovery week.",
   },
   {
     id: "B",
-    label: "B race · Finish well",
-    hint: "A strong, even effort: a few lighter days before it, no recovery week after.",
+    label: "Supporting race",
+    hint: "Along the way to a main goal, at the effort you choose below.",
+  },
+] as const;
+
+/** How hard a supporting race is run, and so how much it changes the weeks around it. */
+export const GOAL_EFFORTS = [
+  {
+    id: "fun",
+    label: "Run for fun",
+    hint: "Easy pace. It counts as the week's easy run; the plan barely changes.",
   },
   {
-    id: "C",
-    label: "C race · Finish",
-    hint: "Reach the line: trained through, like a hard session.",
+    id: "steady",
+    label: "Strong and steady, 70–80 %",
+    hint: "The week's other runs stay easy, race week is lighter, and so is the week after.",
+  },
+  {
+    id: "allOut",
+    label: "Go all out",
+    hint: "A taper before it and a recovery week after, without its own build.",
   },
 ] as const;
 
 export type GoalPriority = (typeof GOAL_PRIORITIES)[number]["id"];
+export type GoalEffort = (typeof GOAL_EFFORTS)[number]["id"];
+
+/** The effort a goal is raced at: a main goal is always raced to perform. */
+export const effortLabel = (goal: Pick<Goal, "priority" | "effort">) =>
+  goal.priority === "A"
+    ? "Perform, 100 %"
+    : (GOAL_EFFORTS.find((effort) => effort.id === goal.effort)?.label ?? "");
+
+/** A short name for the goal's weight on its badge: "Main", or the effort, such as "Steady". */
+export const goalWeightLabel = (goal: Pick<Goal, "priority" | "effort">) =>
+  goal.priority === "A"
+    ? "Main"
+    : ({ fun: "Fun", steady: "Steady", allOut: "All out" } as const)[goal.effort ?? "steady"];
+
+/**
+ * A goal stored or copied before ADR 0052 in the current model: C became a supporting race for
+ * fun, and B a steady one. Drizzle migration 0041 applies the same mapping to stored goals.
+ */
+export function currentGoalWeight(goal: { priority?: unknown; effort?: unknown }) {
+  if (goal.priority === "C") return { priority: "B", effort: "fun" };
+  if (goal.priority === "B" && goal.effort == null) return { priority: "B", effort: "steady" };
+  return { priority: goal.priority, effort: goal.effort };
+}
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Pick a date." });
 
-export const goalInputSchema = z.object({
+const goalFieldsSchema = z.object({
   name: z.string().trim().min(1, { error: "Name your goal." }).max(120),
   sportType: z.enum(GOAL_SPORT_TYPES as [StravaSportType, ...StravaSportType[]]),
   date: dateKeySchema,
@@ -49,15 +86,38 @@ export const goalInputSchema = z.object({
     .min(0)
     .max(50_000, { error: "50,000 m at most." })
     .nullable(),
-  priority: z.enum(["A", "B", "C"]).default("A"),
+  priority: z.enum(["A", "B"]).default("A"),
+  /** A supporting race's effort; null for a main goal. */
+  effort: z.enum(["fun", "steady", "allOut"]).nullable().default(null),
 });
+
+/** A supporting race needs an effort, and a main goal has none. */
+const effortFitsPriority = (goal: { priority: GoalPriority; effort: GoalEffort | null }) =>
+  (goal.priority === "B") === (goal.effort != null);
+const effortMissing = { error: "Choose how hard you'll race it.", path: ["effort"] };
+
+export const goalInputSchema = goalFieldsSchema.refine(effortFitsPriority, effortMissing);
+/** A goal to update: its id and its fields. */
+export const goalUpdateSchema = goalFieldsSchema
+  .extend({ id: z.string() })
+  .refine(effortFitsPriority, effortMissing);
 
 export type GoalInput = z.input<typeof goalInputSchema>;
 
 /** A season as copied text, to paste into another VO2 account or install. */
 export const seasonCopySchema = z.object({
   vo2Season: z.literal(1),
-  goals: z.array(goalInputSchema).min(1).max(500),
+  // A season copied before ADR 0052 may carry C goals, or B goals with no effort.
+  goals: z
+    .array(
+      z.preprocess(
+        (goal) =>
+          goal && typeof goal === "object" ? { ...goal, ...currentGoalWeight(goal) } : goal,
+        goalInputSchema,
+      ),
+    )
+    .min(1)
+    .max(500),
 });
 
 export function seasonCopy(goals: Goal[]): z.input<typeof seasonCopySchema> {
@@ -70,6 +130,7 @@ export function seasonCopy(goals: Goal[]): z.input<typeof seasonCopySchema> {
       distanceM: goal.distanceM,
       elevationGainM: goal.elevationGainM,
       priority: goal.priority,
+      effort: goal.effort,
     })),
   };
 }
@@ -168,13 +229,20 @@ export function seasonEvents(goals: Goal[]): SeasonEvent[] {
   return events;
 }
 
-const PRIORITY_RANK: Record<GoalPriority, number> = { A: 0, B: 1, C: 2 };
+const EFFORT_RANK: Record<GoalEffort, number> = { fun: 0, steady: 1, allOut: 2 };
 
 /** An event matters as much as its most important goal. */
 export function eventPriority(event: SeasonEvent): GoalPriority {
-  return event.goals.reduce<GoalPriority>(
-    (best, goal) => (PRIORITY_RANK[goal.priority] < PRIORITY_RANK[best] ? goal.priority : best),
-    "C",
+  return event.goals.some((goal) => goal.priority === "A") ? "A" : "B";
+}
+
+/** A supporting event's effort: its hardest leg's. Null for a main goal's event. */
+export function eventEffort(event: SeasonEvent): GoalEffort | null {
+  if (eventPriority(event) === "A") return null;
+  return event.goals.reduce<GoalEffort>(
+    (hardest, goal) =>
+      goal.effort && EFFORT_RANK[goal.effort] > EFFORT_RANK[hardest] ? goal.effort : hardest,
+    "fun",
   );
 }
 
@@ -187,6 +255,17 @@ export function eventTitle(event: SeasonEvent) {
   return bases.join(" + ");
 }
 
+/** The other legs of `goal`'s event: same date and same name before the leg separator. */
+export function otherLegs<T extends Pick<Goal, "id" | "name" | "date">>(goal: T, all: T[]) {
+  const base = goal.name.split(LEG_SEPARATOR)[0]!.trim();
+  return all.filter(
+    (other) =>
+      other.id !== goal.id &&
+      other.date === goal.date &&
+      other.name.split(LEG_SEPARATOR)[0]!.trim() === base,
+  );
+}
+
 /** The leg's own label within its event, or null for a one-goal event. */
 export function legLabel(goal: Goal, event: SeasonEvent) {
   if (event.goals.length < 2) return null;
@@ -194,11 +273,7 @@ export function legLabel(goal: Goal, event: SeasonEvent) {
   return leg?.trim() || null;
 }
 
-/** The event the plan builds toward: the next with an A goal, else the next with a B goal. */
+/** The event the plan builds toward: the next with a main goal. A supporting race never leads. */
 export function anchorEvent(events: SeasonEvent[]): SeasonEvent | null {
-  return (
-    events.find((event) => eventPriority(event) === "A") ??
-    events.find((event) => eventPriority(event) === "B") ??
-    null
-  );
+  return events.find((event) => eventPriority(event) === "A") ?? null;
 }

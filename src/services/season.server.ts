@@ -8,10 +8,11 @@ import { getAthleteSettings } from "./athlete-settings.server.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { predictsRaceTime } from "./training-paces.types.ts";
 import { addDayKey, dayKey } from "./day-key.ts";
+import { supportingRaceBlock } from "./season-phase.ts";
 import {
-  LEG_SEPARATOR,
   goalSportTypes,
   newGoals,
+  otherLegs,
   seasonEvents,
   type Goal,
   type GoalInput,
@@ -27,6 +28,7 @@ const goalColumns = {
   distanceM: goals.distanceM,
   elevationGainM: goals.elevationGainM,
   priority: goals.priority,
+  effort: goals.effort,
 };
 
 export async function goalsFor(userId: string): Promise<Goal[]> {
@@ -120,24 +122,28 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
   };
 }
 
-/** The legs of `goal`'s event: same date and same name before the leg separator. */
-function siblingsOf(goal: Goal, all: Goal[]) {
-  const base = goal.name.split(LEG_SEPARATOR)[0]!.trim();
-  return all.filter(
-    (other) =>
-      other.id !== goal.id &&
-      other.date === goal.date &&
-      other.name.split(LEG_SEPARATOR)[0]!.trim() === base,
+/** Refuses a supporting race in a main goal's taper, as the goal form does (ADR 0052). */
+async function assertRaceFits(userId: string, race: GoalInput, except: string[] = []) {
+  const block = supportingRaceBlock(
+    await goalsFor(userId),
+    {
+      date: race.date,
+      priority: race.priority ?? "A",
+    },
+    except,
   );
+  if (block) throw new Error(block);
 }
 
 export async function createGoalImpl(data: GoalInput) {
   const session = await getRequiredSession();
+  await assertRaceFits(session.user.id, data);
   const id = crypto.randomUUID();
   await db.insert(goals).values({ id, userId: session.user.id, ...data });
   logger.info("goal.created", {
     sportType: data.sportType,
     priority: data.priority,
+    effort: data.effort,
   });
   return { id };
 }
@@ -147,6 +153,7 @@ export async function createEventImpl(data: { legs: GoalInput[] }) {
   const session = await getRequiredSession();
   const ids = data.legs.map(() => crypto.randomUUID());
   const { legs } = data;
+  await assertRaceFits(session.user.id, legs[0]!);
   await db
     .insert(goals)
     .values(legs.map((leg, index) => ({ id: ids[index]!, userId: session.user.id, ...leg })));
@@ -160,16 +167,26 @@ export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }
   const all = await goalsFor(userId);
   const current = all.find((goal) => goal.id === id);
   if (!current) return;
+  // The legs of one event move, and matter, together.
+  const siblings = otherLegs(current, all);
+  const block = supportingRaceBlock(all, { date: data.date, priority: data.priority ?? "A" }, [
+    id,
+    ...siblings.map((goal) => goal.id),
+  ]);
+  if (block) throw new Error(block);
   await db
     .update(goals)
     .set({ ...data, updatedAt: new Date() })
     .where(and(eq(goals.id, id), eq(goals.userId, userId)));
-  // The legs of one event move, and matter, together.
-  const siblings = siblingsOf(current, all);
   if (siblings.length) {
     await db
       .update(goals)
-      .set({ date: data.date, priority: data.priority, updatedAt: new Date() })
+      .set({
+        date: data.date,
+        priority: data.priority,
+        effort: data.effort ?? null,
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(goals.userId, userId),
