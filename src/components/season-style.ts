@@ -23,5 +23,4 @@ export const LEGEND_PHASES: PhaseKind[] = ["base", "build", "peak", "taper", "ra
 export const PRIORITY_FILL: Record<GoalPriority, string> = {
   A: "var(--ds-red-700)",
   B: "var(--ds-pink-600)",
-  C: "var(--ds-gray-500)",
 };

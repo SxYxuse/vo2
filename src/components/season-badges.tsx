@@ -1,5 +1,5 @@
 import { PHASES, type PhaseKind } from "@/services/season-phase.ts";
-import type { GoalPriority } from "@/services/season.types.ts";
+import { goalWeightLabel, type GoalEffort, type GoalPriority } from "@/services/season.types.ts";
 import { PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
 import { Badge } from "@/components/ui/badge";
 
@@ -20,12 +20,22 @@ export function PhaseBadge({ kind, lighter = false }: { kind: PhaseKind; lighter
   );
 }
 
-/** A goal's priority as an outline badge: "A", "B", or "C" with its colour. */
-export function PriorityBadge({ priority }: { priority: GoalPriority }) {
+/** A goal's weight as an outline badge: "Main", or a supporting race's effort, with its colour. */
+export function PriorityBadge({
+  priority,
+  effort,
+}: {
+  priority: GoalPriority;
+  effort: GoalEffort | null;
+}) {
+  const label = goalWeightLabel({ priority, effort });
   return (
-    <Badge variant="outline" aria-label={`${priority} race`}>
+    <Badge
+      variant="outline"
+      aria-label={priority === "A" ? "Main goal" : `Supporting race, ${label.toLowerCase()}`}
+    >
       <Dot fill={PRIORITY_FILL[priority]} />
-      {priority}
+      {label}
     </Badge>
   );
 }

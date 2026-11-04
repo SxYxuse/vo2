@@ -9,7 +9,7 @@ import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts"
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { coachModelFor } from "./coach-model.server.ts";
 import { weekBudgets, weeklyAmount, type SportDay } from "./coach-plan-budget.ts";
-import type { RuleContext } from "./coach-plan-rules.ts";
+import { raceWeeks, type RuleContext } from "./coach-plan-rules.ts";
 import {
   availabilityText,
   paceText,
@@ -42,7 +42,7 @@ import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonWeeks } from "./season-phase.ts";
 import { goalsFor } from "./season.server.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
-import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
+import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 
@@ -211,7 +211,10 @@ function planGoals(goals: Goal[], today: string): PlanGoal[] {
         goal.date >= today && (goal.priority === "A" || planSportOf(goal.sportType) != null),
     )
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((goal) => [goal.id, goal.date, goal.distanceM, goal.priority, goal.sportType]);
+    .map((goal): PlanGoal => {
+      const row = [goal.id, goal.date, goal.distanceM, goal.priority, goal.sportType] as const;
+      return goal.effort ? [...row, goal.effort] : [...row];
+    });
 }
 
 /**
@@ -439,7 +442,10 @@ function raceSession(goal: Goal): PlannedSession {
       sport,
       kind: "race",
       title: goal.name,
-      why: `Your ${goal.priority} race.`,
+      why:
+        goal.priority === "A"
+          ? "Your main goal: race it to perform."
+          : `A supporting race: ${effortLabel(goal).toLowerCase()}.`,
       blocks: [
         {
           repeat: 1,
@@ -526,13 +532,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       (session) => session.weekStart >= inputs.currentWeek && session.weekStart < fromWeek,
     );
     const lastDay = addDayKey(weeks.at(-1)!.weekStart, 6);
-    const races = inputs.goals.filter(
-      (goal) =>
-        planSportOf(goal.sportType) != null &&
-        goal.distanceM != null &&
-        goal.date >= fromWeek &&
-        goal.date <= lastDay,
-    );
+    const races = raceWeeks(inputs.goals, fromWeek, lastDay);
     const anchors = anchorsOf(inputs);
     const ctx: RuleContext = {
       availability,
@@ -542,10 +542,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       frozen: kept,
       runs: inputs.runs,
       rides: inputs.rides,
-      races: races.map((goal) => ({
-        weekStart: mondayOf(goal.date),
-        sport: planSportOf(goal.sportType)!,
-      })),
+      races: races.map(({ race }) => race),
       neighbours,
       easySecPerKm: stepSecPerKm(
         { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },
@@ -553,7 +550,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       ),
     };
     const prompt = {
-      task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their A goal and the rest of their season, following the coaching knowledge and every rule below.`,
+      task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their main goal (aGoal) and the rest of their season, following the coaching knowledge and every rule below.`,
       today: inputs.today,
       aGoal: {
         name: aGoal.name,
@@ -571,7 +568,8 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
           sportType: goal.sportType,
           distanceKm: goal.distanceM == null ? null : goal.distanceM / 1000,
           elevationGainM: goal.elevationGainM,
-          priority: goal.priority,
+          priority: goal.priority === "A" ? "main goal" : "supporting race",
+          effort: effortLabel(goal),
         })),
       availability: availabilityText(ctx),
       ...(availability.runsPerWeek ? { paces: paceText(anchors.paces) } : {}),
@@ -594,7 +592,9 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
     const added = [
       ...kept,
       ...result.sessions,
-      ...races.map(raceSession).map((race) => ({ ...race, done: doneRaces.has(raceKey(race)) })),
+      ...races
+        .map(({ goal }) => raceSession(goal))
+        .map((race) => ({ ...race, done: doneRaces.has(raceKey(race)) })),
     ];
     const plan: CoachPlan = {
       weeks: [

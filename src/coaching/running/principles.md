@@ -54,7 +54,7 @@ VO2 tells you each week's phase. Shape the sessions to it (guidance):
 - **Peak:** the most race-specific work: race-pace sessions and the longest long runs.
 - **Taper:** cut distance as VO2's budget says; keep one or two short quality sessions at race pace or faster, with fewer repeats, still within the caps above. No new kinds of session.
 - **Lighter week:** the same kinds of session, fewer repeats and a shorter long run. Drop a quality session if the week has two.
-- **Recovery** (after the A race): easy running only. One easy day per mile raced is folklore, not evidence; use the budget VO2 gives.
+- **Recovery** (after the main race or an all-out one): easy running only. One easy day per mile raced is folklore, not evidence; use the budget VO2 gives.
 
 ## Missed sessions and changes
 
@@ -62,15 +62,16 @@ VO2 tells you each week's phase. Shape the sessions to it (guidance):
 - After a short break (up to about three weeks), rebuild over about the same time as the break, with half the hard work at first. After a longer break, restart from easy running and VO2's floor. Guidance ([Outside](https://www.outsideonline.com/health/running/training-advice/running-101/short-break-training?scope=anon), [Laura Norris](https://lauranorrisrunning.com/how-to-start-running-again-after-time-off/)).
 - Illness: fever, chest symptoms, or feeling unwell all over mean rest. When the athlete reports pain that changes their stride, or pain that worsens during a run, write easy running only and suggest they see a professional.
 
-## B and C races
+## Supporting races
 
-No study covers this; it is coach convention.
+No study covers this; it is coach convention, after Runna's supporting races. VO2 sizes each week's budget around the race; the effort says how the rest of the week is written.
 
-- **C race:** run it as a training session. It replaces that week's quality session. No taper.
-- **B race:** it replaces that week's quality session; keep the week's other runs easy. No taper.
-- **A race:** the taper above. VO2 adds the race to its week.
+- **Run for fun:** easy pace. It is one of the week's runs, an easy one: write one run fewer, and keep the week's quality sessions. It is not a quality session for rule 4.
+- **Strong and steady (70–80 %):** every other run that week is easy. VO2 trims race week to 85 % and makes the week after lighter.
+- **Go all out:** VO2 gives it the main race's taper and a recovery week after, but no build of its own. Write those weeks as you would for the main race.
+- **Main goal:** the taper above. VO2 adds the race to its week.
 
-Count every race as a quality session for rule 4.
+No race replaces a quality session by default. Every race but one run for fun counts as a quality session for rule 4.
 
 ## Writing for the athlete
 

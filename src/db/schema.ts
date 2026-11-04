@@ -134,8 +134,10 @@ export const goals = pgTable(
     date: date("date", { mode: "string" }).notNull(),
     distanceM: real("distance_m"),
     elevationGainM: real("elevation_gain_m"),
-    /** A: peak and taper for it; B: finish well; C: trained through (ADR 0049). */
-    priority: text("priority").$type<"A" | "B" | "C">().notNull().default("A"),
+    /** A: a main goal, built, peaked, and tapered for; B: a supporting race (ADR 0052). */
+    priority: text("priority").$type<"A" | "B">().notNull().default("A"),
+    /** How hard a supporting race is run: fun, steady, or allOut. Null for a main goal. */
+    effort: text("effort").$type<"fun" | "steady" | "allOut">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

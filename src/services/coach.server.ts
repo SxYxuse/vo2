@@ -78,7 +78,7 @@ const COACHING_SKILLS = [
   inlineSkill({
     name: "running-principles",
     description:
-      "How VO2 builds a running week: the rules every coach plan is checked against, week templates by runs per week, intensity, the long run, season phases, missed sessions, and B and C races. Load before explaining how a week is built or proposing a plan change.",
+      "How VO2 builds a running week: the rules every coach plan is checked against, week templates by runs per week, intensity, the long run, season phases, missed sessions, and supporting races by effort. Load before explaining how a week is built or proposing a plan change.",
     instructions: principles,
   }),
   inlineSkill({
@@ -96,7 +96,7 @@ const COACHING_SKILLS = [
   inlineSkill({
     name: "cycling-principles",
     description:
-      "How VO2 builds a riding week: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, and B and C events. Load before explaining how rides are planned or proposing a change to a ride.",
+      "How VO2 builds a riding week: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, and supporting rides by effort. Load before explaining how rides are planned or proposing a change to a ride.",
     instructions: ridePrinciples,
   }),
   inlineSkill({
@@ -114,7 +114,7 @@ const COACHING_SKILLS = [
   inlineSkill({
     name: "season-multisport",
     description:
-      "How VO2 plans a season of runs and rides: which sport builds, how the other holds, the shared quality limit, B and C goals of the other sport, and triathlon and duathlon. Load before explaining how runs and rides share the week.",
+      "How VO2 plans a season of runs and rides: which sport builds, how the other holds, the shared quality limit, supporting races of the other sport, and triathlon and duathlon. Load before explaining how runs and rides share the week.",
     instructions: season,
   }),
 ];

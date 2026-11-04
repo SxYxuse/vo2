@@ -74,7 +74,7 @@ export function mockCoachPlan(
   for (const week of ctx.weeks.filter((item) => item.weekStart >= ctx.fromWeek)) {
     const races = ctx.races.filter((race) => race.weekStart === week.weekStart);
     let quality =
-      races.length +
+      races.filter((race) => race.effort !== "fun").length +
       ctx.frozen.filter((s) => s.weekStart === week.weekStart && isQualityKind(s.kind)).length;
     for (const sport of plannedSports(ctx.availability)) {
       const mock = MOCK[sport];
@@ -109,12 +109,14 @@ export function mockCoachPlan(
       }
       if (size < mock.start) continue;
 
-      // One quality session when the sport and the week allow it, there is no race of the sport,
-      // and the sessions are long enough.
+      // One quality session when the sport and the week allow it, no steady race of the sport
+      // keeps the week easy, and the sessions are long enough.
+      const sportRaces = races.filter((race) => race.sport === sport);
       const sportQuality =
-        races.filter((race) => race.sport === sport).length +
+        sportRaces.filter((race) => race.effort !== "fun").length +
         frozen.filter((session) => isQualityKind(session.kind)).length;
       const canQuality =
+        !sportRaces.some((race) => race.effort === "steady") &&
         sportQuality < maxQualitySessions(sessionsPerWeek(ctx.availability, sport)) &&
         quality < MAX_QUALITY_ACROSS_SPORTS &&
         week.phase !== "recovery" &&

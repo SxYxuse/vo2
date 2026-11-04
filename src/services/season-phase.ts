@@ -4,14 +4,15 @@ import { addDayKey } from "./day-key.ts";
 import {
   anchorEvent,
   daysBetween,
+  eventEffort,
   eventPriority,
   seasonEvents,
   type Goal,
-  type GoalPriority,
+  type SeasonEvent,
 } from "./season.types.ts";
 
 export const PHASES = {
-  hold: { label: "Hold", hint: "No goal ahead: keep fitness where it is." },
+  hold: { label: "Hold", hint: "No main goal ahead: keep fitness where it is." },
   base: { label: "Base", hint: "Unhurried volume, mostly easy, a long session that grows." },
   build: { label: "Build", hint: "Fitness rises toward the goal with race-specific sessions." },
   maintain: {
@@ -38,6 +39,8 @@ export const REBUILD_WEEKS = 8;
 export const LIGHTER_EVERY_WEEKS = 4;
 /** Share of the usual week a lighter week keeps. */
 export const LIGHTER_LOAD_FACTOR = 0.7;
+/** Share of the usual week the race week of a steady supporting race keeps (ADR 0052). */
+export const STEADY_RACE_LOAD_FACTOR = 0.85;
 /** Days after an A goal during which the plan does not ramp, whatever comes next. */
 export const NO_RAMP_AFTER_A_DAYS = 13;
 /** The week target never asks for more than this times the recent weeks' load (rampBaseLoad). */
@@ -49,8 +52,6 @@ export type SeasonPhase = {
   anchor: Goal[];
   /** Days from the start of the week to the anchor. */
   daysToAnchor: number | null;
-  /** The anchor event's priority: how fast fitness rises (ADR 0049). */
-  priority: GoalPriority | null;
   /** A lighter week inside a build: less load. */
   lighter: boolean;
   /**
@@ -64,28 +65,39 @@ export type SeasonPhase = {
 /** The athlete's usual speed and climbing per sport group, from recent activities. */
 export type GroupPace = { kmh: number; climbPerKm: number };
 
-const RAMP: Record<"base" | "build" | "peak", Record<GoalPriority, number>> = {
-  base: { C: 3, B: 3, A: 5 },
-  build: { C: 3, B: 5, A: 7 },
-  peak: { C: 3, B: 5, A: 5 },
-};
+/** How fast fitness rises toward the main goal, in fitness per week. */
+const RAMP = { base: 5, build: 7, peak: 5 } as const;
 
 const HOLD: SeasonPhase = {
   kind: "hold",
   anchor: [],
   daysToAnchor: null,
-  priority: null,
   lighter: false,
   ramp: 0,
   loadFactor: null,
 };
 
 /**
- * The week's phase from the season, read at the start of the week so it holds all week.
- * The plan builds toward the next A event (else the next B one) (ADR 0024).
+ * The week's phase from the season, read at the start of the week so it holds all week. The plan
+ * builds toward the next main goal (ADR 0024); a supporting race only changes the weeks around it,
+ * by its effort (ADR 0052).
  */
 export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
   const events = seasonEvents(goals);
+  const phase = mainPhase(events, weekStart);
+  // The main goal's taper, race week, and recovery come first.
+  if (phase.kind === "taper" || phase.kind === "race" || phase.kind === "recovery") return phase;
+  return events
+    .map((event) => supportingWeek(event, weekStart))
+    .reduce<SeasonPhase>(
+      (week, change) =>
+        change && change.loadFactor! < (week.loadFactor ?? 1) ? { ...week, ...change } : week,
+      phase,
+    );
+}
+
+/** The phase the next main goal sets: base, build, peak, taper, race week, then recovery. */
+function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
   const ahead = events.filter((event) => daysBetween(weekStart, event.date) >= 0);
   const lastA = events
     .filter((event) => daysBetween(weekStart, event.date) < 0 && eventPriority(event) === "A")
@@ -96,8 +108,6 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
   const anchorAhead = anchorEvent(ahead);
   if (!anchorAhead) return justRaced ? recoveryPhase(lastA!.goals) : HOLD;
   const anchor = anchorAhead.goals;
-  const priority = eventPriority(anchorAhead);
-  const anchorIsA = priority === "A";
   const daysToAnchor = daysBetween(weekStart, anchorAhead.date);
   const weeksLeft = Math.floor(daysToAnchor / 7);
 
@@ -105,39 +115,18 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
   if (justRaced) {
     phase = recoveryPhase(lastA!.goals);
   } else if (weeksLeft === 0) {
-    phase = {
-      ...HOLD,
-      kind: "race",
-      // A B goal leading the season gets a few lighter days, not a full taper.
-      loadFactor: anchorIsA ? 0.5 : 0.85,
-    };
-  } else if (weeksLeft === 1 && anchorIsA) {
-    phase = {
-      ...HOLD,
-      kind: "taper",
-      loadFactor: 0.75,
-    };
+    phase = { ...HOLD, kind: "race", loadFactor: 0.5 };
+  } else if (weeksLeft === 1) {
+    phase = { ...HOLD, kind: "taper", loadFactor: 0.75 };
   } else if (weeksLeft <= PEAK_WEEKS) {
-    phase = {
-      ...HOLD,
-      kind: "peak",
-      ramp: RAMP.peak[priority],
-    };
+    phase = { ...HOLD, kind: "peak", ramp: RAMP.peak };
   } else if (weeksLeft <= BASE_WEEKS) {
     const rebuilding = sinceLast != null && sinceLast + daysToAnchor < REBUILD_WEEKS * 7;
     phase = rebuilding
       ? { ...HOLD, kind: "maintain" }
-      : {
-          ...HOLD,
-          kind: "build",
-          ramp: RAMP.build[priority],
-        };
+      : { ...HOLD, kind: "build", ramp: RAMP.build };
   } else {
-    phase = {
-      ...HOLD,
-      kind: "base",
-      ramp: RAMP.base[priority],
-    };
+    phase = { ...HOLD, kind: "base", ramp: RAMP.base };
   }
 
   // Right after an A goal the body is still recovering: hold, however close the next one is.
@@ -164,7 +153,30 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     };
   }
 
-  return { ...phase, anchor, daysToAnchor, priority };
+  return { ...phase, anchor, daysToAnchor };
+}
+
+/**
+ * How a supporting race changes the week, by its effort, or null when it doesn't (ADR 0052). Fun
+ * changes nothing. Steady trims its race week and lightens the week after. All out gets the main
+ * goal's taper and race week, and a recovery week after, but no build of its own. The most a
+ * week is cut wins.
+ */
+function supportingWeek(event: SeasonEvent, weekStart: string): Partial<SeasonPhase> | null {
+  const effort = eventEffort(event);
+  if (effort == null || effort === "fun") return null;
+  const days = daysBetween(weekStart, event.date);
+  const weeksLeft = Math.floor(days / 7);
+  const after = days < 0 && days >= -7;
+  if (effort === "steady") {
+    if (weeksLeft === 0) return { ramp: 0, loadFactor: STEADY_RACE_LOAD_FACTOR };
+    if (after) return { lighter: true, ramp: 0, loadFactor: LIGHTER_LOAD_FACTOR };
+    return null;
+  }
+  if (weeksLeft === 1) return { kind: "taper", lighter: false, ramp: 0, loadFactor: 0.75 };
+  if (weeksLeft === 0) return { kind: "race", lighter: false, ramp: 0, loadFactor: 0.5 };
+  if (after) return { kind: "recovery", lighter: false, ramp: 0, loadFactor: 0.6 };
+  return null;
 }
 
 function recoveryPhase(raced: Goal[]): SeasonPhase {
@@ -172,9 +184,28 @@ function recoveryPhase(raced: Goal[]): SeasonPhase {
     ...HOLD,
     kind: "recovery",
     anchor: raced,
-    priority: "A",
     loadFactor: 0.6,
   };
+}
+
+/**
+ * Why a supporting race can't go on its date, or null when it can: it falls in a main goal's
+ * taper, the week before it or its race week (ADR 0052). `except` are the goals being changed.
+ */
+export function supportingRaceBlock(
+  goals: Pick<Goal, "id" | "name" | "date" | "priority">[],
+  race: Pick<Goal, "date" | "priority">,
+  except: string[] = [],
+): string | null {
+  if (race.priority !== "B") return null;
+  const taperStart = (date: string) => addDayKey(mondayOf(date), -7);
+  const main = goals
+    .filter((goal) => goal.priority === "A" && !except.includes(goal.id))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .find((goal) => race.date <= goal.date && race.date >= taperStart(goal.date));
+  return main
+    ? `This falls in the taper for ${main.name}: the week before it and its race week stay clear. Pick another date, or make it a main goal.`
+    : null;
 }
 
 /** Days of activities that set the athlete's usual pace for a goal. */

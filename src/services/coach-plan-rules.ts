@@ -3,6 +3,7 @@ import {
   isQualityKind,
   kindFitsSport,
   minutesText,
+  planSportOf,
   plannedSports,
   sessionKindLabel,
   sessionsPerWeek,
@@ -12,7 +13,8 @@ import {
 } from "./coach-plan.types.ts";
 import type { SportDay, WeekBudget } from "./coach-plan-budget.ts";
 import { addDayKey } from "./day-key.ts";
-import { daysBetween } from "./season.types.ts";
+import { mondayOf } from "./season-phase.ts";
+import { daysBetween, type Goal, type GoalEffort } from "./season.types.ts";
 
 /*
  * The rules of ADR 0037 and ADR 0050, checked in code on every plan the coach writes. Each check
@@ -25,8 +27,32 @@ import { daysBetween } from "./season.types.ts";
 
 export type RuleBreak = { rule: string; message: string };
 
-/** An upcoming goal in the weeks written: VO2 adds the race itself. */
-export type RaceWeek = { weekStart: string; sport: PlanSport };
+/**
+ * An upcoming goal in the weeks written: VO2 adds the race itself. Its effort is "perform" for a
+ * main goal, else the supporting race's (ADR 0052).
+ */
+export type RaceWeek = { weekStart: string; sport: PlanSport; effort: RaceEffort };
+export type RaceEffort = "perform" | GoalEffort;
+
+/** The run and ride goals from `fromWeek` through `lastDay`, as the rules read them. */
+export function raceWeeks(goals: Goal[], fromWeek: string, lastDay: string) {
+  return goals
+    .filter(
+      (goal) =>
+        planSportOf(goal.sportType) != null &&
+        goal.distanceM != null &&
+        goal.date >= fromWeek &&
+        goal.date <= lastDay,
+    )
+    .map((goal) => ({
+      goal,
+      race: {
+        weekStart: mondayOf(goal.date),
+        sport: planSportOf(goal.sportType)!,
+        effort: goal.priority === "A" ? "perform" : (goal.effort ?? "steady"),
+      } satisfies RaceWeek,
+    }));
+}
 
 export type RuleContext = {
   availability: Availability;
@@ -146,10 +172,15 @@ const inWeek =
     session.weekStart === week.weekStart && (sport == null || session.sport === sport);
 /** How the coach finds a session in a break: its week, then its title. */
 const named = (session: PlannedSession) => `Week of ${session.weekStart}, "${session.title}"`;
-const racesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
+const racesOf = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   ctx.races.filter(
     (race) => race.weekStart === week.weekStart && (sport == null || race.sport === sport),
-  ).length;
+  );
+const racesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
+  racesOf(week, ctx, sport).length;
+/** Races that count as a quality session (rule 4): every race but one run for fun. */
+const qualityRacesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
+  racesOf(week, ctx, sport).filter((race) => race.effort !== "fun").length;
 const sumOf = (sessions: PlannedSession[], sport: PlanSport) =>
   sessions.reduce((sum, session) => sum + SPORT_RULES[sport].amount(session), 0);
 
@@ -225,12 +256,15 @@ export function weekBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBr
 /**
  * Sessions of one sport the athlete's availability allows in the week: their sessions per week,
  * or fewer when the week is under way and has fewer days left, one of each sport a day and none
- * on that sport's race day. Sessions kept because they are done count.
+ * on that sport's race day, and one fewer for each race run for fun. Sessions kept because they
+ * are done count.
  */
 export function sessionsAvailable(week: WeekBudget, ctx: RuleContext, sport: PlanSport) {
   const kept = ctx.frozen.filter(inWeek(week, sport)).length;
   const open = Math.max(0, daysLeft(week, ctx.today) - racesIn(week, ctx, sport));
-  return Math.min(sessionsPerWeek(ctx.availability, sport), kept + open);
+  // A race run for fun is the week's easy session, so one fewer is written (ADR 0052).
+  const fun = racesIn(week, ctx, sport) - qualityRacesIn(week, ctx, sport);
+  return Math.max(0, Math.min(sessionsPerWeek(ctx.availability, sport) - fun, kept + open));
 }
 
 /** No more sessions of a sport in a week than the athlete's availability allows. */
@@ -375,7 +409,8 @@ export function spikeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleB
 
 /**
  * Rule 4 per sport and across both, and rule 5 per sport: the long session's share of the week
- * and its time.
+ * and its time. A race counts as a quality session unless it is run for fun, and a steady
+ * supporting race keeps its sport's other sessions that week easy (ADR 0052).
  */
 export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
@@ -383,7 +418,7 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
   for (const week of ctx.weeks) {
     const all = [...ctx.frozen, ...sessions].filter(inWeek(week));
     const allQuality =
-      all.filter((session) => isQualityKind(session.kind)).length + racesIn(week, ctx);
+      all.filter((session) => isQualityKind(session.kind)).length + qualityRacesIn(week, ctx);
     if (sports.length > 1 && allQuality > MAX_QUALITY_ACROSS_SPORTS) {
       breaks.push({
         rule: "4. quality sessions",
@@ -394,10 +429,17 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
       const rules = SPORT_RULES[sport];
       const perWeek = sessionsPerWeek(ctx.availability, sport);
       const mine = all.filter((session) => session.sport === sport);
-      const races = racesIn(week, ctx, sport);
-      const quality = mine.filter((session) => isQualityKind(session.kind)).length + races;
+      const races = qualityRacesIn(week, ctx, sport);
+      const written = mine.filter((session) => isQualityKind(session.kind));
+      const quality = written.length + races;
       const maxQuality = maxQualitySessions(perWeek);
-      if (quality > maxQuality) {
+      const steady = racesOf(week, ctx, sport).some((race) => race.effort === "steady");
+      if (steady && written.length) {
+        breaks.push({
+          rule: "4. quality sessions",
+          message: `Week of ${week.weekStart}: a steady ${rules.noun} race keeps the week's other ${rules.plural} easy, but it has ${written.length} quality ${written.length === 1 ? rules.noun : rules.plural}.`,
+        });
+      } else if (quality > maxQuality) {
         breaks.push({
           rule: "4. quality sessions",
           message: `Week of ${week.weekStart}: ${quality} quality ${rules.plural}${races ? " (races count)" : ""}, at most ${maxQuality} with ${perWeek} ${rules.plural} a week.`,

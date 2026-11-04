@@ -200,6 +200,62 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
   }
 });
 
+test("an athlete adds a steady supporting race, is kept out of the main goal's taper, and removes it", async ({
+  page,
+}) => {
+  try {
+    // A main goal on Sunday 12 July: its taper is the week from 29 June and its race week.
+    await pasteGoal(page, {
+      name: "Summer 10K",
+      sportType: "Run",
+      date: "2026-07-12",
+      distanceM: 10_000,
+      elevationGainM: null,
+      priority: "A",
+    });
+    await expect(page.getByRole("region", { name: "Upcoming goals" })).toContainText("Main");
+
+    await page.getByRole("button", { name: "Add a goal" }).first().click();
+    await page.getByRole("textbox", { name: "Name" }).fill("Club 5K");
+    await page.getByRole("combobox", { name: "Sport" }).click();
+    await page.getByRole("option", { name: "Run", exact: true }).click();
+    const pickDate = async (day: string) => {
+      await page.getByRole("button", { name: "Date", exact: true }).click();
+      await page.locator(`[data-day="${day}"]`).click();
+    };
+    await pickDate("30/06/2026");
+    await page.getByRole("textbox", { name: "Distance" }).fill("5");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+
+    // A supporting race takes an effort, steady unless another is picked, and none in the taper.
+    await page.getByRole("radio", { name: /^Supporting race/ }).click();
+    await expect(page.getByRole("radio", { name: /^Strong and steady/ })).toBeChecked();
+    await expect(page.getByText(/falls in the taper for Summer 10K/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add goal" })).toBeDisabled();
+    await expect(page).toHaveScreenshot("goal-supporting-race-blocked.png", {
+      mask: [syncButton(page)],
+    });
+
+    // Two days earlier it is clear of the taper.
+    await page.getByRole("button", { name: "Back" }).click();
+    await pickDate("27/06/2026");
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("radio", { name: /^Strong and steady/ })).toBeChecked();
+    await expect(page.getByText(/falls in the taper/)).toHaveCount(0);
+    await page.getByRole("button", { name: "Add goal" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Upcoming goals" })).toContainText("Steady");
+
+    // And the way out: removing it leaves the main goal alone.
+    await deleteGoalIfThere(page, /Run · 5\.00 km/);
+    await expect(page.getByRole("region", { name: "Upcoming goals" })).not.toContainText("Steady");
+  } finally {
+    // The other specs share this athlete and expect no goals.
+    await deleteGoalIfThere(page, /Run · 5\.00 km/);
+    await deleteGoalIfThere(page, /Run · 10\.0 km/);
+  }
+});
+
 /**
  * Opens Settings → Paces as the server has them. The device's copy is written at most once a
  * second, so a page opened right after a change can restore paces from before it; drop it.

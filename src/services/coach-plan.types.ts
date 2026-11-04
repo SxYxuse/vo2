@@ -224,13 +224,17 @@ export type PlanWeek = {
   budgetMinutes?: number;
   phase: PhaseKind;
   lighter: boolean;
-  /** A taper week before the A goal, or the race week itself. */
+  /** A taper week before a main goal or an all-out race, or the race week itself. */
   taper: boolean;
   sessions: PlannedSession[];
 };
 
-/** A goal as the plan was written around it: id, date, distance, priority, sport type. */
-export type PlanGoal = [string, string, number | null, string, string];
+/**
+ * A goal as the plan was written around it: id, date, distance, priority, sport type, and a
+ * supporting race's effort. A main goal has no sixth item, so plans written before efforts are
+ * not rewritten for one.
+ */
+export type PlanGoal = [string, string, number | null, string, string, string?];
 
 /** What a written plan was written from; a change in any of it rewrites the weeks ahead. */
 export type PlanBasis = {
