@@ -51,7 +51,7 @@ Read the level from the athlete's recent weekly distance and runs per week (guid
 
 ## Which quality sessions for which goal
 
-Guidance from the sources above. The long run's peak is the smallest of the target below, 30 % of the week's budget, and 2 h 30 (`principles.md`).
+Guidance from the sources above. The long run's peak is the smallest of the target below, its share of the week (rule 5 in `principles.md`), and 2 h 30.
 
 | Goal          | Main quality                      | Second quality                    | Long run target |
 | ------------- | --------------------------------- | --------------------------------- | --------------- |
@@ -76,6 +76,12 @@ Aerobic base and volume; most of the week. No pace below E.
 ```
 
 - Beginner: 20–40 min; run-walk allowed. Advanced: 45–75 min.
+- Run-walk, for beginners and returns from a break. Grow the running part over the weeks, then drop the walks:
+
+```
+8 × (3 min easy, 1 min walk)
+```
+
 - Strides (15–20 s, fast and relaxed, full recovery) after an easy run, 1–2 times a week, from base phase on. Beginner 4, advanced 8–10 (McMillan, via [Running Magazine](https://runningmagazine.ca/?p=109810)). Strides do not make a run a hard day, and don't count against the caps.
 
 ## Recovery run
@@ -90,7 +96,7 @@ Keep under 40 min. No strides.
 
 ## Long run
 
-Endurance. Easy unless the phase calls for marathon-pace work. The longest run of the week, and at most 30 % of it.
+Endurance. Easy unless the phase calls for marathon-pace work. The longest run of the week, and at most twice the average of the others (rule 5).
 
 Easy, at a 40 km week (12 km at most):
 
@@ -113,8 +119,25 @@ Warm-up: 4 km E
 Cool-down: 4 km E
 ```
 
+Steady blocks, at a 50 km week (build phase, half and marathon goals):
+
+```
+3 km E
+3 × (3 km E, 2 km steady)
+```
+
+Progression, at a 40 km week:
+
+```
+6 km E
+3 km steady
+2 km M
+```
+
 - Marathon-pace long run (build and peak, half and marathon goals only): a middle block at M, at most 20 % of the week and 1 h 50 (Daniels). Counts as a quality session.
 - Fast finish: the last 15–20 % steady, never faster than M. Counts as quality only when the finish is at M or faster.
+- Steady blocks: easy running with blocks at a steady effort, slower than M. Not a quality session. A way to make a long run harder without race-pace work.
+- Progression long run: starts easy and steps up in blocks. Counts as quality only when it reaches M.
 
 ## Threshold: tempo run
 
@@ -154,6 +177,18 @@ Cool-down: 1.5 km E
 
 - Daniels: an athlete who handles 20 min at T can do about 30 min as cruise intervals, still within the cap.
 
+## Threshold: over-unders
+
+Threshold work that crosses the line: alternate just above and just below T. Written as `tempo`; the work above and below both count against the T cap. For intermediate and advanced athletes.
+
+```
+Warm-up: 2 km E
+3 × (3 × (1 min slightly faster than T, 1 min slightly slower than T)), 2 min jog
+Cool-down: 1.5 km E
+```
+
+- At a 40 km week: 3 sets of 6 min, as above (about 4 km of T work). At 60 km: 4 sets.
+
 ## Intervals (I)
 
 Raises the athlete's ceiling: VO2max. Each repeat 3–5 min; recovery 2–3 min jog, or about equal to the work (Daniels, ctyeh).
@@ -172,6 +207,15 @@ Cool-down: 1.5 km E
 | 80 km | 6.4 km | 6 × 1000 m I, 2–3 min jog                 |
 
 - Rare for marathon goals beyond one block in build.
+- Pyramid: up then down in length, same pace, recovery about equal to the work. At a 40 km week (I cap 3.2 km):
+
+```
+Warm-up: 2 km E
+400 m I, 800 m I, 1200 m I, 800 m I, all with 400 m jog
+Cool-down: 1.5 km E
+```
+
+- Beginners may walk the recoveries: `90 s walk` instead of a jog.
 
 ## Repetitions (R)
 
@@ -285,4 +329,11 @@ Cool-down: 1 km E
 
 - Keep the same session types, sized from the lighter week's own budget: the caps shrink with it.
 - Race week: one short session, such as 4 × 200 m R or 2 × 1 km at race effort, with full recovery, still within that week's caps. The rest easy and short.
+- The last run before the race: a short easy shakeout with a few strides, written as `easy`:
+
+```
+20 min easy
+4 × 15 s fast and relaxed, 60 s walk
+```
+
 - Never a new kind of session in a taper.

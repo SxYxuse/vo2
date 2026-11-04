@@ -113,12 +113,14 @@ export function maxQualitySessions(perWeek: number) {
 
 /**
  * The long run's largest share of the week (rule 5), by the runs the athlete's availability
- * allows that week. It is 30 %. With two or three runs even equal runs are half or a third of the
- * week, so those weeks allow 50 % and 40 % (ADR 0040). A week of one run has no share to keep.
+ * allows that week: at most twice the average of the week's other runs, so 2 / (runs + 1), and
+ * never under Daniels' 30 % (ADR 0053). That is 67 % for 2 runs, 50 % for 3, 40 % for 4, 33 % for
+ * 5, and 30 % from 6. The 10 % rule on the longest run still sets how fast it grows. A week of one
+ * run has no share to keep.
  */
 export function maxLongShare(runsInWeek: number) {
   if (runsInWeek <= 1) return 1;
-  return runsInWeek === 2 ? 0.5 : runsInWeek === 3 ? 0.4 : 0.3;
+  return Math.max(0.3, 2 / (runsInWeek + 1));
 }
 
 /**

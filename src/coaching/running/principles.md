@@ -10,7 +10,7 @@ Evidence tags: **rule** means VO2 checks it in code. **Guidance** means coaching
 2. **No run is more than 10 % longer than the longest run of the last 30 days.** A single run longer than the recent longest is the best-supported spike signal for injury (Garmin-RUNSAFE cohort, 5,205 runners, [secondary coverage](https://www.shoulditrain.com/blog/10-percent-rule-running-injury-myth)). Grow the long run in steps.
 3. **Sessions have no day.** Each session belongs to a week, and the athlete picks the day. A week holds no more runs than the athlete's runs per week, fewer in a week already under way. Never name a day in a session.
 4. **Quality sessions per week:** 1 for 2–3 runs, 2 for 4–5 runs, at most 3 for 6 runs. The long run counts as quality only when it has marathon-pace or faster work in it.
-5. **The long run is at most 30 % of the week's distance and at most 2 h 30.** Daniels' limit, reported second-hand ([Running Magazine](https://runningmagazine.ca/?p=99607)).
+5. **The long run is at most twice the average of the week's other runs, and at most 2 h 30.** As a share of the week: 67 % with 2 runs, 50 % with 3, 40 % with 4, 33 % with 5, and 30 % from 6 runs, which is Daniels' limit ([Running Magazine](https://runningmagazine.ca/?p=99607), reported second-hand). Daniels' 30 % was written for athletes running most days; with fewer runs it would keep the long run near the length of the others. How fast the long run grows is rule 2's job, not the share's.
 6. **Every fourth week is lighter, about 70 % of the week before.** The size and rhythm of cutbacks have no controlled trial behind them (guidance in origin); VO2 enforces them because athletes skip them otherwise.
 7. **Taper: two weeks before a marathon, one to two weeks before shorter races.** Cut volume, keep intensity and frequency (Bosquet 2007 meta-analysis: a two-week taper with volume cut 41–60 %, [PubMed](https://pubmed.ncbi.nlm.nih.gov/17762369/)).
 8. **A missed session is skipped.** Continue the plan from the next session. Never add its distance to another run or add a run to make it up.
@@ -41,8 +41,8 @@ Templates by runs per week (guidance; no study compares them):
 ## Long run
 
 - Easy pace by default. In build and peak phases for a half or full marathon, a long run may carry a block at marathon pace (see `sessions.md`); it then counts as a quality session.
-- The long run's length comes from the week: at most 30 % of the week's budget and at most 2 h 30 (rule 5), and no more than 10 % longer than the longest run of the last 30 days (rule 2). Whichever is smallest wins.
-- Coaches aim for these peaks by goal distance (guidance, coach consensus): 5 km: 60–75 min. 10 km: 75–90 min. Half marathon: about 2 h. Marathon: 2 h 30. Reaching them needs enough weekly volume: a 2 h 30 long run is 30 % of a week of about 8 h 20 of running. When the week is smaller, the rules above win and the long run stays shorter; never break a rule to reach a peak.
+- The long run's length comes from the week: at most twice the average of the week's other runs and at most 2 h 30 (rule 5), and no more than 10 % longer than the longest run of the last 30 days (rule 2). Whichever is smallest wins.
+- Coaches aim for these peaks by goal distance (guidance, coach consensus): 5 km: 60–75 min. 10 km: 75–90 min. Half marathon: about 2 h. Marathon: 2 h 30. Reaching them needs enough weekly volume: a 2 h 30 long run needs about 5 h of running a week with 3 runs, and about 8 h 20 with 6. When the week is smaller, the rules above win and the long run stays shorter; never break a rule to reach a peak.
 - Reach the peak by growing from the longest run of the last 30 days, at most 10 % per step (rule 2).
 
 ## Season phases

@@ -83,7 +83,7 @@ export function rulesFor(ctx: RuleContext) {
     rules.push(
       "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
       `4. At most ${maxQualitySessions(runsPerWeek)} quality run(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A running race counts as one, unless it is run for fun: then it is one of the week's runs, an easy one. In the week of a steady running race, every other run is easy.`,
-      `5. One long run a week. The week's longest run, whatever its kind, is at most ${Math.round(maxLongShare(4) * 100)} % of the week's running (${Math.round(maxLongShare(3) * 100)} % when only 3 runs fit the week, ${Math.round(maxLongShare(2) * 100)} % when 2), so write all the week's runs, and at most ${MAX_LONG_MINUTES} minutes.`,
+      `5. One long run a week. The week's longest run, whatever its kind, is at most twice the average of the week's other runs, and never held under 30 % of the week's running: ${[2, 3, 4, 5].map((runs) => `${Math.round(maxLongShare(runs) * 100)} % with ${runs} runs`).join(", ")}, ${Math.round(maxLongShare(6) * 100)} % from 6, counted by the runs that fit the week. Write all the week's runs, and the long run at most ${MAX_LONG_MINUTES} minutes.`,
     );
   }
   if (sports.includes("ride")) {

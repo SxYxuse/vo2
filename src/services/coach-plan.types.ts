@@ -498,3 +498,57 @@ export function sessionKindLabel(kind: SessionKind, sport: PlanSport = "run") {
   const item = SESSION_KINDS.find((entry) => entry.id === kind);
   return item?.[sport] ?? item?.run ?? item?.ride ?? kind;
 }
+
+/**
+ * What each kind of session is and what it does, for the athlete reading one. Kept beside the
+ * kinds so a new kind gets its words here; the coach's fuller library is in `src/coaching/`.
+ */
+const SESSION_KIND_ABOUT: Record<SessionKind, Partial<Record<PlanSport, string>>> = {
+  easy: {
+    run: "Running at a pace you could chat at. It builds your aerobic base and makes up most of the week.",
+    ride: "Steady riding in zone 2, at a pace you could chat at. It builds your aerobic base and makes up most of the week.",
+  },
+  recovery: {
+    run: "Shorter and slower than an easy run. It keeps you moving between harder sessions without adding fatigue.",
+    ride: "A short, very easy spin that loosens your legs between harder sessions.",
+  },
+  long: {
+    run: "The week's longest run, mostly easy. It builds endurance; later in a build it may finish steadier or carry steady blocks.",
+    ride: "The week's longest ride, mostly in zone 2. It builds endurance and lets you practise eating and drinking on the bike.",
+  },
+  tempo: {
+    run: "Comfortably hard: the pace you could hold for about an hour, run continuously or in long repeats with short jogs. It raises the pace you can sustain.",
+    ride: "Blocks of 10–20 minutes at threshold, the power you could hold for about an hour, with easy riding between. It raises that power.",
+  },
+  intervals: {
+    run: "Repeats of 3–5 minutes hard, near your 5 km race pace, with jogs between. They raise your ceiling: your VO2 max.",
+    ride: "Hard repeats above threshold, with easy riding between. They raise your ceiling: your VO2 max.",
+  },
+  repetitions: {
+    run: "Short, fast repeats of up to 2 minutes with full recovery. They work on speed and running form rather than leaving you out of breath.",
+  },
+  hills: {
+    run: "Hard efforts uphill, by effort rather than pace, with an easy way back down. They build strength and power with less pounding than fast running on the flat.",
+    ride: "Repeats on a climb at threshold or just under, some at a low cadence. They build the strength to climb at your event's pace.",
+  },
+  fartlek: {
+    run: "Easy running broken up by surges by feel, such as 1 minute hard and 2 minutes easy. A gentle way into faster running.",
+  },
+  marathonPace: {
+    run: "A long run with a block at marathon pace in it. It rehearses race pace on tired legs.",
+  },
+  sweetSpot: {
+    ride: "Long blocks just under threshold: hard enough to build the power you can hold, easy enough to repeat often.",
+  },
+  sprints: {
+    ride: "An endurance ride with a few all-out sprints of 10–15 seconds and full recovery. They build leg speed.",
+  },
+  race: {
+    run: "A race from your season, at the effort set on its goal.",
+    ride: "A race from your season, at the effort set on its goal.",
+  },
+};
+
+export function sessionKindAbout(kind: SessionKind, sport: PlanSport = "run") {
+  return SESSION_KIND_ABOUT[kind][sport] ?? null;
+}
