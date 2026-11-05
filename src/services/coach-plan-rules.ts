@@ -10,11 +10,14 @@ import {
   type Availability,
   type PlanSport,
   type PlannedSession,
+  type Step,
 } from "./coach-plan.types.ts";
 import type { SportDay, WeekBudget } from "./coach-plan-budget.ts";
 import { addDayKey } from "./day-key.ts";
 import { mondayOf } from "./season-phase.ts";
 import { daysBetween, type Goal, type GoalEffort } from "./season.types.ts";
+import { formatPaceClock } from "./locomotion.ts";
+import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
 /*
  * The rules of ADR 0037 and ADR 0050, checked in code on every plan the coach writes. Each check
@@ -75,6 +78,10 @@ export type RuleContext = {
   neighbours: PlannedSession[];
   /** Seconds per km at the middle of easy pace, to size a 2 h 30 run for the floor. */
   easySecPerKm: number;
+  /** The athlete's training paces; null without running history, when runs go by effort. */
+  paces: Record<PaceType, PaceRange> | null;
+  /** Each upcoming run goal's predicted race pace in seconds per km, for race-pace steps. */
+  racePaces: number[];
   /**
    * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
    * athlete who is ill or away trains less, and less training breaks no safety rule, and the
@@ -113,17 +120,19 @@ export function maxQualitySessions(perWeek: number) {
 
 /**
  * The long run's largest share of the week (rule 5), by the runs the athlete's availability
- * allows that week. It is 30 %. With two or three runs even equal runs are half or a third of the
- * week, so those weeks allow 50 % and 40 % (ADR 0040). A week of one run has no share to keep.
+ * allows that week: at most twice the average of the week's other runs, so 2 / (runs + 1), and
+ * never under Daniels' 30 % (ADR 0053). That is 67 % for 2 runs, 50 % for 3, 40 % for 4, 33 % for
+ * 5, and 30 % from 6. The 10 % rule on the longest run still sets how fast it grows. A week of one
+ * run has no share to keep.
  */
 export function maxLongShare(runsInWeek: number) {
   if (runsInWeek <= 1) return 1;
-  return runsInWeek === 2 ? 0.5 : runsInWeek === 3 ? 0.4 : 0.3;
+  return Math.max(0.3, 2 / (runsInWeek + 1));
 }
 
 /**
  * The long ride's largest share of the week's riding (rule 5): about 40 %, more with fewer rides,
- * where even equal rides take a bigger share (`cycling/principles.md`).
+ * where even equal rides take a bigger share (`coaching/cycling.md`).
  */
 export function maxLongRideShare(ridesInWeek: number) {
   if (ridesInWeek <= 1) return 1;
@@ -188,13 +197,44 @@ const sumOf = (sessions: PlannedSession[], sport: PlanSport) =>
 const daysLeft = (week: WeekBudget, today: string) =>
   Math.min(7, Math.max(0, 7 - daysBetween(week.weekStart, today)));
 
-function stepIssue(sport: PlanSport, step: PlannedSession["blocks"][number]["steps"][number]) {
+/** A run step's own pace may sit this far outside its range or a race pace, for rounding. */
+const PACE_SLACK_SEC = 2;
+
+/**
+ * Why a run step's own pace is wrong, or null: a step at a pace harder than easy names one pace
+ * inside its pace type's range or at a goal's race pace, and every other step names none
+ * (ADR 0055).
+ */
+function paceIssue(step: Step, ctx: Pick<RuleContext, "paces" | "racePaces">) {
+  const paces = ctx.paces;
+  if (paces == null || step.pace == null || step.pace === "easy") {
+    return step.secPerKm == null
+      ? null
+      : "only a step at marathon, threshold, interval, or repetition pace has a secPerKm; easy, effort, and walk steps have it null";
+  }
+  if (step.secPerKm == null) {
+    return `a step at ${step.pace} pace needs secPerKm: one pace in seconds per km`;
+  }
+  const range = paces[step.pace];
+  const inRange =
+    step.secPerKm >= range.fastSecPerKm - PACE_SLACK_SEC &&
+    step.secPerKm <= range.slowSecPerKm + PACE_SLACK_SEC;
+  const atRace = ctx.racePaces.some(
+    (target) => Math.abs(step.secPerKm! - target) <= PACE_SLACK_SEC,
+  );
+  if (inRange || atRace) return null;
+  const races = ctx.racePaces.length ? ctx.racePaces.join(", ") : "none";
+  return `secPerKm ${step.secPerKm} (${formatPaceClock(step.secPerKm)} /km) is outside ${step.pace} pace, ${range.fastSecPerKm}–${range.slowSecPerKm}, and at no race pace (${races})`;
+}
+
+function stepIssue(sport: PlanSport, step: Step) {
   const amount = step.distanceM ?? step.durationS ?? 0;
   if (sport === "ride") {
     return (
       step.durationS == null ||
       step.distanceM != null ||
       step.pace != null ||
+      step.secPerKm != null ||
       (step.zone == null) === (step.effort == null) ||
       amount <= 0
     );
@@ -207,8 +247,8 @@ function stepIssue(sport: PlanSport, step: PlannedSession["blocks"][number]["ste
   );
 }
 
-/** Steps that read as one thing, and a kind written for the session's sport. */
-export function formatBreaks(sessions: PlannedSession[]): RuleBreak[] {
+/** Steps that read as one thing, run paces that fit, and a kind written for the session's sport. */
+export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const session of sessions) {
     if (!kindFitsSport(session.kind, session.sport)) {
@@ -217,17 +257,21 @@ export function formatBreaks(sessions: PlannedSession[]): RuleBreak[] {
         message: `${named(session)}: kind ${session.kind} is not written for a ${SPORT_RULES[session.sport].noun}.`,
       });
     }
-    const bad = session.blocks.some((block) =>
-      block.steps.some((step) => stepIssue(session.sport, step)),
-    );
-    if (!bad) continue;
-    breaks.push({
-      rule: "format",
-      message:
-        session.sport === "ride"
-          ? `${named(session)}: every ride step needs durationS (above 0) and no distanceM, and exactly one of zone or effort, with pace null.`
-          : `${named(session)}: every run step needs exactly one of distanceM or durationS (above 0), and exactly one of pace or effort, with zone null.`,
-    });
+    const steps = session.blocks.flatMap((block) => block.steps);
+    if (steps.some((step) => stepIssue(session.sport, step))) {
+      breaks.push({
+        rule: "format",
+        message:
+          session.sport === "ride"
+            ? `${named(session)}: every ride step needs durationS (above 0) and no distanceM, and exactly one of zone or effort, with pace and secPerKm null.`
+            : `${named(session)}: every run step needs exactly one of distanceM or durationS (above 0), and exactly one of pace or effort, with zone null.`,
+      });
+    }
+    if (session.sport !== "run") continue;
+    const issue = steps.map((step) => paceIssue(step, ctx)).find((item) => item != null);
+    if (issue) {
+      breaks.push({ rule: "format", message: `${named(session)}: ${issue}.` });
+    }
   }
   return breaks;
 }
@@ -490,7 +534,7 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
 /** Every rule the plan's new sessions break; empty when it passes. */
 export function checkPlan(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   return [
-    ...formatBreaks(sessions),
+    ...formatBreaks(sessions, ctx),
     ...weekBreaks(sessions, ctx),
     ...availabilityBreaks(sessions, ctx),
     ...budgetBreaks(sessions, ctx),

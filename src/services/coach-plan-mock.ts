@@ -33,20 +33,37 @@ const tenth = (km: number) => Math.round(km * 10) / 10;
 /** Room left under each limit, so the sizes VO2 works out from the steps stay inside it. */
 const MARGIN = 0.95;
 
-function runStep(part: Step["part"], km: number, pace: PaceType, withPaces: boolean): Step {
+function runStep(
+  part: Step["part"],
+  km: number,
+  pace: PaceType,
+  paces: Record<PaceType, PaceRange> | null,
+): Step {
   const effort = pace === "easy" ? "easy" : "comfortablyHard";
+  const range = paces?.[pace];
   return {
     part,
     distanceM: Math.round(km * 1000),
     durationS: null,
-    pace: withPaces ? pace : null,
+    pace: paces ? pace : null,
+    // A harder pace names one pace inside its range, as the coach must (ADR 0055).
+    secPerKm:
+      range && pace !== "easy" ? Math.round((range.fastSecPerKm + range.slowSecPerKm) / 2) : null,
     zone: null,
-    effort: withPaces ? null : effort,
+    effort: paces ? null : effort,
   };
 }
 
 function rideStep(part: Step["part"], minutes: number, zone: Step["zone"]): Step {
-  return { part, distanceM: null, durationS: minutes * 60, pace: null, zone, effort: null };
+  return {
+    part,
+    distanceM: null,
+    durationS: minutes * 60,
+    pace: null,
+    secPerKm: null,
+    zone,
+    effort: null,
+  };
 }
 
 /** Per sport: the step it grows by, its long-session cap, its share, and its sessions. */
@@ -64,8 +81,7 @@ export function mockCoachPlan(
   ctx: RuleContext,
   paces: Record<PaceType, PaceRange> | null,
 ): WrittenSession[] {
-  const withPaces = paces != null;
-  const easySecPerKm = stepSecPerKm(runStep("work", 1, "easy", withPaces), paces);
+  const easySecPerKm = stepSecPerKm(runStep("work", 1, "easy", paces), paces);
   const sessions: WrittenSession[] = [];
   // Earlier weeks' sessions raise the longest-session limit of the weeks after them (rule 2).
   const planned: Pick<PlannedSession, "weekStart" | "distanceKm" | "minutes" | "kind" | "sport">[] =
@@ -134,7 +150,7 @@ export function mockCoachPlan(
         });
         sessions.push(
           sport === "run"
-            ? mockRun(week.weekStart, index, size, canQuality, week.budgetKm, withPaces)
+            ? mockRun(week.weekStart, index, size, canQuality, week.budgetKm, paces)
             : mockRide(week.weekStart, index, size, canQuality),
         );
       }
@@ -149,7 +165,7 @@ function mockRun(
   size: number,
   quality: boolean,
   budgetKm: number,
-  withPaces: boolean,
+  paces: Record<PaceType, PaceRange> | null,
 ): WrittenSession {
   const base = { weekStart, sport: "run" as PlanSport };
   if (index === 0) {
@@ -158,7 +174,7 @@ function mockRun(
       kind: "long",
       title: `${size} km long run`,
       why: "The long run builds the endurance your race needs.",
-      blocks: [{ repeat: 1, steps: [runStep("work", size, "easy", withPaces)] }],
+      blocks: [{ repeat: 1, steps: [runStep("work", size, "easy", paces)] }],
     };
   }
   if (index === 1 && quality) {
@@ -173,9 +189,9 @@ function mockRun(
         {
           repeat: 1,
           steps: [
-            runStep("warmup", warmup, "easy", withPaces),
-            runStep("work", work, "threshold", withPaces),
-            runStep("cooldown", tenth(size - work - warmup), "easy", withPaces),
+            runStep("warmup", warmup, "easy", paces),
+            runStep("work", work, "threshold", paces),
+            runStep("cooldown", tenth(size - work - warmup), "easy", paces),
           ],
         },
       ],
@@ -186,7 +202,7 @@ function mockRun(
     kind: "easy",
     title: `${size} km easy`,
     why: "Easy running adds volume while you recover from the harder runs.",
-    blocks: [{ repeat: 1, steps: [runStep("work", size, "easy", withPaces)] }],
+    blocks: [{ repeat: 1, steps: [runStep("work", size, "easy", paces)] }],
   };
 }
 

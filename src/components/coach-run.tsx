@@ -71,7 +71,8 @@ const rangeMiddle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPer
 function stepWidth(step: PlannedStep, sport: PlanSport) {
   if (sport === "ride") return step.durationS ?? 0;
   if (step.distanceM != null) return step.distanceM;
-  const secPerKm = step.range ? rangeMiddle(step.range) : stepSecPerKm(step, null);
+  const secPerKm =
+    step.secPerKm ?? (step.range ? rangeMiddle(step.range) : stepSecPerKm(step, null));
   return ((step.durationS ?? 0) / secPerKm) * 1000;
 }
 
@@ -124,6 +125,7 @@ export function stepText(step: PlannedStep, sport: PlanSport) {
     step.part in PART_LABEL ? `${PART_LABEL[step.part as keyof typeof PART_LABEL]}: ` : "";
   const amount = stepAmountText(step);
   if (sport === "ride") return `${part}${amount} ${rideTargetText(step)}`;
+  if (step.secPerKm != null) return `${part}${amount} at ${formatPaceClock(step.secPerKm)}/km`;
   if (step.range) return `${part}${amount} at ${rangeText(step.range)}`;
   if (step.part === "recovery" && (step.effort === "easy" || step.pace === "easy")) {
     return `${part}${amount} jog`;
@@ -147,8 +149,9 @@ export function headlineTarget(run: Pick<PlannedSession, "blocks" | "sport">): s
     if (!top) return null;
     return top.watts ? bandText(top.watts, "W") : bandText(top.bpm!, "bpm");
   }
-  const range = steps.find((step) => step.range)?.range;
-  return range ? rangeText(range) : null;
+  const top = steps.find((step) => step.secPerKm != null || step.range);
+  if (top?.secPerKm != null) return `${formatPaceClock(top.secPerKm)}/km`;
+  return top?.range ? rangeText(top.range) : null;
 }
 
 /** The steps, a repeated block as one line: "6 × 800 m at 4:15–4:20/km, 400 m jog". */

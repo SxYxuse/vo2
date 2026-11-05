@@ -12,14 +12,27 @@ import {
   type RuleBreak,
   type RuleContext,
 } from "./coach-plan-rules.ts";
-import { availabilityText, paceText, rulesFor, zoneText } from "./coach-plan-writer.server.ts";
-import { anchorsOf, gather, rangesOf, statusOf, type Inputs } from "./coach-plan.server.ts";
+import {
+  availabilityText,
+  paceText,
+  racePaceText,
+  rulesFor,
+  zoneText,
+} from "./coach-plan-writer.server.ts";
+import {
+  anchorsOf,
+  gather,
+  paceContext,
+  racePacesOf,
+  rangesOf,
+  statusOf,
+  type Inputs,
+} from "./coach-plan.server.ts";
 import {
   PLAN_SPORTS,
   plannedSession,
   readCoachPlan,
   sessionLines,
-  stepSecPerKm,
   type CoachPlan,
   type PlanSport,
   type PlanWeek,
@@ -101,10 +114,7 @@ function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
       addDayKey(weeks.at(-1)?.weekStart ?? inputs.currentWeek, 6),
     ).map(({ race }) => race),
     neighbours: [],
-    easySecPerKm: stepSecPerKm(
-      { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },
-      rangesOf(inputs),
-    ),
+    ...paceContext(inputs),
     allowShort: true,
   };
 }
@@ -181,6 +191,7 @@ export async function coachPlanForCoach(userId: string) {
     today: inputs.today,
     availability: availabilityText(ctx),
     paces: paceText(rangesOf(inputs)),
+    racePaces: racePaceText(racePacesOf(inputs)),
     rideZones: zoneText(anchorsOf(inputs)),
     weeks: weeksAhead(inputs, plan).map((week) => ({
       weekStart: week.weekStart,

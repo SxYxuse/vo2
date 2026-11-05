@@ -13,6 +13,7 @@ import { raceWeeks, type RuleContext } from "./coach-plan-rules.ts";
 import {
   availabilityText,
   paceText,
+  racePaceText,
   rulesFor,
   sessionLine,
   weeksText,
@@ -45,6 +46,7 @@ import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
+import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
 /** The current week and the three after it are written (ADR 0037). */
 const WEEKS_AHEAD = 4;
@@ -170,6 +172,43 @@ function easyOf(inputs: Inputs): PlanBasis["easy"] {
 }
 export const rangesOf = (inputs: Inputs) =>
   inputs.paces.source === "none" ? null : inputs.paces.paces;
+
+/**
+ * Each upcoming run goal the paces can predict, with its predicted race pace in seconds per km: a
+ * race-pace step may target it exactly (ADR 0055).
+ */
+export function racePacesOf(inputs: Inputs) {
+  const vdot = vdotOf(inputs);
+  if (vdot == null) return [];
+  return inputs.goals.flatMap((goal) => {
+    const metres = goal.distanceM;
+    if (goal.date < inputs.today || planSportOf(goal.sportType) !== "run") return [];
+    if (metres == null || !canPredict(metres)) return [];
+    const secPerKm = Math.round(predictRaceSeconds(vdot, metres) / (metres / 1000));
+    return [{ name: goal.name, distanceKm: metres / 1000, secPerKm }];
+  });
+}
+
+/** The paces a plan's run steps are checked against: easy for sizing, ranges, race paces. */
+export const paceContext = (inputs: Inputs) => {
+  const paces = rangesOf(inputs);
+  return {
+    easySecPerKm: stepSecPerKm(
+      {
+        part: "work",
+        distanceM: 1000,
+        durationS: null,
+        pace: null,
+        secPerKm: null,
+        zone: null,
+        effort: "easy",
+      },
+      paces,
+    ),
+    paces,
+    racePaces: racePacesOf(inputs).map((race) => race.secPerKm),
+  };
+};
 
 /** What planned steps aim at: paces for runs, FTP and cycling LTHR for rides. */
 export const anchorsOf = (inputs: Inputs): PlanAnchors => ({
@@ -455,6 +494,7 @@ function raceSession(goal: Goal): PlannedSession {
               distanceM: sport === "run" ? goal.distanceM : null,
               durationS: sport === "ride" ? Math.round(roughGoalHours(goal) * 3600) : null,
               pace: null,
+              secPerKm: null,
               zone: null,
               effort: "hard",
             },
@@ -544,10 +584,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       rides: inputs.rides,
       races: races.map(({ race }) => race),
       neighbours,
-      easySecPerKm: stepSecPerKm(
-        { part: "work", distanceM: 1000, durationS: null, pace: null, zone: null, effort: "easy" },
-        anchors.paces,
-      ),
+      ...paceContext(inputs),
     };
     const prompt = {
       task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their main goal (aGoal) and the rest of their season, following the coaching knowledge and every rule below.`,
@@ -572,7 +609,9 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
           effort: effortLabel(goal),
         })),
       availability: availabilityText(ctx),
-      ...(availability.runsPerWeek ? { paces: paceText(anchors.paces) } : {}),
+      ...(availability.runsPerWeek
+        ? { paces: paceText(anchors.paces), racePaces: racePaceText(racePacesOf(inputs)) }
+        : {}),
       ...(availability.ridesPerWeek ? { rideZones: zoneText(anchors) } : {}),
       weeks: weeksText(ctx),
       plannedBefore: neighbours.map((session) => `${session.weekStart} ${sessionLine(session)}`),
