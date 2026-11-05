@@ -302,6 +302,13 @@
       "when": 1793816913553,
       "tag": "0042_power_files",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793893014480,
+      "tag": "0043_coach_plan_progression",
+      "breakpoints": true
     }
   ]
 }

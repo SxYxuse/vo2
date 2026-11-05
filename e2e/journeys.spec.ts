@@ -535,6 +535,69 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   }
 });
 
+test("an athlete sets their own running peak, holds running, and goes back to the recommended progression", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  try {
+    await choosePlanningStyle(page, "Coach plan", "coachPlan");
+    await addRaceAndWritePlan(page, { runs: 4, rides: 2 });
+    // Plan charts each sport's season (ADR 0058) and names the progression with a way to change it.
+    const season = page.getByRole("region", { name: "Your season" });
+    await expect(season.getByText(/^Progression: running Standard · riding Hold/)).toBeVisible();
+
+    await page.goto("/settings/training");
+    await settle(page);
+    await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+    const running = page.getByRole("group", { name: "Running" });
+    const slider = running.getByRole("slider", { name: "Running progression" });
+    const save = page.getByRole("button", { name: "Save progression" });
+    await expect(save).toBeDisabled();
+
+    // My own peak, above the recommended one: Settings says by how much.
+    await running.getByRole("button", { name: "My own" }).click();
+    for (let step = 0; step < 6; step++) {
+      await running.getByRole("button", { name: "Raise running peak" }).click();
+    }
+    await expect(running.getByText(/% above the recommended peak/)).toBeVisible();
+    await save.click();
+    await expect(save).toBeDisabled();
+    await page.goto("/week");
+    await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+    await expect(season.getByText(/running Standard, your peak \d+ km/)).toBeVisible();
+
+    // Hold: running no longer builds toward the A goal, and Plan says so.
+    await page.goto("/settings/training");
+    await settle(page);
+    await slider.focus();
+    await page.keyboard.press("Home");
+    await expect(running.getByText("Hold · no growth")).toBeVisible();
+    await save.click();
+    await expect(save).toBeDisabled();
+    await page.goto("/week");
+    await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+    await expect(
+      season.getByText("Running is set to Hold, so it won't build toward Autumn half."),
+    ).toBeVisible();
+
+    // The way back: Standard and the recommended peak.
+    await page.goto("/settings/training");
+    await settle(page);
+    await running.getByRole("button", { name: "Recommended" }).click();
+    await slider.focus();
+    for (let step = 0; step < 10; step++) await page.keyboard.press("ArrowRight");
+    await expect(running.getByText("Standard · +5 % a week")).toBeVisible();
+    await save.click();
+    await expect(save).toBeDisabled();
+    await page.goto("/week");
+    await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+    await expect(season.getByText(/^Progression: running Standard · riding Hold$/)).toBeVisible();
+  } finally {
+    await withDatabase((client) => client.query("update coach_plans set progression = null"));
+    await leaveCoachPlan(page);
+  }
+});
+
 /** The A race the coach plan needs, then availability; ends on Plan with the plan written. */
 async function addRaceAndWritePlan(page: Page, availability: { runs: number; rides: number }) {
   const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);

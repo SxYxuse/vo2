@@ -28,9 +28,11 @@ import {
   FieldGroup,
   FieldLabel,
   FieldLegend,
+  FieldSeparator,
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { ProgressionSettings, savedProgressionKey } from "@/components/progression-settings.tsx";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -344,8 +346,8 @@ export function coachPlanStatusText(state: CoachPlanState) {
 }
 
 /**
- * Settings → Training under the coach plan: what's missing, availability, and where the plan
- * stands. Availability saves with its own button: each save can rewrite the weeks ahead on the
+ * Settings → Training under the coach plan: what's missing, availability, progression, and where
+ * the plan stands. Availability saves with its own button: each save can rewrite the weeks ahead on the
  * athlete's key, so it shouldn't save one tap at a time.
  */
 export function CoachPlanSettings() {
@@ -400,6 +402,12 @@ export function CoachPlanSettings() {
                 : null}
         </p>
       </div>
+      {state.volume ? (
+        <>
+          <FieldSeparator />
+          <ProgressionSettings key={savedProgressionKey(state.volume)} state={state} />
+        </>
+      ) : null}
       {state.plan || state.status === "writing" ? (
         <Button variant="outline" nativeButton={false} render={<Link to="/week" />}>
           Open your plan

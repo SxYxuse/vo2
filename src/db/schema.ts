@@ -201,6 +201,8 @@ export const coachPlans = pgTable("coach_plans", {
   requestedFrom: date("requested_from", { mode: "string" }),
   /** What the last writing started from, so a failed one isn't started again on every load. */
   attemptKey: text("attempt_key"),
+  /** How fast each sport's budget grows, and the athlete's own peaks (ADR 0058). */
+  progression: jsonb("progression"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
