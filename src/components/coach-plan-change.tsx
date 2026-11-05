@@ -223,22 +223,25 @@ function ChangeWeeks({ sessions }: { sessions: ChangedSession[] }) {
 
 function Outcome({ call }: { call: ToolCall }) {
   const queryClient = useQueryClient();
-  const output = call.output as PlanChangeApplied | undefined;
+  // A declined call also gets an output, TanStack AI's { error: "User declined tool execution" },
+  // so only an output that says whether it applied is the apply's answer.
+  const output = call.output as Partial<PlanChangeApplied> | undefined;
   const applied = output?.applied === true;
   useEffect(() => {
     if (applied) void queryClient.invalidateQueries(coachPlanQueryOptions);
   }, [applied, queryClient]);
-  if (output) {
-    return output.applied ? (
+  if (applied) {
+    return (
       <p className="text-success flex items-center gap-1.5 text-sm font-medium">
         <CheckIcon aria-hidden className="size-4" />
         Applied to your plan
       </p>
-    ) : (
-      <p className="text-destructive text-sm">{output.reason}</p>
     );
   }
-  if (call.approval?.approved === false) {
+  if (output?.applied === false) {
+    return <p className="text-destructive text-sm">{output.reason}</p>;
+  }
+  if (call.approval?.approved === false || output) {
     return (
       <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
         <XIcon aria-hidden className="size-4" />
