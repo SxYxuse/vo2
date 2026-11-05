@@ -2,6 +2,8 @@
 
 Supersedes [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md) (the week planner, the plan builder, the training plan, and season changes), the week planner and its choice in [0037](0037-the-coach-plan-is-written-by-the-coach-inside-a-budget-vo2-sets.md), and the A running goal and runs-only plan of 0037. It extends [0046](0046-the-coach-chat-loads-running-knowledge-as-skills.md) with cycling and season skills.
 
+Partly superseded by [0058](0058-each-sports-budget-grows-at-a-progression-the-athlete-sets-up-to-a-peak-ceiling.md): each sport grows at a progression the athlete sets rather than the other sport holding, and Plan charts each sport's weekly budget through the season.
+
 **One planning style.** The athlete picks the coach plan or off. The week planner goes, with the plan builder, Settings → Training's week shape, the season-change prompt, the week plan's coach notes and their model choice, and the week planner's session page. A migration moves athletes on the week planner, and those who built its plan before the choice existed, to the coach plan, so they keep planning and skip onboarding; it drops the stored training plan and week plans. Old `/plan` links open Plan. The season's time zone now comes from the coach plan's availability.
 
 **Runs and rides.** Availability is runs a week and rides a week, 0 to 6 each and at least two sessions in all; availability saved with runs only reads as no rides. Every session has a sport. The plan builds toward the next A goal that is a run or a ride with a distance, and toward the rest of the season: every upcoming run and ride goal in the weeks written is added as a race, and the coach sees every goal. An A goal whose sport has no sessions a week can't be written, and says so.
