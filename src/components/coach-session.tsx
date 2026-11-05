@@ -6,7 +6,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
-import { minutesText, sessionKindAbout, sessionKindLabel } from "@/services/coach-plan.types.ts";
+import { minutesText, sessionKindLabel } from "@/services/coach-plan.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
   DoneToggle,
@@ -57,7 +57,6 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
   const ride = run.sport === "ride";
   const { icon: Icon, className: iconClass } = SPORT_ICON[run.sport];
   const ahead = run.weekStart > mondayOf(state.today);
-  const about = sessionKindAbout(run.kind, run.sport);
 
   return (
     <div className="flex flex-col gap-4">
@@ -118,16 +117,6 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
               <p className="text-xs/relaxed">{run.why}</p>
             </CardContent>
           </Card>
-          {about ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{sessionKindLabel(run.kind, run.sport)}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs/relaxed">{about}</p>
-              </CardContent>
-            </Card>
-          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Done?</CardTitle>
