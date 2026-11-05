@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { format } from "date-fns";
-import { ArrowUpIcon, AtSignIcon, SquareIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, AtSignIcon, SquareIcon, XIcon, ZapIcon } from "lucide-react";
 
 import { SPORT_STYLE } from "@/components/sport-style.ts";
 import { formatSportType } from "@/services/athlete-settings.types.ts";
@@ -73,7 +73,7 @@ function MentionChip({
   activity: MentionableActivity;
   onRemove: () => void;
 }) {
-  const Icon = sportIcon(activity.sportType);
+  const Icon = activity.powerFile ? ZapIcon : sportIcon(activity.sportType);
   return (
     <Attachment size="sm">
       <AttachmentMedia style={activity.color ? { color: activity.color } : undefined}>
@@ -81,7 +81,10 @@ function MentionChip({
       </AttachmentMedia>
       <AttachmentContent>
         <AttachmentTitle>{activity.name}</AttachmentTitle>
-        <AttachmentDescription>{dayLabel(activity.start)}</AttachmentDescription>
+        <AttachmentDescription>
+          {activity.powerFile ? "Power file · " : null}
+          {dayLabel(activity.start)}
+        </AttachmentDescription>
       </AttachmentContent>
       <AttachmentActions>
         <AttachmentAction
@@ -103,6 +106,7 @@ function MentionChip({
 export function CoachComposer({
   activities,
   initialMentions = [],
+  initialText = "",
   disabled,
   placeholder,
   busy,
@@ -111,6 +115,8 @@ export function CoachComposer({
 }: {
   activities: readonly MentionableActivity[];
   initialMentions?: readonly MentionableActivity[];
+  /** A question to start from, such as one asked from a section of a power file. */
+  initialText?: string;
   disabled: boolean;
   placeholder: string;
   busy: boolean;
@@ -118,8 +124,8 @@ export function CoachComposer({
   onStop: () => void;
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const [text, setText] = useState("");
-  const [caret, setCaret] = useState(0);
+  const [text, setText] = useState(initialText);
+  const [caret, setCaret] = useState(initialText.length);
   const [closedAt, setClosedAt] = useState<number | null>(null);
   const [mentions, setMentions] = useState<MentionableActivity[]>([...initialMentions]);
   const [highlighted, setHighlighted] = useState<string>("");

@@ -52,6 +52,22 @@ export const getActivityStreamsDef = toolDefinition({
   }),
 });
 
+export const findPowerFilesDef = toolDefinition({
+  name: "find_power_files",
+  description:
+    "List the ride FIT files the athlete imported on the Power page, newest first, with each one's synced ride, average and normalized power, and left/right balance.",
+  inputSchema: z.object({ limit: z.number().int().min(1).max(50).optional() }),
+});
+
+export const getPowerFileDef = toolDefinition({
+  name: "get_power_file",
+  description:
+    "One power file in depth: what the power meter recorded beyond Strava. Includes power, zones, the power curve, left/right balance, platform center offset, power phase and peak power phase per leg (overall, by zone, seated, and standing), cadence and quadrants, heart-rate drift, laps, gears, and data coverage. Load the power-files skill before explaining it.",
+  inputSchema: z.object({
+    powerFileId: z.string().min(1).describe("The power file id, as in /power/<id> links."),
+  }),
+});
+
 export const findClimbsDef = toolDefinition({
   name: "find_climbs",
   description:

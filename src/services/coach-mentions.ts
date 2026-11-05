@@ -1,9 +1,11 @@
-export type ActivityMention = { id: string; name: string };
+/** An activity, or a ride's power file (`powerFile`) brought in from the Power page. */
+export type ActivityMention = { id: string; name: string; powerFile?: boolean };
 
-/** How a reference to an activity reads in the coach chat: a link to its page. */
+/** How a reference to an activity or power file reads in the coach chat: a link to its page. */
 export function activityLink(activity: ActivityMention) {
   const label = activity.name.replace(/[[\]\\]/g, (char) => `\\${char}`);
-  return `[${label}](/activities/${encodeURIComponent(activity.id)})`;
+  const page = activity.powerFile ? "power" : "activities";
+  return `[${label}](/${page}/${encodeURIComponent(activity.id)})`;
 }
 
 /**
@@ -31,5 +33,11 @@ export function withActivityLinks(text: string, mentions: readonly ActivityMenti
 /** The activity a chat link points to, or null for any other link. */
 export function activityIdFromHref(href: string | undefined) {
   const match = href?.match(/^\/activities\/([^/?#]+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+/** The power file a chat link points to, or null for any other link. */
+export function powerFileIdFromHref(href: string | undefined) {
+  const match = href?.match(/^\/power\/([^/?#]+)$/);
   return match ? decodeURIComponent(match[1]) : null;
 }

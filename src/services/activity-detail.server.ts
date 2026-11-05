@@ -41,6 +41,7 @@ import {
   summarizeRide,
   type RideAnalysis,
 } from "./ride-analysis.ts";
+import { powerFileIdFor } from "./power-file.server.ts";
 import { isOtherSportType } from "./sport-groups.ts";
 import { isCyclingSport } from "./training-load.ts";
 
@@ -122,6 +123,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     derived.heart?.histogram.length || isPlausibleBpm(row.averageHeartrate)
       ? await buildActivityHeart(session.user.id, row, derived.heart)
       : null;
+  const powerFileId = await powerFileIdFor(session.user.id, row.sportType, row.startDate);
   logger.debug("activity_detail.loaded", {
     activityId: id,
     hasStreams: hasStreamsRow,
@@ -159,6 +161,7 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
           })
         : null,
     heart,
+    powerFileId,
   };
 }
 

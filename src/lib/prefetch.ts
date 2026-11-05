@@ -20,6 +20,7 @@ const APP_ROUTES = [
   "/merge-gpx",
   "/fitness",
   "/heart-rate",
+  "/power",
 ] as const;
 
 // On a slow connection, other pages' chunks and data would compete with the page the athlete

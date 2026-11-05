@@ -26,6 +26,8 @@ import { Route as AppWeekRouteImport } from './routes/_app.week'
 import { Route as AppWeekBucketRouteImport } from './routes/_app.week-bucket'
 import { Route as ApiCoachRouteImport } from './routes/api/coach'
 import { Route as AppActivitiesActivityIdRouteImport } from './routes/_app.activities.$activityId'
+import { Route as AppPowerIndexRouteImport } from './routes/_app.power.index'
+import { Route as AppPowerFileIdRouteImport } from './routes/_app.power.$fileId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -117,6 +119,16 @@ const AppActivitiesActivityIdRoute = AppActivitiesActivityIdRouteImport.update({
   path: '/activities/$activityId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPowerIndexRoute = AppPowerIndexRouteImport.update({
+  id: '/power/',
+  path: '/power/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPowerFileIdRoute = AppPowerFileIdRouteImport.update({
+  id: '/power/$fileId',
+  path: '/power/$fileId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -165,10 +177,12 @@ export interface FileRoutesByFullPath {
   '/week-bucket': typeof AppWeekBucketRoute
   '/api/coach': typeof ApiCoachRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/power/$fileId': typeof AppPowerFileIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
+  '/power/': typeof AppPowerIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/week/run/$sessionId': typeof AppWeekRunSessionIdRoute
 }
@@ -188,10 +202,12 @@ export interface FileRoutesByTo {
   '/api/coach': typeof ApiCoachRoute
   '/': typeof AppIndexRoute
   '/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/power/$fileId': typeof AppPowerFileIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
+  '/power': typeof AppPowerIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/week/run/$sessionId': typeof AppWeekRunSessionIdRoute
 }
@@ -214,10 +230,12 @@ export interface FileRoutesById {
   '/api/coach': typeof ApiCoachRoute
   '/_app/': typeof AppIndexRoute
   '/_app/activities/$activityId': typeof AppActivitiesActivityIdRoute
+  '/_app/power/$fileId': typeof AppPowerFileIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
+  '/_app/power/': typeof AppPowerIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/week_/run/$sessionId': typeof AppWeekRunSessionIdRoute
 }
@@ -240,10 +258,12 @@ export interface FileRouteTypes {
     | '/week-bucket'
     | '/api/coach'
     | '/activities/$activityId'
+    | '/power/$fileId'
     | '/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
+    | '/power/'
     | '/settings/'
     | '/week/run/$sessionId'
   fileRoutesByTo: FileRoutesByTo
@@ -263,10 +283,12 @@ export interface FileRouteTypes {
     | '/api/coach'
     | '/'
     | '/activities/$activityId'
+    | '/power/$fileId'
     | '/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
+    | '/power'
     | '/settings'
     | '/week/run/$sessionId'
   id:
@@ -288,10 +310,12 @@ export interface FileRouteTypes {
     | '/api/coach'
     | '/_app/'
     | '/_app/activities/$activityId'
+    | '/_app/power/$fileId'
     | '/_app/settings/$section'
     | '/api/auth/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
+    | '/_app/power/'
     | '/_app/settings/'
     | '/_app/week_/run/$sessionId'
   fileRoutesById: FileRoutesById
@@ -427,6 +451,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppActivitiesActivityIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/power/': {
+      id: '/_app/power/'
+      path: '/power'
+      fullPath: '/power/'
+      preLoaderRoute: typeof AppPowerIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/power/$fileId': {
+      id: '/_app/power/$fileId'
+      path: '/power/$fileId'
+      fullPath: '/power/$fileId'
+      preLoaderRoute: typeof AppPowerFileIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
@@ -500,6 +538,8 @@ interface AppRouteChildren {
   AppWeekBucketRoute: typeof AppWeekBucketRoute
   AppIndexRoute: typeof AppIndexRoute
   AppActivitiesActivityIdRoute: typeof AppActivitiesActivityIdRoute
+  AppPowerFileIdRoute: typeof AppPowerFileIdRoute
+  AppPowerIndexRoute: typeof AppPowerIndexRoute
   AppWeekRunSessionIdRoute: typeof AppWeekRunSessionIdRoute
 }
 
@@ -517,6 +557,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppWeekBucketRoute: AppWeekBucketRoute,
   AppIndexRoute: AppIndexRoute,
   AppActivitiesActivityIdRoute: AppActivitiesActivityIdRoute,
+  AppPowerFileIdRoute: AppPowerFileIdRoute,
+  AppPowerIndexRoute: AppPowerIndexRoute,
   AppWeekRunSessionIdRoute: AppWeekRunSessionIdRoute,
 }
 

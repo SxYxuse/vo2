@@ -25,6 +25,7 @@ import {
   TrophyIcon,
   WavesIcon,
   WifiOffIcon,
+  ZapIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,7 +41,14 @@ import {
 import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
 import { applyPlanChangeDef } from "@/services/coach-tools.ts";
-import { coachChatQueryKey, coachChatsQueryOptions, homeQueryOptions } from "@/lib/queries.ts";
+import {
+  coachChatQueryKey,
+  coachChatsQueryOptions,
+  homeQueryOptions,
+  powerFilesQueryOptions,
+} from "@/lib/queries.ts";
+import { withActivityLinks } from "@/services/coach-mentions.ts";
+import { powerFileTitle } from "@/services/power-file.ts";
 import { isSportTypeShown, sportTypeColor } from "@/services/athlete-settings.types.ts";
 import { coachErrorMessage } from "@/lib/coach-errors.ts";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -79,6 +87,13 @@ const STARTERS = [
   "What are my best 5 km times this year?",
 ];
 
+/** Offered when the athlete came from "Ask the coach" on a power file. */
+const POWER_FILE_STARTERS = [
+  "What does my pedaling say, and what should I change?",
+  "Is my left/right balance something to work on?",
+  "Where on the pedal do I push, and should I move my cleats?",
+];
+
 /** Offered when the athlete came from "Ask the coach to change my plan". */
 const PLAN_STARTERS = [
   "I can only run twice this week",
@@ -93,6 +108,8 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
     icon: CalendarSearchIcon,
   },
   get_activity: { running: "Reading the activity", done: "Read the activity", icon: ActivityIcon },
+  find_power_files: { running: "Finding power files", done: "Found power files", icon: ZapIcon },
+  get_power_file: { running: "Reading the power file", done: "Read the power file", icon: ZapIcon },
   measure_activity: {
     running: "Measuring the activity",
     done: "Measured the activity",
@@ -133,8 +150,8 @@ const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIc
     icon: TargetIcon,
   },
   load_skill: {
-    running: "Reading the running guide",
-    done: "Read the running guide",
+    running: "Reading the coaching guide",
+    done: "Read the coaching guide",
     icon: BookOpenIcon,
   },
   propose_plan_change: {
@@ -367,15 +384,33 @@ function coachConnection(queryClient: QueryClient): ConnectionAdapter {
  * One coach chat. The server keeps it, so the athlete can reopen it later from Chats on any
  * device; the one open last also reads offline.
  */
+/** A power file brought in from its page, as a chip like an activity's. */
+function usePowerFileMention(fileId: string | undefined): MentionableActivity | undefined {
+  const { data } = useQuery({ ...powerFilesQueryOptions, enabled: Boolean(fileId) });
+  return useMemo(() => {
+    const file = fileId ? data?.find((item) => item.id === fileId) : undefined;
+    if (!file) return undefined;
+    const name = powerFileTitle(file);
+    return { id: file.id, name, sportType: file.sportType, start: file.start, powerFile: true };
+  }, [data, fileId]);
+}
+
 export function CoachChat({
   threadId,
   initialActivityId,
-  onInitialActivitySent,
+  initialPowerFileId,
+  initialQuestion,
+  onInitialSent,
   planChange = false,
 }: {
   threadId: string;
   initialActivityId?: string;
-  onInitialActivitySent: () => void;
+  /** Opened from "Ask the coach" on a power file: the file is brought in. */
+  initialPowerFileId?: string;
+  /** A question to start from, asked from a section of a power file. */
+  initialQuestion?: string;
+  /** The activity, power file, or question brought in went out with the first message. */
+  onInitialSent: () => void;
   /** Opened from "Ask the coach to change my plan": offer plan changes to start with. */
   planChange?: boolean;
 }) {
@@ -408,10 +443,11 @@ export function CoachChat({
   });
 
   const lookup = useCallback<ActivityLookup>((id) => byId.get(id), [byId]);
+  const powerFile = usePowerFileMention(initialPowerFileId);
   const initialMentions = useMemo<MentionableActivity[]>(() => {
     const activity = initialActivityId ? byId.get(initialActivityId) : undefined;
-    return activity ? [activity] : [];
-  }, [byId, initialActivityId]);
+    return [activity, powerFile].filter((item) => item != null);
+  }, [byId, initialActivityId, powerFile]);
 
   // Keep only the chat open now for offline reading, so the saved copy stays small.
   useEffect(() => {
@@ -427,7 +463,7 @@ export function CoachChat({
 
   const send = (message: string) => {
     void sendMessage(message);
-    if (initialActivityId) onInitialActivitySent();
+    if (initialActivityId || initialPowerFileId || initialQuestion) onInitialSent();
   };
   const empty = !messages.length && !isHydrating;
   // The chat stays readable without a key; only asking needs one (ADR 0036).
@@ -438,7 +474,7 @@ export function CoachChat({
   // even when the paused run was restored hours later.
   const awaitingAnswer = interrupts.length > 0;
   const canSend = canAsk && !awaitingAnswer;
-  const starters = planChange ? PLAN_STARTERS : STARTERS;
+  const starters = planChange ? PLAN_STARTERS : powerFile ? POWER_FILE_STARTERS : STARTERS;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -489,11 +525,14 @@ export function CoachChat({
               </EmptyMedia>
               <EmptyTitle>Ask the coach</EmptyTitle>
               <EmptyDescription>
-                Ask about any activity, your form, or your plan. Type @ to point at an activity.
+                {powerFile
+                  ? "Ask what a number of this power file means, whether it's normal for you, and what to change."
+                  : "Ask about any activity, your form, or your plan. Type @ to point at an activity."}
               </EmptyDescription>
             </EmptyHeader>
-            {/* A starter would send without the activity "Ask about this activity" brought in. */}
-            {initialMentions.length ? null : (
+            {/* A starter would send without the activity "Ask about this activity" brought in, and
+                competes with a question asked from a power file's section. */}
+            {(initialMentions.length > 0 && !powerFile) || initialQuestion ? null : (
               <EmptyContent className="flex-col">
                 {starters.map((starter) => (
                   <Button
@@ -501,7 +540,7 @@ export function CoachChat({
                     variant="outline"
                     className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
                     disabled={!canSend}
-                    onClick={() => send(starter)}
+                    onClick={() => send(withActivityLinks(starter, initialMentions))}
                   >
                     {starter}
                   </Button>
@@ -564,9 +603,10 @@ export function CoachChat({
       <div className="mx-auto w-full max-w-3xl shrink-0">
         <CoachComposer
           // The activities may still be loading on first paint; start again once it's known.
-          key={`${initialActivityId}-${initialMentions.length}`}
+          key={`${initialActivityId}-${initialPowerFileId}-${initialMentions.length}`}
           activities={shown}
           initialMentions={initialMentions}
+          initialText={initialQuestion}
           disabled={!canSend}
           placeholder={
             awaitingAnswer

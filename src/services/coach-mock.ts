@@ -214,6 +214,59 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
   return { kind: "tools", calls: [{ name: "propose_plan_change", input: next }] };
 }
 
+// ----- Power files (ADR 0057) -----
+
+type MockPowerFile = {
+  id: string;
+  title: string;
+  pedaling: {
+    overall: {
+      rightPct: number | null;
+      left: { pcoMm: number | null };
+      right: { pcoMm: number | null };
+    };
+  };
+};
+
+/** The power file the athlete's last message links to, like [Morning Ride](/power/<id>). */
+function linkedPowerFile(messages: ModelMessage[]) {
+  const question = messages[lastUserIndex(messages)];
+  const match = question ? /\]\(\/power\/([^)\s]+)\)/.exec(textOf(question.content)) : null;
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function signedMm(value: number | null) {
+  if (value == null) return "no";
+  return `${value > 0 ? "+" : ""}${value} mm`;
+}
+
+function powerFileText(file: MockPowerFile | undefined) {
+  if (!file?.pedaling)
+    return "I couldn't read that power file. Open it on the Power page and ask again.";
+  const { rightPct, left, right } = file.pedaling.overall;
+  const balance =
+    rightPct == null
+      ? "This file has no left/right balance: the power meter measures one side."
+      : `Your legs split the work L ${Math.round(100 - rightPct)} / R ${Math.round(rightPct)}, ${Math.abs(rightPct - 50) <= 2 ? "well within the usual range" : "a little uneven"}.`;
+  return [
+    "This is the mock coach: no model key is set, so the answer is scripted.",
+    "",
+    `On [${file.title}](/power/${file.id}): ${balance} Your platform center offset is ${signedMm(left.pcoMm)} on the left and ${signedMm(right.pcoMm)} on the right.`,
+    "",
+    "- With your OpenRouter key, the coach explains each number, whether it's normal for you, and what to change.",
+  ].join("\n");
+}
+
+function powerFileStep(messages: ModelMessage[]): Step | null {
+  const id = linkedPowerFile(messages);
+  if (!id) return null;
+  const results = resultsThisTurn(messages);
+  if (!results.has("get_power_file")) {
+    return { kind: "tools", calls: [{ name: "get_power_file", input: { powerFileId: id } }] };
+  }
+  return { kind: "text", text: powerFileText(results.get("get_power_file") as MockPowerFile) };
+}
+
 function recentActivities(results: Map<string, unknown>): MockActivity[] {
   const found = results.get("find_activities") as { activities?: MockActivity[] } | undefined;
   return (found?.activities ?? []).slice(0, 7).reverse();
@@ -261,6 +314,8 @@ function nextStep(messages: ModelMessage[], tools: string[]): Step {
     const change = planChangeStep(messages);
     if (change) return change;
   }
+  const powerFile = powerFileStep(messages);
+  if (powerFile) return powerFile;
   const results = resultsThisTurn(messages);
   if (!results.has("find_activities")) {
     return {

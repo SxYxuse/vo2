@@ -17,7 +17,7 @@ The athlete's own choices that shape what VO2 shows: per sport type whether it i
 _Avoid_: Calendar settings, preferences, app settings
 
 **Body weight**:
-The athlete's weight in kilograms, asked during onboarding with the birthday. It is used for watts per kilogram on personal bests.
+The athlete's weight in kilograms, asked during onboarding with the birthday. It is used for watts per kilogram on personal bests and power files.
 _Avoid_: Mass, BMI
 
 ## Completed work
@@ -61,6 +61,10 @@ _Avoid_: Pace, velocity, kph
 **Sync**:
 Copying new and missing activities and their streams from Strava into VO2. It pauses when Strava's read limits run out. While the app is open, it resumes on its own after the pause to finish an incomplete local copy, and checks for new activities when the app opens or returns to the foreground, at most every 15 minutes. The athlete can also sync again by hand.
 _Avoid_: Import, fetch, refresh
+
+**Power file**:
+A ride's FIT file the athlete imported from their head unit, for what Strava's streams leave out: each leg's share of power, platform center offset, power phase, seated and standing, and gears. It is linked to the synced ride that started within five minutes of it and never counts toward training load, fitness, or bests (ADR 0056).
+_Avoid_: Upload, imported activity, FIT activity
 
 **Local copy**:
 VO2's stored activities and streams. It may be incomplete or paused while older history or streams are still missing.
