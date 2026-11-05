@@ -1,5 +1,7 @@
 # Power files are imported FIT files, kept for analysis only
 
+Extended by [0057](0057-the-coach-chat-reads-power-files.md): the coach chat reads power files.
+
 Strava keeps a ride's power but drops what a dual-sided power meter records beside it: each leg's share of power, where on the pedal the force goes (platform center offset), the crank arc of each stroke (power phase and peak power phase), seated and standing, and electronic shifting. The head unit's FIT file has all of it. The athlete imports a ride's FIT file, or Garmin Connect's "Export original" zip around it, on the Power page, and VO2 shows that analysis there.
 
 A power file is kept on the server: the original file, a short summary for the list, and the analysis. Unlike a GPX merge (ADR 0043), it is the athlete's record of a ride, read again later and on another device, so it follows the athlete and is removed with them. The original file stays so a better analysis can read it again without asking for the file; the analysis carries a version and is rebuilt from the file when that version changes. Importing the same file twice opens the first import.
