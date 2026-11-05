@@ -6,6 +6,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
@@ -168,17 +169,24 @@ export const topEffortCelebrations = pgTable(
 );
 
 /**
- * The athlete's own OpenRouter key, encrypted with a key derived from BETTER_AUTH_SECRET so it
- * follows them to every device; only the server ever decrypts it (ADR 0036).
+ * The athlete's own provider keys, one per provider (ADR 0059), each encrypted with a key derived
+ * from BETTER_AUTH_SECRET so it follows them to every device; only the server ever decrypts it
+ * (ADR 0036).
  */
-export const coachKeys = pgTable("coach_keys", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  /** AES-256-GCM: base64 iv, auth tag, and ciphertext, joined by dots. */
-  sealed: text("sealed").notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const coachKeys = pgTable(
+  "coach_keys",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** A COACH_PROVIDERS id. Keys saved before ADR 0059 are all OpenRouter's. */
+    provider: text("provider").notNull().default("openrouter"),
+    /** AES-256-GCM: base64 iv, auth tag, and ciphertext, joined by dots. */
+    sealed: text("sealed").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.provider] })],
+);
 
 /**
  * The coach plan (ADR 0037): the athlete's availability, the plan as last written, and whether

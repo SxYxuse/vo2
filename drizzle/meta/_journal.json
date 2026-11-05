@@ -309,6 +309,13 @@
       "when": 1793893014480,
       "tag": "0043_coach_plan_progression",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1793915417647,
+      "tag": "0044_coach_key_providers",
+      "breakpoints": true
     }
   ]
 }

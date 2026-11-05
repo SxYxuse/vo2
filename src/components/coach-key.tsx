@@ -7,17 +7,16 @@ import { formatDistanceToNow } from "date-fns";
 import { KeyRoundIcon } from "lucide-react";
 
 import { coachStatusQueryOptions, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
-import { saveCoachModel } from "@/services/athlete-settings.ts";
 import { removeCoachKey, saveCoachKey } from "@/services/coach-key.ts";
 import {
   COACH_FEATURES,
-  COACH_MODELS,
-  coachModelLabel,
+  COACH_PROVIDERS,
   DEFAULT_COACH_MODELS,
-  isCoachModel,
+  OPENROUTER,
   type CoachFeature,
-  type CoachModelId,
+  type CoachProvider,
 } from "@/services/coach-models.ts";
+import { CoachModelRow } from "@/components/coach-model-picker.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,18 +37,15 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 
-const OPENROUTER_KEYS_URL = "https://openrouter.ai/settings/keys";
-
 /**
- * Whether coach features can run: the athlete saved a key, or the mock coach answers (mock Strava
- * only). Undecided until the status loads, so no prompt flashes.
+ * Whether a coach feature can run: the athlete saved the key its model needs, or the mock coach
+ * answers (mock Strava only). Undecided until the status loads, so no prompt flashes.
  */
-export function useCoachAvailable() {
+export function useCoachAvailable(feature: CoachFeature) {
   const { data: status } = useQuery(coachStatusQueryOptions);
-  const hasKey = status?.keySavedAt != null;
+  const hasKey = status?.ready[feature] === true;
   const available = hasKey || status?.mocked === true;
   return {
     hasKey,
@@ -68,7 +64,7 @@ export function CoachKeyPrompt({ children }: { children: string }) {
         <EmptyMedia variant="icon">
           <KeyRoundIcon />
         </EmptyMedia>
-        <EmptyTitle>Add your OpenRouter key</EmptyTitle>
+        <EmptyTitle>Add your model's key</EmptyTitle>
         <EmptyDescription>{children}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
@@ -84,24 +80,37 @@ export function CoachKeyPrompt({ children }: { children: string }) {
   );
 }
 
-/** Adds, replaces, or removes the athlete's OpenRouter key; it is never shown back. */
-export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
+/** Adds, replaces, or removes the athlete's key for one provider; it is never shown back. */
+export function CoachKeyField({
+  idPrefix,
+  provider = OPENROUTER,
+  titled = true,
+}: {
+  idPrefix: string;
+  provider?: CoachProvider;
+  /** False under a heading that already says what the key is for, as in Settings → Coach. */
+  titled?: boolean;
+}) {
+  const info = COACH_PROVIDERS.find((each) => each.id === provider) ?? COACH_PROVIDERS[0];
   const queryClient = useQueryClient();
   const { data: status } = useQuery(coachStatusQueryOptions);
   const [value, setValue] = useState("");
   const [replacing, setReplacing] = useState(false);
   const refresh = () => queryClient.invalidateQueries(coachStatusQueryOptions);
   const save = useMutation({
-    mutationFn: (key: string) => saveCoachKey({ data: { key } }),
+    mutationFn: (key: string) => saveCoachKey({ data: { provider, key } }),
     onSuccess: async () => {
       setValue("");
       setReplacing(false);
       await refresh();
     },
   });
-  const remove = useMutation({ mutationFn: () => removeCoachKey(), onSuccess: refresh });
-  const id = `${idPrefix}-openrouter-key`;
-  const savedAt = status?.keySavedAt ?? null;
+  const remove = useMutation({
+    mutationFn: () => removeCoachKey({ data: { provider } }),
+    onSuccess: refresh,
+  });
+  const id = `${idPrefix}-${provider}-key`;
+  const savedAt = status?.keys[provider] ?? null;
   const editing = savedAt == null || replacing;
 
   function submit() {
@@ -110,13 +119,13 @@ export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
 
   return (
     <FieldSet>
-      <FieldLegend>OpenRouter key</FieldLegend>
+      <FieldLegend variant={titled ? "legend" : "label"}>{info.label} key</FieldLegend>
       <FieldDescription>
-        Every coach feature runs on your own OpenRouter key and is billed to your OpenRouter
-        account. VO2 saves it encrypted with your account, so it works on every device, and never
-        shows it again.{" "}
-        <a href={OPENROUTER_KEYS_URL} target="_blank" rel="noreferrer" className="underline">
-          Get a key on openrouter.ai
+        {titled
+          ? `Every coach feature runs on your own key and is billed to your ${info.label} account. VO2 saves it encrypted with your account, so it works on every device, and never shows it again. `
+          : `${info.hint} `}
+        <a href={info.keysUrl} target="_blank" rel="noreferrer" className="underline">
+          Get a key on {info.keysSite}
         </a>
         .
       </FieldDescription>
@@ -127,14 +136,17 @@ export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
       ) : editing ? (
         // Settings and onboarding are forms already: Enter here saves the key, not the page.
         <div className="flex flex-col gap-2">
-          <FieldLabel htmlFor={id}>Key</FieldLabel>
+          {/* The legend shows the provider; each input still needs its own name. */}
+          <FieldLabel htmlFor={id} className="sr-only">
+            {info.label} key
+          </FieldLabel>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               id={id}
               type="password"
               autoComplete="off"
               spellCheck={false}
-              placeholder="sk-or-…"
+              placeholder={info.placeholder}
               value={value}
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
@@ -202,78 +214,46 @@ export function CoachKeyField({ idPrefix }: { idPrefix: string }) {
   );
 }
 
-function CoachModelField({
-  feature,
-  label,
-  hint,
-  model,
-}: {
-  feature: CoachFeature;
-  label: string;
-  hint: string;
-  model: string;
-}) {
-  const queryClient = useQueryClient();
-  const save = useMutation({
-    mutationFn: (next: CoachModelId) => saveCoachModel({ data: { feature, model: next } }),
-    onSuccess: (coachModels) =>
-      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
-        current ? { ...current, settings: { ...current.settings, coachModels } } : current,
-      ),
-  });
-  const id = `settings-coach-model-${feature}`;
-  const offered = isCoachModel(model);
-  return (
-    <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NativeSelect
-        id={id}
-        value={save.isPending ? save.variables : model}
-        disabled={save.isPending}
-        onChange={(event) => {
-          const next = event.target.value;
-          if (isCoachModel(next)) save.mutate(next);
-        }}
-      >
-        {offered ? null : (
-          <NativeSelectOption value={model} disabled>
-            {coachModelLabel(model)} (no longer offered)
-          </NativeSelectOption>
-        )}
-        {COACH_MODELS.map((option) => (
-          <NativeSelectOption key={option.id} value={option.id}>
-            {option.label} · {option.hint}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-      <FieldDescription>{save.error ? "Could not save. Pick it again." : hint}</FieldDescription>
-    </Field>
-  );
-}
-
-/** Settings → Coach: the athlete's key and the model for each coach feature. */
+/** Settings → Coach: the athlete's keys, and the model and reasoning for each coach feature. */
 export function SettingsCoachSection() {
   const { data } = useQuery(settingsSnapshotQueryOptions);
+  const { data: status } = useQuery(coachStatusQueryOptions);
   const models = data?.settings.coachModels ?? DEFAULT_COACH_MODELS;
   return (
     <FieldGroup>
-      <CoachKeyField idPrefix="settings" />
+      <FieldSet>
+        <FieldLegend>Keys</FieldLegend>
+        <FieldDescription>
+          Every coach feature runs on your own key and is billed to that provider. VO2 saves each
+          key encrypted with your account, so it works on every device, and never shows it again.
+        </FieldDescription>
+        {COACH_PROVIDERS.map((provider) => (
+          <CoachKeyField
+            key={provider.id}
+            idPrefix="settings"
+            provider={provider.id}
+            titled={false}
+          />
+        ))}
+      </FieldSet>
       <FieldSeparator />
       <FieldSet>
         <FieldLegend>Models</FieldLegend>
         <FieldDescription>
-          The model each coach feature runs on. They're saved with your account, so every device
-          uses the same ones.
+          The model and reasoning each coach feature runs on. They're saved with your account, so
+          every device uses the same ones.
         </FieldDescription>
-        {COACH_FEATURES.map((feature) => (
-          <CoachModelField
-            key={feature.id}
-            feature={feature.id}
-            label={feature.label}
-            hint={feature.hint}
-            model={models[feature.id]}
-          />
-        ))}
+        <div className="flex flex-col gap-2">
+          {COACH_FEATURES.map((feature) => (
+            <CoachModelRow
+              key={feature.id}
+              feature={feature}
+              choice={models[feature.id]}
+              keys={status?.keys}
+              mocked={status?.mocked === true}
+            />
+          ))}
+        </div>
       </FieldSet>
     </FieldGroup>
   );

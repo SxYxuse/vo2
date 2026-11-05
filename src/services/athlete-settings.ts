@@ -9,7 +9,13 @@ import {
   type AthleteSettings,
   type ProfileSettings,
 } from "./athlete-settings.types.ts";
-import { COACH_FEATURES, COACH_MODELS, type CoachModels } from "./coach-models.ts";
+import {
+  COACH_FEATURES,
+  COACH_PROVIDER_IDS,
+  findCoachModel,
+  REASONING_LEVELS,
+  type CoachModels,
+} from "./coach-models.ts";
 import {
   heartRateSettingsSchema,
   type HeartRateEstimates,
@@ -64,14 +70,25 @@ export const saveProfile = createServerFn({ method: "POST" })
     await saveProfileImpl(data);
   });
 
-const coachModelSaveSchema = z.object({
-  feature: z.enum(COACH_FEATURES.map((feature) => feature.id)),
-  model: z.enum(COACH_MODELS.map((model) => model.id)),
-});
+const coachModelSaveSchema = z
+  .object({
+    feature: z.enum(COACH_FEATURES.map((feature) => feature.id)),
+    provider: z.enum(COACH_PROVIDER_IDS),
+    model: z.string(),
+    reasoning: z.enum(REASONING_LEVELS).nullable(),
+  })
+  .refine(
+    ({ provider, model, reasoning }) => {
+      const listed = findCoachModel(provider, model);
+      return listed != null && (reasoning == null || listed.reasoning.some((l) => l === reasoning));
+    },
+    { message: "Not an offered model and reasoning level" },
+  );
 
 export const saveCoachModel = createServerFn({ method: "POST" })
   .validator(coachModelSaveSchema)
   .handler(async ({ data }): Promise<CoachModels> => {
     const { saveCoachModelImpl } = await import("./athlete-settings.server.ts");
-    return saveCoachModelImpl(data.feature, data.model);
+    const { feature, ...choice } = data;
+    return saveCoachModelImpl(feature, choice);
   });

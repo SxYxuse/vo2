@@ -291,7 +291,7 @@ function powerFileText(file: MockPowerFile | undefined) {
     "",
     `On [${file.title}](/power/${file.id}): ${balance} Your platform center offset is ${signedMm(left.pcoMm)} on the left and ${signedMm(right.pcoMm)} on the right.`,
     "",
-    "- With your OpenRouter key, the coach explains each number, whether it's normal for you, and what to change.",
+    "- With your own key, the coach explains each number, whether it's normal for you, and what to change.",
   ].join("\n");
 }
 

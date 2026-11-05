@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 import { E2E_NOW, E2E_URL } from "./env.ts";
 
@@ -17,7 +17,7 @@ export const test = base.extend({
   },
 });
 
-export { expect, type Page };
+export { expect, type Locator, type Page };
 
 /** Waits until the page has its data: no requests in flight and no skeleton left. */
 export async function settle(page: Page) {

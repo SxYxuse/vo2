@@ -299,7 +299,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const isReady = step.id === "ready";
   // The setup is saved by now, so the steps before it stay closed.
   const planSaved = step.id === "coach" || isReady;
-  const coachKey = useCoachAvailable();
+  const coachKey = useCoachAvailable("plan");
   const copyUnfinished = syncStatus?.status !== "complete";
   const coachPlan = useQuery({ ...coachPlanQueryOptions, enabled: planningStyle === "coachPlan" });
   const saveAvailability = useSaveAvailability();

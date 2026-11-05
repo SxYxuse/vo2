@@ -1,0 +1,271 @@
+"use client";
+
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { CheckIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
+import { cn } from "cn";
+
+import { coachStatusQueryOptions, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
+import { saveCoachModel } from "@/services/athlete-settings.ts";
+import {
+  COACH_MODELS,
+  COACH_PROVIDERS,
+  coachModelLabel,
+  coachProviderLabel,
+  findCoachModel,
+  keptReasoning,
+  REASONING_LABELS,
+  type CoachFeature,
+  type CoachModelChoice,
+  type CoachModelOption,
+  type CoachProvider,
+} from "@/services/coach-models.ts";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/responsive-dialog.tsx";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+/** A picked toggle reads at a glance, not only as a faint muted fill. */
+const PICKED =
+  "aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/90";
+
+type Feature = { id: CoachFeature; label: string; hint: string };
+type Keys = Partial<Record<CoachProvider, string>> | undefined;
+
+function reasoningText(choice: CoachModelChoice) {
+  return choice.reasoning == null ? "Auto" : REASONING_LABELS[choice.reasoning];
+}
+
+/** A coach feature's model and reasoning in Settings → Coach; opens the picker. */
+export function CoachModelRow({
+  feature,
+  choice,
+  keys,
+  mocked,
+}: {
+  feature: Feature;
+  choice: CoachModelChoice;
+  keys: Keys;
+  /** The mock coach answers without a key, so a missing one is no warning. */
+  mocked: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: (next: CoachModelChoice) =>
+      saveCoachModel({ data: { feature: feature.id, ...next } }),
+    onSuccess: async (coachModels) => {
+      queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
+        current ? { ...current, settings: { ...current.settings, coachModels } } : current,
+      );
+      // Whether the feature can run depends on the new model's provider having a key.
+      await queryClient.invalidateQueries(coachStatusQueryOptions);
+    },
+  });
+  const shown = save.isPending ? save.variables : choice;
+  const offered = findCoachModel(shown.provider, shown.model) != null;
+  const keyMissing = keys != null && !mocked && !(shown.provider in keys);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex min-h-14 w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-xs text-muted-foreground">{feature.label}</span>
+          <span className="truncate text-sm font-medium">
+            {coachModelLabel(shown.model, shown.provider)}
+            {offered ? null : " (no longer offered)"}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {reasoningText(shown)} reasoning · via {coachProviderLabel(shown.provider)}
+            {keyMissing ? (
+              <span className="text-destructive">
+                {" "}
+                · Add your {coachProviderLabel(shown.provider)} key
+              </span>
+            ) : null}
+          </span>
+        </span>
+        <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+      {save.error ? (
+        <p className="text-xs text-destructive">Could not save. Pick it again.</p>
+      ) : null}
+      <ResponsiveDialog open={open} onOpenChange={setOpen}>
+        <ResponsiveDialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden sm:max-w-lg">
+          <CoachModelPicker
+            feature={feature}
+            choice={shown}
+            keys={keys}
+            onPick={(next) => save.mutate(next)}
+          />
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
+    </>
+  );
+}
+
+function CoachModelPicker({
+  feature,
+  choice,
+  keys,
+  onPick,
+}: {
+  feature: Feature;
+  choice: CoachModelChoice;
+  keys: Keys;
+  onPick: (next: CoachModelChoice) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [provider, setProvider] = useState<CoachProvider | "all">("all");
+  const listed = findCoachModel(choice.provider, choice.model);
+  const needle = query.trim().toLowerCase();
+  const matches = COACH_MODELS.filter(
+    (model) =>
+      (provider === "all" || model.provider === provider) &&
+      (!needle || `${model.label} ${model.hint}`.toLowerCase().includes(needle)),
+  );
+  const groups = COACH_PROVIDERS.map((each) => ({
+    ...each,
+    models: matches.filter((model) => model.provider === each.id),
+  })).filter((group) => group.models.length);
+
+  function pick(model: CoachModelOption) {
+    onPick({
+      provider: model.provider,
+      model: model.id,
+      reasoning: keptReasoning(choice.reasoning, model.reasoning),
+    });
+  }
+
+  return (
+    <>
+      <ResponsiveDialogHeader className="text-left">
+        <ResponsiveDialogTitle>{feature.label}</ResponsiveDialogTitle>
+        <ResponsiveDialogDescription>{feature.hint}</ResponsiveDialogDescription>
+      </ResponsiveDialogHeader>
+      {/* The drawer pads its header but not its body; the desktop dialog pads both. */}
+      <div className="flex flex-col gap-2 px-4 pt-2 md:px-0">
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            aria-label="Search models"
+            placeholder="Search models…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </InputGroup>
+        <ToggleGroup
+          aria-label="Provider"
+          value={[provider]}
+          onValueChange={(next) => {
+            const value = next[0] as CoachProvider | "all" | undefined;
+            if (value) setProvider(value);
+          }}
+          variant="outline"
+          size="sm"
+          className="flex-wrap"
+        >
+          <ToggleGroupItem value="all" className={PICKED}>
+            All
+          </ToggleGroupItem>
+          {COACH_PROVIDERS.map((each) => (
+            <ToggleGroupItem key={each.id} value={each.id} className={PICKED}>
+              {each.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Model"
+        className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-4 py-2 md:px-0"
+      >
+        {groups.length ? null : (
+          <p className="py-6 text-center text-sm text-muted-foreground">No model matches.</p>
+        )}
+        {groups.map((group) => (
+          <section key={group.id} className="flex flex-col gap-1">
+            <h3 className="mt-2 flex items-baseline justify-between gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Via {group.label}
+              {keys != null && !(group.id in keys) ? (
+                <span className="font-normal tracking-normal normal-case">No key yet</span>
+              ) : null}
+            </h3>
+            {group.models.map((model) => {
+              const selected = model.provider === choice.provider && model.id === choice.model;
+              return (
+                <button
+                  key={`${model.provider}:${model.id}`}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${model.label} via ${group.label}`}
+                  onClick={() => pick(model)}
+                  className={cn(
+                    "flex min-h-12 items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                    selected && "border-foreground/80 bg-muted",
+                  )}
+                >
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-medium">{model.label}</span>
+                    <span className="text-xs text-muted-foreground">{model.hint}</span>
+                  </span>
+                  {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
+                </button>
+              );
+            })}
+          </section>
+        ))}
+      </div>
+      <div className="flex flex-col gap-2 border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-0 md:pb-0">
+        <span className="text-xs font-medium" id={`reasoning-${feature.id}`}>
+          Reasoning
+        </span>
+        {listed && listed.reasoning.length ? (
+          <ToggleGroup
+            aria-labelledby={`reasoning-${feature.id}`}
+            value={[choice.reasoning ?? "auto"]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (!value) return;
+              const level = listed.reasoning.find((each) => each === value) ?? null;
+              onPick({ ...choice, reasoning: level });
+            }}
+            variant="outline"
+            size="sm"
+            className="flex-wrap"
+          >
+            <ToggleGroupItem value="auto" className={PICKED}>
+              Auto
+            </ToggleGroupItem>
+            {listed.reasoning.map((level) => (
+              <ToggleGroupItem key={level} value={level} className={PICKED}>
+                {REASONING_LABELS[level]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            This model doesn't take a reasoning level.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Auto leaves it to the model. Higher levels think longer and cost more, which helps plan
+          writing most.
+        </p>
+      </div>
+    </>
+  );
+}

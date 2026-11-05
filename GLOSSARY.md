@@ -161,16 +161,20 @@ How a coach-plan session stands: done when the athlete marks it, otherwise open,
 _Avoid_: Completed, compliance
 
 **Coach**:
-The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan. It runs only on the athlete's OpenRouter key.
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan. It runs only on the athlete's own provider keys.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:
-One of the two things the coach does: coach chat (which proposes plan changes) and writing the coach plan. The athlete picks the model for each one.
+One of the two things the coach does: coach chat (which proposes plan changes) and writing the coach plan. The athlete picks the model, its provider, and the reasoning level for each one.
 _Avoid_: AI feature
 
-**OpenRouter key**:
-The athlete's own OpenRouter key, which every coach feature runs on. It is saved with the athlete's account, so it works on every device, and is never shown again once saved; without it, no coach feature runs.
+**Provider key**:
+The athlete's own key for a model provider, OpenRouter or OpenAI, which coach features on that provider's models run on. It is saved with the athlete's account, so it works on every device, and is never shown again once saved; a coach feature whose provider has no key doesn't run.
 _Avoid_: API key, token, BYOK key
+
+**Reasoning level**:
+How long a coach feature's model thinks before it answers, from Off to Max, or Auto to leave it to the provider (ADR 0059).
+_Avoid_: Effort, thinking budget
 
 **Coach chat**:
 A conversation between the athlete and the coach. The server keeps every chat, so the athlete reopens or deletes any of them from **Chats** on any device; the one opened last still reads offline. Starting a new chat keeps the others.

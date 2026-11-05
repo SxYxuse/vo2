@@ -1,47 +1,75 @@
+import type { ReasoningLevel } from "@tanstack/ai";
 import { byokMissing } from "@tanstack/ai/byok";
+import { createOpenaiChat } from "@tanstack/ai-openai";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
 import { env } from "@/configs/env.ts";
 import { APP_NAME } from "@/lib/brand.ts";
 import { coachModelsFor } from "./athlete-settings.server.ts";
 import { coachKeyFor } from "./coach-key.server.ts";
-import { OPENROUTER, type CoachFeature } from "./coach-models.ts";
+import type { CoachFeature, CoachModelChoice, CoachProvider } from "./coach-models.ts";
 
-/** The ids the adapter's types list; it sends any OpenRouter id as given. */
-type ListedModel = Parameters<typeof createOpenRouterText>[0];
+/** The ids the adapters' types list; each sends any id as given. */
+type ListedOpenRouterModel = Parameters<typeof createOpenRouterText>[0];
+type ListedOpenAIModel = Parameters<typeof createOpenaiChat>[0];
+
+/**
+ * The stored id is a plain string: a model dropped from the curated list keeps running until the
+ * athlete picks another. The adapters' types name only the ids they list, hence the casts.
+ */
+function textAdapter({ provider, model }: CoachModelChoice, key: string) {
+  switch (provider) {
+    case "openai":
+      return createOpenaiChat(model as ListedOpenAIModel, key);
+    case "openrouter":
+      return createOpenRouterText(model as ListedOpenRouterModel, key, {
+        httpReferer: env.BETTER_AUTH_URL,
+        appTitle: APP_NAME,
+      });
+  }
+}
 
 export type CoachModel =
   | {
-      kind: "openrouter";
+      kind: "live";
+      provider: CoachProvider;
       model: string;
-      adapter: ReturnType<typeof createOpenRouterText>;
+      adapter: ReturnType<typeof textAdapter>;
+      /** Undefined: send no level, so the provider's default applies. */
+      reasoning: ReasoningLevel | undefined;
       /** For scrubbing it out of anything logged. */
       key: string;
     }
   | { kind: "mock"; model: "mock" }
-  | { kind: "missing" };
+  | { kind: "missing"; provider: CoachProvider };
 
 /**
- * The model a coach feature runs on for this athlete. Only the athlete's own key, saved with their
- * account, runs one: VO2 keeps no key of its own (ADR 0036). Under mock Strava the mock coach
- * answers when no key is saved, so development, CI, and the e2e suite need none.
+ * The model a coach feature runs on for this athlete. Only the athlete's own key for the model's
+ * provider, saved with their account, runs one: VO2 keeps no key of its own (ADR 0036, ADR 0059).
+ * Under mock Strava the mock coach answers when that key is missing, so development, CI, and the
+ * e2e suite need none.
  */
 export async function coachModelFor(userId: string, feature: CoachFeature): Promise<CoachModel> {
-  const [key, models] = await Promise.all([coachKeyFor(userId), coachModelsFor(userId)]);
-  if (!key) return env.STRAVA_MOCK ? { kind: "mock", model: "mock" } : { kind: "missing" };
-  const model = models[feature];
-  // The stored id is a plain string: a model dropped from the curated list keeps running until
-  // the athlete picks another. The adapter's types name only the ids it lists, hence the cast.
-  const adapter = createOpenRouterText(model as ListedModel, key, {
-    httpReferer: env.BETTER_AUTH_URL,
-    appTitle: APP_NAME,
-  });
-  return { kind: "openrouter", model, adapter, key };
+  const choice = (await coachModelsFor(userId))[feature];
+  const key = await coachKeyFor(userId, choice.provider);
+  if (!key) {
+    return env.STRAVA_MOCK
+      ? { kind: "mock", model: "mock" }
+      : { kind: "missing", provider: choice.provider };
+  }
+  return {
+    kind: "live",
+    provider: choice.provider,
+    model: choice.model,
+    adapter: textAdapter(choice, key),
+    reasoning: choice.reasoning ?? undefined,
+    key,
+  };
 }
 
-/** The 401 the client reads as "add your OpenRouter key". */
-export function coachKeyMissing() {
-  return byokMissing(OPENROUTER);
+/** The 401 the client reads as "add your key for this provider". */
+export function coachKeyMissing(provider: CoachProvider) {
+  return byokMissing(provider);
 }
 
 /** Whether coach features answer without a key: only the mock coach does. */

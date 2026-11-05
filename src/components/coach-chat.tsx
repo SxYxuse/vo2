@@ -482,7 +482,7 @@ export function CoachChat({
 }) {
   const online = useOnline();
   const { shown, byId } = useMentionableActivities();
-  const coach = useCoachAvailable();
+  const coach = useCoachAvailable("chat");
   const queryClient = useQueryClient();
   const [connection] = useState(() => coachConnection(queryClient));
   const {
@@ -586,7 +586,8 @@ export function CoachChat({
           </Empty>
         ) : empty && needsKey ? (
           <CoachKeyPrompt>
-            The coach answers on your own OpenRouter key. Add it once to ask about your training.
+            The coach answers on your own key for your chat model. Add it once to ask about your
+            training.
           </CoachKeyPrompt>
         ) : empty ? (
           // Bottom-aligned on phones, so the starters sit where the thumb already is.
@@ -699,7 +700,7 @@ export function CoachChat({
               : !online
                 ? "You're offline. You can read this chat; the coach answers once you're back online."
                 : needsKey
-                  ? "Add your OpenRouter key in Settings → Coach to ask the coach."
+                  ? "Add the key your chat model needs in Settings → Coach to ask the coach."
                   : planChange
                     ? "Tell the coach what changed… (away, ill, too hard, swap days)"
                     : "Ask the coach… (@ to mention an activity)"

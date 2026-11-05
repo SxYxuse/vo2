@@ -1,7 +1,7 @@
 import pg from "pg";
 
 import { E2E_NOW, e2eDatabaseUrl } from "./env.ts";
-import { test, expect, settle, syncButton, type Page } from "./test.ts";
+import { test, expect, settle, syncButton, type Locator, type Page } from "./test.ts";
 
 // An installed PWA has no browser back button: the in-app link is the way back on iOS, and the
 // system back gesture on Android.
@@ -29,37 +29,60 @@ for (const [way, goBack] of Object.entries(WAYS_BACK)) {
 }
 
 /**
- * Picks a model and waits for its save: networkidle has already passed once the page loaded, so
- * settle() would let a reload, or the end of the test, cancel the save on its way.
+ * Taps an option in a coach feature's model picker and waits for its save: networkidle has
+ * already passed once the page loaded, so settle() would let a reload, or the end of the test,
+ * cancel the save on its way.
  */
-async function pickModel(page: Page, feature: string, model: string) {
+async function pickInModelPicker(page: Page, option: Locator, saves: string) {
   const saved = page.waitForResponse(
     (response) =>
       response.url().includes("/_serverFn/") &&
-      (response.request().postData() ?? "").includes(model),
+      (response.request().postData() ?? "").includes(saves),
   );
-  await page.getByRole("combobox", { name: feature }).selectOption(model);
+  await option.click();
   expect((await saved).ok()).toBe(true);
 }
 
-test("a model picked for a coach feature stays picked on every visit", async ({ page }) => {
+const modelRow = (page: Page, feature: string) =>
+  page.getByRole("button", { name: new RegExp(`^${feature}`) });
+
+test("a model and reasoning picked for a coach feature stay picked on every visit", async ({
+  page,
+}) => {
   await page.goto("/settings/coach");
   await settle(page);
-  const chat = page.getByRole("combobox", { name: "Coach chat" });
-  await expect(chat).toHaveValue("openai/gpt-6-luna");
+  await expect(modelRow(page, "Coach chat")).toContainText("GPT-6 Luna");
+  await expect(modelRow(page, "Coach chat")).toContainText("Auto reasoning · via OpenRouter");
 
-  await pickModel(page, "Coach chat", "anthropic/claude-sonnet-5.5");
+  await modelRow(page, "Coach chat").click();
+  const picker = page.getByRole("dialog");
+  await pickInModelPicker(
+    page,
+    picker.getByRole("radio", { name: "Claude Sonnet 5.5 via OpenRouter" }),
+    "anthropic/claude-sonnet-5.5",
+  );
+  await pickInModelPicker(page, picker.getByRole("button", { name: "High", exact: true }), "high");
   await page.reload();
   await settle(page);
 
-  await expect(page.getByRole("combobox", { name: "Coach chat" })).toHaveValue(
-    "anthropic/claude-sonnet-5.5",
-  );
-  await expect(page.getByRole("combobox", { name: "Plan writing" })).toHaveValue(
+  await expect(modelRow(page, "Coach chat")).toContainText("Claude Sonnet 5.5");
+  await expect(modelRow(page, "Coach chat")).toContainText("High reasoning · via OpenRouter");
+  await expect(modelRow(page, "Plan writing")).toContainText("GPT-6 Luna");
+  await expect(modelRow(page, "Plan writing")).toContainText("Auto reasoning");
+
+  // Back to the default, so the other specs see the athlete as the setup left them.
+  await modelRow(page, "Coach chat").click();
+  await pickInModelPicker(
+    page,
+    picker.getByRole("radio", { name: "GPT-6 Luna via OpenRouter" }),
     "openai/gpt-6-luna",
   );
-  // Back to the default, so the other specs see the athlete as the setup left them.
-  await pickModel(page, "Coach chat", "openai/gpt-6-luna");
+  // Auto saves no level, so the request names only the field.
+  await pickInModelPicker(
+    page,
+    picker.getByRole("button", { name: "Auto", exact: true }),
+    "reasoning",
+  );
 });
 
 /**
@@ -750,20 +773,29 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
   ).toHaveCount(0);
 });
 
-// Last: with a key saved, the coach would call OpenRouter instead of the mock coach.
-test("an athlete saves an OpenRouter key, sees it kept, and removes it", async ({ page }) => {
+// Last: with a key saved, the coach would call the provider instead of the mock coach.
+test("an athlete saves a key for each provider, sees them kept, and removes them", async ({
+  page,
+}) => {
   await page.goto("/settings/coach");
   await settle(page);
-  const key = page.getByRole("textbox", { name: "Key" });
-  await key.fill("sk-or-e2e-not-a-real-key");
-  await page.getByRole("button", { name: "Save key" }).click();
-  await expect(page.getByText(/^Saved /)).toBeVisible();
+  for (const [provider, value] of [
+    ["OpenRouter", "sk-or-e2e-not-a-real-key"],
+    ["OpenAI", "sk-e2e-not-a-real-key"],
+  ]) {
+    const field = page.getByRole("group", { name: `${provider} key` });
+    await field.getByRole("textbox", { name: `${provider} key` }).fill(value);
+    await field.getByRole("button", { name: "Save key" }).click();
+    await expect(field.getByText(/^Saved /)).toBeVisible();
+  }
 
   // Saved with the account, never shown back.
   await page.reload();
-  await expect(page.getByText(/^Saved /)).toBeVisible();
-  await expect(page.getByText("sk-or-e2e-not-a-real-key")).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByRole("textbox", { name: "Key" })).toBeVisible();
+  for (const provider of ["OpenRouter", "OpenAI"]) {
+    const field = page.getByRole("group", { name: `${provider} key` });
+    await expect(field.getByText(/^Saved /)).toBeVisible();
+    await field.getByRole("button", { name: "Remove" }).click();
+    await expect(field.getByRole("textbox", { name: `${provider} key` })).toBeVisible();
+  }
+  await expect(page.getByText("not-a-real-key")).toHaveCount(0);
 });
