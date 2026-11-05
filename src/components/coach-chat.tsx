@@ -7,9 +7,13 @@ import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import type { ConnectionAdapter, UIMessage } from "@tanstack/ai-react";
 import {
   ActivityIcon,
+  BatteryMediumIcon,
   BookOpenIcon,
+  CalendarMinusIcon,
   CalendarSearchIcon,
+  CheckIcon,
   ChartLineIcon,
+  CopyIcon,
   FlagIcon,
   GaugeIcon,
   HeartPulseIcon,
@@ -17,7 +21,9 @@ import {
   ListOrderedIcon,
   MountainIcon,
   RefreshCwIcon,
+  RepeatIcon,
   RulerIcon,
+  ScaleIcon,
   SparklesIcon,
   SquarePenIcon,
   TargetIcon,
@@ -56,13 +62,12 @@ import { Bubble, BubbleContent } from "@/components/ui/bubble";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Message, MessageContent } from "@/components/ui/message";
+import { Message, MessageContent, MessageFooter, MessageHeader } from "@/components/ui/message";
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -81,24 +86,26 @@ import {
   TraceTitle,
 } from "@/components/ui/trace";
 
-const STARTERS = [
-  "How did my last run go?",
-  "Am I fresh enough for a hard session tomorrow?",
-  "What are my best 5 km times this year?",
+type Starter = { text: string; icon: LucideIcon };
+
+const STARTERS: Starter[] = [
+  { text: "How did my last run go?", icon: ActivityIcon },
+  { text: "Am I fresh enough for a hard session tomorrow?", icon: BatteryMediumIcon },
+  { text: "What are my best 5 km times this year?", icon: TrophyIcon },
 ];
 
 /** Offered when the athlete came from "Ask the coach" on a power file. */
-const POWER_FILE_STARTERS = [
-  "What does my pedaling say, and what should I change?",
-  "Is my left/right balance something to work on?",
-  "Where on the pedal do I push, and should I move my cleats?",
+const POWER_FILE_STARTERS: Starter[] = [
+  { text: "What does my pedaling say, and what should I change?", icon: ZapIcon },
+  { text: "Is my left/right balance something to work on?", icon: ScaleIcon },
+  { text: "Where on the pedal do I push, and should I move my cleats?", icon: TargetIcon },
 ];
 
 /** Offered when the athlete came from "Ask the coach to change my plan". */
-const PLAN_STARTERS = [
-  "I can only run twice this week",
-  "This week feels too hard",
-  "I can only run on a treadmill this week",
+const PLAN_STARTERS: Starter[] = [
+  { text: "I can only run twice this week", icon: CalendarMinusIcon },
+  { text: "This week feels too hard", icon: GaugeIcon },
+  { text: "I can only run on a treadmill this week", icon: RepeatIcon },
 ];
 
 const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
@@ -309,10 +316,10 @@ export function CoachMessage({
       .flatMap((part) => (part.type === "text" ? [part.content] : []))
       .join("\n");
     return (
-      <Message align="end">
+      <Message align="end" className="text-sm">
         <MessageContent>
-          <Bubble variant="secondary" align="end">
-            <BubbleContent>
+          <Bubble variant="secondary" align="end" className="max-w-[85%]">
+            <BubbleContent className="rounded-2xl rounded-br-sm px-3.5 py-2 text-sm">
               <CoachMarkdown markdown={text} lookup={lookup} />
             </BubbleContent>
           </Bubble>
@@ -321,10 +328,17 @@ export function CoachMessage({
     );
   }
   const failed = failedCalls(message.parts);
+  const blocks = blocksOf(message.parts);
+  const reply = blocks.flatMap((block) => (block.kind === "text" ? [block.text] : [])).join("\n\n");
   return (
-    <Message>
+    <Message className="text-sm">
       <MessageContent className="gap-3">
-        {blocksOf(message.parts).map((block, index) => (
+        <MessageHeader className="gap-2 px-0 text-xs text-foreground">
+          <CoachAvatar />
+          Coach
+        </MessageHeader>
+        {live && !blocks.length ? <CoachThinking /> : null}
+        {blocks.map((block, index) => (
           <Fragment key={index}>
             {block.kind === "text" ? <CoachMarkdown markdown={block.text} lookup={lookup} /> : null}
             {block.kind === "thinking" ? <ThinkingTrace text={block.text} /> : null}
@@ -335,8 +349,60 @@ export function CoachMessage({
             {block.kind === "change" ? <PlanChangeCard call={block.call} /> : null}
           </Fragment>
         ))}
+        {!live && reply ? (
+          <MessageFooter className="-ml-2 px-0">
+            <CopyButton text={reply} />
+          </MessageFooter>
+        ) : null}
       </MessageContent>
     </Message>
+  );
+}
+
+function CoachAvatar() {
+  return (
+    <span
+      aria-hidden
+      className="bg-primary text-primary-foreground flex size-6 shrink-0 items-center justify-center rounded-full"
+    >
+      <SparklesIcon className="size-3.5" />
+    </span>
+  );
+}
+
+/** Shown between sending and the coach's first word, so a slow model never looks stuck. */
+function CoachThinking() {
+  return (
+    <Trace aria-live="polite">
+      <TraceLine status="running">
+        <TraceTitle className="text-sm">Thinking…</TraceTitle>
+      </TraceLine>
+    </Trace>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground max-sm:h-11"
+      onClick={() =>
+        void navigator.clipboard.writeText(text).then(
+          () => setCopied(true),
+          () => undefined,
+        )
+      }
+    >
+      {copied ? <CheckIcon /> : <CopyIcon />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
   );
 }
 
@@ -475,28 +541,33 @@ export function CoachChat({
   const awaitingAnswer = interrupts.length > 0;
   const canSend = canAsk && !awaitingAnswer;
   const starters = planChange ? PLAN_STARTERS : powerFile ? POWER_FILE_STARTERS : STARTERS;
+  const { data: chats } = useQuery(coachChatsQueryOptions);
+  const title = chats?.find((chat) => chat.id === threadId)?.title;
+  // Between sending and the reply's first part, the transcript ends on the question.
+  const waiting = isLoading && messages.at(-1)?.role === "user";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <SparklesIcon aria-hidden className="size-5" />
-          Coach
-        </h1>
-        <div className="flex items-center gap-2">
-          <CoachChatList currentId={threadId} />
-          {messages.length ? (
-            <Button
-              variant="outline"
-              size="sm"
-              nativeButton={false}
-              render={<Link to="/coach" search={{}} />}
-            >
-              <SquarePenIcon />
-              New chat
-            </Button>
+      <div className="mx-auto flex w-full max-w-3xl shrink-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h1 className="text-lg font-semibold tracking-tight sm:text-xl">Coach</h1>
+          {title && messages.length ? (
+            <p className="text-muted-foreground truncate text-xs sm:text-sm">{title}</p>
           ) : null}
         </div>
+        <CoachChatList currentId={threadId} />
+        {messages.length ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-sm:size-11 max-sm:px-0"
+            nativeButton={false}
+            render={<Link to="/coach" search={{}} />}
+          >
+            <SquarePenIcon />
+            <span className="max-sm:sr-only">New chat</span>
+          </Button>
+        ) : null}
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
@@ -518,36 +589,41 @@ export function CoachChat({
             The coach answers on your own OpenRouter key. Add it once to ask about your training.
           </CoachKeyPrompt>
         ) : empty ? (
-          <Empty className="flex-1">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <SparklesIcon />
-              </EmptyMedia>
-              <EmptyTitle>Ask the coach</EmptyTitle>
-              <EmptyDescription>
+          // Bottom-aligned on phones, so the starters sit where the thumb already is.
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end gap-6 overflow-y-auto pb-4 sm:justify-center">
+            <div className="flex flex-col items-center gap-3 text-center text-balance">
+              <span
+                aria-hidden
+                className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-2xl shadow-sm"
+              >
+                <SparklesIcon className="size-6" />
+              </span>
+              <h2 className="text-xl font-semibold tracking-tight">Ask the coach</h2>
+              <p className="text-muted-foreground max-w-sm text-sm">
                 {powerFile
                   ? "Ask what a number of this power file means, whether it's normal for you, and what to change."
                   : "Ask about any activity, your form, or your plan. Type @ to point at an activity."}
-              </EmptyDescription>
-            </EmptyHeader>
+              </p>
+            </div>
             {/* A starter would send without the activity "Ask about this activity" brought in, and
                 competes with a question asked from a power file's section. */}
             {(initialMentions.length > 0 && !powerFile) || initialQuestion ? null : (
-              <EmptyContent className="flex-col">
+              <div className="grid gap-2 sm:grid-cols-3">
                 {starters.map((starter) => (
                   <Button
-                    key={starter}
+                    key={starter.text}
                     variant="outline"
-                    className="h-auto min-h-11 w-full justify-start py-2 text-left whitespace-normal sm:min-h-8"
+                    className="bg-card h-auto min-h-12 w-full items-start justify-start gap-3 rounded-xl p-3 text-left text-sm font-normal whitespace-normal sm:flex-col sm:gap-2"
                     disabled={!canSend}
-                    onClick={() => send(withActivityLinks(starter, initialMentions))}
+                    onClick={() => send(withActivityLinks(starter.text, initialMentions))}
                   >
-                    {starter}
+                    <starter.icon aria-hidden className="text-muted-foreground mt-0.5 size-4" />
+                    {starter.text}
                   </Button>
                 ))}
-              </EmptyContent>
+              </div>
             )}
-          </Empty>
+          </div>
         ) : (
           <PlanChangeProvider value={planChanges}>
             <MessageScrollerProvider>
@@ -572,6 +648,15 @@ export function CoachChat({
                         />
                       </MessageScrollerItem>
                     ))}
+                    {waiting ? (
+                      <MessageScrollerItem>
+                        <CoachMessage
+                          message={{ id: "waiting", role: "assistant", parts: [] }}
+                          lookup={lookup}
+                          live
+                        />
+                      </MessageScrollerItem>
+                    ) : null}
                     {error && !isLoading ? (
                       <MessageScrollerItem>
                         <Alert variant="destructive">
