@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { createContext, use, useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { cn } from "cn";
-import { ActivityIcon, ChevronLeftIcon, Trash2Icon, ZapIcon } from "lucide-react";
+import { ActivityIcon, ChevronLeftIcon, SparklesIcon, Trash2Icon, ZapIcon } from "lucide-react";
 
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
@@ -83,6 +83,27 @@ const INFO = {
     "Time on the big ring with the two biggest cogs, or the small ring with the two smallest: the chain runs at an angle and wears faster.",
   ftp: "The FTP behind zones, intensity, and the quadrants. VO2's own FTP when it has one, else the one set on your head unit.",
 } as const;
+
+/** The power file on the page, for the coach links at the end of each section. */
+const PowerFileIdContext = createContext("");
+
+/** Opens the coach chat with this power file brought in and the question ready to send. */
+function AskCoach({ question }: { question: string }) {
+  const fileId = use(PowerFileIdContext);
+  return (
+    <Link
+      to="/coach"
+      search={{ power: fileId, ask: question }}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "sm" }),
+        "h-auto min-h-11 max-w-full justify-start self-start py-1.5 text-left whitespace-normal sm:min-h-8",
+      )}
+    >
+      <SparklesIcon />
+      {question}
+    </Link>
+  );
+}
 
 function fixed(value: number | null | undefined, digits = 0, unit = "") {
   if (value == null) return "—";
@@ -247,6 +268,7 @@ function PowerCurveSection({ view }: { view: PowerFileView }) {
           W/kg at {weight} kg ({sourceLabel(view.weightKg!.source)}).
         </p>
       ) : null}
+      <AskCoach question="What does this power curve say about my strengths?" />
     </ActivityDetailSection>
   );
 }
@@ -294,6 +316,7 @@ function ZonesSection({ view }: { view: PowerFileView }) {
           </li>
         ))}
       </ul>
+      <AskCoach question="Was my time in each zone right for this kind of ride?" />
     </ActivityDetailSection>
   );
 }
@@ -390,6 +413,7 @@ function PedalingSection({ view }: { view: PowerFileView }) {
           />
         </div>
       ) : null}
+      <AskCoach question="What do my pedaling dynamics say, and what should I change?" />
     </ActivityDetailSection>
   );
 }
@@ -442,6 +466,7 @@ function PositionsSection({ view }: { view: PowerFileView }) {
           ),
         ]}
       />
+      <AskCoach question="How does my pedaling change out of the saddle, and is that normal?" />
     </ActivityDetailSection>
   );
 }
@@ -506,6 +531,7 @@ function CadenceSection({ view }: { view: PowerFileView }) {
           <p className="text-muted-foreground text-xs">{INFO.quadrants}</p>
         </div>
       ) : null}
+      <AskCoach question="Is my cadence right, and what do my quadrants say?" />
     </ActivityDetailSection>
   );
 }
@@ -573,6 +599,7 @@ function HeartSection({ view }: { view: PowerFileView }) {
           <StatCard label="Calories" value={`${view.calories} kcal`} />
         ) : null}
       </StatGrid>
+      <AskCoach question="What do my heart rate drift and efficiency say about my endurance?" />
     </ActivityDetailSection>
   );
 }
@@ -615,6 +642,7 @@ function LapsSection({ view }: { view: PowerFileView }) {
           ],
         }))}
       />
+      <AskCoach question="What stands out between my laps?" />
     </ActivityDetailSection>
   );
 }
@@ -656,6 +684,7 @@ function GearsSection({ view }: { view: PowerFileView }) {
           ],
         }))}
       />
+      <AskCoach question="Am I using my gears well?" />
     </ActivityDetailSection>
   );
 }
@@ -707,6 +736,7 @@ function RecordingSection({ view, fileName }: { view: PowerFileView; fileName: s
           </div>
         ))}
       </dl>
+      <AskCoach question="Can I trust this file's numbers?" />
     </ActivityDetailSection>
   );
 }
@@ -793,6 +823,15 @@ export function PowerFileDetailView({ file }: { file: PowerFileDetail }) {
         <div className="flex items-center justify-between gap-2">
           <BackLink />
           <div className="flex items-center gap-1">
+            <Link
+              to="/coach"
+              search={{ power: file.id }}
+              aria-label="Ask the coach about this ride"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <SparklesIcon />
+              <span className={cn(file.activity && "hidden sm:inline")}>Ask the coach</span>
+            </Link>
             {file.activity ? (
               <Link
                 to="/activities/$activityId"
@@ -820,25 +859,27 @@ export function PowerFileDetailView({ file }: { file: PowerFileDetail }) {
         </div>
         <p className="text-muted-foreground text-sm">{formatActivitySchedule(view.start, end)}</p>
       </div>
-      <div className="flex flex-col gap-4">
-        <PowerSummary view={view} />
-        <ActivityDetailSection
-          title="Ride over time"
-          description="Power, heart rate, cadence, balance, and PCO through the ride."
-        >
-          <RideOverTimeChart series={view.series} />
-        </ActivityDetailSection>
-        <PedalingSection view={view} />
-        <PositionsSection view={view} />
-        <PowerCurveSection view={view} />
-        <ZonesSection view={view} />
-        <CadenceSection view={view} />
-        <HeartSection view={view} />
-        <LapsSection view={view} />
-        <GearsSection view={view} />
-        {view.terrain ? <ActivityRideAnalysis ride={view.terrain} /> : null}
-        <RecordingSection view={view} fileName={file.fileName} />
-      </div>
+      <PowerFileIdContext value={file.id}>
+        <div className="flex flex-col gap-4">
+          <PowerSummary view={view} />
+          <ActivityDetailSection
+            title="Ride over time"
+            description="Power, heart rate, cadence, balance, and PCO through the ride."
+          >
+            <RideOverTimeChart series={view.series} />
+          </ActivityDetailSection>
+          <PedalingSection view={view} />
+          <PositionsSection view={view} />
+          <PowerCurveSection view={view} />
+          <ZonesSection view={view} />
+          <CadenceSection view={view} />
+          <HeartSection view={view} />
+          <LapsSection view={view} />
+          <GearsSection view={view} />
+          {view.terrain ? <ActivityRideAnalysis ride={view.terrain} /> : null}
+          <RecordingSection view={view} fileName={file.fileName} />
+        </div>
+      </PowerFileIdContext>
     </div>
   );
 }

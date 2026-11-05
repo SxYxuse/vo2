@@ -34,9 +34,11 @@ function importFile(page: Page, name: string, buffer: Buffer) {
     .setInputFiles({ name, mimeType: "application/octet-stream", buffer });
 }
 
-test("an athlete imports a ride's FIT file, reads its pedaling, opens the ride, and deletes it", async ({
+test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, opens the ride, and deletes it", async ({
   page,
 }) => {
+  // The mock coach answers at a model's pace.
+  test.setTimeout(90_000);
   const fit = await thresholdRideFile();
   await openPowerFromSidebar(page);
   await expect(page.getByText("No power files yet")).toBeVisible();
@@ -62,6 +64,20 @@ test("an athlete imports a ride's FIT file, reads its pedaling, opens the ride, 
     fullPage: true,
     mask: [syncButton(page)],
   });
+
+  // A section asks the coach about itself: the question waits in the message box with the file
+  // brought in, and the answer links back to the analysis.
+  const question = "What do my pedaling dynamics say, and what should I change?";
+  await page.getByRole("link", { name: question }).click();
+  await expect(page.getByRole("textbox", { name: "Message the coach" })).toHaveValue(question);
+  await expect(page.getByRole("button", { name: "Remove Threshold ride" })).toBeVisible();
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(
+    page.getByText(/Your legs split the work L 52 \/ R 48, well within the usual range/),
+  ).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("link", { name: "Threshold ride" }).last().click();
+  await expect(page).toHaveURL(analysisUrl);
+  await expect(page.getByRole("link", { name: "Ask the coach about this ride" })).toBeVisible();
 
   // Both ways between the analysis and the synced ride.
   await page.getByRole("link", { name: "Open ride" }).click();

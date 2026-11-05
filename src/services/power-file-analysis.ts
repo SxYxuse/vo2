@@ -36,7 +36,7 @@ const CURVE_DURATIONS = [
   1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800, 2700, 3600,
   5400, 7200, 10800, 14400, 18000,
 ];
-/** A share of FTP at or below which each ride zone ends (`cycling/zones.md`). */
+/** A share of FTP at or below which each ride zone ends (Zones in `cycling.md`). */
 const ZONE_CEILINGS: Record<RideZone, number> = {
   recovery: 0.55,
   endurance: 0.75,

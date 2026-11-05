@@ -14,6 +14,8 @@ Units: running and walking pace in min/km (4:32 /km), swimming pace in min/100m,
 
 Activities: the athlete references an activity as a markdown link like [Morning Run](/activities/123). When you talk about a specific activity, link it the same way, with its name and id.
 
+Power files: a ride's FIT file the athlete imported, with what their power meter recorded beyond Strava (left/right balance, where on the pedal they push, the arc of each stroke, seated and standing, gears). The athlete references one as a link like [Morning Ride](/power/<id>); read it with get_power_file, and link it the same way. get_activity gives a ride's powerFileId when it has one. Before explaining a power file, load the power-files skill. Say what a number means, whether it is normal for them, and what, if anything, to change.
+
 Visuals: when a chart or a small diagram explains better than words (splits, heart rate over a run, load over weeks), call show_visual with a complete HTML document, then add one or two sentences on what it shows. Do not repeat its numbers in text. Rules for the HTML:
 - Self-contained, every number typed in. There is no network: no external scripts, fonts, styles, or images. Draw with inline SVG, HTML, and CSS; plain JavaScript is allowed.
 - Keep data small: summaries (splits, zones, weekly load) before raw streams, and at most ${MAX_STREAM_POINTS} points per series from get_activity_streams.

@@ -3,11 +3,15 @@
 import { memo, type ComponentProps } from "react";
 import { Link } from "@tanstack/react-router";
 import { Markdown, type MarkdownComponents } from "@tanstack/markdown/react";
+import { ZapIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { activityIdFromHref } from "@/services/coach-mentions.ts";
+import { activityIdFromHref, powerFileIdFromHref } from "@/services/coach-mentions.ts";
 
 export type ActivityLookup = (id: string) => { color?: string } | undefined;
+
+const CHIP =
+  "not-typeset bg-background hover:bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md border px-1.5 py-px align-baseline text-[0.9em] font-medium no-underline transition-colors";
 
 function makeComponents(lookup: ActivityLookup): MarkdownComponents {
   return {
@@ -16,16 +20,21 @@ function makeComponents(lookup: ActivityLookup): MarkdownComponents {
       if (activityId) {
         const color = lookup(activityId)?.color;
         return (
-          <Link
-            to="/activities/$activityId"
-            params={{ activityId }}
-            className="not-typeset bg-background hover:bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md border px-1.5 py-px align-baseline text-[0.9em] font-medium no-underline transition-colors"
-          >
+          <Link to="/activities/$activityId" params={{ activityId }} className={CHIP}>
             <span
               aria-hidden
               className="bg-muted-foreground size-2 shrink-0 rounded-full"
               style={color ? { backgroundColor: color } : undefined}
             />
+            <span className="truncate">{children}</span>
+          </Link>
+        );
+      }
+      const fileId = powerFileIdFromHref(href);
+      if (fileId) {
+        return (
+          <Link to="/power/$fileId" params={{ fileId }} className={CHIP}>
+            <ZapIcon aria-hidden className="text-muted-foreground size-3 shrink-0" />
             <span className="truncate">{children}</span>
           </Link>
         );
@@ -58,8 +67,8 @@ function makeComponents(lookup: ActivityLookup): MarkdownComponents {
 }
 
 /**
- * Chat markdown, styled by Typeset. Links to an activity become chips that open it. Raw HTML
- * is never rendered; the coach draws HTML only through a visual.
+ * Chat markdown, styled by Typeset. Links to an activity or a power file become chips that open
+ * it. Raw HTML is never rendered; the coach draws HTML only through a visual.
  */
 export const CoachMarkdown = memo(function CoachMarkdown({
   markdown,

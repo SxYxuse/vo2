@@ -98,8 +98,7 @@ export async function powerFileIdFor(userId: string, sportType: string, start: D
   return nearest(rows, start)?.id ?? null;
 }
 
-export async function listPowerFilesImpl(): Promise<PowerFileListItem[]> {
-  const session = await getRequiredSession();
+export async function loadPowerFiles(userId: string): Promise<PowerFileListItem[]> {
   const rows = await db
     .select({
       id: powerFiles.id,
@@ -108,10 +107,10 @@ export async function listPowerFilesImpl(): Promise<PowerFileListItem[]> {
       summary: powerFiles.summary,
     })
     .from(powerFiles)
-    .where(eq(powerFiles.userId, session.user.id))
+    .where(eq(powerFiles.userId, userId))
     .orderBy(desc(powerFiles.startDate));
   const matches = await matchActivities(
-    session.user.id,
+    userId,
     rows.map((row) => row.startDate),
   );
   return rows.map((row) => ({
@@ -140,8 +139,13 @@ async function currentAnalysis(id: string, stored: unknown) {
   return analysis;
 }
 
-export async function getPowerFileImpl(id: string): Promise<PowerFileDetail | null> {
+export async function listPowerFilesImpl() {
   const session = await getRequiredSession();
+  return loadPowerFiles(session.user.id);
+}
+
+/** One of the athlete's power files, read with their current FTP and weight. */
+export async function loadPowerFile(userId: string, id: string): Promise<PowerFileDetail | null> {
   const [row] = await db
     .select({
       id: powerFiles.id,
@@ -154,11 +158,11 @@ export async function getPowerFileImpl(id: string): Promise<PowerFileDetail | nu
     })
     .from(powerFiles)
     .leftJoin(athleteMetrics, eq(athleteMetrics.userId, powerFiles.userId))
-    .where(and(eq(powerFiles.id, id), eq(powerFiles.userId, session.user.id)))
+    .where(and(eq(powerFiles.id, id), eq(powerFiles.userId, userId)))
     .limit(1);
   if (!row) return null;
   const analysis = await currentAnalysis(row.id, row.analysis);
-  const matches = await matchActivities(session.user.id, [row.startDate]);
+  const matches = await matchActivities(userId, [row.startDate]);
   return {
     id: row.id,
     fileName: row.fileName,
@@ -166,6 +170,11 @@ export async function getPowerFileImpl(id: string): Promise<PowerFileDetail | nu
     activity: matches.get(row.startDate.getTime()) ?? null,
     analysis: powerFileView(analysis, { ftp: row.ftp, weightKg: row.weightKg }),
   };
+}
+
+export async function getPowerFileImpl(id: string) {
+  const session = await getRequiredSession();
+  return loadPowerFile(session.user.id, id);
 }
 
 async function existingId(userId: string, fileHash: string) {

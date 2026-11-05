@@ -9,6 +9,7 @@ import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack
 import { inlineSkill, withSkills } from "@tanstack/ai-skills";
 
 import cycling from "@/coaching/cycling.md?raw";
+import powerFileGuide from "@/coaching/power-files.md?raw";
 import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
 
@@ -43,12 +44,14 @@ import {
   correlateStreamsDef,
   findActivitiesDef,
   findClimbsDef,
+  findPowerFilesDef,
   getActivityDef,
   getActivityStreamsDef,
   getAthleteProfileDef,
   getCoachPlanDef,
   getFitnessDef,
   getPersonalBestsDef,
+  getPowerFileDef,
   getSeasonDef,
   measureActivityDef,
   proposePlanChangeDef,
@@ -57,6 +60,8 @@ import {
 } from "./coach-tools.ts";
 import { loadHeartRateImpl } from "./heart-rate.server.ts";
 import { loadBestsForUser } from "./personal-bests.server.ts";
+import { powerFileForCoach, powerFilesForCoach } from "./power-file-coach.ts";
+import { loadPowerFile, loadPowerFiles, powerFileIdFor } from "./power-file.server.ts";
 import { topEfforts, type BestsPeriod } from "./personal-bests.ts";
 import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
@@ -82,6 +87,12 @@ const COACHING_SKILLS = [
     description:
       "How VO2 plans rides: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, supporting rides by effort, the zones rides target as a share of FTP and cycling LTHR, and the sessions VO2 writes (endurance, long, sweet spot, threshold, VO2 max, climbing, sprints) with their sizing. Load before explaining a ride, its target, or proposing a change to a ride.",
     instructions: cycling,
+  }),
+  inlineSkill({
+    name: "power-files",
+    description:
+      "How to read a power file from dual-sided pedals: left/right balance, platform center offset, power phase and peak power phase, torque effectiveness and pedal smoothness, seated and standing, cadence and quadrants, decoupling, and gears. What is normal, what is worth acting on, and what to change. Load before explaining a power file.",
+    instructions: powerFileGuide,
   }),
   inlineSkill({
     name: "season-multisport",
@@ -216,14 +227,27 @@ function createCoachTools(coachPlan: boolean) {
           .where(and(eq(activities.id, activityId), eq(activities.userId, context.userId)))
           .limit(1),
       ]);
+      const powerFileId = row
+        ? await powerFileIdFor(context.userId, snapshot.overview.sportType, row.startDate)
+        : null;
       return {
         id: activityId,
         day: row ? dayKey(row.startDate, context.timeZone) : null,
         start: row?.startDate.toISOString() ?? null,
         trainingLoad: row?.trainingLoad == null ? null : roundLoad(row.trainingLoad),
         bestEfforts: isBestEfforts(row?.bestEfforts) ? row.bestEfforts : null,
+        // The ride's imported FIT file, read with get_power_file.
+        powerFileId,
         ...presentOverviewForCoach(snapshot.overview),
       };
+    }),
+    findPowerFilesDef.server<CoachRuntime>(async ({ limit }, { context }) =>
+      powerFilesForCoach(await loadPowerFiles(context.userId), context.timeZone, limit ?? 20),
+    ),
+    getPowerFileDef.server<CoachRuntime>(async ({ powerFileId }, { context }) => {
+      const file = await loadPowerFile(context.userId, powerFileId);
+      if (!file) throw new Error(`No power file ${powerFileId} for this athlete.`);
+      return powerFileForCoach(file, context.timeZone);
     }),
     measureActivityDef.server<CoachRuntime>(async (input, { context }) => {
       const row = await loadStreams(input.activityId, context.userId);
