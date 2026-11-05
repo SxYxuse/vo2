@@ -652,13 +652,26 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
     const card = page.getByRole("group", { name: "Plan change" }).last();
     await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
     await expect(card).toContainText("Week of 15 Jun");
-    await expect(card.getByRole("group", { name: "After" })).toHaveText("No session");
+    await expect(card.getByRole("listitem")).toHaveCount(1);
+    await expect(card.getByRole("listitem")).toContainText("Removed:");
     // Nothing else can be asked until the change is answered.
     const composer = page.getByRole("textbox", { name: "Message the coach" });
     await expect(composer).toBeDisabled();
     await card.getByRole("button", { name: "Decline" }).click();
     await expect(card).toContainText("Declined: your plan stays as it was");
     await expect(page.getByText("No problem: your plan stays as it was.")).toBeVisible();
+
+    // A change over several weeks folds the weeks past the first two.
+    await composer.fill("I'm travelling for a while");
+    await page.getByRole("button", { name: "Send" }).click();
+    await expect(card.getByRole("button", { name: /^Apply \d+ changes$/ })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(card.getByRole("region", { name: /^Week of/ })).toHaveCount(2);
+    await card.getByRole("button", { name: /^Show 1 more week/ }).click();
+    await expect(card.getByRole("region", { name: /^Week of/ })).toHaveCount(3);
+    await card.getByRole("button", { name: "Decline" }).click();
+    await expect(card).toContainText("Declined: your plan stays as it was");
 
     // Asked again and applied: this week has one run fewer.
     await composer.fill("I can only run twice this week");
