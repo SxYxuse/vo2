@@ -200,6 +200,8 @@ describe("rules around a supporting race", () => {
     races: [{ weekStart: supportWeek, sport: "run", effort }],
     neighbours: [],
     easySecPerKm: 360,
+    paces: null,
+    racePaces: [],
   });
   const run = (kind: PlannedSession["kind"], distanceKm: number) =>
     ({

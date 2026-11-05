@@ -80,12 +80,12 @@ No race replaces a quality session by default. Every race but one run for fun co
 ### Writing for the athlete
 
 - Each session has a short "why": what it trains, in one sentence, in plain words.
-- Use the athlete's training paces (_Training paces_). Never invent a pace.
+- Use the athlete's training paces (_Training paces_). Every exact pace you write comes from inside one of their ranges or is a goal's race pace.
 - Prefer effort to pace on hills, trails, in heat, and for athletes without recent running history.
 
 ## Training paces
 
-VO2 gives you the athlete's training paces: five pace ranges in seconds per km, read from their current fitness. Target every running step with one of them, or with an effort. Never compute or invent a pace yourself.
+VO2 gives you the athlete's training paces: five pace ranges in seconds per km, read from their current fitness, and the predicted race pace of each upcoming run goal. Target every running step with a pace type or an effort. A step at marathon, threshold, interval, or repetition pace also names the one pace the athlete holds, picked inside that pace's range or at a goal's race pace; VO2 refuses any other.
 
 ### Where the paces come from
 
@@ -111,7 +111,7 @@ Race paces against the five (checked at VDOT 50: 5 km 3:59/km, 10 km 4:08/km, ha
 - 10 km race pace sits between T and I pace.
 - Half marathon pace is the slow end of T pace.
 
-When a session needs a race pace, write it as an effort ("10 km effort") with the pace type it sits at or between.
+When a session needs a goal's race pace, target its exact pace from `racePaces` (see "Race pace" in the session library). For a race distance that is no goal of the athlete's, write it as an effort ("10 km effort").
 
 ### How much at each pace
 
@@ -142,7 +142,15 @@ Pace is precise on flat, steady, cool ground and fails elsewhere. Prefer effort 
 
 ### Writing a target
 
-Write a pace target as the pace type and its range from the athlete's training paces, for example `T 4:15–4:22 /km`. Write an effort target as one of the five efforts above. Do not mix both on one step.
+Write a pace target as the pace type and one exact pace, for example `T 4:18 /km` (`secPerKm` 258). Write an effort target as one of the five efforts above. Do not mix both on one step. Easy steps, warm-ups, cool-downs, and jogs keep the easy range or an effort: an exact easy pace would steer the athlete by the watch when easy is run by feel.
+
+Where in the range to pick the pace (guidance; Daniels sets the ranges, not the spot inside them):
+
+- **Phase:** the slow end in base and early build, the middle in build, the fast end in peak. Back to the middle in a taper.
+- **Repeat length:** longer repeats slower, shorter repeats faster. 3 × 2 km T sits nearer the slow end than 6 × 1 km T.
+- **Level:** beginners and athletes back from a break at the slow end.
+- **Race pace:** a race-pace step targets the goal's predicted race pace exactly, from `racePaces`, under the pace type whose cap it counts against (see "Race pace" in the session library). It may sit between two ranges; that is allowed.
+- Whole seconds. When unsure, the slower half of the range.
 
 ## Session library
 
@@ -162,7 +170,7 @@ Cool-down: <amount> <target>
 ```
 
 - **Amount:** a distance (`400 m`, `2 km`) or a time (`20 min`, `30 s`). Use distance on flat road; time for easy running, hills, and trails.
-- **Target:** a pace type with its range from the athlete's training paces (`I 3:50–4:00 /km`), or an effort (`easy`, `steady`, `comfortably hard`, `hard`, `fast and relaxed`). See _Training paces_.
+- **Target:** a pace type with one exact pace inside its range (`I 3:55 /km`), the easy range (`E`), or an effort (`easy`, `steady`, `comfortably hard`, `hard`, `fast and relaxed`). See _Training paces_.
 - **Recovery:** between repeats, an amount and how: `300 m jog`, `90 s walk`, `2 min standing`. Jog recoveries are at easy effort or slower.
 - **Warm-up and cool-down:** every quality session has both, at easy. Warm-up 10–20 min or 2–3 km; cool-down 10 min or 1–2 km.
 - A session's distance includes warm-up, cool-down, and recoveries. VO2 counts it toward the week.
@@ -381,13 +389,13 @@ Cool-down: 1.5 km E
 
 ### Race pace
 
-Rehearses the goal race, in build and peak phases only. Write the pace as an effort with the pace type it sits at or between (_Training paces_), and size it against the cap in "Sizing a quality session".
+Rehearses the goal race, in build and peak phases only. Write the step with the pace type whose cap it counts against (I for 5 km and 10 km, T for the half marathon, M for the marathon) and the goal's exact race pace from `racePaces`, and size it against the cap in "Sizing a quality session". Without training paces, write it as an effort.
 
 5 km, at a 60 km week (I cap 4.8 km):
 
 ```
 Warm-up: 2 km E
-4 × 1 km 5 km effort (slow end of I), 2 min jog
+4 × 1 km I at the 5 km race pace, 2 min jog
 Cool-down: 1.5 km E
 ```
 
@@ -395,7 +403,7 @@ Cool-down: 1.5 km E
 
 ```
 Warm-up: 2 km E
-2 × 2 km 10 km effort (T–I), 2 min jog
+2 × 2 km I at the 10 km race pace (between T and I), 2 min jog
 Cool-down: 2 km E
 ```
 
@@ -403,7 +411,7 @@ Half marathon, at a 60 km week (T cap 6 km):
 
 ```
 Warm-up: 3 km E
-2 × 3 km half marathon effort (slow end of T), 3 min jog
+2 × 3 km T at the half marathon race pace, 3 min jog
 Cool-down: 2 km E
 ```
 
@@ -411,7 +419,7 @@ Marathon, at a 60 km week (M 12 km at most):
 
 ```
 Warm-up: 2 km E
-2 × 5 km M, 2 min jog
+2 × 5 km M at the marathon race pace, 2 min jog
 Cool-down: 2 km E
 ```
 

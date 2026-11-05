@@ -148,7 +148,8 @@ export type StepPart = (typeof STEP_PARTS)[number];
 
 /**
  * One step: a distance or a time, and a target. A run targets a pace type or an effort; a ride
- * targets a zone or an effort, by time only. Kept flat, without refinements, so every
+ * targets a zone or an effort, by time only. A run step at a pace harder than easy also names one
+ * pace in seconds per km, inside its pace type's range or at a goal's race pace (ADR 0055). Kept flat, without refinements, so every
  * structured-output model reads it the same way; the rule checker reports a step that mixes them
  * (coach-plan-rules.ts).
  */
@@ -161,6 +162,7 @@ const stepSchema = z.object({
     .max(7 * 3600)
     .nullable(),
   pace: z.enum(PACE_IDS).nullable(),
+  secPerKm: z.number().min(120).max(900).nullable(),
   zone: z.enum(RIDE_ZONE_IDS).nullable(),
   effort: z.enum(EFFORT_IDS).nullable(),
 });
@@ -338,10 +340,12 @@ const RIDE_KMH = 25;
 const middle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPerKm) / 2;
 
 /**
- * The seconds per km a run step is counted at: the middle of its pace range, or of the pace an
- * effort sits at, so time steps count toward distance and distance steps toward time.
+ * The seconds per km a run step is counted at: its own pace, else the middle of its pace range, or
+ * of the pace an effort sits at, so time steps count toward distance and distance steps toward
+ * time. Steps stored before ADR 0055 have no pace of their own.
  */
 export function stepSecPerKm(step: Step, paces: Record<PaceType, PaceRange> | null) {
+  if (step.secPerKm != null) return step.secPerKm;
   const effort = step.effort ?? (step.pace ? PACE_EFFORT[step.pace] : "easy");
   if (effort === "walk") return NO_PACE_SEC_PER_KM.walk;
   const pace = step.pace ?? EFFORTS.find((item) => item.id === effort)?.pace ?? "easy";
@@ -469,6 +473,7 @@ function targetText(step: PlannedStep, sport: PlanSport) {
   }
   if (step.pace) {
     const letter = PACE_TYPES.find((pace) => pace.id === step.pace)!.letter;
+    if (step.secPerKm != null) return `${letter} ${formatPaceClock(step.secPerKm)} /km`;
     return step.range
       ? `${letter} ${formatPaceClock(step.range.fastSecPerKm)}–${formatPaceClock(step.range.slowSecPerKm)} /km`
       : letter;

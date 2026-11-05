@@ -49,9 +49,9 @@ const FORMAT = [
   "You are the endurance coach writing an athlete's coach plan in VO2. VO2 sets each week's budgets and checks every plan in code; you write precise sessions inside them. Answer only with the requested JSON.",
   "Sessions have no day: you write each week's sessions, and the athlete picks the days. Never name a weekday or date in a title or why.",
   "Each session: weekStart (the Monday of its week, YYYY-MM-DD), sport (run or ride), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
-  "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace is null. Never write a pace, watts, or heart rate number: VO2 fills in the athlete's own.",
+  "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A step at marathon, threshold, interval, or repetition pace also has secPerKm: the one pace the athlete holds, in whole seconds per km, picked inside that pace's range in `paces`, or a goal's race pace from `racePaces`. Easy, effort, and walk steps have secPerKm null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace and secPerKm are null. Never write watts or heart rate: VO2 fills in the athlete's own.",
   "Kinds for runs: easy, recovery, long, tempo, intervals, repetitions, hills, fartlek, marathonPace. Kinds for rides: easy (endurance), recovery, long, tempo (threshold), intervals (VO2 max), hills (climbing), sweetSpot, sprints.",
-  "VO2 works out each run's distance and time from its steps, counting time steps at the middle of their pace, and each ride's time. Those numbers are what the rules check.",
+  "VO2 works out each run's distance and time from its steps, counting time steps at their secPerKm, or the middle of their pace range, and each ride's time. Those numbers are what the rules check.",
 ].join("\n\n");
 
 /** The knowledge the coach writes from: each planned sport's file, and the season's when both. */
@@ -129,8 +129,16 @@ export function paceText(ranges: Record<PaceType, PaceRange> | null) {
   return Object.fromEntries(
     Object.entries(ranges).map(([type, range]) => [
       type,
-      `${formatPaceClock(range.fastSecPerKm)}–${formatPaceClock(range.slowSecPerKm)} /km`,
+      `${formatPaceClock(range.fastSecPerKm)}–${formatPaceClock(range.slowSecPerKm)} /km (secPerKm ${range.fastSecPerKm}–${range.slowSecPerKm})`,
     ]),
+  );
+}
+
+/** Each upcoming run goal's predicted race pace, which a race-pace step may target exactly. */
+export function racePaceText(races: { name: string; distanceKm: number; secPerKm: number }[]) {
+  return races.map(
+    (race) =>
+      `${race.name} (${race.distanceKm} km): ${formatPaceClock(race.secPerKm)} /km (secPerKm ${race.secPerKm})`,
   );
 }
 

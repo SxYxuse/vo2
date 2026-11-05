@@ -84,7 +84,13 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
   const why = "Shorter and easy, so the week stays light.";
   if (session.sport === "ride") {
     const minutes = Math.max(30, Math.round(session.minutes / 10) * 5);
-    const step = { part: "work" as const, distanceM: null, durationS: minutes * 60, pace: null };
+    const step = {
+      part: "work" as const,
+      distanceM: null,
+      durationS: minutes * 60,
+      pace: null,
+      secPerKm: null,
+    };
     return {
       ...base,
       title: `${minutes} min endurance ride`,
@@ -106,6 +112,7 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
             distanceM: km * 1000,
             durationS: null,
             pace: null,
+            secPerKm: null,
             zone: null,
             effort: "easy",
           },
