@@ -58,13 +58,14 @@ type MockCoachPlan = {
   message?: string;
   weeks: { weekStart: string; sessions: MockSession[] }[];
 };
-type Asked = { weekStart: string | null; kind: "fewer" | "indoor" | "easier" };
+type Asked = { weekStart: string | null; kind: "fewer" | "indoor" | "easier" | "away" };
 
 /** Each kind of change, from the words of a week note or a chat message. */
 function kindOf(text: string): Asked["kind"] | null {
   if (/can'?t (?:run|train)|only run (?:once|twice|\w+ times)/i.test(text)) return "fewer";
   if (/indoors|treadmill/i.test(text)) return "indoor";
   if (/too hard|take it easy|short on time/i.test(text)) return "easier";
+  if (/travel|away for/i.test(text)) return "away";
   return null;
 }
 
@@ -162,6 +163,40 @@ function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["k
     }));
 }
 
+/**
+ * Away for a while: over the next three weeks, the shortest session of each week that isn't the
+ * long one is dropped, and the first week's long session gets easier. A change over several
+ * weeks, with drops and a replacement; then the drops alone if that breaks a rule.
+ */
+function awayChanges(weeks: MockCoachPlan["weeks"]) {
+  const open = weeks
+    .slice(0, 3)
+    .map((week) => ({
+      weekStart: week.weekStart,
+      sessions: week.sessions.filter((item) => item.status === "open" && item.kind !== "race"),
+    }))
+    .filter((week) => week.sessions.length > 1);
+  const drops = open.flatMap((week) => {
+    const short = week.sessions
+      .filter((item) => item.kind !== "long")
+      .sort((a, b) => a.minutes - b.minutes)[0];
+    return short ? [{ id: short.id, session: null }] : [];
+  });
+  const long = open[0]?.sessions.find((item) => item.kind === "long");
+  const summary = "Lighter weeks while you're away: a short session goes each week.";
+  return [
+    ...(long
+      ? [
+          {
+            summary: `${summary} Your first long run is easier too.`,
+            sessions: [{ id: long.id, session: easierSession(open[0].weekStart, long) }, ...drops],
+          },
+        ]
+      : []),
+    { summary, sessions: drops },
+  ].filter((change) => change.sessions.length);
+}
+
 function appliedText(result: unknown) {
   const applied = result as { applied?: boolean; reason?: string } | undefined;
   if (applied?.applied === true) return "Done: the change is in your plan.";
@@ -203,7 +238,10 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
       calls: [{ name: "apply_plan_change", input: { proposalId: last.proposalId } }],
     };
   }
-  const candidates = candidateChanges(week.weekStart, open, asked.kind);
+  const candidates =
+    asked.kind === "away"
+      ? awayChanges(plan.weeks)
+      : candidateChanges(week.weekStart, open, asked.kind);
   const next = candidates[proposals.length];
   if (!next) {
     return {
