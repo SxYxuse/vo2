@@ -125,7 +125,7 @@ export function maxLongShare(runsInWeek: number) {
 
 /**
  * The long ride's largest share of the week's riding (rule 5): about 40 %, more with fewer rides,
- * where even equal rides take a bigger share (`cycling/principles.md`).
+ * where even equal rides take a bigger share (`coaching/cycling.md`).
  */
 export function maxLongRideShare(ridesInWeek: number) {
   if (ridesInWeek <= 1) return 1;

@@ -8,12 +8,8 @@ import {
 import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
 import { inlineSkill, withSkills } from "@tanstack/ai-skills";
 
-import ridePrinciples from "@/coaching/cycling/principles.md?raw";
-import rideSessions from "@/coaching/cycling/sessions.md?raw";
-import rideZones from "@/coaching/cycling/zones.md?raw";
-import paces from "@/coaching/running/paces.md?raw";
-import principles from "@/coaching/running/principles.md?raw";
-import sessions from "@/coaching/running/sessions.md?raw";
+import cycling from "@/coaching/cycling.md?raw";
+import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
 
 import { db } from "@/db/index.ts";
@@ -76,40 +72,16 @@ type CoachRuntime = { userId: string; timeZone: string };
  */
 const COACHING_SKILLS = [
   inlineSkill({
-    name: "running-principles",
+    name: "running",
     description:
-      "How VO2 builds a running week: the rules every coach plan is checked against, week templates by runs per week, intensity, the long run, season phases, missed sessions, and supporting races by effort. Load before explaining how a week is built or proposing a plan change.",
-    instructions: principles,
+      "How VO2 plans runs: the rules every coach plan is checked against, week templates by runs per week, intensity, the long run, season phases, missed sessions, supporting races by effort, the five training paces and how much at each, and the sessions VO2 writes (easy, recovery, long, threshold, intervals, repetitions, race pace, fartlek, hills, progression) with their step format and sizing. Load before explaining a run, a pace, how a week is built, or proposing a plan change to a run.",
+    instructions: running,
   }),
   inlineSkill({
-    name: "running-paces",
+    name: "cycling",
     description:
-      "The five running training paces: where VO2's paces come from, what each is for, how much running at each, and when to target an effort instead. Load before explaining a pace or how hard a session is.",
-    instructions: paces,
-  }),
-  inlineSkill({
-    name: "running-sessions",
-    description:
-      "The running sessions VO2 writes (easy, recovery, long, tempo, cruise intervals, intervals, repetitions, race pace, fartlek, hills, progression), their step format, and how to size them by level and goal. Load before explaining a session or writing one in a plan change.",
-    instructions: sessions,
-  }),
-  inlineSkill({
-    name: "cycling-principles",
-    description:
-      "How VO2 builds a riding week: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, and supporting rides by effort. Load before explaining how rides are planned or proposing a change to a ride.",
-    instructions: ridePrinciples,
-  }),
-  inlineSkill({
-    name: "cycling-zones",
-    description:
-      "The cycling zones rides target (recovery to sprint) as a share of FTP and of cycling LTHR, what each is for, and where FTP comes from. Load before explaining a ride's target or how hard it is.",
-    instructions: rideZones,
-  }),
-  inlineSkill({
-    name: "cycling-sessions",
-    description:
-      "The ride sessions VO2 writes (endurance, long, sweet spot, threshold, VO2 max, climbing, sprints), their step format, work by event type, and sizing by weekly hours. Load before explaining a ride or writing one in a plan change.",
-    instructions: rideSessions,
+      "How VO2 plans rides: the rules every coach plan's rides are checked against, week templates by rides per week, the long ride, fuelling, season phases, taper, indoor rides, supporting rides by effort, the zones rides target as a share of FTP and cycling LTHR, and the sessions VO2 writes (endurance, long, sweet spot, threshold, VO2 max, climbing, sprints) with their sizing. Load before explaining a ride, its target, or proposing a change to a ride.",
+    instructions: cycling,
   }),
   inlineSkill({
     name: "season-multisport",

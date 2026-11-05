@@ -109,7 +109,7 @@ export const isLongKind = (kind: SessionKind) => LONG_KINDS.has(kind);
 export const kindFitsSport = (kind: SessionKind, sport: PlanSport) =>
   SESSION_KINDS.find((item) => item.id === kind)?.[sport] != null;
 
-/** The five efforts of `paces.md`, plus walking for recoveries. */
+/** The five efforts of `coaching/running.md`, plus walking for recoveries. */
 export const EFFORTS = [
   { id: "easy", label: "easy", pace: "easy", zone: "endurance" },
   { id: "steady", label: "steady", pace: "marathon", zone: "tempo" },
@@ -124,7 +124,7 @@ const EFFORT_IDS = EFFORTS.map((effort) => effort.id) as [Effort, ...Effort[]];
 const PACE_IDS = PACE_TYPES.map((pace) => pace.id) as [PaceType, ...PaceType[]];
 
 /**
- * Cycling zones a ride step targets (`cycling/zones.md`): Coggan's levels as a share of FTP, with
+ * Cycling zones a ride step targets (`coaching/cycling.md`): Coggan's levels as a share of FTP, with
  * sweet spot between tempo and threshold, and as a share of cycling LTHR where heart rate still
  * reads the effort. Above threshold heart rate lags too much to steer by.
  */

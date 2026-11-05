@@ -35,7 +35,7 @@ const SPORT_BUDGETS: Record<PlanSport, SportBudget> = {
     noHistoryPerSession: 3,
   },
   // Rides: 10 % a week, the volume growth cycling coaches allow, but at least half an hour so a
-  // rider starting from little can grow (`cycling/principles.md`).
+  // rider starting from little can grow (`coaching/cycling.md`).
   ride: {
     amount: (day) => day.minutes,
     cap: (biggest) => Math.max(biggest * 1.1, biggest + 30),
@@ -93,7 +93,7 @@ export function floorOf(days: SportDay[], weekStart: string, perWeek: number, sp
 /**
  * The share of the usual week a taper keeps, by weeks left to the A goal (0 is race week): two
  * weeks before a marathon or a ride of five hours or more, two gentler ones before a half, one
- * before shorter races (Bosquet 2007: volume cut 41–60 % over two weeks; `cycling/principles.md`
+ * before shorter races (Bosquet 2007: volume cut 41–60 % over two weeks; `coaching/cycling.md`
  * for rides). The race itself is not in the budget. The A goal's taper holds for both sports.
  */
 function taperShare(

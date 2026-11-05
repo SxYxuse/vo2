@@ -2,12 +2,8 @@ import { chat, type ModelMessage } from "@tanstack/ai";
 import { scrubSecrets } from "@tanstack/ai/byok";
 
 // Server-only: imported from handlers alone, so the coaching knowledge stays out of the app.
-import rideZones from "@/coaching/cycling/zones.md?raw";
-import ridePrinciples from "@/coaching/cycling/principles.md?raw";
-import rideSessions from "@/coaching/cycling/sessions.md?raw";
-import paces from "@/coaching/running/paces.md?raw";
-import principles from "@/coaching/running/principles.md?raw";
-import sessions from "@/coaching/running/sessions.md?raw";
+import cycling from "@/coaching/cycling.md?raw";
+import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
 import { logger } from "@/lib/logger.server.ts";
 import type { CoachModel } from "./coach-model.server.ts";
@@ -58,15 +54,15 @@ const FORMAT = [
   "VO2 works out each run's distance and time from its steps, counting time steps at the middle of their pace, and each ride's time. Those numbers are what the rules check.",
 ].join("\n\n");
 
-/** The knowledge the coach writes from: each planned sport's files, and the season's when both. */
+/** The knowledge the coach writes from: each planned sport's file, and the season's when both. */
 function systemPrompt(ctx: RuleContext) {
   const sports = plannedSports(ctx.availability);
   return [
     FORMAT,
     "The coaching knowledge you write from follows.",
     ...(sports.length > 1 ? [season] : []),
-    ...(sports.includes("run") ? [principles, paces, sessions] : []),
-    ...(sports.includes("ride") ? [ridePrinciples, rideZones, rideSessions] : []),
+    ...(sports.includes("run") ? [running] : []),
+    ...(sports.includes("ride") ? [cycling] : []),
   ].join("\n\n");
 }
 
