@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { formatPaceClock } from "./locomotion.ts";
+import type { SportSeed, WeekShape } from "./coach-plan-budget.ts";
 import type { PhaseKind, SeasonWeek } from "./season-phase.ts";
 import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 import type { Goal } from "./season.types.ts";
@@ -63,6 +64,51 @@ export function availabilityKey(value: unknown) {
 
 export function sessionsPerWeek(availability: Availability, sport: PlanSport) {
   return sport === "run" ? availability.runsPerWeek : availability.ridesPerWeek;
+}
+
+/**
+ * How fast each sport's weekly budget grows, and the athlete's own peak, when they set one (ADR
+ * 0058). Growth is the base phase's weekly %, from Hold (0) to Steep (10); a sport left unset
+ * grows at Standard when the A goal is in it and holds otherwise. Peak is in the sport's unit (km
+ * of running, minutes of riding); null is the peak VO2 recommends.
+ */
+const sportProgressionSchema = (peakLimit: number) =>
+  z.object({
+    growth: z.number().min(0).max(10).multipleOf(0.5),
+    peak: z.number().int().positive().max(peakLimit).nullable(),
+  });
+
+/** Peaks up to 200 km of running and 25 h of riding (PEAK_LIMIT in coach-plan-budget.ts). */
+export const progressionSchema = z.object({
+  run: sportProgressionSchema(200).optional(),
+  ride: sportProgressionSchema(25 * 60).optional(),
+});
+
+export type Progression = z.output<typeof progressionSchema>;
+
+export function parseProgression(value: unknown): Progression {
+  const parsed = progressionSchema.safeParse(value);
+  return parsed.success ? parsed.data : {};
+}
+
+/** The named marks on the progression slider, in % a week. */
+export const PROGRESSION_MARKS = [
+  { growth: 0, label: "Hold" },
+  { growth: 3, label: "Gentle" },
+  { growth: 5, label: "Standard" },
+  { growth: 7, label: "Bold" },
+  { growth: 10, label: "Steep" },
+] as const;
+
+/** "42 km" of running, "4.5 h" of riding (riding budgets are in minutes). */
+export function amountText(sport: PlanSport, amount: number) {
+  if (sport === "run") return `${Math.round(amount)} km`;
+  return `${Math.round((amount / 60) * 10) / 10} h`;
+}
+
+/** "Standard", or "+6 %" between the marks. */
+export function progressionLabel(growth: number) {
+  return PROGRESSION_MARKS.find((mark) => mark.growth === growth)?.label ?? `+${growth} %`;
 }
 
 /** The sports the athlete's availability plans. */
@@ -296,6 +342,33 @@ export type CoachPlanState = {
   goals: Goal[];
   /** The VDOT of the athlete's training paces, for the predicted race time. */
   vdot: number | null;
+  /** The season's volume, for Plan's charts and the progression setting; null without an A goal. */
+  volume: SeasonVolume | null;
+};
+
+/**
+ * What the app needs to draw each planned sport's season and recompute it live as the athlete
+ * moves the progression (ADR 0058): the season's weeks and each sport's starting point.
+ */
+export type SeasonVolume = {
+  shape: WeekShape[];
+  sports: SportVolume[];
+};
+
+export type SportVolume = {
+  sport: PlanSport;
+  seed: SportSeed;
+  /** What the athlete set; null growth is the default by week (Standard for the A goal's sport). */
+  growth: number | null;
+  /** The growth the slider shows when the athlete set none: the A goal's sport grows. */
+  defaultGrowth: number;
+  /** The athlete's own peak, or null for the recommended one. */
+  peak: number | null;
+  recommended: number;
+  /** The goal that sets the ceiling, with what it usually asks, or null without one. */
+  goal: { name: string; floor: number } | null;
+  /** What's done of the sport this week, for the current week's bar. */
+  doneThisWeek: number;
 };
 
 /** The A goal the coach plan builds toward: the next A run or ride with a distance. */

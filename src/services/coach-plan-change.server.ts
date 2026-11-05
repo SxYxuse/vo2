@@ -22,6 +22,7 @@ import {
 import {
   anchorsOf,
   gather,
+  ownPeakNotes,
   paceContext,
   racePacesOf,
   rangesOf,
@@ -193,6 +194,7 @@ export async function coachPlanForCoach(userId: string) {
     paces: paceText(rangesOf(inputs)),
     racePaces: racePaceText(racePacesOf(inputs)),
     rideZones: zoneText(anchorsOf(inputs)),
+    athleteChoices: ownPeakNotes(inputs),
     weeks: weeksAhead(inputs, plan).map((week) => ({
       weekStart: week.weekStart,
       phase: PHASES[week.phase].label,

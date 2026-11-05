@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { availabilitySchema, type CoachPlanState } from "./coach-plan.types.ts";
+import { availabilitySchema, progressionSchema, type CoachPlanState } from "./coach-plan.types.ts";
 
 const timeZoneSchema = z
   .string()
@@ -29,6 +29,14 @@ export const saveCoachPlanAvailability = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CoachPlanState> => {
     const { saveAvailabilityImpl } = await import("./coach-plan.server.ts");
     return saveAvailabilityImpl(data.availability, data.timeZone);
+  });
+
+/** Saves how each sport's budget grows and the athlete's own peaks (ADR 0058). */
+export const saveCoachPlanProgression = createServerFn({ method: "POST" })
+  .validator(z.object({ progression: progressionSchema }))
+  .handler(async ({ data }): Promise<CoachPlanState> => {
+    const { saveProgressionImpl } = await import("./coach-plan.server.ts");
+    return saveProgressionImpl(data.progression);
   });
 
 export const writeCoachPlanAgain = createServerFn({ method: "POST" }).handler(

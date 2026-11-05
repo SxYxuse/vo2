@@ -8,7 +8,19 @@ import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { coachModelFor } from "./coach-model.server.ts";
-import { weekBudgets, weeklyAmount, type SportDay } from "./coach-plan-budget.ts";
+import {
+  ceilingGoal,
+  ceilingOf,
+  firstWeekOffBudget,
+  racePeak,
+  recommendedPeak,
+  seasonShape,
+  sportSeed,
+  STANDARD_GROWTH,
+  weekBudgets,
+  weeklyAmount,
+  type SportDay,
+} from "./coach-plan-budget.ts";
 import { raceWeeks, type RuleContext } from "./coach-plan-rules.ts";
 import {
   availabilityText,
@@ -22,9 +34,12 @@ import {
 } from "./coach-plan-writer.server.ts";
 import {
   coachPlanGoal,
+  amountText,
   availabilityKey,
   parseAvailability,
+  parseProgression,
   plannedSession,
+  plannedSports,
   planSportOf,
   readCoachPlan,
   sessionsPerWeek,
@@ -38,6 +53,9 @@ import {
   type PlanBasis,
   type PlanGoal,
   type PlannedSession,
+  type PlanSport,
+  type Progression,
+  type SeasonVolume,
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonWeeks } from "./season-phase.ts";
@@ -150,6 +168,7 @@ export async function gather(userId: string, now = new Date()) {
     today,
     currentWeek: weekStartKey(now, timeZone),
     availability: row ? parseAvailability(row.availability) : null,
+    progression: parseProgression(row?.progression),
     aGoal: coachPlanGoal(goals, today),
     plan: readCoachPlan(row?.plan),
     runs: runs as (SportDay & Activity)[],
@@ -387,7 +406,63 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
     road: roadOf(inputs),
     goals: upcomingOf(inputs),
     vdot: vdotOf(inputs),
+    volume: volumeOf(inputs),
   };
+}
+
+const daysOf = (inputs: Inputs, sport: PlanSport) => (sport === "run" ? inputs.runs : inputs.rides);
+
+/**
+ * The season's volume through the last goal, for Plan and the progression setting (ADR 0058):
+ * each planned sport's start, progression, and peak, so the app projects the same budgets the
+ * coach is held to. Null without an A goal or availability: nothing builds.
+ */
+function volumeOf(inputs: Inputs): SeasonVolume | null {
+  const { aGoal, availability, progression } = inputs;
+  const road = roadOf(inputs);
+  if (!aGoal || !availability || !road.length) return null;
+  const shape = seasonShape(inputs.goals, aGoal, inputs.currentWeek, road.length);
+  const aSports = shape[0]?.anchorSports ?? [];
+  return {
+    shape,
+    sports: plannedSports(availability).map((sport) => {
+      const days = daysOf(inputs, sport);
+      const seed = sportSeed(days, inputs.currentWeek, sessionsPerWeek(availability, sport), sport);
+      const goal = ceilingGoal(inputs.goals, sport, inputs.currentWeek);
+      return {
+        sport,
+        seed,
+        growth: progression[sport]?.growth ?? null,
+        defaultGrowth: aSports.includes(sport) ? STANDARD_GROWTH : 0,
+        peak: progression[sport]?.peak ?? null,
+        recommended: recommendedPeak(sport, seed.usual, goal),
+        goal: goal ? { name: goal.name, floor: racePeak(sport, goal).floor } : null,
+        doneThisWeek: days
+          .filter((day) => day.date >= inputs.currentWeek)
+          .reduce((sum, day) => sum + (sport === "run" ? day.km : day.minutes), 0),
+      };
+    }),
+  };
+}
+
+/**
+ * The athlete's own peaks above the ones VO2 recommends, in words for the coach: it brings them
+ * up only when they matter (ADR 0058).
+ */
+export function ownPeakNotes(inputs: Inputs): string[] {
+  const { availability, progression } = inputs;
+  if (!availability) return [];
+  return plannedSports(availability).flatMap((sport) => {
+    const peak = progression[sport]?.peak;
+    if (peak == null) return [];
+    const perWeek = sessionsPerWeek(availability, sport);
+    const seed = sportSeed(daysOf(inputs, sport), inputs.currentWeek, perWeek, sport);
+    const recommended = ceilingOf(sport, seed, inputs.goals, inputs.currentWeek, {});
+    if (peak <= recommended) return [];
+    return [
+      `The athlete chose their own ${sport === "run" ? "running" : "riding"} peak of ${amountText(sport, peak)} a week, above the ${amountText(sport, recommended)} VO2 recommends from their usual week. Respect it; bring it up only if they ask about their volume or report fatigue, pain, or injury.`,
+    ];
+  });
 }
 
 /**
@@ -558,6 +633,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       firstWeek: inputs.currentWeek,
       count: WEEKS_AHEAD,
       availability,
+      progression: inputs.progression,
     });
     const weeks = budgets.filter((week) => week.weekStart >= fromWeek);
     const old = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
@@ -616,6 +692,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       weeks: weeksText(ctx),
       plannedBefore: neighbours.map((session) => `${session.weekStart} ${sessionLine(session)}`),
       recentTraining: recentTraining(inputs),
+      athleteChoices: ownPeakNotes(inputs),
       rules: rulesFor(ctx),
     };
     const result = await writeSessions(coach, prompt, ctx, anchors);
@@ -677,6 +754,7 @@ const SIGNED_OUT: CoachPlanState = {
   road: [],
   goals: [],
   vdot: null,
+  volume: null,
 };
 
 /** The stored plan, starting a writing when one is due (only under the coach plan). */
@@ -703,6 +781,44 @@ export async function saveAvailabilityImpl(
     runsPerWeek: availability.runsPerWeek,
     ridesPerWeek: availability.ridesPerWeek,
   });
+  const inputs = await gather(userId);
+  return stateOf(inputs, await startIfDue(userId, inputs));
+}
+
+/**
+ * Saves the progression (ADR 0058). The written weeks from next Monday are written again only
+ * when one of them no longer fits its new budget; otherwise later weeks take the new budgets as
+ * they're written. This week stays: its sessions may have started.
+ */
+export async function saveProgressionImpl(progression: Progression): Promise<CoachPlanState> {
+  const session = await getRequiredSession();
+  const userId = session.user.id;
+  const before = await gather(userId);
+  if (!before.row) throw new Error("Set your availability first.");
+  const nextWeek = addDayKey(before.currentWeek, 7);
+  let requestedFrom: string | null = null;
+  if (before.plan && before.aGoal && before.availability) {
+    const budgets = weekBudgets({
+      runs: before.runs,
+      rides: before.rides,
+      goals: before.goals,
+      aGoal: before.aGoal,
+      firstWeek: before.currentWeek,
+      count: WEEKS_AHEAD,
+      availability: before.availability,
+      progression,
+    });
+    requestedFrom = firstWeekOffBudget(before.plan.weeks, budgets, nextWeek) ? nextWeek : null;
+  }
+  await db
+    .update(coachPlans)
+    .set({
+      progression,
+      updatedAt: new Date(),
+      ...(requestedFrom ? { requestedFrom } : {}),
+    })
+    .where(eq(coachPlans.userId, userId));
+  logger.info("coach_plan.progression_saved", { rewrite: requestedFrom != null });
   const inputs = await gather(userId);
   return stateOf(inputs, await startIfDue(userId, inputs));
 }

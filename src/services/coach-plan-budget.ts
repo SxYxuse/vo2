@@ -1,4 +1,11 @@
-import { planSportOf, type Availability, type PlanSport } from "./coach-plan.types.ts";
+import {
+  planSportOf,
+  sessionsPerWeek,
+  type Availability,
+  type PlanSport,
+  type PlanWeek,
+  type Progression,
+} from "./coach-plan.types.ts";
 import { seasonPhase, type PhaseKind } from "./season-phase.ts";
 import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
 import { addDayKey } from "./day-key.ts";
@@ -6,8 +13,9 @@ import { addDayKey } from "./day-key.ts";
 /*
  * The coach plan's weekly budgets (ADR 0037, ADR 0050). VO2 sets how far the athlete runs and how
  * long they ride each week; the coach only writes sessions inside them. Runs are budgeted in km,
- * rides in minutes, since a ride's distance hangs on terrain, wind, and drafting. Pure, so the
- * numbers are easy to follow.
+ * rides in minutes, since a ride's distance hangs on terrain, wind, and drafting. Each sport grows
+ * at the athlete's progression up to a peak ceiling (ADR 0058). Pure, and shared with the app, so
+ * Plan and Settings draw the season from the same numbers the coach is held to.
  */
 
 /** An activity as the budget and the rules read it: its day, distance, and time. */
@@ -50,8 +58,11 @@ const USUAL_BEST_WEEKS = 4;
 /** ...in the last this many weeks (six months). */
 const USUAL_WINDOW_WEEKS = 26;
 
-/** How much a week grows on the last, by phase, before the cap. */
-const GROWTH: Partial<Record<PhaseKind, number>> = { base: 1.05, build: 1.07, peak: 1.03 };
+/**
+ * How fast each phase grows, as a share of the athlete's progression (the base phase's weekly
+ * growth): Standard's 5 % grows base weeks 5 %, build 7 %, and peak 3 % (ADR 0058).
+ */
+const PHASE_GROWTH: Partial<Record<PhaseKind, number>> = { base: 1, build: 1.4, peak: 0.6 };
 
 /** One sport's amount per week for the `weeks` whole weeks before `weekStart`, oldest first. */
 export function weeklyAmount(
@@ -83,11 +94,16 @@ const average = (values: number[]) =>
  * since.
  */
 export function floorOf(days: SportDay[], weekStart: string, perWeek: number, sport: PlanSport) {
-  const history = weeklyAmount(days, weekStart, USUAL_WINDOW_WEEKS, sport);
-  const usual = average([...history].sort((a, b) => b - a).slice(0, USUAL_BEST_WEEKS));
+  const usual = usualWeek(days, weekStart, sport);
   return usual > 0
     ? usual * RETURN_FLOOR_SHARE
     : perWeek * SPORT_BUDGETS[sport].noHistoryPerSession;
+}
+
+/** The usual week: the average of the best four of the last six months, 0 without history. */
+function usualWeek(days: SportDay[], weekStart: string, sport: PlanSport) {
+  const history = weeklyAmount(days, weekStart, USUAL_WINDOW_WEEKS, sport);
+  return average([...history].sort((a, b) => b - a).slice(0, USUAL_BEST_WEEKS));
 }
 
 /**
@@ -111,6 +127,171 @@ function taperShare(
   return [0.5, 0.75][weeksLeft] ?? null;
 }
 
+// ----- The season's budgets (ADR 0058) -----
+
+/** A week of the season as every sport reads it: its phase and the share of the level it keeps. */
+export type WeekShape = {
+  weekStart: string;
+  phase: PhaseKind;
+  lighter: boolean;
+  taper: boolean;
+  /** The share of the level the week keeps: a lighter week, the taper, a supporting race. */
+  share: number;
+  /** The sports of the A event the week builds toward: they grow by default. */
+  anchorSports: PlanSport[];
+};
+
+/** The season's weeks from `firstWeek`, `count` of them, toward the A goal. */
+export function seasonShape(
+  goals: Goal[],
+  aGoal: Pick<Goal, "date" | "distanceM" | "sportType" | "elevationGainM">,
+  firstWeek: string,
+  count: number,
+): WeekShape[] {
+  return Array.from({ length: count }, (_, index) => {
+    const weekStart = addDayKey(firstWeek, 7 * index);
+    const phase = seasonPhase(goals, weekStart);
+    const weeksLeft = Math.floor(daysBetween(weekStart, aGoal.date) / 7);
+    const taper = weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
+    return {
+      weekStart,
+      phase: phase.kind,
+      lighter: phase.lighter && taper == null,
+      taper: taper != null || phase.kind === "taper" || phase.kind === "race",
+      share: taper ?? phase.loadFactor ?? 1,
+      anchorSports: [...new Set(phase.anchor.flatMap((goal) => planSportOf(goal.sportType) ?? []))],
+    };
+  });
+}
+
+/** Where a sport's season starts from, read from its history. */
+export type SportSeed = {
+  /** The lowest week planned: after a break, or without history (floorOf). */
+  floor: number;
+  /** The level the first week starts from: the best three of the last four weeks. */
+  level: number;
+  /** The four weeks before the first, for the cap. */
+  window: number[];
+  /** The usual week, or the floor without history, never under the level: the ceiling's base. */
+  usual: number;
+};
+
+export function sportSeed(
+  days: SportDay[],
+  firstWeek: string,
+  perWeek: number,
+  sport: PlanSport,
+): SportSeed {
+  const recent = weeklyAmount(days, firstWeek, 4, sport);
+  const floor = floorOf(days, firstWeek, perWeek, sport);
+  const level = Math.max(floor, average([...recent].sort((a, b) => b - a).slice(0, 3)));
+  const usual =
+    usualWeek(days, firstWeek, sport) || perWeek * SPORT_BUDGETS[sport].noHistoryPerSession;
+  return { floor, level, window: recent, usual: Math.max(usual, level) };
+}
+
+/** Standard: the growth before the athlete could set one, and the default for the A goal's sport. */
+export const STANDARD_GROWTH = 5;
+
+/**
+ * The season's relative growth (`G`), and the biggest peak VO2 recommends without a goal in the
+ * sport. From the published plans: runners peak about 1.2 to 2.5 times what they ran, and riders'
+ * biggest week is about 1.35 times their average (Friel). Never more than twice the usual week.
+ */
+const CEILING = {
+  run: { growth: 1.5, noGoalMax: 120 },
+  ride: { growth: 1.35, noGoalMax: 15 * 60 },
+} as const satisfies Record<PlanSport, unknown>;
+
+/** Running race floors and peaks by race distance, longest first (`coaching/running.md`). */
+const RUN_RACE_PEAKS = [
+  { fromKm: 45, floor: 65, max: 130 },
+  { fromKm: 35, floor: 55, max: 120 },
+  { fromKm: 15, floor: 40, max: 90 },
+  { fromKm: 8, floor: 30, max: 70 },
+  { fromKm: 0, floor: 25, max: 60 },
+];
+
+/**
+ * What a goal asks of the sport's peak week: a floor below which the season is thin for it, and a
+ * max beyond what recreational plans prescribe. Rides read the event's rough hours; 15 h keeps a
+ * 6 h long ride at 40 % of the week.
+ */
+export function racePeak(
+  sport: PlanSport,
+  goal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM">,
+): { floor: number; max: number } {
+  if (sport === "run") {
+    const km = (goal.distanceM ?? 0) / 1000;
+    const { floor, max } = RUN_RACE_PEAKS.find((race) => km >= race.fromKm)!;
+    return { floor, max };
+  }
+  const hours = roughGoalHours(goal);
+  return {
+    floor: Math.max(240, hours * 90),
+    max: Math.min(900, Math.max(480, hours * 180)),
+  };
+}
+
+/**
+ * The peak ceiling VO2 recommends: the usual week grown by the season's relative growth, at most
+ * doubled, raised toward the goal's floor and held under its max. An athlete already above it
+ * holds, never cut. Without a goal in the sport, the relative growth alone, under a top.
+ */
+export function recommendedPeak(
+  sport: PlanSport,
+  usual: number,
+  goal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM"> | null,
+) {
+  const { growth, noGoalMax } = CEILING[sport];
+  if (!goal) return Math.max(usual, Math.min(usual * growth, usual * 2, noGoalMax));
+  const race = racePeak(sport, goal);
+  return Math.max(usual, Math.min(race.max, usual * 2, Math.max(race.floor, usual * growth)));
+}
+
+/** The goal that sets a sport's ceiling: its next A goal, else its next goal, with a distance. */
+export function ceilingGoal(goals: Goal[], sport: PlanSport, today: string): Goal | null {
+  const ahead = goals
+    .filter((goal) => goal.date >= today && goal.distanceM && planSportOf(goal.sportType) === sport)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  return ahead.find((goal) => goal.priority === "A") ?? ahead[0] ?? null;
+}
+
+/**
+ * The athlete's own peak moves in round steps (km of running, minutes of riding), and stops only
+ * where a number can no longer be meant: past any recreational week, to catch a slip of the thumb,
+ * not to second-guess the athlete (ADR 0058).
+ */
+export const PEAK_STEP: Record<PlanSport, number> = { run: 5, ride: 30 };
+export const PEAK_LIMIT: Record<PlanSport, number> = { run: 200, ride: 25 * 60 };
+
+/**
+ * One sport's week amounts through the season. The level grows by the progression (or, when the
+ * athlete set none, Standard for the A event's sports and none for the others, as before ADR
+ * 0058), never past the cap over the biggest of the four weeks before, never under the floor,
+ * and never above the ceiling; each week then keeps its share.
+ */
+export function projectSport(
+  shape: WeekShape[],
+  seed: SportSeed,
+  sport: PlanSport,
+  growth: number | null,
+  ceiling: number,
+): number[] {
+  let level = seed.level;
+  const window = [...seed.window];
+  return shape.map((week, index) => {
+    const rate = growth ?? (week.anchorSports.includes(sport) ? STANDARD_GROWTH : 0);
+    if (index > 0) level *= 1 + (rate / 100) * (PHASE_GROWTH[week.phase] ?? 0);
+    const biggest = Math.max(...window.slice(-4));
+    const cap = biggest > 0 ? SPORT_BUDGETS[sport].cap(biggest) : Number.POSITIVE_INFINITY;
+    level = Math.min(ceiling, Math.max(seed.floor, Math.min(cap, level)));
+    const sized = Math.round(level * week.share);
+    window.push(sized);
+    return sport === "ride" ? Math.round(sized / 5) * 5 : sized;
+  });
+}
+
 export type WeekBudget = {
   weekStart: string;
   /** Running km (rule 1); 0 when the athlete plans no runs. */
@@ -122,13 +303,24 @@ export type WeekBudget = {
   taper: boolean;
 };
 
+/** A sport's ceiling: the athlete's own peak, or the one VO2 recommends. */
+export function ceilingOf(
+  sport: PlanSport,
+  seed: SportSeed,
+  goals: Goal[],
+  today: string,
+  progression: Progression,
+) {
+  return (
+    progression[sport]?.peak ?? recommendedPeak(sport, seed.usual, ceilingGoal(goals, sport, today))
+  );
+}
+
 /**
- * Budgets for `count` weeks from `firstWeek`, per sport. Each starts from the athlete's recent
- * level (the average of the best three of the last four weeks) and never exceeds its cap over the
- * biggest of the four weeks before it, actual or planned, unless the floor is higher. Only the
- * sports of the event the week builds toward grow with its phase; the other sport holds where it
- * is (ADR 0050). Lighter weeks keep 70 %, the taper its share, and the weeks around a supporting
- * race what its effort keeps (ADR 0052); the level grows on underneath.
+ * Budgets for `count` weeks from `firstWeek`, per sport: each sport's projection (projectSport)
+ * from its history, at the athlete's progression and up to its ceiling. Lighter weeks keep 70 %,
+ * the taper its share, and the weeks around a supporting race what its effort keeps (ADR 0052);
+ * the level grows on underneath.
  */
 export function weekBudgets(input: {
   runs: SportDay[];
@@ -138,50 +330,61 @@ export function weekBudgets(input: {
   firstWeek: string;
   count: number;
   availability: Availability;
+  progression: Progression;
 }): WeekBudget[] {
-  const { goals, aGoal, firstWeek, count, availability } = input;
-  const sports = {
-    run: { days: input.runs, perWeek: availability.runsPerWeek },
-    ride: { days: input.rides, perWeek: availability.ridesPerWeek },
-  } satisfies Record<PlanSport, unknown>;
-  const state = Object.fromEntries(
-    (Object.keys(sports) as PlanSport[]).map((sport) => {
-      const { days, perWeek } = sports[sport];
-      const recent = weeklyAmount(days, firstWeek, 4, sport);
-      const floor = floorOf(days, firstWeek, perWeek, sport);
-      const level = Math.max(floor, average([...recent].sort((a, b) => b - a).slice(0, 3)));
-      return [sport, { floor, level, window: [...recent] }];
-    }),
-  ) as Record<PlanSport, { floor: number; level: number; window: number[] }>;
+  const { goals, aGoal, firstWeek, count, availability, progression } = input;
+  const shape = seasonShape(goals, aGoal, firstWeek, count);
+  const amounts = (sport: PlanSport, days: SportDay[]) => {
+    const perWeek = sessionsPerWeek(availability, sport);
+    if (!perWeek) return shape.map(() => 0);
+    const seed = sportSeed(days, firstWeek, perWeek, sport);
+    const ceiling = ceilingOf(sport, seed, goals, firstWeek, progression);
+    return projectSport(shape, seed, sport, progression[sport]?.growth ?? null, ceiling);
+  };
+  const run = amounts("run", input.runs);
+  const ride = amounts("ride", input.rides);
+  return shape.map((week, index) => ({
+    weekStart: week.weekStart,
+    budgetKm: run[index]!,
+    budgetMinutes: ride[index]!,
+    phase: week.phase,
+    lighter: week.lighter,
+    taper: week.taper,
+  }));
+}
 
-  const budgets: WeekBudget[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const weekStart = addDayKey(firstWeek, 7 * index);
-    const phase = seasonPhase(goals, weekStart);
-    const growing = new Set(phase.anchor.map((goal) => planSportOf(goal.sportType)));
-    const weeksLeft = Math.floor(daysBetween(weekStart, aGoal.date) / 7);
-    const taper = weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
-    // The phase's share: a lighter week, a recovery week, and the weeks a supporting race changes.
-    const share = taper ?? phase.loadFactor ?? 1;
-    const sized = {} as Record<PlanSport, number>;
-    for (const sport of Object.keys(sports) as PlanSport[]) {
-      const sportState = state[sport];
-      if (index > 0 && growing.has(sport)) sportState.level *= GROWTH[phase.kind] ?? 1;
-      const biggest = Math.max(...sportState.window.slice(-4));
-      const cap = biggest > 0 ? SPORT_BUDGETS[sport].cap(biggest) : Number.POSITIVE_INFINITY;
-      sportState.level = Math.max(sportState.floor, Math.min(cap, sportState.level));
-      sized[sport] = sports[sport].perWeek > 0 ? Math.round(sportState.level * share) : 0;
-      sportState.window.push(sized[sport]);
+/** What a written week holds of a sport, races aside (they're not in the budget). */
+export function plannedAmount(week: Pick<PlanWeek, "sessions">, sport: PlanSport) {
+  return week.sessions
+    .filter((session) => session.sport === sport && session.kind !== "race")
+    .reduce((sum, session) => sum + (sport === "run" ? session.distanceKm : session.minutes), 0);
+}
+
+/** A week may come in this much over its budget, and must reach this share of it (rule 1). */
+const BAND = { over: 1.05, under: 0.9 };
+
+/**
+ * The first written week, from `fromWeek`, whose sessions a new budget leaves out of the band the
+ * plan check accepts: over 105 %, or under 90 % of a budget that grew. A week the coach already
+ * held lower stays (ADR 0058). Null when every written week still fits.
+ */
+export function firstWeekOffBudget(
+  weeks: Pick<PlanWeek, "weekStart" | "sessions" | "budgetKm" | "budgetMinutes">[],
+  budgets: WeekBudget[],
+  fromWeek: string,
+): string | null {
+  for (const week of weeks) {
+    if (week.weekStart < fromWeek) continue;
+    const next = budgets.find((budget) => budget.weekStart === week.weekStart);
+    if (!next) continue;
+    for (const sport of ["run", "ride"] as const) {
+      const before = sport === "run" ? week.budgetKm : (week.budgetMinutes ?? 0);
+      const after = sport === "run" ? next.budgetKm : next.budgetMinutes;
+      const planned = plannedAmount(week, sport);
+      if (planned > after * BAND.over || (after > before && planned < after * BAND.under)) {
+        return week.weekStart;
+      }
     }
-    budgets.push({
-      weekStart,
-      budgetKm: sized.run,
-      // Whole five minutes: the coach sizes rides in round numbers.
-      budgetMinutes: Math.round(sized.ride / 5) * 5,
-      phase: phase.kind,
-      lighter: phase.lighter && taper == null,
-      taper: taper != null || phase.kind === "taper" || phase.kind === "race",
-    });
   }
-  return budgets;
+  return null;
 }

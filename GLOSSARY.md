@@ -93,8 +93,16 @@ What the athlete gives the coach plan: how many runs and how many rides a week, 
 _Avoid_: Schedule, available days, rest days, week shape
 
 **Weekly budget**:
-What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running and minutes of riding. Only the sports of the event the week builds toward grow with its phase; the other holds. Lighter weeks, recovery, and the taper shrink both (ADR 0037, ADR 0050).
+What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running and minutes of riding. Each sport grows with the week's phase at its own progression, up to its peak ceiling. Lighter weeks, recovery, and the taper shrink both (ADR 0037, ADR 0050, ADR 0058).
 _Avoid_: Week target, quota, bucket
+
+**Progression**:
+How fast a sport's weekly budget grows toward the A goal, set per sport by the athlete as a weekly growth from Hold (no growth) through Gentle, Standard, and Bold to Steep, or anywhere between. Growth stops at the sport's peak ceiling, and the coach plan's week-to-week rules always apply (ADR 0058).
+_Avoid_: Ramp, aggressiveness, build rate
+
+**Peak ceiling**:
+The biggest week a sport's budget grows to in a season, after which it holds. VO2 recommends one from the athlete's usual week and that sport's next goal; the athlete may set their own, higher or lower. An athlete already above it is never cut (ADR 0058).
+_Avoid_: Max volume, target volume, peak target
 
 **Training paces**:
 The pace ranges the coach plan's sessions target, from easy to repetition, read from a VDOT. The athlete chooses what it comes from: Automatic (the estimate from recent best efforts), one of their best efforts, or a race result. The easy pace comes from the pace they hold in running zone 2 by default, never faster than marathon pace, or from the VDOT (ADR 0042).
@@ -133,7 +141,7 @@ How a supporting race is run: fun (easy pace, minimal impact on the plan), stead
 _Avoid_: Intensity, intent, objective
 
 **Season**:
-The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. Plan shows the season week by week through the last goal, with each week's phase, the written weeks, and what the plan does for each goal ahead (ADR 0050).
+The athlete's goals in date order. The coach plan works toward the next A run or ride, and adds the season's other runs and rides as races. Plan shows the season week by week through the last goal, with each week's phase and running and riding budget, the written weeks, and what the plan does for each goal ahead (ADR 0050, ADR 0058).
 _Avoid_: Calendar, year, block
 
 **Phase**:
