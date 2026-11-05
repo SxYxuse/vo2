@@ -28,14 +28,27 @@ for (const [way, goBack] of Object.entries(WAYS_BACK)) {
   });
 }
 
+/**
+ * Picks a model and waits for its save: networkidle has already passed once the page loaded, so
+ * settle() would let a reload, or the end of the test, cancel the save on its way.
+ */
+async function pickModel(page: Page, feature: string, model: string) {
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().includes("/_serverFn/") &&
+      (response.request().postData() ?? "").includes(model),
+  );
+  await page.getByRole("combobox", { name: feature }).selectOption(model);
+  expect((await saved).ok()).toBe(true);
+}
+
 test("a model picked for a coach feature stays picked on every visit", async ({ page }) => {
   await page.goto("/settings/coach");
   await settle(page);
   const chat = page.getByRole("combobox", { name: "Coach chat" });
   await expect(chat).toHaveValue("openai/gpt-6-luna");
 
-  await chat.selectOption("anthropic/claude-sonnet-5.5");
-  await settle(page);
+  await pickModel(page, "Coach chat", "anthropic/claude-sonnet-5.5");
   await page.reload();
   await settle(page);
 
@@ -46,8 +59,7 @@ test("a model picked for a coach feature stays picked on every visit", async ({ 
     "openai/gpt-6-luna",
   );
   // Back to the default, so the other specs see the athlete as the setup left them.
-  await page.getByRole("combobox", { name: "Coach chat" }).selectOption("openai/gpt-6-luna");
-  await settle(page);
+  await pickModel(page, "Coach chat", "openai/gpt-6-luna");
 });
 
 /**
