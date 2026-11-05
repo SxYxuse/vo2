@@ -103,9 +103,12 @@ export function CoachChatList({ currentId }: { currentId: string }) {
         setOpen(next);
       }}
     >
-      <SheetTrigger render={<Button variant="outline" size="sm" />}>
+      {/* Icon-only and 44px on phones, where the header is narrow. */}
+      <SheetTrigger
+        render={<Button variant="ghost" size="sm" className="max-sm:size-11 max-sm:px-0" />}
+      >
         <HistoryIcon />
-        Chats
+        <span className="max-sm:sr-only">Chats</span>
       </SheetTrigger>
       <SheetContent className="pb-[env(safe-area-inset-bottom)]">
         <SheetHeader className="pt-[max(1.5rem,env(safe-area-inset-top))]">

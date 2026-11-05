@@ -244,7 +244,7 @@ export function CoachComposer({
           </CommandList>
         </Command>
       ) : null}
-      <InputGroup>
+      <InputGroup className="bg-background dark:bg-input/30 rounded-2xl shadow-sm has-data-[align=block-end]:rounded-2xl has-data-[align=block-start]:rounded-2xl">
         {mentions.length ? (
           <InputGroupAddon align="block-start">
             <AttachmentGroup className="w-full">
@@ -267,7 +267,7 @@ export function CoachComposer({
           disabled={disabled}
           placeholder={placeholder}
           rows={1}
-          className="max-h-40 min-h-11 text-base sm:text-sm"
+          className="max-h-40 min-h-12 px-3.5 pt-3 text-base sm:text-sm"
           aria-label="Message the coach"
           onChange={(event) => {
             setText(event.target.value);
@@ -279,7 +279,7 @@ export function CoachComposer({
         <InputGroupAddon align="block-end" className="justify-between">
           <InputGroupButton
             size="icon-sm"
-            className={TOUCH_BUTTON}
+            className={`${TOUCH_BUTTON} rounded-full`}
             variant="ghost"
             aria-label="Mention an activity"
             disabled={disabled}
@@ -290,7 +290,7 @@ export function CoachComposer({
           {busy ? (
             <InputGroupButton
               size="icon-sm"
-              className={TOUCH_BUTTON}
+              className={`${TOUCH_BUTTON} rounded-full`}
               variant="default"
               aria-label="Stop"
               onClick={onStop}
@@ -300,7 +300,7 @@ export function CoachComposer({
           ) : (
             <InputGroupButton
               size="icon-sm"
-              className={TOUCH_BUTTON}
+              className={`${TOUCH_BUTTON} rounded-full`}
               variant="default"
               aria-label="Send"
               disabled={disabled || (!text.trim() && !mentions.length)}
