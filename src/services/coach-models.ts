@@ -47,7 +47,7 @@ export const COACH_FEATURES = [
   {
     id: "plan",
     label: "Plan writing",
-    hint: "Writes the coach plan's rides and runs, four weeks ahead.",
+    hint: "Writes the coach plan's runs, rides, and swims, four weeks ahead.",
   },
 ] as const;
 

@@ -1,6 +1,6 @@
 # VO2
 
-VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and has the coach plan each week's runs and rides toward their goals.
+VO2 is a personal training companion: it copies an athlete's Strava activities, scores fitness and form, and has the coach plan each week's runs, rides, and swims toward their goals.
 
 ## People
 
@@ -77,23 +77,23 @@ How VO2 plans the athlete's training, chosen in onboarding and settings: the coa
 _Avoid_: Plan type, planning mode
 
 **Coach plan**:
-The planning style where the coach writes precise runs and rides for the next four weeks, toward the season led by an A run or ride, inside the weekly budgets VO2 allows. Its sessions have no day or order (ADR 0048). Swims, walks, and other sports count toward load but aren't planned. It is a coach feature (ADR 0037, ADR 0050).
+The planning style where the coach writes precise runs, rides, and swims for the next four weeks, toward the season led by an A run, ride, or swim, inside the weekly budgets VO2 allows. Its sessions have no day or order (ADR 0048). Walks and other sports count toward load but aren't planned. It is a coach feature (ADR 0037, ADR 0050, ADR 0061).
 _Avoid_: AI plan, Runna plan
 
 **Plan sport**:
-A sport the coach plan writes sessions for: runs (the running sport group) or rides (the cycling sport group). Each session has one (ADR 0050).
+A sport the coach plan writes sessions for: runs (the running sport group), rides (the cycling sport group), or swims (the swimming sport group). Each session has one (ADR 0050, ADR 0061).
 _Avoid_: Sport family, discipline
 
 **The week's sessions**:
-The coach plan's runs and rides for one training week, shown as one unordered set with each session's sport and size: a run's distance, a ride's time. A session is done when the athlete marks it, otherwise open (ADR 0048).
+The coach plan's runs, rides, and swims for one training week, shown as one unordered set with each session's sport and size: a run's distance, a ride's time, a swim's metres. A session is done when the athlete marks it, otherwise open (ADR 0048).
 _Avoid_: Week plan, schedule, key sessions
 
 **Availability**:
-What the athlete gives the coach plan: how many runs and how many rides a week, 0 to 6 each. It has no days and no time per day (ADR 0041, ADR 0048, ADR 0050).
+What the athlete gives the coach plan: how many runs, rides, and swims a week, 0 to 6 each. It has no days and no time per day (ADR 0041, ADR 0048, ADR 0050, ADR 0061).
 _Avoid_: Schedule, available days, rest days, week shape
 
 **Weekly budget**:
-What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running and minutes of riding. Each sport grows with the week's phase at its own progression, up to its peak ceiling. Lighter weeks, recovery, and the taper shrink both (ADR 0037, ADR 0050, ADR 0058).
+What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running, minutes of riding, and metres of swimming. Each sport grows with the week's phase at its own progression, up to its peak ceiling. Lighter weeks, recovery, and the taper shrink every sport (ADR 0037, ADR 0050, ADR 0058, ADR 0061).
 _Avoid_: Week target, quota, bucket
 
 **Progression**:
@@ -233,6 +233,10 @@ An anchor is either estimated by VO2 or set by the athlete. A set anchor wins ov
 **FTP**:
 Estimated ~60-minute maximal cycling power, used as the cycling power anchor.
 _Avoid_: Threshold watts, FTP watts as a second term
+
+**CSS**:
+Critical swim speed: a threshold swim pace in seconds per 100 m, estimated from the athlete's fastest 200 m and 400 m in recent swims. The coach plan's swim zones are offsets from it (ADR 0061).
+_Avoid_: Threshold pace (that is running), swim FTP
 
 **LTHR**:
 Lactate-threshold heart rate. It is sport-specific: cycling LTHR, running LTHR, and swimming LTHR are different numbers.

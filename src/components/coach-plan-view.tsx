@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { writeCoachPlanAgain } from "@/services/coach-plan.ts";
 import {
   minutesText,
+  PLAN_SPORTS,
   sessionKindLabel,
   type CoachPlanState,
   type PlanWeek,
@@ -38,7 +39,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 /*
  * The Plan view for coach-plan athletes: the week shown with arrows to the other written weeks,
- * its runs and rides as one unordered list (ADR 0048: no day, no order), and the plan against the
+ * its runs, rides, and swims as one unordered list (ADR 0048: no day, no order), and the plan against the
  * season (coach-plan-season.tsx). On desktop the season sits beside the week.
  */
 
@@ -116,7 +117,7 @@ function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanStat
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
             <Icon
-              aria-label={ride ? "Ride" : "Run"}
+              aria-label={PLAN_SPORTS.find((sport) => sport.id === run.sport)?.label}
               className={cn("size-3.5 shrink-0", iconClass)}
             />
             <span className="truncate">{run.title}</span>
@@ -132,8 +133,12 @@ function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanStat
             minutesText(run.minutes)
           ) : (
             <>
-              {run.distanceKm}
-              <small className="text-muted-foreground ms-1 text-xs font-medium">km</small>
+              {run.sport === "swim"
+                ? Math.round(run.distanceKm * 1000).toLocaleString("en")
+                : run.distanceKm}
+              <small className="text-muted-foreground ms-1 text-xs font-medium">
+                {run.sport === "swim" ? "m" : "km"}
+              </small>
             </>
           )}
         </span>

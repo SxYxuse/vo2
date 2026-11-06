@@ -387,15 +387,15 @@ async function setRunningLthr(page: Page, bpm: string) {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
 
-/** Pastes one goal into Season. */
-async function pasteGoal(page: Page, goal: Record<string, unknown>) {
+/** Pastes goals into Season: one, or each leg of a multisport event. */
+async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);
   await page.getByRole("button", { name: "More season actions" }).click();
   await page.getByRole("menuitem", { name: "Paste season" }).click();
   await page
     .getByRole("textbox", { name: "Copied season" })
-    .fill(JSON.stringify({ vo2Season: 1, goals: [goal] }));
+    .fill(JSON.stringify({ vo2Season: 1, goals }));
   await page.getByRole("button", { name: "Add goals" }).click();
   await expect(page.getByRole("heading", { name: "Paste a season" })).toHaveCount(0);
 }
@@ -413,12 +413,16 @@ async function deleteGoalIfThere(page: Page, name: RegExp) {
 }
 
 /**
- * Runs and rides a week. Availability is only how many (ADR 0048, ADR 0050): no days, no long run
- * day, and no time per day (ADR 0041).
+ * Runs, rides, and swims a week (none unless given). Availability is only how many (ADR 0048, ADR
+ * 0050, ADR 0061): no days, no long run day, and no time per day (ADR 0041).
  */
-async function setAvailability(page: Page, { runs, rides }: { runs: number; rides: number }) {
+async function setAvailability(
+  page: Page,
+  { runs, rides, swims = 0 }: { runs: number; rides: number; swims?: number },
+) {
   await page.getByRole("button", { name: `${runs} runs a week` }).click();
   await page.getByRole("button", { name: `${rides} rides a week` }).click();
+  await page.getByRole("button", { name: `${swims} swims a week` }).click();
   await expect(page.getByText("Days you can run")).toHaveCount(0);
   await expect(page.getByText("Long run day")).toHaveCount(0);
   await expect(page.getByText("Time you have")).toHaveCount(0);
@@ -658,7 +662,14 @@ async function addRaceAndWritePlan(page: Page, availability: { runs: number; rid
     elevationGainM: null,
     priority: "A",
   });
+  await saveAvailabilityAndWrite(page, availability);
+}
 
+/** Saves availability in Settings → Training; ends on Plan with the plan written. */
+async function saveAvailabilityAndWrite(
+  page: Page,
+  availability: { runs: number; rides: number; swims?: number },
+) {
   await page.goto("/settings/training");
   await settle(page);
   await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
@@ -684,6 +695,65 @@ async function leaveCoachPlan(page: Page) {
   await dropWrittenPlan();
   await deleteGoalIfThere(page, /Run · 21\.1 km/);
 }
+
+test("a triathlete plans swims beside rides and runs, opens a swim, and stops swimming", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const raceDay = new Date(Date.parse(E2E_NOW) + 84 * 86_400_000).toISOString().slice(0, 10);
+  const leg = (sportType: string, distanceM: number) => ({
+    name: "Lake tri",
+    sportType,
+    date: raceDay,
+    distanceM,
+    elevationGainM: null,
+    priority: "A",
+  });
+  try {
+    await choosePlanningStyle(page, "Coach plan", "coachPlan");
+    // A triathlon is one A goal per leg on the same day; every leg builds (ADR 0061).
+    await pasteGoal(page, leg("Swim", 1500), leg("Ride", 40_000), leg("Run", 10_000));
+    await saveAvailabilityAndWrite(page, { runs: 3, rides: 2, swims: 2 });
+
+    const weekHeading = page.getByRole("heading", { name: WEEK_HEADING });
+    await expect(weekHeading).toHaveText(/ · [\d,]+ m swimming$/);
+    const swims = weekSessions(page).filter({ has: page.getByLabel("Swim") });
+    // This week may hold fewer than two, when its budget or its days left allow only one.
+    await expect(swims.first()).toBeVisible();
+    // Every leg of the A triathlon builds, swimming too (ADR 0061).
+    const season = page.getByRole("region", { name: "Your season" });
+    await expect(
+      season.getByText(/^Progression: running Standard · riding Standard · swimming Standard$/),
+    ).toBeVisible();
+
+    // A swim is planned in metres and aimed at swim zones from CSS, read from the mock swims.
+    await swims.first().getByRole("button", { name: "Open the session" }).click();
+    await expect(page.getByText("Width is distance, height and colour are effort.")).toBeVisible();
+    await expect(page.getByText(/^[\d,]+ m$/).first()).toBeVisible();
+    await expect(page.getByText(/endurance at \d:\d\d–\d:\d\d \/100m/).first()).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot("coach-swim-session.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+    await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
+
+    // The way out: no swims a week, and the plan is written again without them.
+    await saveAvailabilityAndWrite(page, { runs: 3, rides: 2, swims: 0 });
+    await expect(weekHeading).not.toHaveText(/swimming/);
+    await expect(weekSessions(page).filter({ has: page.getByLabel("Swim") })).toHaveCount(0);
+  } finally {
+    // The other specs expect no swims a week and none of the triathlon's legs.
+    await withDatabase(async (client) => {
+      await client.query(
+        `update coach_plans set availability = jsonb_set(availability, '{swimsPerWeek}', '0')`,
+      );
+      await client.query(`delete from goals where name = 'Lake tri'`);
+    });
+    await choosePlanningStyle(page, "Off", "off");
+    await dropWrittenPlan();
+  }
+});
 
 test("an athlete changes the coach plan from the chat and from a note on a week", async ({
   page,

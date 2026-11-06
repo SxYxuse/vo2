@@ -1,5 +1,8 @@
 import {
+  budgetOf,
+  PLAN_SPORTS,
   planSportOf,
+  sessionAmount,
   sessionsPerWeek,
   type Availability,
   type PlanSport,
@@ -11,9 +14,10 @@ import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
 import { addDayKey } from "./day-key.ts";
 
 /*
- * The coach plan's weekly budgets (ADR 0037, ADR 0050). VO2 sets how far the athlete runs and how
- * long they ride each week; the coach only writes sessions inside them. Runs are budgeted in km,
- * rides in minutes, since a ride's distance hangs on terrain, wind, and drafting. Each sport grows
+ * The coach plan's weekly budgets (ADR 0037, ADR 0050, ADR 0061). VO2 sets how far the athlete runs
+ * and swims and how long they ride each week; the coach only writes sessions inside them. Runs are
+ * budgeted in km, swims in metres, rides in minutes, since a ride's distance hangs on terrain,
+ * wind, and drafting while a pool's lengths are exact. Each sport grows
  * at the athlete's progression up to a peak ceiling (ADR 0058). Pure, and shared with the app, so
  * Plan and Settings draw the season from the same numbers the coach is held to.
  */
@@ -25,7 +29,7 @@ export type RunDay = SportDay;
 
 /** How each sport's week is measured and allowed to grow. */
 type SportBudget = {
-  /** The week's amount of an activity: km for runs, minutes for rides. */
+  /** The week's amount of an activity: km for runs, minutes for rides, metres for swims. */
   amount: (day: SportDay) => number;
   /** Never more than this over the biggest of the last four weeks (rule 1). */
   cap: (biggest: number) => number;
@@ -48,6 +52,13 @@ const SPORT_BUDGETS: Record<PlanSport, SportBudget> = {
     amount: (day) => day.minutes,
     cap: (biggest) => Math.max(biggest * 1.1, biggest + 30),
     noHistoryPerSession: 60,
+  },
+  // Swims: 10 % a week, as swim coaches advise for the shoulder, or 500 m for a small week
+  // (`coaching/swimming.md`).
+  swim: {
+    amount: (day) => day.km * 1000,
+    cap: (biggest) => Math.max(biggest * 1.1, biggest + 500),
+    noHistoryPerSession: 1500,
   },
 };
 
@@ -89,7 +100,7 @@ const average = (values: number[]) =>
 
 /**
  * The lowest week VO2 plans. With none of the sport in six months: sessions per week × 3 km of
- * running or 60 minutes of riding. Otherwise 60 % of the usual week (the best four of the last six
+ * running, 60 minutes of riding, or 1,500 m of swimming. Otherwise 60 % of the usual week (the best four of the last six
  * months), so an athlete back from a break restarts near where they were, not from the little
  * since.
  */
@@ -116,16 +127,24 @@ function taperShare(
   weeksLeft: number,
   aGoal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM">,
 ) {
-  if (planSportOf(aGoal.sportType) === "ride") {
+  const sport = planSportOf(aGoal.sportType);
+  if (sport === "ride") {
     return roughGoalHours(aGoal) >= 5
       ? ([0.5, 0.6, 0.85][weeksLeft] ?? null)
       : ([0.5, 0.75][weeksLeft] ?? null);
   }
+  if (sport === "swim") return SWIM_TAPER[weeksLeft] ?? null;
   const raceKm = (aGoal.distanceM ?? 0) / 1000;
   if (raceKm >= 35) return [0.4, 0.6, 0.8][weeksLeft] ?? null;
   if (raceKm >= 15) return [0.5, 0.7, 0.9][weeksLeft] ?? null;
   return [0.5, 0.75][weeksLeft] ?? null;
 }
+
+/**
+ * The share a swim goal's taper keeps, race week first (`coaching/swimming.md`): two weeks, 70 %
+ * then 50 %, a cut inside the 41–60 % that worked best (Bosquet 2007), intensity kept.
+ */
+const SWIM_TAPER = [0.5, 0.7];
 
 // ----- The season's budgets (ADR 0058) -----
 
@@ -196,11 +215,13 @@ export const STANDARD_GROWTH = 5;
 /**
  * The season's relative growth (`G`), and the biggest peak VO2 recommends without a goal in the
  * sport. From the published plans: runners peak about 1.2 to 2.5 times what they ran, and riders'
- * biggest week is about 1.35 times their average (Friel). Never more than twice the usual week.
+ * biggest week is about 1.35 times their average (Friel). No source sets swimmers'; 1.3 is
+ * guidance (`coaching/swimming.md`). Never more than twice the usual week.
  */
 const CEILING = {
   run: { growth: 1.5, noGoalMax: 120 },
   ride: { growth: 1.35, noGoalMax: 15 * 60 },
+  swim: { growth: 1.3, noGoalMax: 20_000 },
 } as const satisfies Record<PlanSport, unknown>;
 
 /** Running race floors and peaks by race distance, longest first (`coaching/running.md`). */
@@ -210,6 +231,14 @@ const RUN_RACE_PEAKS = [
   { fromKm: 15, floor: 40, max: 90 },
   { fromKm: 8, floor: 30, max: 70 },
   { fromKm: 0, floor: 25, max: 60 },
+];
+
+/** Swim race floors and peaks in metres by race distance, longest first (`coaching/swimming.md`). */
+const SWIM_RACE_PEAKS = [
+  { fromM: 5000, floor: 10_000, max: 20_000 },
+  { fromM: 3000, floor: 7000, max: 15_000 },
+  { fromM: 1700, floor: 5000, max: 12_000 },
+  { fromM: 0, floor: 4000, max: 12_000 },
 ];
 
 /**
@@ -224,6 +253,11 @@ export function racePeak(
   if (sport === "run") {
     const km = (goal.distanceM ?? 0) / 1000;
     const { floor, max } = RUN_RACE_PEAKS.find((race) => km >= race.fromKm)!;
+    return { floor, max };
+  }
+  if (sport === "swim") {
+    const metres = goal.distanceM ?? 0;
+    const { floor, max } = SWIM_RACE_PEAKS.find((race) => metres >= race.fromM)!;
     return { floor, max };
   }
   const hours = roughGoalHours(goal);
@@ -258,12 +292,16 @@ export function ceilingGoal(goals: Goal[], sport: PlanSport, today: string): Goa
 }
 
 /**
- * The athlete's own peak moves in round steps (km of running, minutes of riding), and stops only
+ * The athlete's own peak moves in round steps (km of running, minutes of riding, metres of
+ * swimming), and stops only
  * where a number can no longer be meant: past any recreational week, to catch a slip of the thumb,
  * not to second-guess the athlete (ADR 0058).
  */
-export const PEAK_STEP: Record<PlanSport, number> = { run: 5, ride: 30 };
-export const PEAK_LIMIT: Record<PlanSport, number> = { run: 200, ride: 25 * 60 };
+export const PEAK_STEP: Record<PlanSport, number> = { run: 5, ride: 30, swim: 500 };
+export const PEAK_LIMIT: Record<PlanSport, number> = { run: 200, ride: 25 * 60, swim: 60_000 };
+
+/** Budgets are rounded to a step the athlete reads: whole km, 5 minutes, 100 m. */
+const ROUND_TO: Record<PlanSport, number> = { run: 1, ride: 5, swim: 100 };
 
 /**
  * One sport's week amounts through the season. The level grows by the progression (or, when the
@@ -288,7 +326,7 @@ export function projectSport(
     level = Math.min(ceiling, Math.max(seed.floor, Math.min(cap, level)));
     const sized = Math.round(level * week.share);
     window.push(sized);
-    return sport === "ride" ? Math.round(sized / 5) * 5 : sized;
+    return Math.round(sized / ROUND_TO[sport]) * ROUND_TO[sport];
   });
 }
 
@@ -298,6 +336,8 @@ export type WeekBudget = {
   budgetKm: number;
   /** Riding minutes (rule 1); 0 when the athlete plans no rides. */
   budgetMinutes: number;
+  /** Swimming metres (rule 1); 0 when the athlete plans no swims. */
+  budgetSwimM: number;
   phase: PhaseKind;
   lighter: boolean;
   taper: boolean;
@@ -325,6 +365,7 @@ export function ceilingOf(
 export function weekBudgets(input: {
   runs: SportDay[];
   rides: SportDay[];
+  swims: SportDay[];
   goals: Goal[];
   aGoal: Pick<Goal, "date" | "distanceM" | "sportType" | "elevationGainM">;
   firstWeek: string;
@@ -343,10 +384,12 @@ export function weekBudgets(input: {
   };
   const run = amounts("run", input.runs);
   const ride = amounts("ride", input.rides);
+  const swim = amounts("swim", input.swims);
   return shape.map((week, index) => ({
     weekStart: week.weekStart,
     budgetKm: run[index]!,
     budgetMinutes: ride[index]!,
+    budgetSwimM: swim[index]!,
     phase: week.phase,
     lighter: week.lighter,
     taper: week.taper,
@@ -357,7 +400,7 @@ export function weekBudgets(input: {
 export function plannedAmount(week: Pick<PlanWeek, "sessions">, sport: PlanSport) {
   return week.sessions
     .filter((session) => session.sport === sport && session.kind !== "race")
-    .reduce((sum, session) => sum + (sport === "run" ? session.distanceKm : session.minutes), 0);
+    .reduce((sum, session) => sum + sessionAmount(session), 0);
 }
 
 /** A week may come in this much over its budget, and must reach this share of it (rule 1). */
@@ -369,7 +412,7 @@ const BAND = { over: 1.05, under: 0.9 };
  * held lower stays (ADR 0058). Null when every written week still fits.
  */
 export function firstWeekOffBudget(
-  weeks: Pick<PlanWeek, "weekStart" | "sessions" | "budgetKm" | "budgetMinutes">[],
+  weeks: Pick<PlanWeek, "weekStart" | "sessions" | "budgetKm" | "budgetMinutes" | "budgetSwimM">[],
   budgets: WeekBudget[],
   fromWeek: string,
 ): string | null {
@@ -377,9 +420,9 @@ export function firstWeekOffBudget(
     if (week.weekStart < fromWeek) continue;
     const next = budgets.find((budget) => budget.weekStart === week.weekStart);
     if (!next) continue;
-    for (const sport of ["run", "ride"] as const) {
-      const before = sport === "run" ? week.budgetKm : (week.budgetMinutes ?? 0);
-      const after = sport === "run" ? next.budgetKm : next.budgetMinutes;
+    for (const { id: sport } of PLAN_SPORTS) {
+      const before = budgetOf(week, sport);
+      const after = budgetOf(next, sport);
       const planned = plannedAmount(week, sport);
       if (planned > after * BAND.over || (after > before && planned < after * BAND.under)) {
         return week.weekStart;

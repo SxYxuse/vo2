@@ -8,8 +8,10 @@ import { cn } from "cn";
 
 import {
   amountText,
+  metresText,
   minutesText,
   planSportOf,
+  sessionAmount,
   progressionLabel,
   type CoachPlanState,
   type PlanWeek,
@@ -35,15 +37,20 @@ import {
  * outlined, goals marked by priority), and the four written weeks with what each holds.
  */
 
-/** "17 km running · 5 h 20 riding", leaving out a sport the week doesn't hold. */
+/**
+ * "17 km running · 5 h 20 riding · 6,400 m swimming", leaving out a sport the week doesn't hold.
+ */
 export function weekTotals(week: PlanWeek) {
   const runs = week.sessions.filter((session) => session.sport === "run");
   const rides = week.sessions.filter((session) => session.sport === "ride");
+  const swims = week.sessions.filter((session) => session.sport === "swim");
   const km = Math.round(runs.reduce((sum, run) => sum + run.distanceKm, 0));
   const minutes = rides.reduce((sum, ride) => sum + ride.minutes, 0);
+  const metres = swims.reduce((sum, swim) => sum + sessionAmount(swim), 0);
   return [
     runs.length ? `${km} km running` : null,
     rides.length ? `${minutesText(Math.round(minutes / 5) * 5)} riding` : null,
+    swims.length ? `${metresText(Math.round(metres / 100) * 100)} swimming` : null,
   ]
     .filter(Boolean)
     .join(" · ");

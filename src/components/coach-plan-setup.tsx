@@ -60,10 +60,11 @@ export function availabilityIssue(value: Availability) {
 const SPORT_FIELDS = [
   { sport: "run", key: "runsPerWeek", legend: "Runs a week", noun: "runs" },
   { sport: "ride", key: "ridesPerWeek", legend: "Rides a week", noun: "rides" },
+  { sport: "swim", key: "swimsPerWeek", legend: "Swims a week", noun: "swims" },
 ] as const;
 
 /**
- * Availability (ADR 0048, ADR 0050): how many runs and rides a week. The coach writes each week's
+ * Availability (ADR 0048, ADR 0050, ADR 0061): how many runs, rides, and swims a week. The coach writes each week's
  * sessions, and the athlete picks the days to do them. 0 plans none of that sport.
  */
 export function AvailabilityFields({
@@ -79,8 +80,8 @@ export function AvailabilityFields({
   return (
     <FieldGroup>
       <FieldDescription>
-        The coach writes that many runs and rides each week. You pick the days to do them. 0 plans
-        none of that sport.
+        The coach writes that many runs, rides, and swims each week. You pick the days to do them. 0
+        plans none of that sport.
       </FieldDescription>
       {SPORT_FIELDS.map((field) => (
         <FieldSet key={field.key}>
@@ -117,9 +118,9 @@ export function AvailabilityFields({
 /** Availability with the A goal's sport planned: a first ride goal asks for rides, not runs. */
 export function availabilityForGoal(value: Availability, goalSportType: string | undefined) {
   const sport = goalSportType ? planSportOf(goalSportType) : null;
-  if (sport === "ride" && value.ridesPerWeek === 0) return { ...value, ridesPerWeek: 3 };
-  if (sport === "run" && value.runsPerWeek === 0) return { ...value, runsPerWeek: 3 };
-  return value;
+  const field = SPORT_FIELDS.find((item) => item.sport === sport);
+  if (!field || value[field.key] > 0) return value;
+  return { ...value, [field.key]: 3 };
 }
 
 const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
@@ -132,7 +133,7 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
     ),
   },
   goal: {
-    text: "The plan builds toward an upcoming A goal: a run or a ride with a distance.",
+    text: "The plan builds toward an upcoming A goal: a run, a ride, or a swim with a distance.",
     link: (
       <Link to="/season" className="underline">
         Add one in Season
@@ -140,7 +141,7 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
     ),
   },
   availability: {
-    text: "The coach needs to know how many times a week you run and ride.",
+    text: "The coach needs to know how many times a week you run, ride, and swim.",
     link: (
       <Link to="/settings/$section" params={{ section: "training" }} className="underline">
         Set it in Settings → Training
@@ -189,9 +190,25 @@ const DISTANCES: Record<PlanSport, { label: string; metres: number }[]> = {
     { label: "160 km", metres: 160_000 },
     { label: "200 km", metres: 200_000 },
   ],
+  swim: [
+    { label: "1.5 km", metres: 1500 },
+    { label: "1.9 km", metres: 1900 },
+    { label: "3.8 km", metres: 3800 },
+    { label: "5 km", metres: 5000 },
+  ],
 };
 
-const GOAL_SPORT_TYPE = { run: "Run", ride: "Ride" } as const satisfies Record<PlanSport, string>;
+const GOAL_SPORT_TYPE = {
+  run: "Run",
+  ride: "Ride",
+  swim: "Swim",
+} as const satisfies Record<PlanSport, string>;
+
+const PLACEHOLDER: Record<PlanSport, string> = {
+  run: "City half marathon",
+  ride: "Mountain gran fondo",
+  swim: "Lake crossing",
+};
 
 function formatKm(metres: number) {
   return `${Math.round(metres / 100) / 10} km`;
@@ -239,9 +256,9 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
         <FlagIcon />
         <AlertTitle>{state.aGoal.name}</AlertTitle>
         <AlertDescription>
-          {state.aGoal.date} · {formatKm(state.aGoal.distanceM ?? 0)}
-          {planSportOf(state.aGoal.sportType) === "ride" ? " ride" : " run"}. The plan builds toward
-          it, and toward the rest of your season. Change it anytime in Season.
+          {state.aGoal.date} · {formatKm(state.aGoal.distanceM ?? 0)}{" "}
+          {planSportOf(state.aGoal.sportType) ?? "run"}. The plan builds toward it, and toward the
+          rest of your season. Change it anytime in Season.
         </AlertDescription>
       </Alert>
     );
@@ -251,15 +268,16 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
   return (
     <FieldGroup>
       <FieldDescription>
-        The coach plan builds toward an A race: a run or a ride with a distance. Add yours here; you
-        can add more goals, of either sport, in Season later.
+        The coach plan builds toward an A race: a run, a ride, or a swim with a distance. Add yours
+        here; you can add more goals, of any sport, in Season later. A triathlon is one goal per
+        leg, on the same day.
       </FieldDescription>
       <FieldSet>
         <FieldLegend variant="label">Sport</FieldLegend>
         <ToggleGroup
           variant="outline"
           spacing={1}
-          className="grid w-full grid-cols-2"
+          className="grid w-full grid-cols-3"
           value={[sport]}
           onValueChange={(next) => {
             const picked = (next as string[])[0] as PlanSport | undefined;
@@ -274,6 +292,9 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           <ToggleGroupItem value="ride" className="w-full">
             Ride
           </ToggleGroupItem>
+          <ToggleGroupItem value="swim" className="w-full">
+            Swim
+          </ToggleGroupItem>
         </ToggleGroup>
       </FieldSet>
       <Field>
@@ -282,7 +303,7 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           id="coach-goal-name"
           value={name}
           maxLength={120}
-          placeholder={sport === "ride" ? "Mountain gran fondo" : "City half marathon"}
+          placeholder={PLACEHOLDER[sport]}
           onChange={(event) => setName(event.target.value)}
         />
       </Field>

@@ -75,7 +75,7 @@ export const PLANNING_STYLES = [
   {
     id: "coachPlan",
     label: "Coach plan",
-    hint: "The coach writes precise rides and runs for the next four weeks toward your season, on your own key.",
+    hint: "The coach writes precise runs, rides, and swims for the next four weeks toward your season, on your own key.",
   },
   {
     id: "off",

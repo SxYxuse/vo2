@@ -1,6 +1,9 @@
 import {
+  budgetOf,
   isQualityKind,
+  metresText,
   minutesText,
+  sessionAmount,
   plannedSports,
   sessionsPerWeek,
   stepSecPerKm,
@@ -12,6 +15,7 @@ import {
 import {
   MAX_LONG_MINUTES,
   MAX_LONG_RIDE_MINUTES,
+  MAX_LONG_SWIM_MINUTES,
   MAX_QUALITY_ACROSS_SPORTS,
   longShareCount,
   longestAllowed,
@@ -66,22 +70,49 @@ function rideStep(part: Step["part"], minutes: number, zone: Step["zone"]): Step
   };
 }
 
-/** Per sport: the step it grows by, its long-session cap, its share, and its sessions. */
+/** A swim step: metres at a zone, or rest at the wall when `restS` is given. */
+function swimStep(part: Step["part"], metres: number, zone: Step["zone"], restS?: number): Step {
+  return {
+    part,
+    distanceM: restS == null ? metres : null,
+    durationS: restS ?? null,
+    pace: null,
+    secPerKm: null,
+    zone: restS == null ? zone : null,
+    effort: restS == null ? null : "easy",
+  };
+}
+
+/** Per sport: the step it grows by, its smallest session, its share, and how quality sizes. */
 const MOCK = {
-  run: { step: 0.1, start: 2, round: tenth, share: maxLongShare },
+  run: { step: 0.1, start: 2, round: tenth, share: maxLongShare, minQuality: 5 },
   ride: {
     step: 5,
     start: 45,
     round: (minutes: number) => Math.round(minutes),
     share: maxLongRideShare,
+    minQuality: 55,
   },
-} as const;
+  swim: {
+    step: 100,
+    start: 1000,
+    round: (metres: number) => Math.round(metres),
+    share: maxLongRideShare,
+    minQuality: 1500,
+  },
+} as const satisfies Record<PlanSport, unknown>;
 
 export function mockCoachPlan(
   ctx: RuleContext,
   paces: Record<PaceType, PaceRange> | null,
 ): WrittenSession[] {
   const easySecPerKm = stepSecPerKm(runStep("work", 1, "easy", paces), paces);
+  /** The longest session's time cap, in the sport's unit, a little under it. */
+  const timeCapOf = (sport: PlanSport) => {
+    if (sport === "run") return ((MAX_LONG_MINUTES * 60) / easySecPerKm) * MARGIN;
+    if (sport === "swim") return ((MAX_LONG_SWIM_MINUTES * 60) / ctx.easySecPer100m) * 100 * MARGIN;
+    return MAX_LONG_RIDE_MINUTES;
+  };
   const sessions: WrittenSession[] = [];
   // Earlier weeks' sessions raise the longest-session limit of the weeks after them (rule 2).
   const planned: Pick<PlannedSession, "weekStart" | "distanceKm" | "minutes" | "kind" | "sport">[] =
@@ -97,10 +128,8 @@ export function mockCoachPlan(
       const frozen = ctx.frozen.filter(
         (session) => session.weekStart === week.weekStart && session.sport === sport,
       );
-      const amountOf = (session: Pick<PlannedSession, "distanceKm" | "minutes">) =>
-        sport === "run" ? session.distanceKm : session.minutes;
-      const frozenAmount = frozen.reduce((sum, session) => sum + amountOf(session), 0);
-      const budget = (sport === "run" ? week.budgetKm : week.budgetMinutes) * 0.97 - frozenAmount;
+      const frozenAmount = frozen.reduce((sum, session) => sum + sessionAmount(session), 0);
+      const budget = budgetOf(week, sport) * 0.97 - frozenAmount;
       // As many sessions as the longest-session share is read for, so equal ones always pass it.
       const wanted = longShareCount(week, ctx, sport) - frozen.length;
       if (wanted <= 0) continue;
@@ -108,10 +137,8 @@ export function mockCoachPlan(
       // Grow every session a step a round, all together so none outgrows the longest-session
       // share, until the budget or the longest-session rules (time cap, rule 2) stop it.
       const share = mock.share(longShareCount(week, ctx, sport));
-      const timeCap =
-        sport === "run" ? ((MAX_LONG_MINUTES * 60) / easySecPerKm) * MARGIN : MAX_LONG_RIDE_MINUTES;
       const cap = Math.min(
-        timeCap,
+        timeCapOf(sport),
         longestAllowed(week.weekStart, sport, ctx, planned).limit * MARGIN,
       );
       let size = Math.min(
@@ -137,13 +164,13 @@ export function mockCoachPlan(
         quality < MAX_QUALITY_ACROSS_SPORTS &&
         week.phase !== "recovery" &&
         wanted > 1 &&
-        size >= (sport === "run" ? 5 : 55);
+        size >= mock.minQuality;
       if (canQuality) quality += 1;
 
       for (let index = 0; index < wanted; index += 1) {
         planned.push({
           weekStart: week.weekStart,
-          distanceKm: sport === "run" ? size : 0,
+          distanceKm: sport === "run" ? size : sport === "swim" ? size / 1000 : 0,
           minutes: sport === "ride" ? size : 0,
           kind: "easy",
           sport,
@@ -151,7 +178,9 @@ export function mockCoachPlan(
         sessions.push(
           sport === "run"
             ? mockRun(week.weekStart, index, size, canQuality, week.budgetKm, paces)
-            : mockRide(week.weekStart, index, size, canQuality),
+            : sport === "ride"
+              ? mockRide(week.weekStart, index, size, canQuality)
+              : mockSwim(week.weekStart, index, size, canQuality),
         );
       }
     }
@@ -245,5 +274,48 @@ function mockRide(
     title: `${minutesText(size)} endurance ride`,
     why: "Steady endurance riding adds aerobic volume at little cost.",
     blocks: [{ repeat: 1, steps: [rideStep("work", size, "endurance")] }],
+  };
+}
+
+function mockSwim(
+  weekStart: string,
+  index: number,
+  size: number,
+  quality: boolean,
+): WrittenSession {
+  const base = { weekStart, sport: "swim" as PlanSport };
+  if (index === 0) {
+    return {
+      ...base,
+      kind: "long",
+      title: `${metresText(size)} long swim`,
+      why: "A long, steady swim builds the endurance to hold your stroke to the end of the race.",
+      blocks: [{ repeat: 1, steps: [swimStep("work", size, "endurance")] }],
+    };
+  }
+  if (index === 1 && quality) {
+    // 400 m warm-up, 100 m repeats at CSS with 15 s rest, and the rest easy.
+    const repeats = Math.floor((size - 600) / 100);
+    return {
+      ...base,
+      kind: "tempo",
+      title: `${repeats} × 100 m at CSS`,
+      why: "Repeats at your threshold pace raise the speed you can hold over a race.",
+      blocks: [
+        { repeat: 1, steps: [swimStep("warmup", 400, "endurance")] },
+        {
+          repeat: repeats,
+          steps: [swimStep("work", 100, "threshold"), swimStep("recovery", 0, null, 15)],
+        },
+        { repeat: 1, steps: [swimStep("cooldown", size - 400 - repeats * 100, "recovery")] },
+      ],
+    };
+  }
+  return {
+    ...base,
+    kind: "easy",
+    title: `${metresText(size)} endurance swim`,
+    why: "Steady swimming adds aerobic volume and grooves your stroke.",
+    blocks: [{ repeat: 1, steps: [swimStep("work", size, "endurance")] }],
   };
 }
