@@ -55,8 +55,15 @@ jobs:
           path: jscpd-report/jscpd-report.json
           if-no-files-found: ignore
 
+  # Phone and desktop take about as long as each other, so each gets its own runner, database,
+  # and mock athlete; --project brings in the setup and teardown it depends on.
   e2e:
+    name: e2e (${{ matrix.project }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [phone, desktop]
     env:
       DATABASE_URL: postgresql://vo2:vo2@localhost:5432/vo2
       BETTER_AUTH_SECRET: ci-placeholder-secret
@@ -83,14 +90,21 @@ jobs:
           cache: true
 
       # The browser runs in Playwright's Docker image (playwright.config.ts), so nothing to install.
-      - run: vp run e2e
+      # Playwright starts its web servers one after the other, so the image is pulled here while
+      # the app builds instead of after.
+      - name: Pull the browser image in the background
+        run: |
+          version=$(node -p 'require("./node_modules/@playwright/test/package.json").version')
+          nohup docker pull "mcr.microsoft.com/playwright:v$version-noble" >/dev/null 2>&1 &
+
+      - run: vp run e2e --project=${{ matrix.project }}
 
       # Expected, actual, and diff images for every failed screenshot, plus traces.
       - name: Upload the Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           if-no-files-found: ignore
 
