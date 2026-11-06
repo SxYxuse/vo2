@@ -82,7 +82,7 @@ jobs:
 
       - name: Write the summary
         if: always()
-        run: bun scripts/quality-report.ts . baseline >> "$GITHUB_STEP_SUMMARY"
+        run: bun scripts/quality-report.ts lighthouse lighthouse-report baseline >> "$GITHUB_STEP_SUMMARY"
         env:
           SHA: ${{ github.sha }}
           LIGHTHOUSE_RESULT: ${{ job.status }}

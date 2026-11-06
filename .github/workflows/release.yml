@@ -42,9 +42,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Release only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Run the release from main." >&2
+          exit 1
+
+      # The commit Lighthouse checked, not main's HEAD now: something may have merged while it ran.
+      # If main moved, the push below fails rather than tag an unchecked commit.
       - uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - uses: voidzero-dev/setup-vp@v1.21.2
