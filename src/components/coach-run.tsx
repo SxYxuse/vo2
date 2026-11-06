@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { BikeIcon, CheckIcon, CircleIcon, FootprintsIcon } from "lucide-react";
+import { BikeIcon, CheckIcon, CircleIcon, FootprintsIcon, WavesIcon } from "lucide-react";
 
 import { useOnline } from "@/hooks/use-online.ts";
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
@@ -13,7 +13,9 @@ import {
   rideZone,
   stepAmountText,
   stepSecPerKm,
+  stepSwimZone,
   stepZone,
+  swimPaceText,
   type CoachPlanState,
   type PlanSport,
   type PlannedSession,
@@ -26,8 +28,9 @@ import { Spinner } from "@/components/ui/spinner";
 
 /*
  * Pieces of a coach-plan session shared by the Plan view and the session page: its shape (width is
- * a run's distance or a ride's time, height and colour depth are effort), its steps with repeats,
- * and marking it done. Runs are amber and rides blue, as in the coach's visuals.
+ * a run's or a swim's distance or a ride's time, height and colour depth are effort), its steps
+ * with repeats, and marking it done. Runs are amber, rides blue, and swims teal, as in the coach's
+ * visuals.
  */
 
 type Level = 1 | 2 | 3 | 4 | 5;
@@ -36,12 +39,17 @@ type Level = 1 | 2 | 3 | 4 | 5;
 export const SPORT_ICON: Record<PlanSport, { icon: typeof BikeIcon; className: string }> = {
   run: { icon: FootprintsIcon, className: "text-ds-amber-700" },
   ride: { icon: BikeIcon, className: "text-ds-blue-700" },
+  swim: { icon: WavesIcon, className: "text-ds-teal-700" },
 };
+
+/** A swim step with no distance is rest at the wall. */
+const isSwimRest = (step: PlannedStep) => step.distanceM == null;
 
 /** Effort 1 (walk, jog, recovery spin) to 5 (interval pace, VO2 max and up), from the target. */
 function effortLevel(step: PlannedStep, sport: PlanSport): Level {
   if (step.effort === "walk") return 1;
   if (sport === "ride") return rideZone(stepZone(step)).level as Level;
+  if (sport === "swim") return isSwimRest(step) ? 1 : (stepSwimZone(step).level as Level);
   if (step.part === "recovery" && (step.effort === "easy" || step.pace === "easy")) return 1;
   const pace = step.pace ?? EFFORTS.find((effort) => effort.id === step.effort)?.pace ?? "easy";
   return ({ easy: 2, marathon: 3, threshold: 4, interval: 5, repetition: 5 } as const)[pace];
@@ -63,13 +71,24 @@ const LEVEL_BG: Record<PlanSport, Record<Level, string>> = {
     4: "bg-ds-blue-800",
     5: "bg-ds-blue-900",
   },
+  swim: {
+    1: "bg-ds-teal-300",
+    2: "bg-ds-teal-500",
+    3: "bg-ds-teal-700",
+    4: "bg-ds-teal-800",
+    5: "bg-ds-teal-900",
+  },
 };
 
 const rangeMiddle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPerKm) / 2;
 
-/** A step's width: a run's metres, a timed step at the middle of its pace; a ride's seconds. */
+/**
+ * A step's width: a run's metres, a timed step at the middle of its pace; a ride's seconds; a
+ * swim's metres, its rest at about a metre a second so a short rest stays a sliver.
+ */
 function stepWidth(step: PlannedStep, sport: PlanSport) {
   if (sport === "ride") return step.durationS ?? 0;
+  if (sport === "swim") return step.distanceM ?? step.durationS ?? 0;
   if (step.distanceM != null) return step.distanceM;
   const secPerKm =
     step.secPerKm ?? (step.range ? rangeMiddle(step.range) : stepSecPerKm(step, null));
@@ -119,12 +138,23 @@ function rideTargetText(step: PlannedStep) {
   return zone.label;
 }
 
-/** "800 m at 4:15–4:20/km", "400 m jog", "Warm-up: 2 km easy", "12 min sweet spot at 230–245 W". */
+/** A swim step's target: rest, or its zone at its pace per 100 m when VO2 has a CSS. */
+function swimTargetText(step: PlannedStep) {
+  if (isSwimRest(step)) return "rest";
+  const zone = stepSwimZone(step);
+  return step.swimPace ? `${zone.label} at ${swimPaceText(step.swimPace)}` : zone.label;
+}
+
+/**
+ * "800 m at 4:15–4:20/km", "400 m jog", "Warm-up: 2 km easy", "12 min sweet spot at 230–245 W",
+ * "100 m threshold at 1:44–1:47 /100m", "15 s rest".
+ */
 export function stepText(step: PlannedStep, sport: PlanSport) {
   const part =
     step.part in PART_LABEL ? `${PART_LABEL[step.part as keyof typeof PART_LABEL]}: ` : "";
-  const amount = stepAmountText(step);
+  const amount = stepAmountText(step, sport);
   if (sport === "ride") return `${part}${amount} ${rideTargetText(step)}`;
+  if (sport === "swim") return `${part}${amount} ${swimTargetText(step)}`;
   if (step.secPerKm != null) return `${part}${amount} at ${formatPaceClock(step.secPerKm)}/km`;
   if (step.range) return `${part}${amount} at ${rangeText(step.range)}`;
   if (step.part === "recovery" && (step.effort === "easy" || step.pace === "easy")) {
@@ -138,12 +168,16 @@ export function stepText(step: PlannedStep, sport: PlanSport) {
 
 /**
  * What the session is about, from its hardest stretch: a run's pace range, a ride's watts or heart
- * rate; null when it has none, such as a run without training paces.
+ * rate, a swim's pace per 100 m; null when it has none, such as a run without training paces.
  */
 export function headlineTarget(run: Pick<PlannedSession, "blocks" | "sport">): string | null {
   const steps = run.blocks
     .flatMap((block) => block.steps)
     .sort((a, b) => effortLevel(b, run.sport) - effortLevel(a, run.sport));
+  if (run.sport === "swim") {
+    const top = steps.find((step) => step.swimPace);
+    return top?.swimPace ? swimPaceText(top.swimPace) : null;
+  }
   if (run.sport === "ride") {
     const top = steps.find((step) => step.watts || step.bpm);
     if (!top) return null;

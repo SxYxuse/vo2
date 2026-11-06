@@ -101,12 +101,12 @@ const STEP_LIST = [
     id: "goal",
     title: "Your A race",
     description:
-      "The coach plan builds toward your season, led by an upcoming A goal: a run or a ride.",
+      "The coach plan builds toward your season, led by an upcoming A goal: a run, a ride, or a swim.",
   },
   {
     id: "availability",
     title: "How often can you train?",
-    description: "The coach writes that many runs and rides each week. You pick the days.",
+    description: "The coach writes that many runs, rides, and swims each week. You pick the days.",
   },
   {
     id: "paces",

@@ -6,6 +6,7 @@ import { cn } from "cn";
 import { projectSport, type WeekBudget, type WeekShape } from "@/services/coach-plan-budget.ts";
 import {
   amountText,
+  budgetOf,
   type PlanSport,
   type PlanWeek,
   type SeasonVolume,
@@ -23,6 +24,7 @@ import { PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
 export const SPORT_VOLUME_LABEL: Record<PlanSport, { name: string; unit: string }> = {
   run: { name: "Running", unit: "km per week" },
   ride: { name: "Riding", unit: "hours per week" },
+  swim: { name: "Swimming", unit: "metres per week" },
 };
 
 /** The athlete's choice for a sport: growth (null is the default by week) and own peak. */
@@ -52,10 +54,12 @@ export function projectedBudgets(
   };
   const run = amounts("run");
   const ride = amounts("ride");
+  const swim = amounts("swim");
   return volume.shape.map((week, index) => ({
     weekStart: week.weekStart,
     budgetKm: run?.[index] ?? 0,
     budgetMinutes: ride?.[index] ?? 0,
+    budgetSwimM: swim?.[index] ?? 0,
     phase: week.phase,
     lighter: week.lighter,
     taper: week.taper,
@@ -73,7 +77,7 @@ export function weekReaching(shape: WeekShape[], amounts: number[], ceiling: num
 /** A written week's budget for a sport, where the plan has one. */
 export function writtenAmount(week: PlanWeek | undefined, sport: PlanSport) {
   if (!week) return null;
-  return sport === "run" ? week.budgetKm : (week.budgetMinutes ?? 0);
+  return budgetOf(week, sport);
 }
 
 type Line = { value: number; label: string; tone: "muted" | "warning" };

@@ -6,7 +6,12 @@ import { ArrowLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
-import { minutesText, sessionKindLabel } from "@/services/coach-plan.types.ts";
+import {
+  minutesText,
+  PLAN_SPORTS,
+  sessionAmountText,
+  sessionKindLabel,
+} from "@/services/coach-plan.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
 import {
   DoneToggle,
@@ -28,7 +33,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
-/** The session page of a coach-plan run or ride: its shape, steps, why, and whether it's done. */
+/** The session page of a coach-plan run, ride, or swim: its shape, steps, why, and whether it's done. */
 export function CoachSession({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const navigate = useNavigate();
@@ -76,7 +81,10 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           Plan
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <Icon aria-label={ride ? "Ride" : "Run"} className={cn("size-5", iconClass)} />
+          <Icon
+            aria-label={PLAN_SPORTS.find((sport) => sport.id === run.sport)?.label}
+            className={cn("size-5", iconClass)}
+          />
           {run.title}
           {run.done ? <Badge variant="success">Done</Badge> : null}
         </h1>
@@ -86,7 +94,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
       </div>
 
       <StatGrid className="sm:grid-cols-3">
-        {ride ? null : <StatCard label="Distance" value={`${run.distanceKm} km`} />}
+        {ride ? null : <StatCard label="Distance" value={sessionAmountText(run)} />}
         <StatCard label={ride ? "Time" : "Estimated time"} value={minutesText(run.minutes)} />
         <StatCard
           label={ride ? "Target" : "Pace"}

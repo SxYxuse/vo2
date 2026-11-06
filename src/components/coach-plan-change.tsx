@@ -8,7 +8,12 @@ import { CalendarCogIcon, CheckIcon, ChevronDownIcon, XIcon } from "lucide-react
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
-import { minutesText, PLAN_SPORTS, type PlanSport } from "@/services/coach-plan.types.ts";
+import {
+  minutesText,
+  PLAN_SPORTS,
+  sessionAmountText,
+  type PlanSport,
+} from "@/services/coach-plan.types.ts";
 import type {
   ChangedSession,
   ChangeSide,
@@ -159,10 +164,10 @@ function ChangeRow({ sign, side, showSteps }: Row & { showSteps: boolean }) {
           : null}
       </span>
       <span className="text-muted-foreground mt-0.5 text-xs whitespace-nowrap tabular-nums">
-        {/* The coach's run titles usually lead with the distance ("4.3 km easy"). */}
-        {side.sport === "ride" || side.title.includes(`${side.distanceKm} km`)
+        {/* The coach's titles usually lead with the distance ("4.3 km easy", "2,400 m long swim"). */}
+        {side.sport === "ride" || side.title.includes(sessionAmountText(side))
           ? minutesText(side.minutes)
-          : `${side.distanceKm} km · ${minutesText(side.minutes)}`}
+          : `${sessionAmountText(side)} · ${minutesText(side.minutes)}`}
       </span>
     </li>
   );

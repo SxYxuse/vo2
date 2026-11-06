@@ -17,6 +17,7 @@ import {
   paceText,
   racePaceText,
   rulesFor,
+  swimZoneText,
   zoneText,
 } from "./coach-plan-writer.server.ts";
 import {
@@ -33,6 +34,7 @@ import {
   PLAN_SPORTS,
   plannedSession,
   readCoachPlan,
+  sessionAmount,
   sessionLines,
   type CoachPlan,
   type PlanSport,
@@ -84,10 +86,11 @@ function blocker(inputs: Inputs): string | null {
   return null;
 }
 
-/** A written week's budgets, as the rules read them; weeks written before rides have none. */
+/** A written week's budgets, as the rules read them; weeks written before rides or swims have none. */
 const budgetOf = ({ sessions: _sessions, ...week }: PlanWeek): WeekBudget => ({
   ...week,
   budgetMinutes: week.budgetMinutes ?? 0,
+  budgetSwimM: week.budgetSwimM ?? 0,
 });
 
 /** The written weeks from this one on: what a change may touch. */
@@ -109,6 +112,7 @@ function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
     frozen: sessions.filter((session) => session.kind !== "race" && session.done),
     runs: inputs.runs,
     rides: inputs.rides,
+    swims: inputs.swims,
     races: raceWeeks(
       inputs.goals,
       inputs.currentWeek,
@@ -156,7 +160,7 @@ function newBreaks(
         0,
         ...[...ctx.frozen, ...before]
           .filter((session) => session.weekStart === week.weekStart && session.sport === sport)
-          .map((session) => (sport === "run" ? session.distanceKm : session.minutes)),
+          .map(sessionAmount),
       );
     }
     longestBefore[sport] = byWeek;
@@ -194,6 +198,7 @@ export async function coachPlanForCoach(userId: string) {
     paces: paceText(rangesOf(inputs)),
     racePaces: racePaceText(racePacesOf(inputs)),
     rideZones: zoneText(anchorsOf(inputs)),
+    swimZones: swimZoneText(anchorsOf(inputs)),
     athleteChoices: ownPeakNotes(inputs),
     weeks: weeksAhead(inputs, plan).map((week) => ({
       weekStart: week.weekStart,
@@ -202,8 +207,10 @@ export async function coachPlanForCoach(userId: string) {
       taper: week.taper,
       budgetKm: week.budgetKm,
       budgetMinutes: week.budgetMinutes ?? 0,
+      budgetSwimM: week.budgetSwimM ?? 0,
       runs: sessionsAvailable(budgetOf(week), ctx, "run"),
       rides: sessionsAvailable(budgetOf(week), ctx, "ride"),
+      swims: sessionsAvailable(budgetOf(week), ctx, "swim"),
       sessions: week.sessions.map((session) => ({
         id: session.id,
         status: session.done ? "done" : "open",
@@ -215,7 +222,7 @@ export async function coachPlanForCoach(userId: string) {
         minutes: session.minutes,
         blocks: session.blocks.map((block) => ({
           repeat: block.repeat,
-          steps: block.steps.map(({ range: _range, ...step }) => step),
+          steps: block.steps.map(({ range: _range, swimPace: _swimPace, ...step }) => step),
         })),
       })),
     })),

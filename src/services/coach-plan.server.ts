@@ -28,6 +28,7 @@ import {
   racePaceText,
   rulesFor,
   sessionLine,
+  swimZoneText,
   weeksText,
   writeSessions,
   zoneText,
@@ -44,6 +45,7 @@ import {
   readCoachPlan,
   sessionsPerWeek,
   stepSecPerKm,
+  swimSecPer100m,
   type Availability,
   type PlanAnchors,
   type CoachPlan,
@@ -63,6 +65,7 @@ import { goalsFor } from "./season.server.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
+import { swimCssFor } from "./swim-css.server.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
@@ -86,6 +89,8 @@ const PACE_CHANGE_VDOT = 1;
 const EASY_CHANGE_SEC_PER_KM = 10;
 /** FTP drifts with every metered ride; the plan is written again once it moved this share. */
 const FTP_CHANGE_SHARE = 0.05;
+/** CSS moves with every fast swim; the plan is written again once it moved this far per 100 m. */
+const CSS_CHANGE_SEC = 3;
 
 type Row = typeof coachPlans.$inferSelect;
 type Activity = {
@@ -105,12 +110,13 @@ async function readRow(userId: string): Promise<Row | null> {
 
 /** Everything the plan is checked and written from, read fresh. */
 export async function gather(userId: string, now = new Date()) {
-  const [row, style, goals, coach, paces, [metrics], rows] = await Promise.all([
+  const [row, style, goals, coach, paces, css, [metrics], rows] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
     goalsFor(userId),
     coachModelFor(userId, "plan"),
     trainingPacesFor(userId, now),
+    swimCssFor(userId, now),
     db
       .select({
         ftp: athleteMetrics.ftp,
@@ -152,6 +158,7 @@ export async function gather(userId: string, now = new Date()) {
   // Hidden sport types count: hiding changes views, not training (ADR 0018).
   const runs = all.filter((item) => planSportOf(item.sportType) === "run");
   const rides = all.filter((item) => planSportOf(item.sportType) === "ride");
+  const swims = all.filter((item) => planSportOf(item.sportType) === "swim");
   // A cycling LTHR the athlete set wins over the estimate (ADR 0021).
   const rideLthr =
     parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ??
@@ -173,7 +180,9 @@ export async function gather(userId: string, now = new Date()) {
     plan: readCoachPlan(row?.plan),
     runs: runs as (SportDay & Activity)[],
     rides: rides as (SportDay & Activity)[],
+    swims: swims as (SportDay & Activity)[],
     ftp: metrics?.ftp ? Math.round(metrics.ftp) : null,
+    css,
     rideLthr: rideLthr ? Math.round(rideLthr) : null,
     all,
     others: all.filter((item) => planSportOf(item.sportType) == null),
@@ -208,10 +217,11 @@ export function racePacesOf(inputs: Inputs) {
   });
 }
 
-/** The paces a plan's run steps are checked against: easy for sizing, ranges, race paces. */
+/** The paces a plan's steps are checked against: easy run and swim for sizing, ranges, race paces. */
 export const paceContext = (inputs: Inputs) => {
   const paces = rangesOf(inputs);
   return {
+    easySecPer100m: swimSecPer100m({ zone: "endurance", effort: null }, inputs.css),
     easySecPerKm: stepSecPerKm(
       {
         part: "work",
@@ -229,11 +239,12 @@ export const paceContext = (inputs: Inputs) => {
   };
 };
 
-/** What planned steps aim at: paces for runs, FTP and cycling LTHR for rides. */
+/** What planned steps aim at: paces for runs, FTP and cycling LTHR for rides, CSS for swims. */
 export const anchorsOf = (inputs: Inputs): PlanAnchors => ({
   paces: rangesOf(inputs),
   ftp: inputs.ftp,
   rideLthr: inputs.rideLthr,
+  css: inputs.css,
 });
 
 function missingOf(inputs: Inputs): CoachPlanMissing[] {
@@ -241,7 +252,7 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   if (inputs.coach.kind === "missing") missing.push("key");
   if (!inputs.aGoal) missing.push("goal");
   if (!inputs.availability) missing.push("availability");
-  // An A ride with no rides planned, or an A run with no runs, has nothing building toward it.
+  // An A goal whose sport has no sessions a week has nothing building toward it.
   const goalSport = inputs.aGoal ? planSportOf(inputs.aGoal.sportType) : null;
   if (inputs.availability && goalSport && sessionsPerWeek(inputs.availability, goalSport) === 0) {
     missing.push("goalSport");
@@ -261,7 +272,7 @@ function roadOf(inputs: Inputs) {
   return last ? seasonWeeks(inputs.goals, inputs.currentWeek, last) : [];
 }
 
-/** Goals the plan is written around: upcoming runs and rides, and every upcoming A goal. */
+/** Goals the plan is written around: upcoming runs, rides, and swims, and every upcoming A goal. */
 function planGoals(goals: Goal[], today: string): PlanGoal[] {
   return goals
     .filter(
@@ -295,7 +306,15 @@ function basisOf(inputs: Inputs): PlanBasis {
     vdot: vdotOf(inputs),
     easy: easyOf(inputs),
     ftp: inputs.ftp,
+    css: inputs.css,
   };
+}
+
+/** Whether CSS moved enough to rewrite. Plans written before swims have none to compare. */
+function cssChanged(written: PlanBasis["css"], now: PlanBasis["css"]) {
+  if (written === undefined || (written ?? null) === (now ?? null)) return false;
+  if (written == null || now == null) return true;
+  return Math.abs(now - written) >= CSS_CHANGE_SEC;
 }
 
 /** Whether FTP moved enough to rewrite. Plans written before FTP was kept aren't rewritten. */
@@ -365,6 +384,10 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (inputs.availability?.ridesPerWeek && ftpChanged(plan.basis.ftp, basis.ftp)) {
     return { fromWeek: first, reason: "ftp", trigger: basis.ftp };
   }
+  // CSS only shapes swims.
+  if (inputs.availability?.swimsPerWeek && cssChanged(plan.basis.css, basis.css)) {
+    return { fromWeek: first, reason: "css", trigger: basis.css };
+  }
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
@@ -410,7 +433,18 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
   };
 }
 
-const daysOf = (inputs: Inputs, sport: PlanSport) => (sport === "run" ? inputs.runs : inputs.rides);
+const daysOf = (inputs: Inputs, sport: PlanSport): SportDay[] =>
+  sport === "run" ? inputs.runs : sport === "ride" ? inputs.rides : inputs.swims;
+
+/** An activity's amount in its sport's budget unit: km, minutes, or metres. */
+const dayAmount = (day: SportDay, sport: PlanSport) =>
+  sport === "run" ? day.km : sport === "ride" ? day.minutes : day.km * 1000;
+
+const SPORT_DOING: Record<PlanSport, string> = {
+  run: "running",
+  ride: "riding",
+  swim: "swimming",
+};
 
 /**
  * The season's volume through the last goal, for Plan and the progression setting (ADR 0058):
@@ -439,7 +473,7 @@ function volumeOf(inputs: Inputs): SeasonVolume | null {
         goal: goal ? { name: goal.name, floor: racePeak(sport, goal).floor } : null,
         doneThisWeek: days
           .filter((day) => day.date >= inputs.currentWeek)
-          .reduce((sum, day) => sum + (sport === "run" ? day.km : day.minutes), 0),
+          .reduce((sum, day) => sum + dayAmount(day, sport), 0),
       };
     }),
   };
@@ -460,7 +494,7 @@ export function ownPeakNotes(inputs: Inputs): string[] {
     const recommended = ceilingOf(sport, seed, inputs.goals, inputs.currentWeek, {});
     if (peak <= recommended) return [];
     return [
-      `The athlete chose their own ${sport === "run" ? "running" : "riding"} peak of ${amountText(sport, peak)} a week, above the ${amountText(sport, recommended)} VO2 recommends from their usual week. Respect it; bring it up only if they ask about their volume or report fatigue, pain, or injury.`,
+      `The athlete chose their own ${SPORT_DOING[sport]} peak of ${amountText(sport, peak)} a week, above the ${amountText(sport, recommended)} VO2 recommends from their usual week. Respect it; bring it up only if they ask about their volume or report fatigue, pain, or injury.`,
     ];
   });
 }
@@ -547,7 +581,7 @@ async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
     );
 }
 
-/** A goal as its race session: a run by its distance, a ride by its rough time. */
+/** A goal as its race session: a run or a swim by its distance, a ride by its rough time. */
 function raceSession(goal: Goal): PlannedSession {
   const sport = planSportOf(goal.sportType) ?? "run";
   return plannedSession(
@@ -566,7 +600,7 @@ function raceSession(goal: Goal): PlannedSession {
           steps: [
             {
               part: "work",
-              distanceM: sport === "run" ? goal.distanceM : null,
+              distanceM: sport === "ride" ? null : goal.distanceM,
               durationS: sport === "ride" ? Math.round(roughGoalHours(goal) * 3600) : null,
               pace: null,
               secPerKm: null,
@@ -577,7 +611,7 @@ function raceSession(goal: Goal): PlannedSession {
         },
       ],
     },
-    { paces: null, ftp: null, rideLthr: null },
+    { paces: null, ftp: null, rideLthr: null, css: null },
   );
 }
 
@@ -603,8 +637,14 @@ function recentTraining(inputs: Inputs) {
       (minutes) => tenth(minutes / 60),
     ),
     longestRideLast30DaysMin: Math.max(0, ...recent(inputs.rides).map((ride) => ride.minutes)),
-    // Swims, walks, and the rest count toward load: the coach sees them, but plans only runs and
-    // rides.
+    weeklySwimMetresLast8Weeks: weeklyAmount(inputs.swims, inputs.currentWeek, 8, "swim").map(
+      Math.round,
+    ),
+    longestSwimLast30DaysM: Math.round(
+      Math.max(0, ...recent(inputs.swims).map((swim) => swim.km * 1000)),
+    ),
+    // Walks and the rest count toward load: the coach sees them, but plans only runs, rides, and
+    // swims.
     otherSportsHoursLast4Weeks: Object.fromEntries(
       Object.entries(otherHours).map(([group, hours]) => [group, tenth(hours)]),
     ),
@@ -628,6 +668,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
     const budgets = weekBudgets({
       runs: inputs.runs,
       rides: inputs.rides,
+      swims: inputs.swims,
       goals: inputs.goals,
       aGoal,
       firstWeek: inputs.currentWeek,
@@ -658,6 +699,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       frozen: kept,
       runs: inputs.runs,
       rides: inputs.rides,
+      swims: inputs.swims,
       races: races.map(({ race }) => race),
       neighbours,
       ...paceContext(inputs),
@@ -689,6 +731,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
         ? { paces: paceText(anchors.paces), racePaces: racePaceText(racePacesOf(inputs)) }
         : {}),
       ...(availability.ridesPerWeek ? { rideZones: zoneText(anchors) } : {}),
+      ...(availability.swimsPerWeek ? { swimZones: swimZoneText(anchors) } : {}),
       weeks: weeksText(ctx),
       plannedBefore: neighbours.map((session) => `${session.weekStart} ${sessionLine(session)}`),
       recentTraining: recentTraining(inputs),
@@ -780,6 +823,7 @@ export async function saveAvailabilityImpl(
   logger.info("coach_plan.availability_saved", {
     runsPerWeek: availability.runsPerWeek,
     ridesPerWeek: availability.ridesPerWeek,
+    swimsPerWeek: availability.swimsPerWeek,
   });
   const inputs = await gather(userId);
   return stateOf(inputs, await startIfDue(userId, inputs));
@@ -801,6 +845,7 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
     const budgets = weekBudgets({
       runs: before.runs,
       rides: before.rides,
+      swims: before.swims,
       goals: before.goals,
       aGoal: before.aGoal,
       firstWeek: before.currentWeek,

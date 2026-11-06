@@ -12,6 +12,7 @@ import cycling from "@/coaching/cycling.md?raw";
 import powerFileGuide from "@/coaching/power-files.md?raw";
 import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
+import swimming from "@/coaching/swimming.md?raw";
 
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
@@ -71,8 +72,8 @@ import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
 type CoachRuntime = { userId: string; timeZone: string };
 
 /**
- * The running, cycling, and season knowledge the plan writer reads, loaded by the chat only when a
- * question needs it: about 8,000 words would tax every message. Portable skills run on the
+ * The running, cycling, swimming, and season knowledge the plan writer reads, loaded by the chat
+ * only when a question needs it: about 11,000 words would tax every message. Portable skills run on the
  * athlete's OpenRouter model; hosted provider skills need Anthropic's or OpenAI's sandbox.
  */
 const COACHING_SKILLS = [
@@ -89,6 +90,12 @@ const COACHING_SKILLS = [
     instructions: cycling,
   }),
   inlineSkill({
+    name: "swimming",
+    description:
+      "How VO2 plans swims: the rules every coach plan's swims are checked against (weekly metres, longest swim, quality, long swim, taper), week templates by swims per week, the long swim, season phases, open water skills, shoulder load, supporting swims by effort, the swim zones as offsets from CSS and where CSS comes from, and the sessions VO2 writes (endurance, long, technique, threshold CSS sets, VO2 max sets, sprints, open water) with their step format and sizing by event. Load before explaining a swim, a swim pace, or proposing a change to a swim.",
+    instructions: swimming,
+  }),
+  inlineSkill({
     name: "power-files",
     description:
       "How to read a power file from dual-sided pedals: left/right balance, platform center offset, power phase and peak power phase, torque effectiveness and pedal smoothness, seated and standing, cadence and quadrants, decoupling, and gears. What is normal, what is worth acting on, and what to change. Load before explaining a power file.",
@@ -97,7 +104,7 @@ const COACHING_SKILLS = [
   inlineSkill({
     name: "season-multisport",
     description:
-      "How VO2 plans a season of runs and rides: which sport builds, how the other holds, the shared quality limit, supporting races of the other sport, and triathlon and duathlon. Load before explaining how runs and rides share the week.",
+      "How VO2 plans a season of runs, rides, and swims: which sport builds, how the others hold, the shared quality limit, supporting races of another sport, and triathlon and duathlon (splitting the sports, bricks, open water, taper). Load before explaining how the sports share the week.",
     instructions: season,
   }),
 ];

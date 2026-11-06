@@ -53,7 +53,7 @@ function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
       </h1>
       <p className="text-muted-foreground hidden text-sm sm:block">
         {planned
-          ? "Your coach plan: each week's rides and runs for the next four weeks, toward your season. Do them on the days that suit you."
+          ? "Your coach plan: each week's runs, rides, and swims for the next four weeks, toward your season. Do them on the days that suit you."
           : "No week is planned while planning is off."}
       </p>
     </div>

@@ -5,6 +5,7 @@ import { scrubSecrets } from "@tanstack/ai/byok";
 import cycling from "@/coaching/cycling.md?raw";
 import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
+import swimming from "@/coaching/swimming.md?raw";
 import { logger } from "@/lib/logger.server.ts";
 import type { CoachModel } from "./coach-model.server.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
@@ -12,6 +13,7 @@ import {
   checkPlan,
   MAX_LONG_MINUTES,
   MAX_LONG_RIDE_MINUTES,
+  MAX_LONG_SWIM_MINUTES,
   MAX_QUALITY_ACROSS_SPORTS,
   maxLongRideShare,
   maxLongShare,
@@ -26,6 +28,9 @@ import {
   plannedSession,
   plannedSports,
   RIDE_ZONES,
+  sessionAmountText,
+  SWIM_ZONES,
+  swimPaceText,
   writtenPlanSchema,
   type PlanAnchors,
   type PlannedSession,
@@ -48,10 +53,10 @@ const MOCK_PAUSE_MS = 1500;
 const FORMAT = [
   "You are the endurance coach writing an athlete's coach plan in VO2. VO2 sets each week's budgets and checks every plan in code; you write precise sessions inside them. Answer only with the requested JSON.",
   "Sessions have no day: you write each week's sessions, and the athlete picks the days. Never name a weekday or date in a title or why.",
-  "Each session: weekStart (the Monday of its week, YYYY-MM-DD), sport (run or ride), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
-  "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A step at marathon, threshold, interval, or repetition pace also has secPerKm: the one pace the athlete holds, in whole seconds per km, picked inside that pace's range in `paces`, or a goal's race pace from `racePaces`. Easy, effort, and walk steps have secPerKm null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace and secPerKm are null. Never write watts or heart rate: VO2 fills in the athlete's own.",
-  "Kinds for runs: easy, recovery, long, tempo, intervals, repetitions, hills, fartlek, marathonPace. Kinds for rides: easy (endurance), recovery, long, tempo (threshold), intervals (VO2 max), hills (climbing), sweetSpot, sprints.",
-  "VO2 works out each run's distance and time from its steps, counting time steps at their secPerKm, or the middle of their pace range, and each ride's time. Those numbers are what the rules check.",
+  "Each session: weekStart (the Monday of its week, YYYY-MM-DD), sport (run, ride, or swim), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
+  "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A step at marathon, threshold, interval, or repetition pace also has secPerKm: the one pace the athlete holds, in whole seconds per km, picked inside that pace's range in `paces`, or a goal's race pace from `racePaces`. Easy, effort, and walk steps have secPerKm null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace and secPerKm are null. A swim step has part, distanceM in metres (durationS null), and exactly one of zone (a swim zone: recovery, endurance, tempo, threshold, vo2max, sprint) or effort (not walk); pace and secPerKm are null. Rest at the wall between repeats is a recovery step with durationS in seconds, distanceM null, and effort easy. Never write watts, heart rate, or a swim pace: VO2 fills in the athlete's own.",
+  "Kinds for runs: easy, recovery, long, tempo, intervals, repetitions, hills, fartlek, marathonPace. Kinds for rides: easy (endurance), recovery, long, tempo (threshold), intervals (VO2 max), hills (climbing), sweetSpot, sprints. Kinds for swims: easy (endurance), recovery, long, technique, tempo (threshold, CSS), intervals (VO2 max), sprints, openWater.",
+  "VO2 works out each run's distance and time from its steps, counting time steps at their secPerKm, or the middle of their pace range, each ride's time, and each swim's metres and time, counting its steps at the middle of their swim zone and its rests. Those numbers are what the rules check.",
 ].join("\n\n");
 
 /** The knowledge the coach writes from: each planned sport's file, and the season's when both. */
@@ -63,6 +68,7 @@ function systemPrompt(ctx: RuleContext) {
     ...(sports.length > 1 ? [season] : []),
     ...(sports.includes("run") ? [running] : []),
     ...(sports.includes("ride") ? [cycling] : []),
+    ...(sports.includes("swim") ? [swimming] : []),
   ].join("\n\n");
 }
 
@@ -70,10 +76,10 @@ export type PlanPrompt = Record<string, unknown>;
 
 /** The rules in numbers for this athlete, so the coach can size sessions to pass them. */
 export function rulesFor(ctx: RuleContext) {
-  const { runsPerWeek, ridesPerWeek } = ctx.availability;
+  const { runsPerWeek, ridesPerWeek, swimsPerWeek } = ctx.availability;
   const sports = plannedSports(ctx.availability);
   const rules = [
-    "1. Each week's running distance stays at or under its budgetKm and its riding time at or under its budgetMinutes (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of each: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
+    "1. Each week's running distance stays at or under its budgetKm, its riding time at or under its budgetMinutes, and its swimming distance at or under its budgetSwimM (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of each: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
   ];
   if (sports.includes("run")) {
     rules.push(
@@ -89,15 +95,22 @@ export function rulesFor(ctx: RuleContext) {
       `5. One long ride a week. The week's longest ride is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's riding (${Math.round(maxLongRideShare(3) * 100)} % when only 3 rides fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_RIDE_MINUTES} minutes.`,
     );
   }
+  if (sports.includes("swim")) {
+    rules.push(
+      "2. No swim more than 15 % longer than the longest swim of the 30 days before its week (recentTraining.longestSwimLast30DaysM, at least 2000 m, then plannedBefore and your swims in earlier weeks).",
+      `4. At most ${maxQualitySessions(swimsPerWeek)} quality swim(s) a week (tempo, intervals, sprints; technique and openWater are not quality). A swimming race counts as one, unless it is swum for fun: then it is one of the week's swims, an easy one. In the week of a steady swimming race, every other swim is easy.`,
+      `5. One long swim a week. The week's longest swim is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's swimming (${Math.round(maxLongRideShare(3) * 100)} % when only 3 swims fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_SWIM_MINUTES} minutes.`,
+    );
+  }
   if (sports.length > 1) {
     rules.push(
-      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across runs and rides, races included (but not races for fun).`,
+      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across all sports, races included (but not races for fun); a multisport event's legs count as one race.`,
     );
   }
   rules.push(
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budgets.",
     "8. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs and ${ridesPerWeek} rides a week at most, and no more than each week's runs and rides (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
+    `Availability: ${runsPerWeek} runs, ${ridesPerWeek} rides, and ${swimsPerWeek} swims a week at most, and no more than each week's runs, rides, and swims (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
   );
   return rules;
 }
@@ -124,6 +137,20 @@ export function zoneText(anchors: PlanAnchors) {
   );
 }
 
+/** The swim zones in the athlete's pace per 100 m, from CSS. */
+export function swimZoneText(anchors: PlanAnchors) {
+  const { css } = anchors;
+  if (!css) return "No CSS yet: target swim zones by feel.";
+  return Object.fromEntries(
+    SWIM_ZONES.map((zone) => [
+      zone.id,
+      zone.css
+        ? swimPaceText([Math.round(css + zone.css[0]), Math.round(css + zone.css[1])])
+        : "all out",
+    ]),
+  );
+}
+
 export function paceText(ranges: Record<PaceType, PaceRange> | null) {
   if (!ranges) return "No training paces yet: write every step as an effort.";
   return Object.fromEntries(
@@ -142,9 +169,9 @@ export function racePaceText(races: { name: string; distanceKm: number; secPerKm
   );
 }
 
-/** A kept or planned session in a line: "ride long 180 min" or "run easy 8 km". */
+/** A kept or planned session in a line: "ride long 180 min", "run easy 8 km", "swim easy 2,400 m". */
 export const sessionLine = (session: PlannedSession) =>
-  `${session.sport} ${session.kind} ${session.sport === "ride" ? `${session.minutes} min` : `${session.distanceKm} km`}`;
+  `${session.sport} ${session.kind} ${session.sport === "ride" ? `${session.minutes} min` : sessionAmountText(session)}`;
 
 /** A race as the coach reads it in its week (ADR 0052). */
 const RACE_EFFORT_TEXT: Record<RaceEffort, string> = {
@@ -167,6 +194,9 @@ export function weeksText(ctx: RuleContext) {
     ...(sports.includes("ride")
       ? { budgetMinutes: week.budgetMinutes, rides: sessionsAvailable(week, ctx, "ride") }
       : {}),
+    ...(sports.includes("swim")
+      ? { budgetSwimM: week.budgetSwimM, swims: sessionsAvailable(week, ctx, "swim") }
+      : {}),
     kept: ctx.frozen
       .filter((session) => session.weekStart === week.weekStart)
       .map((session) => `${sessionLine(session)}, done`),
@@ -179,6 +209,7 @@ export function weeksText(ctx: RuleContext) {
 export const availabilityText = (ctx: RuleContext) => ({
   runsPerWeek: ctx.availability.runsPerWeek,
   ridesPerWeek: ctx.availability.ridesPerWeek,
+  swimsPerWeek: ctx.availability.swimsPerWeek,
 });
 
 function breaksText(breaks: RuleBreak[]) {
