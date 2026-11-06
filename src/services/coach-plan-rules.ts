@@ -39,7 +39,7 @@ export type RuleBreak = { rule: string; message: string };
  * An upcoming goal in the weeks written: VO2 adds the race itself. Its effort is "perform" for a
  * main goal, else the supporting race's (ADR 0052).
  */
-export type RaceWeek = { weekStart: string; sport: PlanSport; effort: RaceEffort };
+export type RaceWeek = { weekStart: string; date: string; sport: PlanSport; effort: RaceEffort };
 export type RaceEffort = "perform" | GoalEffort;
 
 /** The run, ride, and swim goals from `fromWeek` through `lastDay`, as the rules read them. */
@@ -56,6 +56,7 @@ export function raceWeeks(goals: Goal[], fromWeek: string, lastDay: string) {
       goal,
       race: {
         weekStart: mondayOf(goal.date),
+        date: goal.date,
         sport: planSportOf(goal.sportType)!,
         effort: goal.priority === "A" ? "perform" : (goal.effort ?? "steady"),
       } satisfies RaceWeek,
@@ -220,6 +221,16 @@ const racesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
 /** Races that count as a quality session (rule 4): every race but one run for fun. */
 const qualityRacesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   racesOf(week, ctx, sport).filter((race) => race.effort !== "fun").length;
+/**
+ * Quality races toward the cap across sports: a multisport event's legs, raced on one day, are one
+ * race, or a triathlon alone would fill the week's three.
+ */
+const qualityEventsIn = (week: WeekBudget, ctx: RuleContext) =>
+  new Set(
+    racesOf(week, ctx)
+      .filter((race) => race.effort !== "fun")
+      .map((race) => race.date),
+  ).size;
 const sumOf = (sessions: PlannedSession[], sport: PlanSport) =>
   sessions.reduce((sum, session) => sum + SPORT_RULES[sport].amount(session), 0);
 
@@ -509,8 +520,10 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
   for (const week of ctx.weeks) {
     const all = [...ctx.frozen, ...sessions].filter(inWeek(week));
     const allQuality =
-      all.filter((session) => isQualityKind(session.kind)).length + qualityRacesIn(week, ctx);
-    if (sports.length > 1 && allQuality > MAX_QUALITY_ACROSS_SPORTS) {
+      all.filter((session) => isQualityKind(session.kind)).length + qualityEventsIn(week, ctx);
+    // Sessions kept alone may already pass the cap; then the coach's part is to add nothing.
+    const wrote = sessions.some(inWeek(week));
+    if (sports.length > 1 && wrote && allQuality > MAX_QUALITY_ACROSS_SPORTS) {
       breaks.push({
         rule: "4. quality sessions",
         message: `Week of ${week.weekStart}: ${allQuality} quality sessions across sports (races count), at most ${MAX_QUALITY_ACROSS_SPORTS}.`,

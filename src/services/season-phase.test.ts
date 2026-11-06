@@ -199,7 +199,7 @@ describe("rules around a supporting race", () => {
     runs: [],
     rides: [],
     swims: [],
-    races: [{ weekStart: supportWeek, sport: "run", effort }],
+    races: [{ weekStart: supportWeek, date: supportWeek, sport: "run", effort }],
     neighbours: [],
     easySecPerKm: 360,
     easySecPer100m: 130,

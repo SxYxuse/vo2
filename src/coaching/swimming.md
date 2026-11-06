@@ -51,7 +51,7 @@ VO2 tells you each week's phase. Shape the swims to it (guidance):
 - **Base:** technique, endurance, short CSS sets, a few sprints for speed. At most one quality swim a week. The long swim grows.
 - **Build:** CSS sets grow (more repeats, shorter rest), then VO2 max sets; open water skills for an open water event.
 - **Peak:** the most event-like work: long CSS sets, the longest long swims, open water at race effort.
-- **Taper:** cut metres as the budget says; keep the number of swims and one short CSS or VO2 max touch with fewer repeats. Nothing new.
+- **Taper:** cut metres as the budget says; keep the number of swims and one short CSS or VO2 max touch with fewer repeats, except in race week, where the race fills the quality sessions. Nothing new.
 - **Lighter week:** the same kinds of swim, fewer repeats, a shorter long swim; drop a quality swim if the week has two.
 - **Recovery** (after the main goal or an all-out swim): recovery and technique swims only.
 

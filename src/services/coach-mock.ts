@@ -1,6 +1,6 @@
 import { EventType, type AnyTextAdapter, type ModelMessage, type TextOptions } from "@tanstack/ai";
 
-import type { WrittenSession } from "./coach-plan.types.ts";
+import { metresText, type WrittenSession } from "./coach-plan.types.ts";
 
 type MockActivity = { id: string; name: string; day: string; movingTimeS: number };
 
@@ -103,7 +103,7 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
     const metres = Math.max(1000, Math.round((session.distanceKm * 1000) / 200) * 100);
     return {
       ...base,
-      title: `${metres} m endurance swim`,
+      title: `${metresText(metres)} endurance swim`,
       why,
       blocks: [
         {
@@ -169,10 +169,11 @@ function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["k
   }
   if (kind === "indoor") {
     const where = { ride: "trainer", run: "treadmill", swim: "pool" }[open[0].sport];
+    const on = open[0].sport === "swim" ? "in the" : "on a";
     const indoor = { ...written(open[0]), title: `${open[0].title} (${where})` };
     return [
       {
-        summary: `The same session, on a ${where}.`,
+        summary: `The same session, ${on} ${where}.`,
         sessions: [{ id: open[0].id, session: indoor }],
       },
     ];

@@ -104,7 +104,7 @@ export function rulesFor(ctx: RuleContext) {
   }
   if (sports.length > 1) {
     rules.push(
-      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across all sports, races included (but not races for fun).`,
+      `4. At most ${MAX_QUALITY_ACROSS_SPORTS} quality sessions a week across all sports, races included (but not races for fun); a multisport event's legs count as one race.`,
     );
   }
   rules.push(

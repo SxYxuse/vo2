@@ -250,7 +250,7 @@ export const rideZone = (id: RideZone) => RIDE_ZONES.find((zone) => zone.id === 
 export const SWIM_ZONES = [
   { id: "recovery", label: "recovery", level: 1, css: [11, 20] },
   { id: "endurance", label: "endurance", level: 2, css: [6, 10] },
-  { id: "tempo", label: "tempo", level: 3, css: [2, 5] },
+  { id: "tempo", label: "tempo", level: 3, css: [3, 5] },
   { id: "threshold", label: "threshold", level: 4, css: [-1, 2] },
   { id: "vo2max", label: "VO2 max", level: 5, css: [-6, -2] },
   { id: "sprint", label: "all-out sprint", level: 5, css: null },
@@ -307,7 +307,8 @@ export const writtenSessionSchema = z.object({
 
 /** What the coach answers with. */
 export const writtenPlanSchema = z.object({
-  sessions: z.array(writtenSessionSchema).max(60),
+  // Four weeks of six runs, six rides, and six swims.
+  sessions: z.array(writtenSessionSchema).max(4 * MAX_SESSIONS_PER_SPORT * PLAN_SPORTS.length),
 });
 
 export type Step = z.infer<typeof stepSchema>;
