@@ -1,0 +1,111 @@
+name: Lighthouse
+
+# Lighthouse scores move slowly and vary run to run, so they are tracked on main once a day and
+# checked before each release (release.yml calls this workflow), not on every pull request.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://vo2:vo2@localhost:5432/vo2
+      BETTER_AUTH_SECRET: ci-placeholder-secret
+      BETTER_AUTH_URL: http://localhost:3000
+      APP_ENV: development
+      STRAVA_MOCK: "1"
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: vo2
+          POSTGRES_PASSWORD: vo2
+          POSTGRES_DB: vo2
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vo2 -d vo2"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        with:
+          node-version: "22"
+          cache: true
+
+      - run: vp build
+      - run: vp run db:migrate
+      - run: vp run lighthouse
+
+      # Lighthouse CI still bundles Lighthouse 12, which has no Agentic Browsing category, so
+      # Lighthouse 13 scores it separately: reported in the summary, not asserted.
+      - name: Agentic Browsing (Lighthouse 13)
+        continue-on-error: true
+        run: |
+          bun run .output/server/index.mjs &
+          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000/sign-in; do sleep 1; done'
+          vp dlx lighthouse@13.6.0 http://localhost:3000/sign-in --only-categories=agentic-browsing \
+            --chrome-flags="--headless=new" --output=json \
+            --output-path=lighthouse-report/agentic-browsing.json --quiet
+
+      - name: Upload Lighthouse reports
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: lighthouse-report/
+
+      # The previous successful run's scores, so the summary shows what changed since.
+      - name: Download the previous run's scores
+        if: always()
+        continue-on-error: true
+        run: |
+          read -r run sha < <(gh run list --workflow lighthouse.yml --branch main --status success \
+            --limit 1 --json databaseId,headSha -q '.[0] | "\(.databaseId) \(.headSha)"')
+          gh run download "$run" --name lighthouse --dir baseline
+          echo "BASELINE_SHA=$sha" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - name: Write the summary
+        if: always()
+        run: bun scripts/quality-report.ts . baseline >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SHA: ${{ github.sha }}
+          LIGHTHOUSE_RESULT: ${{ job.status }}
+          LIGHTHOUSE_REPORT_URL: ${{ steps.upload.outputs.artifact-url }}
+
+  # A failed scheduled run emails only whoever last edited the cron line, so it opens an issue.
+  report-failure:
+    needs: lighthouse
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the nightly Lighthouse issue
+        run: |
+          title="Nightly Lighthouse failed on main"
+          body="Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID (main at ${GITHUB_SHA::7})"
+          issue=$(gh issue list --state open --search "in:title \"$title\"" --json number -q '.[0].number')
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
