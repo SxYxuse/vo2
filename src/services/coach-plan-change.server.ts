@@ -222,6 +222,7 @@ export async function coachPlanForCoach(userId: string) {
     })),
     rules: [
       ...rulesFor(ctx),
+      "In a change, the left figures take off only the sessions done: the open sessions you keep count toward runsToWrite, ridesToWrite, swimsToWrite and the budgets left too, so add a session only where the week's open sessions leave room, or replace one.",
       "A change may leave a week under 90 % of its budgets: less training is fine when the athlete is ill, away, or tired.",
       "Sessions marked done and races can't change.",
     ],
