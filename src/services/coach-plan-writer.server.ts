@@ -25,6 +25,7 @@ import {
 } from "./coach-plan-rules.ts";
 import {
   bandText,
+  DRILLS,
   plannedSession,
   plannedSports,
   RIDE_ZONES,
@@ -57,6 +58,13 @@ const FORMAT = [
   "Sessions have no day: you write each week's sessions, and the athlete picks the days. Never name a weekday or date in a title or why.",
   "Each session: weekStart (the Monday of its week, YYYY-MM-DD), sport (run, ride, or swim), kind, a short title, a one-sentence why, and blocks of steps. A block runs its steps `repeat` times: 6 × (300 m R, 300 m jog) is one block with repeat 6 and two steps. Warm-up and cool-down are their own blocks with repeat 1.",
   "A run step has part (warmup, work, recovery, cooldown), exactly one of distanceM or durationS, and exactly one of pace (a training pace type) or effort; zone is null. A step at marathon, threshold, interval, or repetition pace also has secPerKm: the one pace the athlete holds, in whole seconds per km, picked inside that pace's range in `paces`, or a goal's race pace from `racePaces`. Easy, effort, and walk steps have secPerKm null. A ride step has part, durationS only (distanceM null), and exactly one of zone or effort; pace and secPerKm are null. A swim step has part, distanceM in metres (durationS null), and exactly one of zone (a swim zone: recovery, endurance, tempo, threshold, vo2max, sprint) or effort (not walk); pace and secPerKm are null. Rest at the wall between repeats is a recovery step with durationS in seconds, distanceM null, and effort easy. Never write watts, heart rate, or a swim pace: VO2 fills in the athlete's own.",
+  `Every step has drill null, except a swim drill: a swim step with distanceM that names its drill (${DRILLS.filter(
+    (drill) => drill.sport === "swim",
+  )
+    .map((drill) => `${drill.id}, ${drill.label}`)
+    .join(
+      "; ",
+    )}) and swims it at effort easy or zone recovery. Write drills as steps, not only in the title or why: 8 × (50 m drill catchUp, 15 s rest) is one block with repeat 8. The title may still name the session's focus.`,
   "Kinds for runs: easy, recovery, long, tempo, intervals, repetitions, hills, fartlek, marathonPace. Kinds for rides: easy (endurance), recovery, long, tempo (threshold), intervals (VO2 max), hills (climbing), sweetSpot, sprints. Kinds for swims: easy (endurance), recovery, long, technique, tempo (threshold, CSS), intervals (VO2 max), sprints, openWater.",
   "VO2 works out each run's distance and time from its steps, counting time steps at their secPerKm, or the middle of their pace range, each ride's time, and each swim's metres and time, counting its steps at the middle of their swim zone and its rests. Those numbers are what the rules check.",
 ].join("\n\n");

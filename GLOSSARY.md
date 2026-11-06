@@ -112,6 +112,10 @@ _Avoid_: Zones (those are heart rate), target pace, goal pace
 The effort a ride step targets, from recovery to sprint: Coggan's levels as a share of FTP, with sweet spot between tempo and threshold. A planned ride shows it in watts from FTP, or in heart rate from cycling LTHR without power (ADR 0050).
 _Avoid_: Power zone, heart-rate zone (that is the five heart-rate bands)
 
+**Drill**:
+A technique exercise a coach plan step names, such as catch-up or kick with a board, swum easy. VO2 shows the athlete how to do each drill a session uses. Only swims have drills for now (ADR 0063).
+_Avoid_: Technique set, exercise
+
 **Predicted race time**:
 The time VO2 expects the athlete to run a goal's distance today, read from their training paces. Goals have no target time; the prediction takes its place.
 _Avoid_: Goal time, target time, race estimate

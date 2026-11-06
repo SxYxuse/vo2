@@ -264,6 +264,87 @@ export const SWIM_ZONES = [
 export const swimZoneOf = (id: RideZone | null) =>
   SWIM_ZONES.find((zone) => zone.id === id) ?? null;
 
+/**
+ * Drills a step may name, by sport (ADR 0062): what the athlete does in the step, beside its
+ * distance and effort. Swims only for now; another sport's drills join the same list with their
+ * own sport, and the rule checker keeps each drill to its sport.
+ */
+export const DRILLS = [
+  {
+    id: "catchUp",
+    sport: "swim",
+    label: "catch-up drill",
+    how: "Freestyle with one hand waiting out front until the other arrives to touch it, then that arm strokes. Trains a long body line and a full stroke.",
+    kit: null,
+  },
+  {
+    id: "singleArm",
+    sport: "swim",
+    label: "single-arm drill",
+    how: "Freestyle with one arm only, the other resting out front or at your side; breathe to the stroking side. Swap arms each length. Trains the catch and rotation.",
+    kit: null,
+  },
+  {
+    id: "sixKickSwitch",
+    sport: "swim",
+    label: "6-kick switch drill",
+    how: "Kick six times on your side, bottom arm out front, then take one stroke to roll onto the other side. Trains rotation and balance.",
+    kit: null,
+  },
+  {
+    id: "fist",
+    sport: "swim",
+    label: "fist drill",
+    how: "Freestyle with closed fists, so the forearm has to hold the water. Trains an early, high-elbow catch; open the hands for the last length to feel the difference.",
+    kit: null,
+  },
+  {
+    id: "sculling",
+    sport: "swim",
+    label: "sculling",
+    how: "Face down, arms out front, sweep the hands in and out in small figures of eight to move forward with a light kick. Trains feel for the water.",
+    kit: null,
+  },
+  {
+    id: "kickOnSide",
+    sport: "swim",
+    label: "kick on the side",
+    how: "Kick on your side, bottom arm out front, top arm along your body, rolling the face up to breathe. Trains balance and body position.",
+    kit: null,
+  },
+  {
+    id: "kick",
+    sport: "swim",
+    label: "kick with a board",
+    how: "Hold a kickboard out front and kick from the hips with loose ankles and straight-ish knees. Trains the legs and a high body position.",
+    kit: "Kickboard",
+  },
+  {
+    id: "pull",
+    sport: "swim",
+    label: "pull with a buoy",
+    how: "Freestyle with a pull buoy between your thighs and no kick, so the arms do the work. Trains the pull.",
+    kit: "Pull buoy",
+  },
+] as const satisfies readonly {
+  id: string;
+  sport: PlanSport;
+  label: string;
+  how: string;
+  kit: string | null;
+}[];
+
+export type Drill = (typeof DRILLS)[number]["id"];
+const DRILL_IDS = DRILLS.map((drill) => drill.id) as [Drill, ...Drill[]];
+export const drillOf = (id: Drill | null | undefined) =>
+  DRILLS.find((drill) => drill.id === id) ?? null;
+
+/** The drills a session's steps name, each once, in the order they come. */
+export function sessionDrills(session: Pick<PlannedSession, "blocks">) {
+  const ids = new Set(session.blocks.flatMap((block) => block.steps.map((step) => step.drill)));
+  return [...ids].map(drillOf).filter((drill) => drill != null);
+}
+
 export const STEP_PARTS = ["warmup", "work", "recovery", "cooldown"] as const;
 export type StepPart = (typeof STEP_PARTS)[number];
 
@@ -272,7 +353,7 @@ export type StepPart = (typeof STEP_PARTS)[number];
  * targets a zone or an effort, by time only. A run step at a pace harder than easy also names one
  * pace in seconds per km, inside its pace type's range or at a goal's race pace (ADR 0055). A swim
  * step is a distance at a swim zone or an effort, or rest at the wall: a recovery step by time
- * (ADR 0061). Kept flat, without refinements, so every structured-output model reads it the same
+ * (ADR 0061), and may name a swim drill to do in it, at an easy effort (ADR 0062). Kept flat, without refinements, so every structured-output model reads it the same
  * way; the rule checker reports a step that mixes them (coach-plan-rules.ts).
  */
 const stepSchema = z.object({
@@ -287,6 +368,7 @@ const stepSchema = z.object({
   secPerKm: z.number().min(120).max(900).nullable(),
   zone: z.enum(RIDE_ZONE_IDS).nullable(),
   effort: z.enum(EFFORT_IDS).nullable(),
+  drill: z.enum(DRILL_IDS).nullable(),
 });
 
 /** Steps run `repeat` times in a row: 6 × (300 m R, 300 m jog) is one block repeated 6 times. */
@@ -614,7 +696,8 @@ function rideTargets(step: Step, anchors: PlanAnchors) {
 
 /** A swim zone's pace per 100 m from CSS, fast then slow; none for a sprint or rest. */
 function swimTarget(step: Step, css: number | null): Band | null {
-  if (css == null || isRest(step)) return null;
+  // A drill is swum by feel: its pace says nothing about the drill done well.
+  if (css == null || isRest(step) || step.drill != null) return null;
   const zone = stepSwimZone(step);
   return zone.css ? [Math.round(css + zone.css[0]), Math.round(css + zone.css[1])] : null;
 }
@@ -684,11 +767,19 @@ export const bandText = (band: Band, unit: string) => `${band[0]}–${band[1]} $
 export const swimPaceText = (band: Band) =>
   `${formatPaceClock(band[0])}–${formatPaceClock(band[1])} /100m`;
 
-/** A swim step's target: rest, or its zone and its pace per 100 m when VO2 has a CSS. */
-function swimTargetText(step: PlannedStep) {
+/**
+ * A swim step's target: rest, a drill at its effort (a drill is swum by feel, not at a pace), or
+ * its zone and its pace per 100 m when VO2 has a CSS.
+ */
+export function swimTargetText(step: PlannedStep, join = " ") {
   if (isRest(step)) return "rest";
   const zone = stepSwimZone(step);
-  return step.swimPace ? `${zone.label} ${swimPaceText(step.swimPace)}` : zone.label;
+  const drill = drillOf(step.drill);
+  if (drill) {
+    const effort = EFFORTS.find((item) => item.id === step.effort)?.label ?? zone.label;
+    return `${drill.label}, ${effort}`;
+  }
+  return step.swimPace ? `${zone.label}${join}${swimPaceText(step.swimPace)}` : zone.label;
 }
 
 function targetText(step: PlannedStep, sport: PlanSport) {

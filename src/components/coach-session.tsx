@@ -10,6 +10,7 @@ import {
   minutesText,
   PLAN_SPORTS,
   sessionAmountText,
+  sessionDrills,
   sessionKindLabel,
 } from "@/services/coach-plan.types.ts";
 import { mondayOf } from "@/services/season-phase.ts";
@@ -62,6 +63,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
   const ride = run.sport === "ride";
   const { icon: Icon, className: iconClass } = SPORT_ICON[run.sport];
   const ahead = run.weekStart > mondayOf(state.today);
+  const drills = sessionDrills(run);
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,7 +110,8 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           <CardHeader>
             <CardTitle>Shape</CardTitle>
             <CardDescription>
-              Width is {ride ? "time" : "distance"}, height and colour are effort.
+              Width is {ride ? "time" : "distance"}, height and colour are effort
+              {drills.length ? "; stripes are drills." : "."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -125,6 +128,29 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
               <p className="text-xs/relaxed">{run.why}</p>
             </CardContent>
           </Card>
+          {drills.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Drills</CardTitle>
+                <CardDescription>Swim each one easy, long and smooth.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="flex flex-col gap-3 text-xs/relaxed">
+                  {drills.map((drill) => (
+                    <div key={drill.id} className="flex flex-col gap-0.5">
+                      <dt className="font-medium first-letter:uppercase">
+                        {drill.label}
+                        {drill.kit ? (
+                          <span className="text-muted-foreground font-normal"> · {drill.kit}</span>
+                        ) : null}
+                      </dt>
+                      <dd className="text-muted-foreground">{drill.how}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Done?</CardTitle>
