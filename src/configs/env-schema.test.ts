@@ -76,6 +76,8 @@ describe("parseEnv", () => {
 
     expect(env.STRAVA_MOCK).toBe(false);
     expect(env.STRAVA_BASE_URL).toBe("https://www.strava.com");
+    // Nor does production fall back to the mock BRouter; the route builder is off instead.
+    expect(env.BROUTER_URL).toBeUndefined();
   });
 
   it("falls back to NODE_ENV when APP_ENV is absent", () => {

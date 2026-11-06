@@ -19,6 +19,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # The route builder's bike router (ADR 0062). Opt-in, so `db:up` still starts Postgres only:
+  # `vp run routing:up` downloads the map tiles it needs, then starts it. Every checkout shares it.
+  brouter:
+    profiles: [routing]
+    build: ./docker/brouter
+    image: vo2-brouter:1.7.10
+    container_name: vo2-brouter
+    restart: unless-stopped
+    ports:
+      - "17777:17777"
+    volumes:
+      - ${HOME}/.cache/vo2/brouter/segments4:/segments4:ro
+
 volumes:
   vo2-postgres:
     name: vo2-postgres

@@ -184,6 +184,14 @@ _Avoid_: Thread, session (that is planned training), conversation history
 Monday through Sunday in the athlete's timezone. The coach plan's budgets are per training week.
 _Avoid_: Microcycle, calendar week
 
+**Route builder**:
+Proposes road and gravel loops inside a zone the athlete places on the map, routed by BRouter over OpenStreetMap and kept on the device (ADR 0062).
+_Avoid_: Route planner, route generator
+
+**Route confidence**:
+How sure VO2 is, from 0 to 100, that a proposed loop can be ridden end to end on the chosen bike. It is read from each stretch's OpenStreetMap tags and raised a little by popular Strava segments. High from 80, Medium from 60, otherwise Low.
+_Avoid_: Score, quality, rating
+
 ## Load and form
 
 **Training load**:

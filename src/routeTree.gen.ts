@@ -20,6 +20,7 @@ import { Route as AppHeartRateRouteImport } from './routes/_app.heart-rate'
 import { Route as AppMapRouteImport } from './routes/_app.map'
 import { Route as AppMergeGpxRouteImport } from './routes/_app.merge-gpx'
 import { Route as AppPlanRouteImport } from './routes/_app.plan'
+import { Route as AppRouteBuilderRouteImport } from './routes/_app.route-builder'
 import { Route as AppSeasonRouteImport } from './routes/_app.season'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppWeekRouteImport } from './routes/_app.week'
@@ -31,6 +32,7 @@ import { Route as AppPowerFileIdRouteImport } from './routes/_app.power.$fileId'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app.settings.index'
 import { Route as AppSettingsSectionRouteImport } from './routes/_app.settings.$section'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiMockBrouterSplatRouteImport } from './routes/api/mock-brouter/$'
 import { Route as ApiMockStravaSplatRouteImport } from './routes/api/mock-strava/$'
 import { Route as ApiStravaWebhookSecretRouteImport } from './routes/api/strava-webhook/$secret'
 import { Route as AppWeekRunSessionIdRouteImport } from './routes/_app.week_.run.$sessionId'
@@ -89,6 +91,11 @@ const AppPlanRoute = AppPlanRouteImport.update({
   path: '/plan',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRouteBuilderRoute = AppRouteBuilderRouteImport.update({
+  id: '/route-builder',
+  path: '/route-builder',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSeasonRoute = AppSeasonRouteImport.update({
   id: '/season',
   path: '/season',
@@ -144,6 +151,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMockBrouterSplatRoute = ApiMockBrouterSplatRouteImport.update({
+  id: '/api/mock-brouter/$',
+  path: '/api/mock-brouter/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMockStravaSplatRoute = ApiMockStravaSplatRouteImport.update({
   id: '/api/mock-strava/$',
   path: '/api/mock-strava/$',
@@ -171,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof AppMapRoute
   '/merge-gpx': typeof AppMergeGpxRoute
   '/plan': typeof AppPlanRoute
+  '/route-builder': typeof AppRouteBuilderRoute
   '/season': typeof AppSeasonRoute
   '/settings': typeof AppSettingsRouteWithChildren
   '/week': typeof AppWeekRoute
@@ -180,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/power/$fileId': typeof AppPowerFileIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/mock-brouter/$': typeof ApiMockBrouterSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/power/': typeof AppPowerIndexRoute
@@ -196,6 +210,7 @@ export interface FileRoutesByTo {
   '/map': typeof AppMapRoute
   '/merge-gpx': typeof AppMergeGpxRoute
   '/plan': typeof AppPlanRoute
+  '/route-builder': typeof AppRouteBuilderRoute
   '/season': typeof AppSeasonRoute
   '/week': typeof AppWeekRoute
   '/week-bucket': typeof AppWeekBucketRoute
@@ -205,6 +220,7 @@ export interface FileRoutesByTo {
   '/power/$fileId': typeof AppPowerFileIdRoute
   '/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/mock-brouter/$': typeof ApiMockBrouterSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/power': typeof AppPowerIndexRoute
@@ -223,6 +239,7 @@ export interface FileRoutesById {
   '/_app/map': typeof AppMapRoute
   '/_app/merge-gpx': typeof AppMergeGpxRoute
   '/_app/plan': typeof AppPlanRoute
+  '/_app/route-builder': typeof AppRouteBuilderRoute
   '/_app/season': typeof AppSeasonRoute
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/week': typeof AppWeekRoute
@@ -233,6 +250,7 @@ export interface FileRoutesById {
   '/_app/power/$fileId': typeof AppPowerFileIdRoute
   '/_app/settings/$section': typeof AppSettingsSectionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/mock-brouter/$': typeof ApiMockBrouterSplatRoute
   '/api/mock-strava/$': typeof ApiMockStravaSplatRoute
   '/api/strava-webhook/$secret': typeof ApiStravaWebhookSecretRoute
   '/_app/power/': typeof AppPowerIndexRoute
@@ -252,6 +270,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/merge-gpx'
     | '/plan'
+    | '/route-builder'
     | '/season'
     | '/settings'
     | '/week'
@@ -261,6 +280,7 @@ export interface FileRouteTypes {
     | '/power/$fileId'
     | '/settings/$section'
     | '/api/auth/$'
+    | '/api/mock-brouter/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
     | '/power/'
@@ -277,6 +297,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/merge-gpx'
     | '/plan'
+    | '/route-builder'
     | '/season'
     | '/week'
     | '/week-bucket'
@@ -286,6 +307,7 @@ export interface FileRouteTypes {
     | '/power/$fileId'
     | '/settings/$section'
     | '/api/auth/$'
+    | '/api/mock-brouter/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
     | '/power'
@@ -303,6 +325,7 @@ export interface FileRouteTypes {
     | '/_app/map'
     | '/_app/merge-gpx'
     | '/_app/plan'
+    | '/_app/route-builder'
     | '/_app/season'
     | '/_app/settings'
     | '/_app/week'
@@ -313,6 +336,7 @@ export interface FileRouteTypes {
     | '/_app/power/$fileId'
     | '/_app/settings/$section'
     | '/api/auth/$'
+    | '/api/mock-brouter/$'
     | '/api/mock-strava/$'
     | '/api/strava-webhook/$secret'
     | '/_app/power/'
@@ -326,6 +350,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   ApiCoachRoute: typeof ApiCoachRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiMockBrouterSplatRoute: typeof ApiMockBrouterSplatRoute
   ApiMockStravaSplatRoute: typeof ApiMockStravaSplatRoute
   ApiStravaWebhookSecretRoute: typeof ApiStravaWebhookSecretRoute
 }
@@ -409,6 +434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPlanRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/route-builder': {
+      id: '/_app/route-builder'
+      path: '/route-builder'
+      fullPath: '/route-builder'
+      preLoaderRoute: typeof AppRouteBuilderRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/season': {
       id: '/_app/season'
       path: '/season'
@@ -486,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mock-brouter/$': {
+      id: '/api/mock-brouter/$'
+      path: '/api/mock-brouter/$'
+      fullPath: '/api/mock-brouter/$'
+      preLoaderRoute: typeof ApiMockBrouterSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/mock-strava/$': {
       id: '/api/mock-strava/$'
       path: '/api/mock-strava/$'
@@ -532,6 +571,7 @@ interface AppRouteChildren {
   AppMapRoute: typeof AppMapRoute
   AppMergeGpxRoute: typeof AppMergeGpxRoute
   AppPlanRoute: typeof AppPlanRoute
+  AppRouteBuilderRoute: typeof AppRouteBuilderRoute
   AppSeasonRoute: typeof AppSeasonRoute
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppWeekRoute: typeof AppWeekRoute
@@ -551,6 +591,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMapRoute: AppMapRoute,
   AppMergeGpxRoute: AppMergeGpxRoute,
   AppPlanRoute: AppPlanRoute,
+  AppRouteBuilderRoute: AppRouteBuilderRoute,
   AppSeasonRoute: AppSeasonRoute,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppWeekRoute: AppWeekRoute,
@@ -570,6 +611,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   ApiCoachRoute: ApiCoachRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiMockBrouterSplatRoute: ApiMockBrouterSplatRoute,
   ApiMockStravaSplatRoute: ApiMockStravaSplatRoute,
   ApiStravaWebhookSecretRoute: ApiStravaWebhookSecretRoute,
 }

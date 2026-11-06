@@ -19,6 +19,8 @@ const env = {
   BETTER_AUTH_URL: E2E_URL,
   APP_ENV: "development",
   STRAVA_MOCK: "1",
+  // Always the app's mock BRouter, even when .env names a real one: real roads change weekly.
+  BROUTER_URL: "",
   E2E_NOW,
   TZ: "UTC",
 };

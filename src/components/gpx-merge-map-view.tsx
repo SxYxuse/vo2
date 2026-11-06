@@ -24,6 +24,7 @@ import {
   useMap,
 } from "@/components/ui/map";
 
+import { FailBeforeLoad } from "./map-fail-before-load.tsx";
 import { resolveThemeColor } from "./map-theme-color.ts";
 
 export type GpxMergeMapViewProps = {
@@ -74,32 +75,6 @@ const ROUTE_PAINT: LineLayerSpecification["paint"] = {
   "line-width": 4.5,
   "line-opacity": 1,
 };
-
-const FIRST_LOAD_TIMEOUT_MS = 10_000;
-
-/** Falls back to the plain outline when the basemap can't load (offline, weak signal). */
-function FailBeforeLoad({ onFail }: { onFail: () => void }) {
-  const { map } = useMap();
-
-  useEffect(() => {
-    if (!map || map.loaded()) return;
-    const timeout = window.setTimeout(onFail, FIRST_LOAD_TIMEOUT_MS);
-    const stop = () => {
-      window.clearTimeout(timeout);
-      map.off("load", stop);
-      map.off("error", handleError);
-    };
-    const handleError = () => {
-      stop();
-      onFail();
-    };
-    map.on("load", stop);
-    map.on("error", handleError);
-    return stop;
-  }, [map, onFail]);
-
-  return null;
-}
 
 function useResolvedColors(tokens: string[]) {
   const key = tokens.join("|");

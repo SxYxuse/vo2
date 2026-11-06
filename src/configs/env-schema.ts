@@ -29,6 +29,7 @@ export const env$ = z
     STRAVA_CLIENT_ID: optionalString,
     STRAVA_CLIENT_SECRET: optionalString,
     STRAVA_WEBHOOK_SECRET: optionalString,
+    BROUTER_URL: optionalString,
     LOKI_HOST: optionalString,
   })
   .superRefine((raw, ctx) => {
@@ -66,6 +67,13 @@ export const env$ = z
       STRAVA_CLIENT_SECRET: raw.STRAVA_CLIENT_SECRET ?? "mock",
       /** Unset turns the Strava webhook off; the mock always has one so its events reach the app. */
       STRAVA_WEBHOOK_SECRET: raw.STRAVA_WEBHOOK_SECRET ?? (stravaMock ? "mock" : undefined),
+      /**
+       * The BRouter server the route builder asks (ADR 0062). Unset turns the route builder off,
+       * except beside mock Strava, where the app's own mock BRouter answers.
+       */
+      BROUTER_URL: (
+        raw.BROUTER_URL ?? (stravaMock ? `${raw.BETTER_AUTH_URL}/api/mock-brouter` : undefined)
+      )?.replace(/\/$/, ""),
       LOKI_HOST: raw.LOKI_HOST,
     };
   });

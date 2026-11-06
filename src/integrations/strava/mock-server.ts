@@ -101,6 +101,7 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
   if (!isLive(bearerToken(request), "access")) return unauthorized("access_token");
   if (path === "/api/v3/athlete") return json(ATHLETE);
   if (path === "/api/v3/athlete/zones") return json(ZONES);
+  if (path === "/api/v3/segments/explore") return json(exploreSegments(query));
   if (path === "/api/v3/athlete/activities") {
     return json(
       listActivities({
@@ -514,6 +515,45 @@ function loopPoints(count: number): Array<[number, number]> {
     const t = (i / Math.max(count - 1, 1)) * 2 * Math.PI;
     return [HOME_LAT + Math.sin(t) * 0.018, HOME_LNG + Math.cos(t) * 0.028];
   });
+}
+
+/**
+ * Two popular climbs in every box the route builder asks about, placed from the box itself so
+ * any zone gets segments: one up its middle and one across its lower half.
+ */
+function exploreSegments(query: URLSearchParams) {
+  const [south, west, north, east] = (query.get("bounds") ?? "").split(",").map(Number);
+  if (![south, west, north, east].every((value) => Number.isFinite(value))) {
+    return { message: "Bad Request", errors: [{ field: "bounds", code: "invalid" }] };
+  }
+  const at = (y: number, x: number): [number, number] => [
+    south! + (north! - south!) * y,
+    west! + (east! - west!) * x,
+  ];
+  const line = (from: [number, number], to: [number, number]) =>
+    Array.from({ length: 12 }, (_, i): [number, number] => {
+      const t = i / 11;
+      return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t];
+    });
+  const id = Math.abs(Math.round(south! * 1000) * 31 + Math.round(west! * 1000)) % 1_000_000;
+  const segments = [
+    { id: id * 10 + 1, name: "Côte du moulin", points: line(at(0.3, 0.5), at(0.7, 0.55)) },
+    { id: id * 10 + 2, name: "Chemin des crêtes", points: line(at(0.35, 0.25), at(0.3, 0.75)) },
+  ];
+  return {
+    segments: segments.map((segment) => ({
+      id: segment.id,
+      name: segment.name,
+      climb_category: 1,
+      climb_category_desc: "4",
+      avg_grade: 4.2,
+      start_latlng: segment.points[0],
+      end_latlng: segment.points.at(-1),
+      elev_difference: 90,
+      distance: 2200,
+      points: encodePolyline(segment.points),
+    })),
+  };
 }
 
 function encodePolyline(points: Array<[number, number]>) {
