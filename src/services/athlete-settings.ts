@@ -12,8 +12,8 @@ import {
 import {
   COACH_FEATURES,
   COACH_PROVIDER_IDS,
-  findCoachModel,
   REASONING_LEVELS,
+  type CoachModelOption,
   type CoachModels,
 } from "./coach-models.ts";
 import {
@@ -70,25 +70,32 @@ export const saveProfile = createServerFn({ method: "POST" })
     await saveProfileImpl(data);
   });
 
-const coachModelSaveSchema = z
-  .object({
-    feature: z.enum(COACH_FEATURES.map((feature) => feature.id)),
-    provider: z.enum(COACH_PROVIDER_IDS),
-    model: z.string(),
-    reasoning: z.enum(REASONING_LEVELS).nullable(),
-  })
-  .refine(
-    ({ provider, model, reasoning }) => {
-      const listed = findCoachModel(provider, model);
-      return listed != null && (reasoning == null || listed.reasoning.some((l) => l === reasoning));
-    },
-    { message: "Not an offered model and reasoning level" },
-  );
+const coachModelSaveSchema = z.object({
+  feature: z.enum(COACH_FEATURES.map((feature) => feature.id)),
+  provider: z.enum(COACH_PROVIDER_IDS),
+  model: z.string(),
+  reasoning: z.enum(REASONING_LEVELS).nullable(),
+});
+
+/** Every model the picker offers, recommended first (ADR 0060). */
+export const loadCoachCatalog = createServerFn({ method: "GET" }).handler(
+  async (): Promise<CoachModelOption[]> => {
+    const { coachCatalog } = await import("./coach-catalog.server.ts");
+    return coachCatalog();
+  },
+);
 
 export const saveCoachModel = createServerFn({ method: "POST" })
   .validator(coachModelSaveSchema)
   .handler(async ({ data }): Promise<CoachModels> => {
-    const { saveCoachModelImpl } = await import("./athlete-settings.server.ts");
+    const [{ saveCoachModelImpl }, { findOfferedModel }] = await Promise.all([
+      import("./athlete-settings.server.ts"),
+      import("./coach-catalog.server.ts"),
+    ]);
     const { feature, ...choice } = data;
+    const offered = findOfferedModel(choice.provider, choice.model);
+    if (!offered || (choice.reasoning != null && !offered.reasoning.includes(choice.reasoning))) {
+      throw new Error("Not an offered model and reasoning level");
+    }
     return saveCoachModelImpl(feature, choice);
   });

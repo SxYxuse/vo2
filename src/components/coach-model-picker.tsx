@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, ChevronRightIcon, SearchIcon } from "lucide-react";
 import { cn } from "cn";
 
-import { coachStatusQueryOptions, settingsSnapshotQueryOptions } from "@/lib/queries.ts";
+import {
+  coachCatalogQueryOptions,
+  coachStatusQueryOptions,
+  settingsSnapshotQueryOptions,
+} from "@/lib/queries.ts";
 import { saveCoachModel } from "@/services/athlete-settings.ts";
 import {
-  COACH_MODELS,
   COACH_PROVIDERS,
   coachModelLabel,
   coachProviderLabel,
-  findCoachModel,
   keptReasoning,
   REASONING_LABELS,
   type CoachFeature,
@@ -36,6 +38,10 @@ const PICKED =
 
 type Feature = { id: CoachFeature; label: string; hint: string };
 type Keys = Partial<Record<CoachProvider, string>> | undefined;
+
+function findIn(models: CoachModelOption[], { provider, model }: CoachModelChoice) {
+  return models.find((each) => each.provider === provider && each.id === model);
+}
 
 function reasoningText(choice: CoachModelChoice) {
   return choice.reasoning == null ? "Auto" : REASONING_LABELS[choice.reasoning];
@@ -67,8 +73,10 @@ export function CoachModelRow({
       await queryClient.invalidateQueries(coachStatusQueryOptions);
     },
   });
+  const catalog = useQuery(coachCatalogQueryOptions);
   const shown = save.isPending ? save.variables : choice;
-  const offered = findCoachModel(shown.provider, shown.model) != null;
+  // Until the catalog loads, only the recommended models are known: no warning yet.
+  const offered = catalog.isPlaceholderData || findIn(catalog.data ?? [], shown) != null;
   const keyMissing = keys != null && !mocked && !(shown.provider in keys);
 
   return (
@@ -129,12 +137,13 @@ function CoachModelPicker({
 }) {
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState<CoachProvider | "all">("all");
-  const listed = findCoachModel(choice.provider, choice.model);
+  const catalog = useQuery(coachCatalogQueryOptions).data ?? [];
+  const listed = findIn(catalog, choice);
   const needle = query.trim().toLowerCase();
   // Only providers with a key are offered: a keyless model can't run. The current pick stays so
   // the athlete sees what they're on, and the mock coach needs no key, so it offers every model.
   const keyed = (id: CoachProvider) => keys == null || mocked || id in keys;
-  const offered = COACH_MODELS.filter(
+  const offered = catalog.filter(
     (model) =>
       keyed(model.provider) || (model.provider === choice.provider && model.id === choice.model),
   );
@@ -145,14 +154,15 @@ function CoachModelPicker({
   const matches = offered.filter(
     (model) =>
       (provider === "all" || model.provider === provider) &&
-      (!needle || `${model.label} ${model.hint}`.toLowerCase().includes(needle)),
+      (!needle || `${model.label} ${model.hint} ${model.id}`.toLowerCase().includes(needle)),
   );
   const groups = providers
     .map((each) => ({
       ...each,
-      models: matches.filter((model) => model.provider === each.id),
+      recommended: matches.filter((model) => model.provider === each.id && model.recommended),
+      untested: matches.filter((model) => model.provider === each.id && !model.recommended),
     }))
-    .filter((group) => group.models.length);
+    .filter((group) => group.recommended.length || group.untested.length);
 
   function pick(model: CoachModelOption) {
     onPick({
@@ -226,29 +236,29 @@ function CoachModelPicker({
                 <span className="font-normal tracking-normal normal-case">No key yet</span>
               ) : null}
             </h3>
-            {group.models.map((model) => {
-              const selected = model.provider === choice.provider && model.id === choice.model;
-              return (
-                <button
-                  key={`${model.provider}:${model.id}`}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  aria-label={`${model.label} via ${group.label}`}
-                  onClick={() => pick(model)}
-                  className={cn(
-                    "flex min-h-12 items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
-                    selected && "border-foreground/80 bg-muted",
-                  )}
-                >
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm font-medium">{model.label}</span>
-                    <span className="text-xs text-muted-foreground">{model.hint}</span>
-                  </span>
-                  {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
-                </button>
-              );
-            })}
+            {group.recommended.map((model) => (
+              <ModelOption
+                key={model.id}
+                model={model}
+                via={group.label}
+                choice={choice}
+                onPick={pick}
+              />
+            ))}
+            {group.untested.length ? (
+              <h4 className="mt-2 px-3 text-xs text-muted-foreground">
+                Not tested with VO2: chat or plan writing may fail on some.
+              </h4>
+            ) : null}
+            {group.untested.map((model) => (
+              <ModelOption
+                key={model.id}
+                model={model}
+                via={group.label}
+                choice={choice}
+                onPick={pick}
+              />
+            ))}
           </section>
         ))}
       </div>
@@ -290,5 +300,38 @@ function CoachModelPicker({
         </p>
       </div>
     </>
+  );
+}
+
+function ModelOption({
+  model,
+  via,
+  choice,
+  onPick,
+}: {
+  model: CoachModelOption;
+  via: string;
+  choice: CoachModelChoice;
+  onPick: (model: CoachModelOption) => void;
+}) {
+  const selected = model.provider === choice.provider && model.id === choice.model;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      aria-label={`${model.label} via ${via}`}
+      onClick={() => onPick(model)}
+      className={cn(
+        "flex min-h-12 items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+        selected && "border-foreground/80 bg-muted",
+      )}
+    >
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-sm font-medium">{model.label}</span>
+        <span className="text-xs text-muted-foreground">{model.hint}</span>
+      </span>
+      {selected ? <CheckIcon className="size-4 shrink-0" /> : null}
+    </button>
   );
 }
