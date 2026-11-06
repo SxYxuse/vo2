@@ -105,6 +105,7 @@ export function CoachModelRow({
             feature={feature}
             choice={shown}
             keys={keys}
+            mocked={mocked}
             onPick={(next) => save.mutate(next)}
           />
         </ResponsiveDialogContent>
@@ -117,26 +118,41 @@ function CoachModelPicker({
   feature,
   choice,
   keys,
+  mocked,
   onPick,
 }: {
   feature: Feature;
   choice: CoachModelChoice;
   keys: Keys;
+  mocked: boolean;
   onPick: (next: CoachModelChoice) => void;
 }) {
   const [query, setQuery] = useState("");
   const [provider, setProvider] = useState<CoachProvider | "all">("all");
   const listed = findCoachModel(choice.provider, choice.model);
   const needle = query.trim().toLowerCase();
-  const matches = COACH_MODELS.filter(
+  // Only providers with a key are offered: a keyless model can't run. The current pick stays so
+  // the athlete sees what they're on, and the mock coach needs no key, so it offers every model.
+  const keyed = (id: CoachProvider) => keys == null || mocked || id in keys;
+  const offered = COACH_MODELS.filter(
+    (model) =>
+      keyed(model.provider) || (model.provider === choice.provider && model.id === choice.model),
+  );
+  const providers = COACH_PROVIDERS.filter((each) =>
+    offered.some((model) => model.provider === each.id),
+  );
+  const noKeys = !COACH_PROVIDERS.some((each) => keyed(each.id));
+  const matches = offered.filter(
     (model) =>
       (provider === "all" || model.provider === provider) &&
       (!needle || `${model.label} ${model.hint}`.toLowerCase().includes(needle)),
   );
-  const groups = COACH_PROVIDERS.map((each) => ({
-    ...each,
-    models: matches.filter((model) => model.provider === each.id),
-  })).filter((group) => group.models.length);
+  const groups = providers
+    .map((each) => ({
+      ...each,
+      models: matches.filter((model) => model.provider === each.id),
+    }))
+    .filter((group) => group.models.length);
 
   function pick(model: CoachModelOption) {
     onPick({
@@ -166,32 +182,39 @@ function CoachModelPicker({
             onChange={(event) => setQuery(event.target.value)}
           />
         </InputGroup>
-        <ToggleGroup
-          aria-label="Provider"
-          value={[provider]}
-          onValueChange={(next) => {
-            const value = next[0] as CoachProvider | "all" | undefined;
-            if (value) setProvider(value);
-          }}
-          variant="outline"
-          size="sm"
-          className="flex-wrap"
-        >
-          <ToggleGroupItem value="all" className={PICKED}>
-            All
-          </ToggleGroupItem>
-          {COACH_PROVIDERS.map((each) => (
-            <ToggleGroupItem key={each.id} value={each.id} className={PICKED}>
-              {each.label}
+        {providers.length > 1 ? (
+          <ToggleGroup
+            aria-label="Provider"
+            value={[provider]}
+            onValueChange={(next) => {
+              const value = next[0] as CoachProvider | "all" | undefined;
+              if (value) setProvider(value);
+            }}
+            variant="outline"
+            size="sm"
+            className="flex-wrap"
+          >
+            <ToggleGroupItem value="all" className={PICKED}>
+              All
             </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+            {providers.map((each) => (
+              <ToggleGroupItem key={each.id} value={each.id} className={PICKED}>
+                {each.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        ) : null}
       </div>
       <div
         role="radiogroup"
         aria-label="Model"
         className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-4 py-2 md:px-0"
       >
+        {noKeys ? (
+          <p className="pt-2 text-xs text-muted-foreground">
+            Add a key under Keys to see its provider's models.
+          </p>
+        ) : null}
         {groups.length ? null : (
           <p className="py-6 text-center text-sm text-muted-foreground">No model matches.</p>
         )}
