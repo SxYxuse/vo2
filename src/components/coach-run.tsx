@@ -16,6 +16,7 @@ import {
   stepSwimZone,
   stepZone,
   swimPaceText,
+  swimTargetText,
   type CoachPlanState,
   type PlanSport,
   type PlannedSession,
@@ -80,6 +81,10 @@ const LEVEL_BG: Record<PlanSport, Record<Level, string>> = {
   },
 };
 
+/** Drill steps are striped, so a technique swim reads as drills and swimming, not one block. */
+const DRILL_STRIPES =
+  "bg-[repeating-linear-gradient(135deg,transparent_0_3px,rgb(255_255_255/0.45)_3px_6px)]";
+
 const rangeMiddle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPerKm) / 2;
 
 /**
@@ -115,7 +120,11 @@ export function RunShape({
         return (
           <i
             key={index}
-            className={cn("block min-w-px rounded-t-[2px]", LEVEL_BG[run.sport][level])}
+            className={cn(
+              "block min-w-px rounded-t-[2px]",
+              LEVEL_BG[run.sport][level],
+              step.drill != null && DRILL_STRIPES,
+            )}
             style={{ flex: stepWidth(step, run.sport), height: LEVEL_HEIGHT[level] }}
           />
         );
@@ -138,23 +147,16 @@ function rideTargetText(step: PlannedStep) {
   return zone.label;
 }
 
-/** A swim step's target: rest, or its zone at its pace per 100 m when VO2 has a CSS. */
-function swimTargetText(step: PlannedStep) {
-  if (isSwimRest(step)) return "rest";
-  const zone = stepSwimZone(step);
-  return step.swimPace ? `${zone.label} at ${swimPaceText(step.swimPace)}` : zone.label;
-}
-
 /**
  * "800 m at 4:15–4:20/km", "400 m jog", "Warm-up: 2 km easy", "12 min sweet spot at 230–245 W",
- * "100 m threshold at 1:44–1:47 /100m", "15 s rest".
+ * "100 m threshold at 1:44–1:47 /100m", "50 m catch-up drill, easy", "15 s rest".
  */
 export function stepText(step: PlannedStep, sport: PlanSport) {
   const part =
     step.part in PART_LABEL ? `${PART_LABEL[step.part as keyof typeof PART_LABEL]}: ` : "";
   const amount = stepAmountText(step, sport);
   if (sport === "ride") return `${part}${amount} ${rideTargetText(step)}`;
-  if (sport === "swim") return `${part}${amount} ${swimTargetText(step)}`;
+  if (sport === "swim") return `${part}${amount} ${swimTargetText(step, " at ")}`;
   if (step.secPerKm != null) return `${part}${amount} at ${formatPaceClock(step.secPerKm)}/km`;
   if (step.range) return `${part}${amount} at ${rangeText(step.range)}`;
   if (step.part === "recovery" && (step.effort === "easy" || step.pace === "easy")) {

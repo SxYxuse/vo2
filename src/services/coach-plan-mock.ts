@@ -55,6 +55,7 @@ function runStep(
       range && pace !== "easy" ? Math.round((range.fastSecPerKm + range.slowSecPerKm) / 2) : null,
     zone: null,
     effort: paces ? null : effort,
+    drill: null,
   };
 }
 
@@ -67,6 +68,7 @@ function rideStep(part: Step["part"], minutes: number, zone: Step["zone"]): Step
     secPerKm: null,
     zone,
     effort: null,
+    drill: null,
   };
 }
 
@@ -80,7 +82,13 @@ function swimStep(part: Step["part"], metres: number, zone: Step["zone"], restS?
     secPerKm: null,
     zone: restS == null ? zone : null,
     effort: restS == null ? null : "easy",
+    drill: null,
   };
+}
+
+/** A swim drill: metres of it, easy (ADR 0063). */
+function drillStep(metres: number, drill: Step["drill"]): Step {
+  return { ...swimStep("work", metres, null), effort: "easy", drill };
 }
 
 /** Per sport: the step it grows by, its smallest session, its share, and how quality sizes. */
@@ -163,7 +171,8 @@ export function mockCoachPlan(
         sportQuality < maxQualitySessions(sessionsPerWeek(ctx.availability, sport)) &&
         quality < MAX_QUALITY_ACROSS_SPORTS &&
         week.phase !== "recovery" &&
-        wanted > 1 &&
+        // A swim's second session is technique, its third the quality one (`coaching/swimming.md`).
+        wanted > (sport === "swim" ? 2 : 1) &&
         size >= mock.minQuality;
       if (canQuality) quality += 1;
 
@@ -293,7 +302,7 @@ function mockSwim(
       blocks: [{ repeat: 1, steps: [swimStep("work", size, "endurance")] }],
     };
   }
-  if (index === 1 && quality) {
+  if (index === 2 && quality) {
     // 400 m warm-up, 100 m repeats at CSS with 15 s rest, and the rest easy.
     const repeats = Math.floor((size - 600) / 100);
     return {
@@ -311,11 +320,18 @@ function mockSwim(
       ],
     };
   }
+  // Every other swim is technique: drills as steps, then swimming that uses them (size ≥ 1000 m).
   return {
     ...base,
-    kind: "easy",
-    title: `${metresText(size)} endurance swim`,
-    why: "Steady swimming adds aerobic volume and grooves your stroke.",
-    blocks: [{ repeat: 1, steps: [swimStep("work", size, "endurance")] }],
+    kind: "technique",
+    title: "Technique: catch-up and fist",
+    why: "Drills build a longer stroke and a firmer catch, then easy swimming puts them to use.",
+    blocks: [
+      { repeat: 1, steps: [swimStep("warmup", 200, "endurance")] },
+      { repeat: 4, steps: [drillStep(50, "catchUp"), swimStep("recovery", 0, null, 15)] },
+      { repeat: 4, steps: [drillStep(50, "fist"), swimStep("recovery", 0, null, 15)] },
+      { repeat: 1, steps: [swimStep("work", size - 700, "endurance")] },
+      { repeat: 1, steps: [swimStep("cooldown", 100, "recovery")] },
+    ],
   };
 }

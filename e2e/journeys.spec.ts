@@ -738,6 +738,22 @@ test("a triathlete plans swims beside rides and runs, opens a swim, and stops sw
     });
     await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
 
+    // A technique swim names its drills in its steps and says how to swim each (ADR 0063).
+    // This week may hold only the long swim; next week holds the second.
+    await page.getByRole("button", { name: "Next week" }).click();
+    await weekSessions(page)
+      .filter({ hasText: "Technique: catch-up and fist" })
+      .getByRole("button", { name: "Open the session" })
+      .click();
+    await expect(page.getByText("4 × 50 m catch-up drill, easy, 15 s rest")).toBeVisible();
+    await expect(page.getByText(/^Freestyle with closed fists/)).toBeVisible();
+    await settle(page);
+    await expect(page).toHaveScreenshot("coach-technique-swim.png", {
+      fullPage: true,
+      mask: [syncButton(page)],
+    });
+    await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
+
     // The way out: no swims a week, and the plan is written again without them.
     await saveAvailabilityAndWrite(page, { runs: 3, rides: 2, swims: 0 });
     await expect(weekHeading).not.toHaveText(/swimming/);

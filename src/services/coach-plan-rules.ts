@@ -16,6 +16,8 @@ import {
   type Step,
   sessionAmount,
   swimZoneOf,
+  DRILLS,
+  drillOf,
 } from "./coach-plan.types.ts";
 import type { SportDay, WeekBudget } from "./coach-plan-budget.ts";
 import { addDayKey } from "./day-key.ts";
@@ -310,7 +312,30 @@ const STEP_FORMAT: Record<PlanSport, (name: string) => string> = {
     `${name}: every swim step needs distanceM (above 0) and no durationS, except rest at the wall: a recovery step with durationS and no distanceM. Each has exactly one of zone (recovery, endurance, tempo, threshold, vo2max, or sprint) or effort (not walk), with pace and secPerKm null.`,
 };
 
-/** Steps that read as one thing, run paces that fit, and a kind written for the session's sport. */
+/**
+ * Why a step's drill is wrong, or null: a drill is one of the session's sport's drills, on a step
+ * with a distance, at an easy effort or the recovery or endurance zone (ADR 0063).
+ */
+function drillIssue(sport: PlanSport, step: Step) {
+  if (step.drill == null) return null;
+  const drills = DRILLS.filter((drill) => drill.sport === sport).map((drill) => drill.id);
+  if (drillOf(step.drill)?.sport !== sport) {
+    return drills.length
+      ? `drill ${step.drill} is not a ${SPORT_RULES[sport].noun} drill; use one of ${drills.join(", ")}, or null`
+      : `a ${SPORT_RULES[sport].noun} step has drill null; drills are for swims`;
+  }
+  if (step.distanceM == null) return "rest at the wall has drill null";
+  // Effort easy is the endurance zone, so both zones are as easy as a drill allows.
+  if (step.effort !== "easy" && step.zone !== "recovery" && step.zone !== "endurance") {
+    return `a ${step.drill} drill step is swum at effort easy, or zone recovery or endurance`;
+  }
+  return null;
+}
+
+/**
+ * Steps that read as one thing, drills of the session's sport, run paces that fit, and a kind
+ * written for the session's sport.
+ */
 export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const session of sessions) {
@@ -327,6 +352,8 @@ export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): Rule
         message: STEP_FORMAT[session.sport](named(session)),
       });
     }
+    const drill = steps.map((step) => drillIssue(session.sport, step)).find((item) => item);
+    if (drill) breaks.push({ rule: "format", message: `${named(session)}: ${drill}.` });
     if (session.sport !== "run") continue;
     const issue = steps.map((step) => paceIssue(step, ctx)).find((item) => item != null);
     if (issue) {

@@ -91,6 +91,7 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
       durationS: minutes * 60,
       pace: null,
       secPerKm: null,
+      drill: null,
     };
     return {
       ...base,
@@ -117,6 +118,7 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
               secPerKm: null,
               zone: "endurance",
               effort: null,
+              drill: null,
             },
           ],
         },
@@ -140,6 +142,7 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
             secPerKm: null,
             zone: null,
             effort: "easy",
+            drill: null,
           },
         ],
       },

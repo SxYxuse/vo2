@@ -77,7 +77,7 @@ Every race but one swum for fun counts as a quality swim for rule 4.
 
 ### Writing for the athlete
 
-- Each session has a short "why": what it trains, in one sentence of at most 300 characters, in plain words. Steps carry no text, so name drills in the title and the why ("Technique: catch-up and 6-kick switch").
+- Each session has a short "why": what it trains, in one sentence of at most 300 characters, in plain words. Drills are steps (_Sessions_), so the athlete sees which drill to swim and when; the title may still name the focus ("Technique: catch-up and 6-kick switch").
 - Target zones (_Zones_); VO2 fills in the athlete's pace per 100 m. Never write a pace or a time.
 
 ## Zones
@@ -95,7 +95,7 @@ CSS is the speed a swimmer can in theory hold without tiring; it tracks 400 m sp
 | `vo2max`    | −2 to −6                  | Very hard, about 400 m race pace | VO2 max sets                    |
 | `sprint`    | Faster than −6            | All-out                          | 25–50 m sprints, starts         |
 
-- Efforts (`easy`, `steady`, `comfortablyHard`, `hard`, `fastRelaxed`) map to endurance, tempo, threshold, VO2 max, and sprint. Drills are always `easy`.
+- Efforts (`easy`, `steady`, `comfortablyHard`, `hard`, `fastRelaxed`) map to endurance, tempo, threshold, VO2 max, and sprint. Drill steps are always effort `easy` or zone `recovery`.
 - Heart rate is hard to read in the water and runs lower than on land; VO2 doesn't steer swims by it.
 
 ### Where CSS comes from
@@ -104,7 +104,7 @@ VO2 takes the athlete's best 400 m and best 200 m from swims of the last six mon
 
 ## Sessions
 
-The swims VO2 writes, their step format, and how to size them. Every step is a distance (`distanceM`) and a zone or an effort. The one exception is **rest at the wall**: a step with part `recovery`, a time (`durationS`, the seconds of rest) and effort `easy`; it counts toward the session's time but not its metres. A block repeats its steps: 10 × (100 m threshold, 15 s rest) is one block with repeat 10 and two steps. Warm-up and cool-down are their own blocks: typically 200–600 m warm-up (easy, some drills) and 100–300 m cool-down. Size every swim from the week's budget and the rules in _Load and weekly structure_; when an example is bigger than the budget allows, take repeats off.
+The swims VO2 writes, their step format, and how to size them. Every step is a distance (`distanceM`) and a zone or an effort. The one exception is **rest at the wall**: a step with part `recovery`, a time (`durationS`, the seconds of rest) and effort `easy`; it counts toward the session's time but not its metres. A **drill** is a step that also names its drill in `drill`, at effort `easy` or zone `recovery`; every other step has `drill` null. A block repeats its steps: 10 × (100 m threshold, 15 s rest) is one block with repeat 10 and two steps; 6 × (50 m catch-up drill, 15 s rest) is one block with repeat 6. Warm-up and cool-down are their own blocks: typically 200–600 m warm-up (easy, some drills) and 100–300 m cool-down. Size every swim from the week's budget and the rules in _Load and weekly structure_; when an example is bigger than the budget allows, take repeats off.
 
 ### Kinds
 
@@ -113,14 +113,27 @@ The swims VO2 writes, their step format, and how to size them. Every step is a d
 | `recovery`  | Recovery swim   | 1000–2000 m `recovery`, easy repeats of 100–200 m with 20 s rest                                        | After a hard day or an event                                              |
 | `easy`      | Endurance swim  | 1500–3500 m: 4–10 × 300–400 m `endurance`, 20–30 s rest                                                 | The bulk of the week. Swim Smooth: 10 × 400 m at CSS +6, 30 s rest        |
 | `long`      | Long swim       | 2000–5000 m `endurance`, continuous or 400–1000 m repeats with 20–30 s rest; some `tempo` late in build | Event endurance; feeds over 90 minutes                                    |
-| `technique` | Technique       | Warm-up; 8–12 × 50 m drill, `easy`, 15–20 s rest; 4–6 × 100 m `easy` swim using the drill               | Not quality. Name the drills in the title and why                         |
+| `technique` | Technique       | Warm-up; 8–12 × 25–50 m drill steps, `easy`, 15–20 s rest; 4–6 × 100 m `easy` swim using the drill      | Not quality. One or two drills a session; the title names the focus       |
 | `tempo`     | Threshold (CSS) | Warm-up; 8–20 × 100 m `threshold`, 10–15 s rest; or 4–6 × 200–400 m, 20–30 s rest                       | 1000–2000 m of work. Hold the pace; slow a little rather than rest longer |
 | `intervals` | VO2 max set     | Warm-up; 8–16 × 50 m or 6–10 × 100 m `vo2max`, rest about equal to the work (20–60 s)                   | 400–1200 m of work                                                        |
 | `sprints`   | Sprints         | Endurance swim with 8–12 × 25 m `sprint`, 30–60 s rest                                                  | Speed, starts; base and short events                                      |
 | `openWater` | Open water      | 1000–4000 m continuous, `endurance` with 2–6 surges of 100–200 m `tempo` or `threshold`                 | Not quality. Sighting, straight lines, wetsuit; no wall, so no rest steps |
 | `race`      | Race            | The event distance at race effort                                                                       | VO2 adds it                                                               |
 
-Swim Smooth's "Goldilocks" set (2 × 100, 200; 2 × 100, 300; 2 × 100, 400 at CSS, 20 s rest) is written as `tempo`, one block per group. Common drills: catch-up, single arm, 6-kick switch, fist, sculling, kick on the side.
+Swim Smooth's "Goldilocks" set (2 × 100, 200; 2 × 100, 300; 2 × 100, 400 at CSS, 20 s rest) is written as `tempo`, one block per group. The drills a step can name, with what each trains (VO2 shows the athlete how to swim each one):
+
+| `drill`         | Drill             | Trains                         |
+| --------------- | ----------------- | ------------------------------ |
+| `catchUp`       | Catch-up          | A long body line, full stroke  |
+| `singleArm`     | Single arm        | The catch and rotation         |
+| `sixKickSwitch` | 6-kick switch     | Rotation and balance           |
+| `fist`          | Fist              | An early, high-elbow catch     |
+| `sculling`      | Sculling          | Feel for the water             |
+| `kickOnSide`    | Kick on the side  | Balance and body position      |
+| `kick`          | Kick with a board | The legs, a high body position |
+| `pull`          | Pull with a buoy  | The pull                       |
+
+Drills also fit the warm-up of other swims: 4 × 25–50 m of one drill before the main set.
 
 ### By event
 
@@ -133,7 +146,7 @@ Match the work to the event the season builds toward (guidance):
 
 ### Sizing by level
 
-- Under 4000 m a week: one quality swim, short (8 × 100 m CSS, 8 × 50 m VO2 max); technique in every swim.
+- Under 4000 m a week: one quality swim, short (8 × 100 m CSS, 8 × 50 m VO2 max); technique in every swim. A technique swim with 50 m drills is about 800 m; in a small week (under about 1000 m a swim) swim the drills as 25 m repeats, 8 × 25 m in a 500–700 m swim.
 - 4000–8000 m: one to two quality swims; the long swim 2000–3000 m.
 - 8000–12,000 m: two quality swims; the long swim 3000–4000 m.
 - Over 12,000 m: two, sometimes three quality swims; the long swim up to 5000 m or the 2-hour cap.

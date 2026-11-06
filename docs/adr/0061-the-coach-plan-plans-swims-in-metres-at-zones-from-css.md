@@ -1,5 +1,7 @@
 # The coach plan plans swims in metres, at zones from CSS
 
+Superseded in part by [0063](0063-swim-drills-are-steps.md): a swim step may now name a drill.
+
 Supersedes, in part, [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md) (the coach plan plans runs and rides, and swims are the athlete's own) and extends [0054](0054-each-sports-coaching-knowledge-is-one-file-and-one-skill.md) with a swimming file and skill.
 
 **Swims are a plan sport.** Availability gains swims a week, 0 to 6, beside runs and rides; availability saved before has none. An A swim with a distance can lead the plan, and a triathlon (one A goal per leg on the same day) builds every leg's sport. Of a multisport event's legs, the longest by time (a triathlon's ride) is the plan's A goal, so its taper is the event's. Quality sessions stay at three a week across every sport.
