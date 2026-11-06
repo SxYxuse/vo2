@@ -18,7 +18,7 @@ import {
   maxLongRideShare,
   maxLongShare,
   maxQualitySessions,
-  sessionsAvailable,
+  leftToWrite,
   type RaceEffort,
   type RuleBreak,
   type RuleContext,
@@ -34,8 +34,10 @@ import {
   writtenPlanSchema,
   type PlanAnchors,
   type PlannedSession,
+  type PlanSport,
   type WrittenPlan,
 } from "./coach-plan.types.ts";
+import type { WeekBudget } from "./coach-plan-budget.ts";
 import { formatPaceClock } from "./locomotion.ts";
 import { PHASES } from "./season-phase.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
@@ -79,7 +81,7 @@ export function rulesFor(ctx: RuleContext) {
   const { runsPerWeek, ridesPerWeek, swimsPerWeek } = ctx.availability;
   const sports = plannedSports(ctx.availability);
   const rules = [
-    "1. Each week's running distance stays at or under its budgetKm, its riding time at or under its budgetMinutes, and its swimming distance at or under its budgetSwimM (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of each: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
+    "1. The sessions you write in a week add up to at most its budgetKmLeft of running, budgetMinutesLeft of riding, and budgetSwimMLeft of swimming: what is left of the week's budget once the sessions kept are taken off (lighter and taper weeks have smaller budgets). A week written in full reaches at least 90 % of each: aim for 95–100 %. plannedBefore does not count.",
   ];
   if (sports.includes("run")) {
     rules.push(
@@ -110,7 +112,7 @@ export function rulesFor(ctx: RuleContext) {
   rules.push(
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budgets.",
     "8. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs, ${ridesPerWeek} rides, and ${swimsPerWeek} swims a week at most, and no more than each week's runs, rides, and swims (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
+    `Availability: ${runsPerWeek} runs, ${ridesPerWeek} rides, and ${swimsPerWeek} swims a week at most. Write no more than each week's runsToWrite, ridesToWrite, and swimsToWrite: the sessions kept are done and already taken off, and a week under way has fewer days left. Write sessions for the weeks from ${ctx.fromWeek} on. VO2 adds races itself: write none.`,
   );
   return rules;
 }
@@ -181,6 +183,25 @@ const RACE_EFFORT_TEXT: Record<RaceEffort, string> = {
   allOut: "supporting race, all out",
 };
 
+const LEFT_FIELDS = {
+  run: ["runsToWrite", "budgetKmLeft"],
+  ride: ["ridesToWrite", "budgetMinutesLeft"],
+  swim: ["swimsToWrite", "budgetSwimMLeft"],
+} as const;
+
+/** What is left to write of each sport in a week, the sessions kept taken off (rules 1 and Availability). */
+export const leftText = (week: WeekBudget, ctx: RuleContext, sports: readonly PlanSport[]) =>
+  Object.fromEntries(
+    sports.flatMap((sport) => {
+      const { sessions, budget } = leftToWrite(week, ctx, sport);
+      const [count, amount] = LEFT_FIELDS[sport];
+      return [
+        [count, sessions],
+        [amount, budget],
+      ];
+    }),
+  );
+
 export function weeksText(ctx: RuleContext) {
   const sports = plannedSports(ctx.availability);
   return ctx.weeks.map((week) => ({
@@ -188,15 +209,7 @@ export function weeksText(ctx: RuleContext) {
     phase: PHASES[week.phase].label,
     lighter: week.lighter,
     taper: week.taper,
-    ...(sports.includes("run")
-      ? { budgetKm: week.budgetKm, runs: sessionsAvailable(week, ctx, "run") }
-      : {}),
-    ...(sports.includes("ride")
-      ? { budgetMinutes: week.budgetMinutes, rides: sessionsAvailable(week, ctx, "ride") }
-      : {}),
-    ...(sports.includes("swim")
-      ? { budgetSwimM: week.budgetSwimM, swims: sessionsAvailable(week, ctx, "swim") }
-      : {}),
+    ...leftText(week, ctx, sports),
     kept: ctx.frozen
       .filter((session) => session.weekStart === week.weekStart)
       .map((session) => `${sessionLine(session)}, done`),

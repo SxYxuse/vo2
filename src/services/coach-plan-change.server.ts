@@ -5,15 +5,10 @@ import { and, eq, lt } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { coachPlanProposals, coachPlans } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
-import {
-  checkPlan,
-  raceWeeks,
-  sessionsAvailable,
-  type RuleBreak,
-  type RuleContext,
-} from "./coach-plan-rules.ts";
+import { checkPlan, raceWeeks, type RuleBreak, type RuleContext } from "./coach-plan-rules.ts";
 import {
   availabilityText,
+  leftText,
   paceText,
   racePaceText,
   rulesFor,
@@ -205,12 +200,11 @@ export async function coachPlanForCoach(userId: string) {
       phase: PHASES[week.phase].label,
       lighter: week.lighter,
       taper: week.taper,
-      budgetKm: week.budgetKm,
-      budgetMinutes: week.budgetMinutes ?? 0,
-      budgetSwimM: week.budgetSwimM ?? 0,
-      runs: sessionsAvailable(budgetOf(week), ctx, "run"),
-      rides: sessionsAvailable(budgetOf(week), ctx, "ride"),
-      swims: sessionsAvailable(budgetOf(week), ctx, "swim"),
+      ...leftText(
+        budgetOf(week),
+        ctx,
+        PLAN_SPORTS.map((sport) => sport.id),
+      ),
       sessions: week.sessions.map((session) => ({
         id: session.id,
         status: session.done ? "done" : "open",
