@@ -20,7 +20,7 @@ import type {
   SavedAthleteSettings,
   SettingsSnapshot,
 } from "./athlete-settings.ts";
-import type { CoachFeature, CoachModelId, CoachModels } from "./coach-models.ts";
+import type { CoachFeature, CoachModelChoice, CoachModels } from "./coach-models.ts";
 import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
 import { heartRateFamily, isPlausibleBpm, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
 import {
@@ -291,17 +291,17 @@ export async function coachModelsFor(userId: string): Promise<CoachModels> {
 
 export async function saveCoachModelImpl(
   feature: CoachFeature,
-  model: CoachModelId,
+  choice: CoachModelChoice,
 ): Promise<CoachModels> {
   const session = await getRequiredSession();
   const userId = session.user.id;
   const stored = (await storedAthleteSettings(userId)) ?? DEFAULT_ATHLETE_SETTINGS;
-  const value = { ...stored, coachModels: { ...stored.coachModels, [feature]: model } };
+  const value = { ...stored, coachModels: { ...stored.coachModels, [feature]: choice } };
   const updatedAt = new Date();
   await db
     .insert(athleteSettings)
     .values({ userId, value, updatedAt })
     .onConflictDoUpdate({ target: athleteSettings.userId, set: { value, updatedAt } });
-  logger.info("settings.coach_model_saved", { feature, model });
+  logger.info("settings.coach_model_saved", { feature, ...choice });
   return value.coachModels;
 }

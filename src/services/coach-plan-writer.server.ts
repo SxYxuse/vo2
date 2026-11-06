@@ -217,6 +217,7 @@ export async function writeSessions(
     try {
       written = (await chat({
         adapter: coach.adapter,
+        reasoning: coach.reasoning,
         threadId: crypto.randomUUID(),
         systemPrompts: [systemPrompt(ctx)],
         messages,

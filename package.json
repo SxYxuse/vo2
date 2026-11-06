@@ -40,6 +40,7 @@
     "@shadcn/react": "^0.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/ai": "^1.0.0",
+    "@tanstack/ai-openai": "1.0.0",
     "@tanstack/ai-openrouter": "^1.0.0",
     "@tanstack/ai-persistence": "1.0.0",
     "@tanstack/ai-react": "^1.0.0",

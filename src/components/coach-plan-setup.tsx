@@ -124,7 +124,7 @@ export function availabilityForGoal(value: Availability, goalSportType: string |
 
 const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
   key: {
-    text: "The coach writes the plan on your own OpenRouter key.",
+    text: "The coach writes the plan on your own key.",
     link: (
       <Link to="/settings/$section" params={{ section: "coach" }} className="underline">
         Add your key in Settings → Coach

@@ -294,7 +294,7 @@ export function ProgressionSettings({ state }: { state: CoachPlanState }) {
               : !changed
                 ? null
                 : rewriteFrom
-                  ? `Saving writes the weeks from ${format(parseISO(rewriteFrom), "d MMM")} again, on your OpenRouter key.`
+                  ? `Saving writes the weeks from ${format(parseISO(rewriteFrom), "d MMM")} again, on your own key.`
                   : "Your written weeks stay as they are; later weeks are written with the new volume."}
         </p>
       </div>

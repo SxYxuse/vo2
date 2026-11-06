@@ -6,7 +6,7 @@ The reasons are cost and choice. One shared key made VO2 pay for every athlete's
 
 The key is stored on the server with the athlete's account, following TanStack AI's server-side key storage, so it works on every device the athlete opens VO2 on, with nothing to unlock. It is encrypted at rest with AES-256-GCM under a key derived from `BETTER_AUTH_SECRET`, which lives in the server's environment and never in the database. Only the server decrypts it, to call OpenRouter; it is never sent back to the app, not even masked, and never logged. Deleting the athlete deletes it. The cost is that VO2 now holds a secret that can spend the athlete's money, and rotating `BETTER_AUTH_SECRET` makes stored keys unreadable, so athletes add theirs again. To keep opening the calendar from spending the athlete's credit, the coach reads a note in the athlete's own words when it is added, not when the week is planned again. The chosen models are stored with the athlete's settings too.
 
-Only OpenRouter keys are accepted for now. One OpenRouter key reaches every model; direct OpenAI or Anthropic keys may come later.
+Only OpenRouter keys are accepted for now. One OpenRouter key reaches every model; direct OpenAI or Anthropic keys may come later. Superseded by [0059](0059-coach-features-run-on-a-key-per-provider-with-a-reasoning-level.md): OpenAI keys are accepted too, and each feature has a reasoning level.
 
 ## Considered options
 

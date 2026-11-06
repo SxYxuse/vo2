@@ -389,7 +389,7 @@ export async function handleCoachChat(request: Request) {
     coachModelFor(session.user.id, "chat"),
     storedPlanningStyle(session.user.id),
   ]);
-  if (coach.kind === "missing") return coachKeyMissing();
+  if (coach.kind === "missing") return coachKeyMissing(coach.provider);
   const params = await chatParamsFromRequest(request);
   if (await chatOwnedByOther(session.user.id, params.threadId)) {
     return new Response("Not found", { status: 404 });
@@ -406,6 +406,7 @@ export async function handleCoachChat(request: Request) {
 
   const stream = chat({
     adapter,
+    reasoning: coach.kind === "live" ? coach.reasoning : undefined,
     messages: params.messages,
     threadId: params.threadId,
     runId: params.runId,
