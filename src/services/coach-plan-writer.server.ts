@@ -18,7 +18,7 @@ import {
   maxLongRideShare,
   maxLongShare,
   maxQualitySessions,
-  sessionsAvailable,
+  leftToWrite,
   type RaceEffort,
   type RuleBreak,
   type RuleContext,
@@ -34,8 +34,10 @@ import {
   writtenPlanSchema,
   type PlanAnchors,
   type PlannedSession,
+  type PlanSport,
   type WrittenPlan,
 } from "./coach-plan.types.ts";
+import type { WeekBudget } from "./coach-plan-budget.ts";
 import { formatPaceClock } from "./locomotion.ts";
 import { PHASES } from "./season-phase.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
@@ -79,27 +81,27 @@ export function rulesFor(ctx: RuleContext) {
   const { runsPerWeek, ridesPerWeek, swimsPerWeek } = ctx.availability;
   const sports = plannedSports(ctx.availability);
   const rules = [
-    "1. Each week's running distance stays at or under its budgetKm, its riding time at or under its budgetMinutes, and its swimming distance at or under its budgetSwimM (lighter and taper weeks have smaller budgets), and a week written in full reaches at least 90 % of each: aim for 95–100 %. Sessions already kept count toward their week; plannedBefore does not.",
+    "1. The sessions you write in a week add up to at most its budgetKmLeft of running, budgetMinutesLeft of riding, and budgetSwimMLeft of swimming: what is left of the week's budget once the sessions kept are taken off (lighter and taper weeks have smaller budgets). A week written in full reaches at least 90 % of each: aim for 95–100 %. plannedBefore does not count.",
   ];
   if (sports.includes("run")) {
     rules.push(
       "2. No run more than 10 % longer than the longest run of the 30 days before its week (recentTraining.longestRunLast30DaysKm, then plannedBefore and your runs in earlier weeks). Runs in the same week don't raise each other's limit.",
       `4. At most ${maxQualitySessions(runsPerWeek)} quality run(s) a week (tempo, intervals, repetitions, hills, fartlek, marathonPace). A running race counts as one, unless it is run for fun: then it is one of the week's runs, an easy one. In the week of a steady running race, every other run is easy.`,
-      `5. One long run a week. The week's longest run, whatever its kind, is at most twice the average of the week's other runs, and never held under 30 % of the week's running: ${[2, 3, 4, 5].map((runs) => `${Math.round(maxLongShare(runs) * 100)} % with ${runs} runs`).join(", ")}, ${Math.round(maxLongShare(6) * 100)} % from 6, counted by the runs that fit the week. Write all the week's runs, and the long run at most ${MAX_LONG_MINUTES} minutes.`,
+      `5. One long run a week. The week's longest run, whatever its kind, is at most twice the average of the week's other runs, and never held under 30 % of the week's running: ${[2, 3, 4, 5].map((runs) => `${Math.round(maxLongShare(runs) * 100)} % with ${runs} runs`).join(", ")}, ${Math.round(maxLongShare(6) * 100)} % from 6, counted by the runs that fit the week (the runs kept plus runsToWrite) and measured against the week's running with the runs kept. Write all the week's runs, and the long run at most ${MAX_LONG_MINUTES} minutes.`,
     );
   }
   if (sports.includes("ride")) {
     rules.push(
       "2. No ride more than 15 % longer than the longest ride of the 30 days before its week (recentTraining.longestRideLast30DaysMin, at least 90 minutes, then plannedBefore and your rides in earlier weeks).",
       `4. At most ${maxQualitySessions(ridesPerWeek)} quality ride(s) a week (tempo, intervals, hills, sweetSpot, sprints). A cycling race counts as one, unless it is ridden for fun: then it is one of the week's rides, an easy one. In the week of a steady cycling race, every other ride is easy.`,
-      `5. One long ride a week. The week's longest ride is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's riding (${Math.round(maxLongRideShare(3) * 100)} % when only 3 rides fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_RIDE_MINUTES} minutes.`,
+      `5. One long ride a week. The week's longest ride is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's riding (${Math.round(maxLongRideShare(3) * 100)} % when only 3 rides fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), counting the rides kept in both, and at most ${MAX_LONG_RIDE_MINUTES} minutes.`,
     );
   }
   if (sports.includes("swim")) {
     rules.push(
       "2. No swim more than 15 % longer than the longest swim of the 30 days before its week (recentTraining.longestSwimLast30DaysM, at least 2000 m, then plannedBefore and your swims in earlier weeks).",
       `4. At most ${maxQualitySessions(swimsPerWeek)} quality swim(s) a week (tempo, intervals, sprints; technique and openWater are not quality). A swimming race counts as one, unless it is swum for fun: then it is one of the week's swims, an easy one. In the week of a steady swimming race, every other swim is easy.`,
-      `5. One long swim a week. The week's longest swim is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's swimming (${Math.round(maxLongRideShare(3) * 100)} % when only 3 swims fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), and at most ${MAX_LONG_SWIM_MINUTES} minutes.`,
+      `5. One long swim a week. The week's longest swim is at most ${Math.round(maxLongRideShare(4) * 100)} % of the week's swimming (${Math.round(maxLongRideShare(3) * 100)} % when only 3 swims fit, ${Math.round(maxLongRideShare(2) * 100)} % when 2), counting the swims kept in both, and at most ${MAX_LONG_SWIM_MINUTES} minutes.`,
     );
   }
   if (sports.length > 1) {
@@ -110,7 +112,7 @@ export function rulesFor(ctx: RuleContext) {
   rules.push(
     "6. Lighter weeks and 7. taper weeks: stay inside their smaller budgets.",
     "8. A missed session is skipped, never made up.",
-    `Availability: ${runsPerWeek} runs, ${ridesPerWeek} rides, and ${swimsPerWeek} swims a week at most, and no more than each week's runs, rides, and swims (fewer in a week already under way). Write sessions for the weeks from ${ctx.fromWeek} on; sessions kept are done. VO2 adds races itself: write none.`,
+    `Availability: ${runsPerWeek} runs, ${ridesPerWeek} rides, and ${swimsPerWeek} swims a week at most. Write no more than each week's runsToWrite, ridesToWrite, and swimsToWrite: the sessions kept are done and already taken off, and a week under way has fewer days left. Write sessions for the weeks from ${ctx.fromWeek} on. VO2 adds races itself: write none.`,
   );
   return rules;
 }
@@ -181,6 +183,25 @@ const RACE_EFFORT_TEXT: Record<RaceEffort, string> = {
   allOut: "supporting race, all out",
 };
 
+const LEFT_FIELDS = {
+  run: ["runsToWrite", "budgetKmLeft"],
+  ride: ["ridesToWrite", "budgetMinutesLeft"],
+  swim: ["swimsToWrite", "budgetSwimMLeft"],
+} as const;
+
+/** What is left to write of each sport in a week, the sessions kept taken off (rules 1 and Availability). */
+export const leftText = (week: WeekBudget, ctx: RuleContext, sports: readonly PlanSport[]) =>
+  Object.fromEntries(
+    sports.flatMap((sport) => {
+      const { sessions, budget } = leftToWrite(week, ctx, sport);
+      const [count, amount] = LEFT_FIELDS[sport];
+      return [
+        [count, sessions],
+        [amount, budget],
+      ];
+    }),
+  );
+
 export function weeksText(ctx: RuleContext) {
   const sports = plannedSports(ctx.availability);
   return ctx.weeks.map((week) => ({
@@ -188,15 +209,7 @@ export function weeksText(ctx: RuleContext) {
     phase: PHASES[week.phase].label,
     lighter: week.lighter,
     taper: week.taper,
-    ...(sports.includes("run")
-      ? { budgetKm: week.budgetKm, runs: sessionsAvailable(week, ctx, "run") }
-      : {}),
-    ...(sports.includes("ride")
-      ? { budgetMinutes: week.budgetMinutes, rides: sessionsAvailable(week, ctx, "ride") }
-      : {}),
-    ...(sports.includes("swim")
-      ? { budgetSwimM: week.budgetSwimM, swims: sessionsAvailable(week, ctx, "swim") }
-      : {}),
+    ...leftText(week, ctx, sports),
     kept: ctx.frozen
       .filter((session) => session.weekStart === week.weekStart)
       .map((session) => `${sessionLine(session)}, done`),

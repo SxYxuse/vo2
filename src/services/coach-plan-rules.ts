@@ -371,6 +371,19 @@ export function sessionsAvailable(week: WeekBudget, ctx: RuleContext, sport: Pla
   return Math.max(0, Math.min(sessionsPerWeek(ctx.availability, sport) - fun, kept + open));
 }
 
+/**
+ * What the coach has left to write of a sport in a week: the sessions available and the budget,
+ * less the sessions done. The checker counts kept sessions toward their
+ * week, so a coach given the totals writes a full week on top of them.
+ */
+export function leftToWrite(week: WeekBudget, ctx: RuleContext, sport: PlanSport) {
+  const kept = ctx.frozen.filter(inWeek(week, sport));
+  const budget = Math.max(0, Math.round((budgetOf(week, sport) - sumOf(kept, sport)) * 10) / 10);
+  // Kept sessions that already fill the budget leave nothing to write, whatever days are left.
+  const sessions = budget > 0 ? sessionsAvailable(week, ctx, sport) - kept.length : 0;
+  return { sessions: Math.max(0, sessions), budget };
+}
+
 /** No more sessions of a sport in a week than the athlete's availability allows. */
 export function availabilityBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
