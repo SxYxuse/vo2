@@ -265,7 +265,7 @@ export const swimZoneOf = (id: RideZone | null) =>
   SWIM_ZONES.find((zone) => zone.id === id) ?? null;
 
 /**
- * Drills a step may name, by sport (ADR 0062): what the athlete does in the step, beside its
+ * Drills a step may name, by sport (ADR 0063): what the athlete does in the step, beside its
  * distance and effort. Swims only for now; another sport's drills join the same list with their
  * own sport, and the rule checker keeps each drill to its sport.
  */
@@ -353,8 +353,9 @@ export type StepPart = (typeof STEP_PARTS)[number];
  * targets a zone or an effort, by time only. A run step at a pace harder than easy also names one
  * pace in seconds per km, inside its pace type's range or at a goal's race pace (ADR 0055). A swim
  * step is a distance at a swim zone or an effort, or rest at the wall: a recovery step by time
- * (ADR 0061), and may name a swim drill to do in it, at an easy effort (ADR 0062). Kept flat, without refinements, so every structured-output model reads it the same
- * way; the rule checker reports a step that mixes them (coach-plan-rules.ts).
+ * (ADR 0061), and may name a swim drill to do in it, at an easy effort (ADR 0063). Kept flat,
+ * without refinements, so every structured-output model reads it the same way; the rule checker
+ * reports a step that mixes them (coach-plan-rules.ts).
  */
 const stepSchema = z.object({
   part: z.enum(STEP_PARTS),

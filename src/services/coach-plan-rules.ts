@@ -314,7 +314,7 @@ const STEP_FORMAT: Record<PlanSport, (name: string) => string> = {
 
 /**
  * Why a step's drill is wrong, or null: a drill is one of the session's sport's drills, on a step
- * with a distance, at an easy effort or the recovery zone (ADR 0062).
+ * with a distance, at an easy effort or the recovery or endurance zone (ADR 0063).
  */
 function drillIssue(sport: PlanSport, step: Step) {
   if (step.drill == null) return null;
@@ -325,8 +325,9 @@ function drillIssue(sport: PlanSport, step: Step) {
       : `a ${SPORT_RULES[sport].noun} step has drill null; drills are for swims`;
   }
   if (step.distanceM == null) return "rest at the wall has drill null";
-  if (step.effort !== "easy" && step.zone !== "recovery") {
-    return `a ${step.drill} drill step is swum at effort easy or zone recovery`;
+  // Effort easy is the endurance zone, so both zones are as easy as a drill allows.
+  if (step.effort !== "easy" && step.zone !== "recovery" && step.zone !== "endurance") {
+    return `a ${step.drill} drill step is swum at effort easy, or zone recovery or endurance`;
   }
   return null;
 }

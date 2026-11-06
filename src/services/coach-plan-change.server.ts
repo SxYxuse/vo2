@@ -216,7 +216,7 @@ export async function coachPlanForCoach(userId: string) {
         minutes: session.minutes,
         blocks: session.blocks.map((block) => ({
           repeat: block.repeat,
-          // Steps stored before drills (ADR 0062) have none; the session format needs null.
+          // Steps stored before drills (ADR 0063) have none; the session format needs null.
           steps: block.steps.map(({ range: _range, swimPace: _swimPace, ...step }) => ({
             ...step,
             drill: step.drill ?? null,

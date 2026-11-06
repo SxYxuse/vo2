@@ -86,7 +86,7 @@ function swimStep(part: Step["part"], metres: number, zone: Step["zone"], restS?
   };
 }
 
-/** A swim drill: metres of it, easy (ADR 0062). */
+/** A swim drill: metres of it, easy (ADR 0063). */
 function drillStep(metres: number, drill: Step["drill"]): Step {
   return { ...swimStep("work", metres, null), effort: "easy", drill };
 }

@@ -132,7 +132,9 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
             <Card>
               <CardHeader>
                 <CardTitle>Drills</CardTitle>
-                <CardDescription>Swim each one easy, long and smooth.</CardDescription>
+                <CardDescription>
+                  Each one is easy: go slow and get the movement right.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <dl className="flex flex-col gap-3 text-xs/relaxed">
