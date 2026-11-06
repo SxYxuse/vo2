@@ -2,9 +2,10 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { getActivityDetail } from "@/services/activity-detail.ts";
 import { loadActivityMap } from "@/services/activity-map.ts";
-import { loadSettingsSnapshot } from "@/services/athlete-settings.ts";
+import { loadCoachCatalog, loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { listCoachChats } from "@/services/coach-chats.ts";
 import { getCoachStatus } from "@/services/coach-key.ts";
+import { RECOMMENDED_MODELS } from "@/services/coach-models.ts";
 import { loadCoachPlan } from "@/services/coach-plan.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
 import { loadHomeData } from "@/services/home-data.ts";
@@ -102,6 +103,17 @@ export const coachStatusQueryOptions = queryOptions({
   queryKey: ["coach-status"],
   queryFn: () => getCoachStatus(),
   staleTime: 60_000,
+});
+
+/**
+ * The models the coach model picker offers. The recommended ones stand in until it loads, so the
+ * picker works offline; the catalog only changes with a deploy.
+ */
+export const coachCatalogQueryOptions = queryOptions({
+  queryKey: ["coach-catalog"],
+  queryFn: () => loadCoachCatalog(),
+  placeholderData: RECOMMENDED_MODELS,
+  staleTime: Infinity,
 });
 
 /** The athlete's coach chats, newest first; each opens from the list in the coach chat. */

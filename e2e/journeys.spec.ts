@@ -70,8 +70,22 @@ test("a model and reasoning picked for a coach feature stay picked on every visi
   await expect(modelRow(page, "Plan writing")).toContainText("GPT-6 Luna");
   await expect(modelRow(page, "Plan writing")).toContainText("Auto reasoning");
 
+  // Beyond the recommended models, OpenRouter's catalog is searchable and pickable too.
+  await modelRow(page, "Coach chat").click();
+  await picker.getByRole("searchbox", { name: "Search models" }).fill("claude-sonnet-4.6");
+  await expect(picker.getByText(/Not tested with VO2/)).toBeVisible();
+  await pickInModelPicker(
+    page,
+    picker.getByRole("radio", { name: "claude-sonnet-4.6 via OpenRouter" }),
+    "anthropic/claude-sonnet-4.6",
+  );
+  await page.keyboard.press("Escape");
+  await expect(modelRow(page, "Coach chat")).toContainText("claude-sonnet-4.6");
+  await expect(modelRow(page, "Coach chat")).not.toContainText("no longer offered");
+
   // Back to the default, so the other specs see the athlete as the setup left them.
   await modelRow(page, "Coach chat").click();
+  await picker.getByRole("searchbox", { name: "Search models" }).clear();
   await pickInModelPicker(
     page,
     picker.getByRole("radio", { name: "GPT-6 Luna via OpenRouter" }),

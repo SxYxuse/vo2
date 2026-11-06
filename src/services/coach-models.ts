@@ -78,8 +78,9 @@ const NONE_LOW_TO_MAX: ReasoningLevel[] = ["off", "low", "medium", "high", "xhig
 const LOW_TO_MAX: ReasoningLevel[] = ["low", "medium", "high", "xhigh", "max"];
 
 /**
- * Curated, not a provider's whole catalog: each one is checked to support tool calls (chat) and
- * structured JSON output (plan writing), so any of them runs every coach feature.
+ * The recommended models, each checked to run every coach feature: tool calls (chat) and
+ * structured JSON output (plan writing). The picker lists them first; the rest of OpenRouter's
+ * catalog follows, untested (ADR 0060, coach-catalog.server.ts).
  *
  * `reasoning` lists the levels the athlete can pick, copied from the adapter's model data. The
  * adapter clamps the level it is sent to the model's own, so a list that falls behind only offers
@@ -178,7 +179,15 @@ export const COACH_MODELS = [
   reasoning: readonly ReasoningLevel[];
 }[];
 
-export type CoachModelOption = (typeof COACH_MODELS)[number];
+export type CoachModelOption = {
+  provider: CoachProvider;
+  id: string;
+  label: string;
+  hint: string;
+  reasoning: readonly ReasoningLevel[];
+  /** One of COACH_MODELS, checked with every coach feature. */
+  recommended: boolean;
+};
 
 /** The provider default, sent as no reasoning option at all. */
 export const AUTO_REASONING = null;
@@ -235,7 +244,12 @@ export function findCoachModel(provider: CoachProvider, id: string) {
 /** A stored choice keeps its id, including models no longer listed. */
 export function coachModelLabel(id: string, provider: CoachProvider = OPENROUTER) {
   if (id === "mock") return "Mock coach";
-  return findCoachModel(provider, id)?.label ?? id;
+  return findCoachModel(provider, id)?.label ?? catalogLabel(id);
+}
+
+/** OpenRouter ids read "lab/model"; the adapter's catalog keeps no display name at runtime. */
+export function catalogLabel(id: string) {
+  return id.slice(id.indexOf("/") + 1);
 }
 
 /**
@@ -252,3 +266,9 @@ export function keptReasoning(
   const above = levels.find((each) => REASONING_LEVELS.indexOf(each) > rank);
   return above ?? levels.at(-1) ?? AUTO_REASONING;
 }
+
+/** The recommended models as picker options; the picker shows them until the catalog loads. */
+export const RECOMMENDED_MODELS: CoachModelOption[] = COACH_MODELS.map((model) => ({
+  ...model,
+  recommended: true,
+}));
