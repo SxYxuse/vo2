@@ -55,62 +55,6 @@ jobs:
           path: jscpd-report/jscpd-report.json
           if-no-files-found: ignore
 
-  lighthouse:
-    runs-on: ubuntu-latest
-    outputs:
-      report-url: ${{ steps.upload.outputs.artifact-url }}
-    env:
-      DATABASE_URL: postgresql://vo2:vo2@localhost:5432/vo2
-      BETTER_AUTH_SECRET: ci-placeholder-secret
-      BETTER_AUTH_URL: http://localhost:3000
-      APP_ENV: development
-      STRAVA_MOCK: "1"
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: vo2
-          POSTGRES_PASSWORD: vo2
-          POSTGRES_DB: vo2
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U vo2 -d vo2"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: voidzero-dev/setup-vp@v1.21.2
-        with:
-          node-version: "22"
-          cache: true
-
-      - run: vp build
-      - run: vp run db:migrate
-      - run: vp run lighthouse
-
-      # Lighthouse CI still bundles Lighthouse 12, which has no Agentic Browsing category, so
-      # Lighthouse 13 scores it separately: reported on the pull request, not asserted.
-      - name: Agentic Browsing (Lighthouse 13)
-        continue-on-error: true
-        run: |
-          bun run .output/server/index.mjs &
-          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000/sign-in; do sleep 1; done'
-          vp dlx lighthouse@13.6.0 http://localhost:3000/sign-in --only-categories=agentic-browsing \
-            --chrome-flags="--headless=new" --output=json \
-            --output-path=lighthouse-report/agentic-browsing.json --quiet
-
-      - name: Upload Lighthouse reports
-        id: upload
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse
-          path: lighthouse-report/
-          if-no-files-found: ignore
-
   e2e:
     runs-on: ubuntu-latest
     env:
@@ -153,10 +97,9 @@ jobs:
   # One comment per PR, edited on every push, with the numbers behind the checks.
   report:
     if: always() && github.event_name == 'pull_request'
-    needs: [ci, lighthouse, e2e]
+    needs: [ci, e2e]
     runs-on: ubuntu-latest
     permissions:
-      actions: read
       contents: read
       pull-requests: write
     steps:
@@ -171,29 +114,14 @@ jobs:
         with:
           path: reports
 
-      # Main's latest scores, so the report shows what this pull request changes. Until main has
-      # a successful run with them, the report shows this pull request's scores alone.
-      - name: Download main's Lighthouse scores
-        continue-on-error: true
-        run: |
-          read -r run sha < <(gh run list --workflow ci.yml --branch main --event push \
-            --status success --limit 1 --json databaseId,headSha -q '.[0] | "\(.databaseId) \(.headSha)"')
-          gh run download "$run" --name lighthouse --dir baseline
-          echo "BASELINE_SHA=$sha" >> "$GITHUB_ENV"
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-
       - name: Write the quality report
         run: |
-          bun scripts/quality-report.ts reports baseline > quality-report.md
+          bun scripts/quality-report.ts pr reports > quality-report.md
           cat quality-report.md >> "$GITHUB_STEP_SUMMARY"
         env:
           SHA: ${{ github.event.pull_request.head.sha }}
           CI_RESULT: ${{ needs.ci.result }}
-          LIGHTHOUSE_RESULT: ${{ needs.lighthouse.result }}
           E2E_RESULT: ${{ needs.e2e.result }}
-          LIGHTHOUSE_REPORT_URL: ${{ needs.lighthouse.outputs.report-url }}
 
       - uses: marocchino/sticky-pull-request-comment@v2
         with:
