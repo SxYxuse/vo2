@@ -21,20 +21,21 @@ function hasFlock() {
 }
 
 /**
- * SIGINT from a terminal reaches the child itself; a second one would force-quit Playwright.
- * SIGTERM (a timeout, a killed agent) reaches only us, so it is passed on as `onTerminate`.
+ * Runs a command and passes on a SIGTERM (a timeout, a killed agent). A terminal's SIGINT reaches
+ * the child itself, so it is not passed on: a second one would force-quit Playwright.
+ *
+ * `interruptOnly`, for Playwright: it stops its web servers (the build, the app, the browser
+ * container) only on SIGINT, and a SIGTERM would leave them running after the lock is released.
+ * The child gets its own process group, so `timeout`'s group-wide SIGTERM never reaches it, and
+ * every stop signal is passed on as SIGINT. Playwright ignores a repeat within a second.
  */
-export function run(
-  command: string,
-  args: string[],
-  onTerminateSignal: NodeJS.Signals = "SIGTERM",
-): Promise<number> {
-  const child = spawn(command, args, { stdio: "inherit" });
-  const onInterrupt = () => {};
-  const onTerminate = () => child.kill(onTerminateSignal);
+export function run(command: string, args: string[], { interruptOnly = false } = {}) {
+  const child = spawn(command, args, { stdio: "inherit", detached: interruptOnly });
+  const onInterrupt = () => interruptOnly && child.kill("SIGINT");
+  const onTerminate = () => child.kill(interruptOnly ? "SIGINT" : "SIGTERM");
   process.on("SIGINT", onInterrupt);
   process.on("SIGTERM", onTerminate);
-  return new Promise((resolve) => {
+  return new Promise<number>((resolve) => {
     child.on("exit", (code, signal) => {
       process.off("SIGINT", onInterrupt);
       process.off("SIGTERM", onTerminate);

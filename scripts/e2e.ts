@@ -23,7 +23,7 @@ const args = process.argv.slice(2);
 const locked = args[0] === "--locked";
 if (locked) args.shift();
 // `vp run e2e -- -g x` passes the `--` on, and Playwright then ignores every argument after it.
-// Only the first one goes, once, so a grep value of `--` survives.
+// Only the first one goes.
 const separator = locked ? -1 : args.indexOf("--");
 if (separator !== -1) args.splice(separator, 1);
 
@@ -93,9 +93,8 @@ async function cleanUp() {
 
 if (locked) {
   await cleanUp();
-  // Playwright stops its web servers (the build, the app, the browser container) only on SIGINT;
-  // a SIGTERM would leave them running after the lock is released.
-  process.exit(await run(join(root, "node_modules/.bin/playwright"), ["test", ...args], "SIGINT"));
+  const playwright = join(root, "node_modules/.bin/playwright");
+  process.exit(await run(playwright, ["test", ...args], { interruptOnly: true }));
 }
 // Runs itself again inside the lock, so it never cleans up after a suite that is still running.
 process.exit(await runHeavy(["bun", import.meta.filename, "--locked", ...args]));
