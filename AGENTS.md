@@ -59,7 +59,7 @@ Regenerate these, rather than editing them by hand:
 
 ## Pull requests and commits
 
-- Diff, review, and rebase against `origin/main`, never a local `main`. Run `git fetch --tags origin` before reading tags or history; the setup hook fetches once, at worktree creation.
+- Diff, review, and rebase against `origin/main`, never a local `main`. Run `git fetch --tags origin` before reading tags or history; the setup hook fetches whenever it runs (at worktree creation and on `vp run db:setup`).
 - Branch from `origin/main`. Before merging, rebase onto `origin/main` if it moved (no merge commits from main into a branch), then merge the PR with `gh pr merge --merge`. This is what main's history has done since late October.
 - After a rebase or pull, run `bun install` before the gate.
 - Before pushing follow-up work, check `gh pr view --json state`. If the PR is merged, branch fresh from `origin/main` and open a new PR.

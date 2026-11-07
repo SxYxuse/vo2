@@ -35,7 +35,9 @@ function fetchOrigin() {
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     });
   } catch {
-    console.warn("git fetch origin failed; origin/main and tags may be stale.");
+    console.warn(
+      "git fetch origin failed (offline, no origin, or a conflicting local tag); origin/main and tags may be stale.",
+    );
   }
 }
 
