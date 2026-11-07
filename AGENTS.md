@@ -20,7 +20,7 @@ The most common defect is a change that works on the path you tested and is miss
 - **Sport groups.** Rides, runs, and other sports each get a decision, even if it is "not shown here" (ADR 0007). When adding a sport, grep for `PLAN_SPORTS`, `"ride"`, and "rides and runs" to find code and text that assume only rides and runs.
 - **Existing data.** Athletes and rows from before this change: an athlete who finished onboarding without the new field, and what the server accepts when they clear it.
 - **Offline copy.** A new query that a screen reads goes into `OFFLINE_QUERY_KEYS` (`src/integrations/tanstack-query/offline-copy.ts`), or the installed app shows nothing for it offline.
-- **Glossary.** UI text uses `GLOSSARY.md` terms, never a phrase it lists under _Avoid_ (`scripts/glossary-terms.test.ts` checks phrases of two or more words).
+- **Glossary.** UI text uses `GLOSSARY.md` terms, never a phrase it lists under _Avoid_ (`scripts/glossary-terms.test.ts` checks multi-word and hyphenated phrases in `.tsx` files).
 - **Athlete deletion.** A new per-athlete table references `user.id` with `onDelete: "cascade"` so deleting an athlete removes it (`src/db/schema.test.ts` checks).
 - **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts`.
 - **Reverse states.** A way in needs a way out and a way to see it.

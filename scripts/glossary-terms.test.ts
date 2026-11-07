@@ -5,11 +5,11 @@ import { describe, expect, it } from "vite-plus/test";
 
 /*
  * UI text kept using words GLOSSARY.md lists under _Avoid_ ("safety limit" for the cap). This
- * fails when a string or JSX text in src/**\/*.tsx uses one. Only phrases of two or more words
- * are checked: single words ("block", "client", "Calendar") are ordinary English and CSS classes.
- * Phrases with a qualifier in parentheses, rules such as "CTL used alone", phrases that are
- * glossary terms themselves, and "A race" (an article in most sentences) are skipped, because
- * they are only wrong in some sentences.
+ * fails when a string or JSX text in src/**\/*.tsx uses one. Only phrases of several words or
+ * with a hyphen are checked: single words ("block", "client", "Calendar") are ordinary English
+ * and CSS classes. Phrases with a qualifier in parentheses, rules such as "CTL used alone" or
+ * over four words, phrases that are glossary terms themselves, and "A race" (an article in most
+ * sentences) are skipped, because they are only wrong in some sentences.
  */
 
 const ROOT = join(import.meta.dirname, "..");
@@ -59,7 +59,7 @@ function uiText(file: string): string[] {
   const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node)) return;
     if (ts.isJsxText(node) || ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node))
-      texts.push(node.text);
+      texts.push(node.text.replace(/\s+/g, " ")); // JSX prose wraps across lines
     ts.forEachChild(node, visit);
   };
   visit(source);
