@@ -19,10 +19,13 @@ const root = realpathSync(
   execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim(),
 );
 
-// `vp run e2e -- -g x` passes the `--` on, and Playwright then ignores every argument after it.
-const args = process.argv.slice(2).filter((arg) => arg !== "--");
+const args = process.argv.slice(2);
 const locked = args[0] === "--locked";
 if (locked) args.shift();
+// `vp run e2e -- -g x` passes the `--` on, and Playwright then ignores every argument after it.
+// Only the first one goes, once, so a grep value of `--` survives.
+const separator = locked ? -1 : args.indexOf("--");
+if (separator !== -1) args.splice(separator, 1);
 
 if (args[0] === "--update") {
   args.shift();
@@ -51,6 +54,13 @@ function cwdOf(pid: number) {
     ?.slice(1);
 }
 
+/** A process that exits between lsof and the kill is already what we wanted. */
+function signal(pid: number, name: NodeJS.Signals) {
+  try {
+    process.kill(pid, name);
+  } catch {}
+}
+
 async function freePort(port: number) {
   for (const pid of listeners(port)) {
     const cwd = cwdOf(pid);
@@ -62,12 +72,12 @@ async function freePort(port: number) {
       process.exit(1);
     }
     console.log(`Stopping pid ${pid}, left on port ${port} by an earlier run.`);
-    process.kill(pid, "SIGTERM");
+    signal(pid, "SIGTERM");
   }
   const deadline = Date.now() + 5_000;
   while (listeners(port).length > 0) {
     if (Date.now() > deadline) {
-      for (const pid of listeners(port)) process.kill(pid, "SIGKILL");
+      for (const pid of listeners(port)) signal(pid, "SIGKILL");
       break;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -83,7 +93,9 @@ async function cleanUp() {
 
 if (locked) {
   await cleanUp();
-  process.exit(await run(join(root, "node_modules/.bin/playwright"), ["test", ...args]));
+  // Playwright stops its web servers (the build, the app, the browser container) only on SIGINT;
+  // a SIGTERM would leave them running after the lock is released.
+  process.exit(await run(join(root, "node_modules/.bin/playwright"), ["test", ...args], "SIGINT"));
 }
 // Runs itself again inside the lock, so it never cleans up after a suite that is still running.
 process.exit(await runHeavy(["bun", import.meta.filename, "--locked", ...args]));

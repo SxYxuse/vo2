@@ -10,29 +10,35 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { constants } from "node:os";
 
-const LOCK = join(tmpdir(), "vo2-heavy.lock");
+// A fixed path, not os.tmpdir(): agents whose TMPDIR differs must still wait for each other.
+const LOCK = "/tmp/vo2-heavy.lock";
 const BUSY = 75;
 
 function hasFlock() {
   return spawnSync("flock", ["--version"], { stdio: "ignore" }).status === 0;
 }
 
-export function run(command: string, args: string[]): Promise<number> {
-  // SIGINT from a terminal reaches the child itself; a second one would force-quit Playwright.
-  // SIGTERM (a timeout, a killed agent) reaches only us, so it is passed on.
+/**
+ * SIGINT from a terminal reaches the child itself; a second one would force-quit Playwright.
+ * SIGTERM (a timeout, a killed agent) reaches only us, so it is passed on as `onTerminate`.
+ */
+export function run(
+  command: string,
+  args: string[],
+  onTerminateSignal: NodeJS.Signals = "SIGTERM",
+): Promise<number> {
   const child = spawn(command, args, { stdio: "inherit" });
   const onInterrupt = () => {};
-  const onTerminate = () => child.kill("SIGTERM");
+  const onTerminate = () => child.kill(onTerminateSignal);
   process.on("SIGINT", onInterrupt);
   process.on("SIGTERM", onTerminate);
   return new Promise((resolve) => {
     child.on("exit", (code, signal) => {
       process.off("SIGINT", onInterrupt);
       process.off("SIGTERM", onTerminate);
-      resolve(code ?? (signal ? 1 : 0));
+      resolve(code ?? 128 + (signal ? constants.signals[signal] : 0));
     });
   });
 }
