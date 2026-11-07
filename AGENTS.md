@@ -72,7 +72,7 @@ Add the `preview` label in its own step after the PR exists, never with `gh pr c
 
 Most code changes need no documentation change; agents can read the code.
 
-- **ADRs** (`docs/adr/`) record a decision and its reasons. When a decision changes, write a new ADR that supersedes the old one (as 0011 did for field tests).
+- **ADRs** (`docs/adr/`) record a decision and its reasons. When a decision changes, write a new ADR that supersedes the old one (as 0011 did for field tests). Add a "Superseded by" line to the old one. Pick the ADR number with `bun scripts/next-adr.ts` just before opening the pull request; if main takes it first, `bun scripts/renumber-adr.ts <old> <new>` renames yours and your citations of it. The guard tests fail on a citation of a missing ADR or a missing "Superseded by".
 - **`GLOSSARY.md`** defines shared vocabulary; it is not a feature index. See `docs/agents/domain.md`.
 - **Comments** say why: a constraint, a Strava quirk, or an invariant the code can't show.
 

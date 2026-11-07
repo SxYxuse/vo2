@@ -2,7 +2,7 @@
 
 Supersedes, in part, [0037](0037-the-coach-plan-is-written-by-the-coach-inside-a-budget-vo2-sets.md): the long run's 30 % share for weeks of two or three runs.
 
-Partly superseded by [0053](0053-the-long-run-is-at-most-twice-the-average-of-the-other-runs.md): the long run's share is twice the average of the week's other runs.
+Partly superseded by [0053](0053-the-long-run-is-at-most-twice-the-average-of-the-other-runs.md): the long run's share is twice the average of the week's other runs. Partly superseded by [0041](0041-coach-plan-availability-has-no-time-per-day.md): the floor no longer estimates what the days allow. Partly superseded by [0047](0047-the-coach-plan-has-no-key-sessions.md): a missed key session no longer rewrites the weeks ahead.
 
 Choices made while building the coach plan (ADR 0037) that it did not settle, or that changed once the rules met real weeks.
 

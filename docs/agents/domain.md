@@ -44,6 +44,10 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 
+## Number a new ADR
+
+Pick the ADR number with `bun scripts/next-adr.ts` just before opening the pull request: it checks `origin/main` and the ADRs in open pull requests. If main takes the number first, `bun scripts/renumber-adr.ts <old> <new>` renames your ADR and rewrites the number only on lines your branch added. An ADR that supersedes another gets a "Superseded by" line in the old one.
+
 ## Flag ADR conflicts
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
