@@ -34,6 +34,7 @@ try {
   const pulls: { files: { path: string }[] }[] = JSON.parse(
     run("gh", ["pr", "list", "--state", "open", "--limit", "200", "--json", "files"]),
   );
+  // gh lists at most 100 files per pull request; an ADR beyond them goes unseen.
   for (const pull of pulls) for (const file of pull.files) taken.add(file.path);
 } catch {
   console.warn("Could not list open pull requests with gh; their ADRs are not counted.");

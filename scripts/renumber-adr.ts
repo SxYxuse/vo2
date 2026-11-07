@@ -40,22 +40,21 @@ if (readdirSync("docs/adr").some((name) => name.startsWith(`${to}-`))) {
 const renamed = ours[0].replace(`docs/adr/${from}-`, `docs/adr/${to}-`);
 renameSync(ours[0], renamed);
 
+/** Text files only: a screenshot whose bytes hold the number must not be rewritten. */
+const TEXT = /\.(tsx?|css|md|json)$/;
 /** Line numbers (1-based) each changed file holds that origin/main's copy does not; null = all. */
 const added = new Map<string, Set<number> | null>();
-for (const path of git("ls-files", "--others", "--exclude-standard").split("\n").filter(Boolean))
-  added.set(path, null);
-let current = "";
-for (const line of git("diff", "--unified=0", "--no-renames", base).split("\n")) {
-  if (line.startsWith("+++ ")) {
-    current = line === "+++ /dev/null" ? "" : line.slice("+++ b/".length);
-    if (current && !added.has(current)) added.set(current, new Set());
-    continue;
-  }
-  const hunk = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(line);
-  const lines = current ? added.get(current) : undefined;
-  if (!hunk || !lines) continue;
-  const start = Number(hunk[1]);
-  for (let n = start; n < start + Number(hunk[2] ?? 1); n++) lines.add(n);
+for (const path of git("ls-files", "-z", "--others", "--exclude-standard").split("\0"))
+  if (TEXT.test(path)) added.set(path, null);
+for (const path of git("diff", "-z", "--name-only", "--no-renames", base).split("\0")) {
+  if (!TEXT.test(path) || added.has(path)) continue;
+  // One file per diff, so only hunk headers are parsed: a "+++ " line may be added text.
+  const lines = new Set<number>();
+  for (const hunk of git("diff", "--unified=0", base, "--", path).matchAll(
+    /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/gm,
+  ))
+    for (let n = Number(hunk[1]); n < Number(hunk[1]) + Number(hunk[2] ?? 1); n++) lines.add(n);
+  added.set(path, lines);
 }
 
 const number = new RegExp(`\\b${from}\\b`, "g");
