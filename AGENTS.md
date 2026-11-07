@@ -51,6 +51,7 @@ Regenerate these, rather than editing them by hand:
 ## Verifying
 
 - Prove behavior end to end, not function by function. Vitest keeps only guards: tests that hold a rule over the whole repository (every athlete table cascades on delete, ADR numbers are unique, mock Strava stays off in production), not tests of one function.
+- Changes to coach-plan rules, budget or paces must pass the property guard (`src/services/coach-plan-rules.property.test.ts`); extend its generators when you add an input.
 - Open the app in a browser to verify only when the developer asks for it.
 - **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps plus the end-to-end suite on every pull request. Lighthouse (`vp run lighthouse`, on the sign-in page and the calendar, week, and activity screens) runs on main once a day and before each release (`.github/workflows/lighthouse.yml`).
 - **Before a pull request that changes what the athlete sees or does,** run `vp run e2e` (needs Docker and `vp run db:up`). It drives a production build against mock Strava, at phone and desktop size, and compares a screenshot of every screen.
