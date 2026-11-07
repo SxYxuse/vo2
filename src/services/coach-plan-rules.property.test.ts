@@ -43,7 +43,8 @@ import {
  * seeded so a failure names a case that replays. Extend the generators when you add an input.
  */
 
-const CASES = 1500;
+/** Each athlete costs about 3 ms in weekBudgets alone; 600 keep the guard to a few seconds. */
+const CASES = 600;
 const PACE_CASES = 3000;
 
 /** A seeded generator (mulberry32), so every run checks the same athletes. */
@@ -223,7 +224,10 @@ const EASY_STEP = {
   drill: null,
 } as const;
 
-const athletes = Array.from({ length: CASES }, (_, index) => athlete(index + 1));
+let generated: ReturnType<typeof athlete>[] | undefined;
+/** Generated in the first test that reads them, so their time counts as the guard's. */
+const athletes = () =>
+  (generated ??= Array.from({ length: CASES }, (_, index) => athlete(index + 1)));
 /** The athlete's seed and setup, so a failure can be replayed with athlete(seed). */
 const label = ({ seed, ctx }: ReturnType<typeof athlete>) =>
   `seed ${seed}: ${JSON.stringify(ctx.availability)}, today ${ctx.today}, budgets ${JSON.stringify(
@@ -242,7 +246,7 @@ const BUDGET_KEY = { run: "budgetKm", ride: "budgetMinutes", swim: "budgetSwimM"
 describe("coach plan property guard", () => {
   it("never sets a weekly floor above the largest valid week", () => {
     const broken: string[] = [];
-    for (const item of athletes) {
+    for (const item of athletes()) {
       const { ctx } = item;
       for (const week of ctx.weeks) {
         for (const sport of plannedSports(ctx.availability)) {
@@ -271,7 +275,7 @@ describe("coach plan property guard", () => {
 
   it("gets a plan from the mock coach that passes every rule", () => {
     const broken: string[] = [];
-    for (const item of athletes) {
+    for (const item of athletes()) {
       const sessions = mockCoachPlan(item.ctx, item.anchors.paces).map((session) =>
         plannedSession(session, item.anchors, "id"),
       );
@@ -286,7 +290,7 @@ describe("coach plan property guard", () => {
     const broken: string[] = [];
     for (let index = 0; index < PACE_CASES; index += 1) {
       // Up to 76: from about 76.7, a world-class marathoner's, the marathon range's fast end
-      // runs into threshold's slow end by a few seconds. Known on main; widen once that's settled.
+      // runs into threshold's slow end by a few seconds (#223). Widen to 90 when it's fixed.
       const vdot = r.between(20, 76);
       // Zone 2 found anywhere from far too fast to far too slow, or not at all.
       const fast = r.int(150, 520);
