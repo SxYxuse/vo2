@@ -8,9 +8,17 @@ import { E2E_NOW, E2E_URL, e2eDatabaseUrl } from "./env.ts";
  * never leaves the app: map tiles and the like would make runs depend on the network. Every spec
  * that runs after the setup starts from the athlete the setup left (resetAthlete).
  */
-export const test = base.extend({
-  page: async ({ page }, use, testInfo) => {
-    if (testInfo.project.dependencies.includes("setup")) await resetAthlete();
+export const test = base.extend<{ freshAthlete: void }>({
+  freshAthlete: [
+    // Playwright reads a fixture's dependencies from this pattern, and this one needs none.
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use, testInfo) => {
+      if (testInfo.project.dependencies.includes("setup")) await resetAthlete();
+      await use();
+    },
+    { auto: true },
+  ],
+  page: async ({ page }, use) => {
     await page.clock.install({ time: new Date(E2E_NOW) });
     await page.route(
       (url) => url.origin !== E2E_URL,
@@ -26,11 +34,17 @@ export { expect, type Locator, type Page };
 const SNAPSHOT_SCHEMA = "e2e_athlete";
 
 /**
- * The account, so the saved sign-in stays valid, and the synced training, which no spec changes
- * and whose streams would be slow to copy before every test. Every other table is the athlete's
- * state: settings, paces, goals, the plan, the models, keys, chats, power files.
+ * The account, so the saved sign-in stays valid, and the synced streams, which no spec changes
+ * and which would be slow to copy before every test. Every other table is the athlete's state:
+ * settings, paces, goals, the plan, the models, keys, chats, power files.
  */
-const NOT_RESET = ["user", "session", "account", "verification", "activities", "activity_streams"];
+const NOT_RESET = ["user", "session", "account", "verification", "activity_streams"];
+
+/**
+ * Activities are restored in place: deleting them would delete their streams. A heart-rate
+ * change rescores every activity's load, and nothing scores them again once it is undone.
+ */
+const UPDATED_IN_PLACE = "activities";
 
 /** A client on the e2e database, closed once `use` is done. */
 export async function withDatabase<T>(use: (client: pg.Client) => Promise<T>) {
@@ -63,7 +77,8 @@ export async function snapshotAthlete() {
 /**
  * Puts the athlete back as the setup left them, before every test, so a journey that fails
  * partway, or the phone run before the desktop run, leaves nothing behind. A plan still being
- * written for the last test can't land afterwards: it saves only while it holds its claim.
+ * written for the last test can't land afterwards: it saves only while it holds its claim. A coach
+ * reply still streaming could, so chat journeys wait for the reply.
  */
 export async function resetAthlete() {
   await withDatabase(async (client) => {
@@ -71,8 +86,18 @@ export async function resetAthlete() {
       "select tablename from pg_tables where schemaname = $1",
       [SNAPSHOT_SCHEMA],
     );
+    if (rows.length === 0) throw new Error("No athlete snapshot: run the setup project first.");
+    const { rows: columns } = await client.query<{ column_name: string }>(
+      "select column_name from information_schema.columns where table_schema = $1 and table_name = $2 and column_name <> 'id'",
+      [SNAPSHOT_SCHEMA, UPDATED_IN_PLACE],
+    );
+    const list = columns.map(({ column_name }) => `"${column_name}"`).join(", ");
     await client.query("begin");
+    await client.query(
+      `update public.${UPDATED_IN_PLACE} a set (${list}) = (select ${list} from ${SNAPSHOT_SCHEMA}.${UPDATED_IN_PLACE} s where s.id = a.id)`,
+    );
     for (const { tablename } of rows) {
+      if (tablename === UPDATED_IN_PLACE) continue;
       await client.query(`delete from public."${tablename}"`);
       await client.query(
         `insert into public."${tablename}" select * from ${SNAPSHOT_SCHEMA}."${tablename}"`,
