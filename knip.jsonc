@@ -16,7 +16,7 @@
     "src/components/reui/**",
     "src/integrations/strava/strava.types.ts",
   ],
-  "ignoreBinaries": ["shasum"],
+  "ignoreBinaries": ["shasum", "flock"],
   "rules": {
     // 248 unused exports when this gate landed; turn these on once they are cleaned up.
     "exports": "off",

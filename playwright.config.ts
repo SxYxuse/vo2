@@ -27,9 +27,9 @@ export default defineConfig({
   workers: 1,
   forbidOnly: ci,
   retries: ci ? 1 : 0,
-  reporter: ci
-    ? [["github"], ["html", { open: "never" }]]
-    : [["list"], ["html", { open: "never" }]],
+  // No HTML report locally: building it has kept a finished run alive past an agent's time limit.
+  // A failure's trace stays in test-results/ (`bunx playwright show-trace <trace.zip>`).
+  reporter: ci ? [["github"], ["html", { open: "never" }]] : [["list"]],
   expect: {
     toHaveScreenshot: { animations: "disabled", caret: "hide", maxDiffPixelRatio: 0.002 },
   },
