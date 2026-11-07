@@ -1,5 +1,7 @@
 # Onboarding waits for the newest page only; the copy finishes while the app is open
 
+Partly superseded by [0020](0020-app-open-checks-for-new-activities.md): opening the app also checks for new activities, not only to finish an incomplete local copy.
+
 The first onboarding step lets the athlete continue once the newest page of activity summaries is copied: up to 200 of their latest activities, in one Strava read. Older history and streams keep copying after that, history first, then streams newest first. While the app is open and in the foreground, the copy resumes on its own when a rate-limit pause ends or the app comes back to the foreground, but only to finish an incomplete local copy.
 
 An athlete with years of Strava history used to wait in the first step while streams were copied, close to a full 15-minute read window, before they could move on. On a phone that wait is long enough to lose them. Onboarding defaults only read the last three months of training load, and that comes from summaries, not streams.

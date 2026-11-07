@@ -1,5 +1,7 @@
 # Fuel plans are stored per route, apart from the week target
 
+Superseded by [0030](0030-fuel-plans-are-removed.md): fuel plans are removed.
+
 The athlete uploads the GPX of a route they plan to do. VO2 predicts how it will go from their own activities and builds fuel plans from MNSTRY products: what to drink and eat, and roughly when. A route and its plans are stored on their own and never count toward the week target, the calendar, or training load; [0016](0016-week-target-replaces-the-week-bucket.md) removed stored planned sessions from the week and this does not bring them back.
 
 The product catalog is a committed JSON snapshot that a developer refreshes with `vp run catalog:mnstry`. The app never fetches mnstry.com, so a plan does not depend on the store being up, and every change to a product shows as a diff. Values come only from what the store states: carbs from the per-serving column of its nutrition table, otherwise from its description; the glucose:fructose ratio, caffeine, and a drink mix's water volume from its own sentences. A value it does not state stays missing. Products without stated carbs, drink mixes without a stated water volume, and caffeine products without a stated dose are never planned. The athlete ticks the products they have, stored with their profile; plans, the coach model and swaps use only those, and a route can't be planned until they have a drink mix, a jelly or bar, and a gel. Dropping a product later turns the default proposals of each route that used it back on at the next update or prediction.

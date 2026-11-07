@@ -1,5 +1,7 @@
 # A goal's priority replaces its objective
 
+Superseded by [0052](0052-a-goal-is-a-main-goal-or-a-supporting-race-with-an-effort.md) for what a goal's priority means and how it shapes the plan.
+
 Supersedes the objective in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md) and, for goals, "every goal is perform" in [0037](0037-the-coach-plan-is-written-by-the-coach-inside-a-budget-vo2-sets.md).
 
 A goal had two choices: a priority (A, B, or C) and an objective (finish, finish well, or perform). The two said nearly the same thing, athletes rarely picked a mix that changed the plan, and the coach plan already hid the objective. A goal now has only a priority, and it carries what the objective did: an A race is to perform, a B race to finish well, and a C race to finish.

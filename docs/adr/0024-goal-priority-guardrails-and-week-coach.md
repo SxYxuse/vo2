@@ -1,6 +1,6 @@
 # Goal priority, load guardrails, and a week coach
 
-The coach's layout of the rest of the week and the same easing for every B goal are superseded by the week plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md).
+The coach's layout of the rest of the week and the same easing for every B goal are superseded by the week plan in [0026](0026-the-week-is-planned-upfront-from-a-plan-built-on-the-season.md). Goal priority is superseded by [0052](0052-a-goal-is-a-main-goal-or-a-supporting-race-with-an-effort.md): a goal is a main goal or a supporting race with an effort.
 
 Each goal has a priority. **A** goals are what the season is for: the plan builds, peaks, and fully tapers for the next A event, with a recovery week after it. **B** goals get a few lighter days in their week and no recovery week. **C** goals are trained through, like a hard session. With no A goal ahead, the next B goal leads; with neither, the plan holds fitness. Priority replaces the 4-week cluster rule and the main-goal pick.
 

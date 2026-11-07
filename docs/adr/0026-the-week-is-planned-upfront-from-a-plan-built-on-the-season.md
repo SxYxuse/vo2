@@ -1,6 +1,6 @@
 # The week is planned upfront from a plan built on the season
 
-Superseded by [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md): the week planner, its plan builder, and its training plan are removed.
+Superseded by [0050](0050-the-coach-plan-plans-runs-and-rides-and-the-week-planner-is-removed.md): the week planner, its plan builder, and its training plan are removed. Its goal objective was already superseded by [0049](0049-a-goals-priority-replaces-its-objective.md): a goal's priority replaces its objective.
 
 The athlete builds a plan once, in four steps: their season, where they are now, when they can train, and a preview. Every answer starts from their Strava history and the goals already on the Season page; the builder never creates goals. The plan stores the week's shape (rest days, a long session day, how many days can take two sessions, and which sports to plan) and a copy of the goals it was built on. Settings → Training edits the same shape and can rebuild the plan. The week mix, the hours cap, and the single preferred rest day go away.
 
