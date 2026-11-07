@@ -92,9 +92,10 @@ export async function resetAthlete() {
       [SNAPSHOT_SCHEMA, UPDATED_IN_PLACE],
     );
     const list = columns.map(({ column_name }) => `"${column_name}"`).join(", ");
+    const snapshotted = columns.map(({ column_name }) => `s."${column_name}"`).join(", ");
     await client.query("begin");
     await client.query(
-      `update public.${UPDATED_IN_PLACE} a set (${list}) = (select ${list} from ${SNAPSHOT_SCHEMA}.${UPDATED_IN_PLACE} s where s.id = a.id)`,
+      `update public.${UPDATED_IN_PLACE} a set (${list}) = row(${snapshotted}) from ${SNAPSHOT_SCHEMA}.${UPDATED_IN_PLACE} s where s.id = a.id`,
     );
     for (const { tablename } of rows) {
       if (tablename === UPDATED_IN_PLACE) continue;
