@@ -10,7 +10,7 @@
     "preview": "vp preview",
     "test": "vp test",
     "start": "bun run db:migrate && bun run .output/server/index.mjs",
-    "start:mock": "vp build && APP_ENV=development STRAVA_MOCK=1 bun run .output/server/index.mjs",
+    "start:mock": "bun scripts/heavy.ts vp build && APP_ENV=development STRAVA_MOCK=1 bun run .output/server/index.mjs",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:setup": "bun scripts/worktree-setup.ts",
@@ -25,9 +25,9 @@
     "knip": "knip",
     "jscpd": "jscpd",
     "audit": "bun audit --audit-level=high",
-    "lighthouse": "bun scripts/lighthouse.ts",
-    "e2e": "playwright test",
-    "e2e:update": "playwright test --update-snapshots",
+    "lighthouse": "bun scripts/heavy.ts bun scripts/lighthouse.ts",
+    "e2e": "bun scripts/e2e.ts",
+    "e2e:update": "bun scripts/e2e.ts --update",
     "gate": "vp check && knip && jscpd && bun audit --audit-level=high && vp test run"
   },
   "dependencies": {
