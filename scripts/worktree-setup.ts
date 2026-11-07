@@ -25,6 +25,20 @@ function git(...args: string[]) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
+// Agents compare against origin/main and read release tags, so a stale clone misleads them.
+// Best effort: offline, with no origin, or on a clobbered tag, setup carries on.
+function fetchOrigin() {
+  try {
+    execFileSync("git", ["fetch", "--tags", "--quiet", "origin"], {
+      stdio: ["ignore", "inherit", "inherit"],
+      timeout: 15_000,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+  } catch {
+    console.warn("git fetch origin failed; origin/main and tags may be stale.");
+  }
+}
+
 function readOptional(path: string) {
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
 }
@@ -120,6 +134,7 @@ async function main() {
   const gitDir = git("rev-parse", "--path-format=absolute", "--git-dir");
   const isMain = gitDir === git("rev-parse", "--path-format=absolute", "--git-common-dir");
   const existing = readOptional(envPath);
+  fetchOrigin();
 
   // --isolate rewrites DATABASE_URL, so only a worktree can repair the old URL that way.
   if (existing && usesRenamedVoDatabase(existing) && (isMain || !isolate)) {
