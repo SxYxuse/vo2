@@ -7,7 +7,7 @@ Keep it simple. Solve the real constraint with the smallest change that makes th
 VO2 is a PWA first, installed to the athlete's home screen and used on a phone far more than a desktop. Design and build for that:
 
 - **PWA first:** every change should work as an installed standalone app (`public/manifest.webmanifest`, touch icons, offline-tolerant behavior). Don't add anything that assumes a browser tab, a URL bar, or a desktop-only window.
-- **Mobile first:** lay out for a narrow viewport first and scale up. Touch targets, safe-area insets, and thumb reach matter more than hover states or dense tables.
+- **Mobile first:** lay out for a narrow viewport first and scale up. Touch targets, safe-area insets, and thumb reach matter more than hover states or dense tables. A touch target is at least 44px: `size-[2.75rem]` or `min-h-[2.75rem]`. `size-11` is only 42px here, because `--spacing` is 0.24rem.
 - Prefer solutions that keep working when the app is backgrounded, resumed, or briefly offline.
 
 ## Hit every surface
@@ -17,7 +17,10 @@ The most common defect is a change that works on the path you tested and is miss
 - **Viewports.** Phone and desktop lay out differently (the calendar shows one training week on phones, four on desktop).
 - **Installed PWA.** Standalone mode, safe areas, pull-to-refresh, and resuming after the app was backgrounded.
 - **Athlete states.** Signed out, mid-onboarding, never synced, sync paused on rate limits, and fully synced.
-- **Sport groups.** Rides, runs, and other sports each get a decision, even if it is "not shown here" (ADR 0007).
+- **Sport groups.** Rides, runs, and other sports each get a decision, even if it is "not shown here" (ADR 0007). When adding a sport, grep for `PLAN_SPORTS`, `"ride"`, and "rides and runs" to find code and text that assume only rides and runs.
+- **Existing data.** Athletes and rows from before this change: an athlete who finished onboarding without the new field, and what the server accepts when they clear it.
+- **Offline copy.** A new query that a screen reads goes into `OFFLINE_QUERY_KEYS` (`src/integrations/tanstack-query/offline-copy.ts`), or the installed app shows nothing for it offline.
+- **Glossary.** UI text uses `GLOSSARY.md` terms, never a phrase it lists under _Avoid_ (`scripts/glossary-terms.test.ts` checks phrases of two or more words).
 - **Athlete deletion.** A new per-athlete table references `user.id` with `onDelete: "cascade"` so deleting an athlete removes it (`src/db/schema.test.ts` checks).
 - **Mock Strava.** A newly used Strava endpoint or field also gets implemented in `src/integrations/strava/mock-server.ts`.
 - **Reverse states.** A way in needs a way out and a way to see it.
