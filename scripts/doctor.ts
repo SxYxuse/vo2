@@ -12,7 +12,7 @@ import {
   pgPort,
   readEnvValue,
 } from "./worktree-env.ts";
-import { CONTAINER, composeProject, publishedPorts } from "./worktree-setup.ts";
+import { CONTAINER, composeProject, inspect, publishedPorts } from "./worktree-setup.ts";
 
 // `vp run doctor`: checks what setup and sign-in need and prints the fix for each failure. It
 // only reads, and needs nothing from node_modules, so it runs before `bun install` too.
@@ -34,6 +34,7 @@ const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : undefined;
 const databaseUrl = readEnvValue(envText ?? "", "DATABASE_URL");
 const database = databaseFromUrl(databaseUrl);
 const expectedPort = pgPort(envText);
+const running = inspect("{{.State.Running}}") === "true";
 
 function answers(port: number, host = "localhost") {
   return new Promise<boolean>((done) => {
@@ -100,6 +101,7 @@ const checks: Check[] = [
       if (project !== "vo2") {
         return `${CONTAINER} belongs to compose project ${project || "(none)"}, not vo2. Fix: remove it, then \`vp run db:up\`.`;
       }
+      if (!running) return `${CONTAINER} is not running. Fix: \`vp run db:up\`.`;
       if (!publishedPorts().has(expectedPort)) {
         const ports = [...publishedPorts()].join(", ") || "no port";
         return (
@@ -116,6 +118,7 @@ const checks: Check[] = [
     name: "migrations are current",
     run: () => {
       if (!database) return "Skipped: no database in .env.";
+      if (!running) return `Skipped: ${CONTAINER} is not running.`;
       const journal = JSON.parse(
         readFileSync(join(root, "drizzle/meta/_journal.json"), "utf8"),
       ) as {

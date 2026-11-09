@@ -76,7 +76,7 @@ export function psql(sql: string) {
   ).trim();
 }
 
-function inspect(format: string) {
+export function inspect(format: string) {
   try {
     return execFileSync("docker", ["inspect", "-f", format, CONTAINER], {
       encoding: "utf8",
