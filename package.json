@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vp dev",
     "dev:mock": "STRAVA_MOCK=1 vp dev",
+    "dev:seed": "bun scripts/dev-seed.ts",
     "build": "vp build",
     "preview": "vp preview",
     "test": "vp test",

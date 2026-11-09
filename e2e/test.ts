@@ -2,6 +2,7 @@ import { test as base, expect, type Locator, type Page } from "@playwright/test"
 import pg from "pg";
 
 import { E2E_NOW, E2E_URL, e2eDatabaseUrl } from "./env.ts";
+import { waitForHydration } from "./onboard.ts";
 
 /**
  * Every page starts at the server's clock (e2e/fixed-clock.ts), so "today" matches the data, and
@@ -108,8 +109,9 @@ export async function resetAthlete() {
   });
 }
 
-/** Waits until the page has its data: no requests in flight and no skeleton left. */
+/** Waits until the page has its data and answers taps: hydrated, nothing in flight, no skeleton. */
 export async function settle(page: Page) {
+  await waitForHydration(page);
   await page.waitForLoadState("networkidle");
   await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
   await expect(page.getByRole("status", { name: "Loading" })).toHaveCount(0);
