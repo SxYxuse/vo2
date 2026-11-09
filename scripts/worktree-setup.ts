@@ -7,6 +7,8 @@ import {
   SHARED_DATABASE,
   assertSafeIdentifier,
   databaseUrl,
+  migrateLegacyPgPort,
+  pgPort,
   pickPort,
   planEnv,
   readEnvValue,
@@ -18,7 +20,7 @@ import {
 // Run by T3's worktree hook (t3.json) and by `vp run db:setup`. Gives a feature worktree its own
 // database on the shared vo2-postgres server and its own dev-server port. Safe to run twice.
 
-const CONTAINER = "vo2-postgres";
+export const CONTAINER = "vo2-postgres";
 const isolate = process.argv.includes("--isolate");
 
 function git(...args: string[]) {
@@ -74,23 +76,40 @@ export function psql(sql: string) {
   ).trim();
 }
 
-function isHealthy() {
+function inspect(format: string) {
   try {
-    const status = execFileSync(
-      "docker",
-      ["inspect", "-f", "{{.State.Health.Status}}", CONTAINER],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-    );
-    return status.trim() === "healthy";
+    return execFileSync("docker", ["inspect", "-f", format, CONTAINER], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
   } catch {
-    return false;
+    return undefined;
   }
 }
 
-function startServer() {
-  // Skips compose when another checkout already started the server.
-  if (isHealthy()) return;
-  execFileSync("docker", ["compose", "up", "-d", "--wait"], { stdio: "inherit" });
+/** Host ports vo2-postgres publishes, empty when it is missing or published none. */
+export function publishedPorts() {
+  const ports = inspect(`{{range (index .NetworkSettings.Ports "5432/tcp")}}{{.HostPort}} {{end}}`);
+  return new Set((ports ?? "").split(/\s+/).filter(Boolean).map(Number));
+}
+
+export function composeProject() {
+  return inspect(`{{index .Config.Labels "com.docker.compose.project"}}`);
+}
+
+function startServer(port: number) {
+  // Skips compose when another checkout already started the server: recreating it would drop
+  // every other checkout's connections.
+  if (inspect("{{.State.Health.Status}}") !== "healthy") {
+    execFileSync("docker", ["compose", "up", "-d", "--wait"], { stdio: "inherit" });
+  }
+  if (!publishedPorts().has(port)) {
+    throw new Error(
+      `${CONTAINER} does not publish host port ${port} (it publishes ${[...publishedPorts()].join(", ") || "none"}).\n` +
+        `Run \`vp run db:up\` to recreate it on port ${port}; its data volume is kept. Other checkouts ` +
+        `then run \`vp run db:setup\` to move their DATABASE_URL to the new port.`,
+    );
+  }
 }
 
 function createDatabase(name: string) {
@@ -135,14 +154,21 @@ async function main() {
   const examplePath = join(root, ".env.example");
   const gitDir = git("rev-parse", "--path-format=absolute", "--git-dir");
   const isMain = gitDir === git("rev-parse", "--path-format=absolute", "--git-common-dir");
-  const existing = readOptional(envPath);
+  const original = readOptional(envPath);
+  const pg = pgPort(original);
+  // Rewritten on every path, so an existing checkout follows the server to its new port.
+  const existing = original === undefined ? undefined : migrateLegacyPgPort(original, pg);
+  if (existing !== original) {
+    writeFileSync(envPath, existing ?? "");
+    console.log(`Moved DATABASE_URL in .env to Postgres port ${pg}`);
+  }
   fetchOrigin();
 
   // --isolate rewrites DATABASE_URL, so only a worktree can repair the old URL that way.
   if (existing && usesRenamedVoDatabase(existing) && (isMain || !isolate)) {
     console.error(
       `.env still connects as the pre-rename \`vo\` user or database, which vo2-postgres rejects.\n` +
-        `Set DATABASE_URL=${databaseUrl(SHARED_DATABASE)} to share the main database` +
+        `Set DATABASE_URL=${databaseUrl(SHARED_DATABASE, pg)} to share the main database` +
         `${isMain ? "" : ", or run with --isolate for this worktree's own"}.`,
     );
     process.exit(1);
@@ -172,7 +198,7 @@ async function main() {
     return;
   }
 
-  startServer();
+  startServer(pg);
   createDatabase(database);
 
   let base = existing;
@@ -185,7 +211,7 @@ async function main() {
   writeFileSync(
     envPath,
     setEnvValues(base, {
-      DATABASE_URL: databaseUrl(database),
+      DATABASE_URL: databaseUrl(database, pg),
       PORT: String(port),
       BETTER_AUTH_URL: `http://localhost:${port}`,
     }),
@@ -197,9 +223,20 @@ async function main() {
   execFileSync("bun", ["run", "db:migrate"], {
     cwd: root,
     stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: databaseUrl(database) },
+    env: { ...process.env, DATABASE_URL: databaseUrl(database, pg) },
   });
   console.log("Migrated. The database is empty until Connect Strava and Sync from Strava.");
 }
 
-if (import.meta.main) await main();
+if (import.meta.main) {
+  try {
+    await main();
+  } catch (error) {
+    // T3 shows only "Setup script exited with 1", so the reason has to be printed here.
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error(
+      `\nSetup failed: ${reason.trim()}\nRun \`vp run doctor\` to see what else is wrong.`,
+    );
+    process.exit(1);
+  }
+}

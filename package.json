@@ -15,6 +15,7 @@
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:setup": "bun scripts/worktree-setup.ts",
+    "doctor": "bun scripts/doctor.ts",
     "db:prune": "bun scripts/worktree-prune.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

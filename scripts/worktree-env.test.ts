@@ -48,7 +48,7 @@ describe("assertSafeIdentifier", () => {
 
 describe("planEnv", () => {
   const own = worktreeDatabaseName("fix/app-slowness", path);
-  const sharedEnv = "DATABASE_URL=postgresql://vo2:vo2@localhost:5432/vo2\nPORT=3000\n";
+  const sharedEnv = "DATABASE_URL=postgresql://vo2:vo2@localhost:55432/vo2\nPORT=3000\n";
 
   it("leaves an existing .env that still shares vo2 alone", () => {
     expect(planEnv(sharedEnv, own, false)).toEqual({ kind: "keep", database: "vo2" });
@@ -61,7 +61,7 @@ describe("planEnv", () => {
   it("writes a missing .env and refreshes one already on this worktree's database", () => {
     expect(planEnv(undefined, own, false)).toEqual({ kind: "write" });
     expect(
-      planEnv(`DATABASE_URL=postgresql://vo2:vo2@localhost:5432/${own}\n`, own, false),
+      planEnv(`DATABASE_URL=postgresql://vo2:vo2@localhost:55432/${own}\n`, own, false),
     ).toEqual({
       kind: "write",
     });
@@ -77,7 +77,7 @@ describe("usesRenamedVoDatabase", () => {
   });
 
   it("accepts vo2 URLs and an .env without one", () => {
-    expect(usesRenamedVoDatabase("DATABASE_URL=postgresql://vo2:vo2@localhost:5432/vo2\n")).toBe(
+    expect(usesRenamedVoDatabase("DATABASE_URL=postgresql://vo2:vo2@localhost:55432/vo2\n")).toBe(
       false,
     );
     expect(usesRenamedVoDatabase("PORT=3100\n")).toBe(false);

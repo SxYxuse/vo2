@@ -10,7 +10,9 @@ services:
       POSTGRES_PASSWORD: vo2
       POSTGRES_DB: vo2
     ports:
-      - "5432:5432"
+      # Not 5432, which other projects on the same machine use. Every checkout shares this
+      # container, so VO2_PG_PORT must be the same everywhere (scripts/worktree-env.ts reads it too).
+      - "${VO2_PG_PORT:-55432}:5432"
     volumes:
       - vo2-postgres:/var/lib/postgresql/data
     healthcheck:
