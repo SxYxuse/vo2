@@ -33,6 +33,8 @@ The most common defect is a change that works on the path you tested and is miss
 4. Stop the server you started by the PID you captured when starting it. Other worktrees run their own dev servers on this machine, so never kill by name or pattern. `vp run` does not pass the signal on: if the port still answers, stop the process `ss -ltnp` shows on your `PORT`.
 5. To check production-only behavior, such as the service worker, `vp run start:mock` builds and serves a production build against the mock on the same port. Stop it as soon as you are done: other worktrees share this machine's memory.
 
+**Prod, staging, previews, their databases or logs, or a dev link for the developer:** read [`docs/agents/production.md`](docs/agents/production.md) first. Those environments run on this machine and are read-only without the developer's confirmation.
+
 ### Databases
 
 - Every checkout shares one Postgres server, compose project `vo2`, on host port 55432 (`VO2_PG_PORT`), not 5432, which other projects on this machine use. `vp run db:up` attaches to it. `vp run db:down` stops it for every checkout.

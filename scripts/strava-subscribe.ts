@@ -5,7 +5,22 @@ import { stravaWebhookUrl } from "../src/services/strava-webhook.ts";
 // deployment Strava should push to. The app must be running: Strava calls it back to verify.
 // Strava allows one push subscription per app, so an existing one is only replaced with --replace.
 
+// Bun loads .env, and every worktree's .env sets STRAVA_MOCK=1, so without this check the script
+// would quietly subscribe mock Strava when it was run for a real Strava app.
+if (process.env.STRAVA_MOCK && !process.argv.includes("--mock")) {
+  console.error(
+    "STRAVA_MOCK is set (Bun reads it from .env), so this would subscribe mock Strava, not strava.com.\n" +
+      "For a real Strava app, run with the deployment's environment and STRAVA_MOCK= (empty).\n" +
+      "To subscribe mock Strava on purpose, add --mock.",
+  );
+  process.exit(1);
+}
+
 const env = parseEnv();
+if (process.argv.includes("--mock") && !env.STRAVA_MOCK) {
+  console.error("--mock needs STRAVA_MOCK=1 outside production; this would reach strava.com.");
+  process.exit(1);
+}
 if (!env.STRAVA_WEBHOOK_SECRET) throw new Error("Set STRAVA_WEBHOOK_SECRET first");
 
 const endpoint = `${env.STRAVA_BASE_URL}/api/v3/push_subscriptions`;
