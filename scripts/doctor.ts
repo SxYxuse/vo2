@@ -174,7 +174,7 @@ const checks: Check[] = [
         // Set up before the default moved off 3000, which other servers on this machine hold.
         move = `set PORT=${DEFAULT_DEV_PORT} and BETTER_AUTH_URL=http://localhost:${DEFAULT_DEV_PORT} in .env`;
       } else if (isMain) {
-        move = `set PORT and BETTER_AUTH_URL in .env to another free port below ${PORT_RANGE.first}`;
+        move = `set PORT and BETTER_AUTH_URL in .env to another free port from 3001 to ${PORT_RANGE.first - 1}`;
       } else if (database === SHARED_DATABASE) {
         move =
           "run `bun scripts/worktree-setup.ts --isolate` for this worktree's own database and port";
