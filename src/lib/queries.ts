@@ -12,6 +12,7 @@ import { loadHomeData } from "@/services/home-data.ts";
 import { loadBests } from "@/services/personal-bests.ts";
 import { getPowerFile, listPowerFiles } from "@/services/power-file.ts";
 import { loadProgress } from "@/services/progress.ts";
+import { getRouteBuilderStatus } from "@/services/route-builder.ts";
 import { loadSeason } from "@/services/season.ts";
 import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
@@ -43,6 +44,12 @@ export const activityMapQueryOptions = queryOptions({
   queryKey: ["activity-map"],
   queryFn: () => loadActivityMap(),
   staleTime: 60_000,
+});
+
+export const routeBuilderStatusQueryOptions = queryOptions({
+  queryKey: ["route-builder-status"],
+  queryFn: () => getRouteBuilderStatus(),
+  staleTime: 5 * 60_000,
 });
 
 export const fitnessQueryOptions = queryOptions({

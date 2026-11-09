@@ -6,6 +6,7 @@ import type { components, operations } from "./strava.types.ts";
 export type SummaryActivity = components["schemas"]["SummaryActivity"];
 export type StreamSet = components["schemas"]["StreamSet"];
 export type StravaZones = components["schemas"]["Zones"];
+export type ExplorerResponse = components["schemas"]["ExplorerResponse"];
 type StreamKey = NonNullable<
   operations["getActivityStreams"]["parameters"]["query"]
 >["keys"][number];
@@ -85,6 +86,17 @@ export class StravaApi {
   /** Needs the profile:read_all scope, which sign-in already requests. */
   async getAthleteZones() {
     return this.request<StravaZones>("/athlete/zones");
+  }
+
+  /**
+   * Strava's ten most popular segments in a box. Strava reserves it for Extended Access apps, so
+   * expect a 401 or 403 from an app without that grant.
+   */
+  async exploreSegments(bounds: [south: number, west: number, north: number, east: number]) {
+    const search = new URLSearchParams();
+    search.set("bounds", bounds.map((value) => value.toFixed(5)).join(","));
+    search.set("activity_type", "riding");
+    return this.request<ExplorerResponse>(`/segments/explore?${search.toString()}`);
   }
 
   /** Revokes VO2's access for this athlete; Strava echoes back the revoked token. */

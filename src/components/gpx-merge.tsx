@@ -43,7 +43,6 @@ import {
   suggestLegs,
   switchAtJunction,
   switchLegAt,
-  toGpx,
   trackLength,
   type GpxPoint,
   type Junction,
@@ -59,6 +58,7 @@ import {
   type GpxMergePlan,
   type GpxMergeTrack,
 } from "@/lib/gpx-merge-draft.ts";
+import { downloadGpx } from "@/lib/gpx-download.ts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -125,15 +125,6 @@ function formatKm(m: number) {
 
 function formatGap(m: number) {
   return m < 1000 ? `${Math.round(m)} m` : formatKm(m);
-}
-
-function fileSlug(name: string) {
-  return (
-    name
-      .replace(/[^\p{L}\p{N}\- ]+/gu, "")
-      .trim()
-      .replace(/\s+/g, "-") || "merged-route"
-  );
 }
 
 /** The meeting point the leg starts from is no place to switch again. */
@@ -1087,27 +1078,8 @@ function DownloadCard({
   const hasElevation = route.points.some((point) => point.ele !== null);
   const jumps = route.legs.filter((leg, index) => index > 0 && leg.gapM > plan.toleranceM);
 
-  const download = async () => {
-    const name = plan.name.trim() || defaultName || "Merged route";
-    const file = new File([toGpx(name, route.points)], `${fileSlug(name)}.gpx`, {
-      type: "application/gpx+xml",
-    });
-    // Phones hand the file to the share sheet, so it can go straight to a bike computer app.
-    if (window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: name });
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
-    }
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = file.name;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const download = () =>
+    downloadGpx(plan.name.trim() || defaultName || "Merged route", route.points);
 
   return (
     <Card size="sm">

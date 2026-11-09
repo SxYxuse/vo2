@@ -13,6 +13,8 @@
     "start:mock": "bun scripts/heavy.ts vp build && APP_ENV=development STRAVA_MOCK=1 bun run .output/server/index.mjs",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
+    "routing:up": "bun scripts/brouter-segments.ts && docker compose --profile routing up -d --build brouter",
+    "routing:down": "docker compose --profile routing stop brouter",
     "db:setup": "bun scripts/worktree-setup.ts",
     "db:prune": "bun scripts/worktree-prune.ts",
     "db:generate": "drizzle-kit generate",

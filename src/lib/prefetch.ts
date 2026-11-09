@@ -18,6 +18,7 @@ const APP_ROUTES = [
   "/coach",
   "/map",
   "/merge-gpx",
+  "/route-builder",
   "/fitness",
   "/heart-rate",
   "/power",

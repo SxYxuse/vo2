@@ -17,6 +17,7 @@ import {
   SparklesIcon,
   TrendingUpIcon,
   TrophyIcon,
+  WaypointsIcon,
   ZapIcon,
 } from "lucide-react";
 
@@ -89,6 +90,7 @@ const COLLAPSIBLE_NAV_GROUPS = [
     label: "Routes",
     items: [
       { title: "Map", to: "/map", icon: MapIcon },
+      { title: "Route builder", to: "/route-builder", icon: WaypointsIcon },
       { title: "Merge GPX", to: "/merge-gpx", icon: RouteIcon },
     ],
   },
