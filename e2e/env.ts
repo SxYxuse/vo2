@@ -18,7 +18,7 @@ const root = realpathSync(
 export const E2E_DATABASE = assertSafeIdentifier(`${DATABASE_PREFIX}e2e_${pathHash(root)}`);
 
 export function e2eDatabaseUrl(database = E2E_DATABASE) {
-  const url = new URL(process.env.DATABASE_URL ?? "postgresql://vo2:vo2@localhost:5432/vo2");
+  const url = new URL(process.env.DATABASE_URL ?? "postgresql://vo2:vo2@localhost:55432/vo2");
   url.pathname = `/${database}`;
   return url.toString();
 }

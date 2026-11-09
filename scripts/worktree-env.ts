@@ -5,6 +5,10 @@ import { createHash } from "node:crypto";
 export const SHARED_DATABASE = "vo2";
 export const DATABASE_PREFIX = "vo2_wt_";
 export const PORT_RANGE = { first: 3100, last: 3999 } as const;
+/** Not 5432, which other projects' Postgres on the same machine also wants. */
+export const DEFAULT_PG_PORT = 55432;
+/** Before #208 every checkout's DATABASE_URL named this port. */
+const LEGACY_PG_PORT = "5432";
 
 /** Postgres truncates identifiers past 63 bytes, which would make two worktrees collide. */
 const MAX_IDENTIFIER = 63;
@@ -34,8 +38,34 @@ export function assertSafeIdentifier(name: string) {
   return name;
 }
 
-export function databaseUrl(database: string) {
-  return `postgresql://vo2:vo2@localhost:5432/${database}`;
+/** The host port vo2-postgres publishes. Like Docker Compose, the shell wins over `.env`. */
+export function pgPort(envText = "") {
+  const raw = process.env.VO2_PG_PORT || readEnvValue(envText, "VO2_PG_PORT");
+  const port = Number(raw);
+  if (!raw) return DEFAULT_PG_PORT;
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error(`VO2_PG_PORT=${raw} is not a port number`);
+  }
+  return port;
+}
+
+export function databaseUrl(database: string, port: number) {
+  return `postgresql://vo2:vo2@localhost:${port}/${database}`;
+}
+
+/** Moves a local DATABASE_URL still on 5432 to `port`; any other URL is left alone. */
+export function migrateLegacyPgPort(envText: string, port: number) {
+  const value = readEnvValue(envText, "DATABASE_URL");
+  if (!value) return envText;
+  try {
+    const url = new URL(value);
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (!local || (url.port || LEGACY_PG_PORT) !== LEGACY_PG_PORT || port === 5432) return envText;
+    url.port = String(port);
+    return setEnvValues(envText, { DATABASE_URL: url.toString() });
+  } catch {
+    return envText;
+  }
 }
 
 export function databaseFromUrl(url: string | undefined) {
