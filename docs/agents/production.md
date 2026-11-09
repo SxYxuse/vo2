@@ -27,7 +27,7 @@ Swarm container names are `<appName>.1.<task id>`; find one with `docker ps --fi
 | Strava app         | its own                                         | shared with previews                         | staging's                                                                                   |
 | Logs               | Loki                                            | Loki                                         | `docker logs` only                                                                          |
 
-**What's in prod:** the latest release tag (`gh release list -L 1`). Staging runs `origin/main`.
+**What's deployed:** `bun scripts/dokploy.ts deploys prod` (or `staging`, or `pr-<number>`) lists the latest deployments, with status, commit and title; a prod title names its release, such as `chore(release): 0.8.0`. Staging runs `origin/main`.
 
 **Databases:** database `vo`, user `vo`, port 5432 on the Docker network only, not published on the host. Read one with `docker exec <container> psql -U vo -d vo -c '\dt'`.
 
@@ -35,6 +35,10 @@ Not part of any deployment:
 
 - `vo2-postgres` (host port 55432) is the local dev Postgres every checkout shares (see AGENTS.md).
 - `vo2-database-4usk1q` and `vo2-database-sgmfhm` hold leftover VO2 tables in database `postgres`. No app points at them and Dokploy doesn't manage them. Leave them alone; what they were is _unverified_.
+
+## Dokploy API
+
+`scripts/dokploy.ts` reads deployments and build logs through the Dokploy API, read-only; its header lists the commands. Run `bun scripts/dokploy.ts check` first: the developer keeps API keys short-lived, and when the key has expired, `check` prints how to get a new one. Read a build log with `bun scripts/dokploy.ts logs <deploymentId>`, taking the ID from `deploys`. To wait for a deploy, and to prune the previews of closed PRs, see `.agents/skills/preview-deploy/SKILL.md`.
 
 ## Strava apps
 
