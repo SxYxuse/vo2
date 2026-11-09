@@ -3,7 +3,12 @@ import { realpathSync } from "node:fs";
 
 import { config } from "dotenv";
 
-import { DATABASE_PREFIX, assertSafeIdentifier, pathHash } from "../scripts/worktree-env.ts";
+import {
+  DATABASE_PREFIX,
+  DEFAULT_DEV_PORT,
+  assertSafeIdentifier,
+  pathHash,
+} from "../scripts/worktree-env.ts";
 
 config({ path: [".env"], quiet: true });
 
@@ -24,7 +29,7 @@ export function e2eDatabaseUrl(database = E2E_DATABASE) {
 }
 
 /** Its own port, so the suite runs beside this checkout's dev server. */
-export const E2E_PORT = (Number(process.env.PORT) || 3000) + 1000;
+export const E2E_PORT = (Number(process.env.PORT) || DEFAULT_DEV_PORT) + 1000;
 export const E2E_URL = `http://localhost:${E2E_PORT}`;
 
 /** Where the Docker browser listens (playwright.config.ts). */

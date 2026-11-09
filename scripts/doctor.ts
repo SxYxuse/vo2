@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   DATABASE_PREFIX,
+  DEFAULT_DEV_PORT,
   SHARED_DATABASE,
   assertSafeIdentifier,
   databaseFromUrl,
@@ -164,11 +165,16 @@ const checks: Check[] = [
       const port = Number(readEnvValue(envText ?? "", "PORT"));
       if (!Number.isInteger(port) || port <= 0)
         return "PORT is not set in .env. Fix: `vp run db:setup`.";
-      return (await isListening(port))
-        ? `Port ${port} is in use. Fine if it is this checkout's dev server; otherwise stop the ` +
-            `process \`ss -ltnp | grep :${port}\` shows (by its PID), or run \`vp run db:setup\` in a ` +
-            "worktree to pick another port."
-        : undefined;
+      if (!(await isListening(port))) return undefined;
+      // A main checkout set up before 3090 became the default has 3000, which Dokploy holds here.
+      const move =
+        isMain && port !== DEFAULT_DEV_PORT
+          ? `set PORT=${DEFAULT_DEV_PORT} and BETTER_AUTH_URL=http://localhost:${DEFAULT_DEV_PORT} in .env`
+          : "remove PORT from .env and run `vp run db:setup` to pick a free one";
+      return (
+        `Port ${port} is in use. Fine if it is this checkout's dev server; otherwise stop the ` +
+        `process \`ss -ltnp | grep :${port}\` shows (by its PID) if it is yours, or ${move}.`
+      );
     },
   },
 ];
