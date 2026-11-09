@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   DATABASE_PREFIX,
   DEFAULT_DEV_PORT,
+  PORT_RANGE,
   SHARED_DATABASE,
   assertSafeIdentifier,
   databaseFromUrl,
@@ -166,11 +167,18 @@ const checks: Check[] = [
       if (!Number.isInteger(port) || port <= 0)
         return "PORT is not set in .env. Fix: `vp run db:setup`.";
       if (!(await isListening(port))) return undefined;
-      // A main checkout set up before 3090 became the default has 3000, which Dokploy holds here.
-      const move =
-        isMain && port !== DEFAULT_DEV_PORT
-          ? `set PORT=${DEFAULT_DEV_PORT} and BETTER_AUTH_URL=http://localhost:${DEFAULT_DEV_PORT} in .env`
-          : "remove PORT from .env and run `vp run db:setup` to pick a free one";
+      // Setup never moves the main checkout's PORT, nor a worktree's that shares its database
+      // (planEnv keeps that .env), so each gets the fix that applies to it.
+      let move = "remove PORT from .env and run `vp run db:setup` to pick a free one";
+      if (isMain && port !== DEFAULT_DEV_PORT) {
+        // Set up before the default moved off 3000, which other servers on this machine hold.
+        move = `set PORT=${DEFAULT_DEV_PORT} and BETTER_AUTH_URL=http://localhost:${DEFAULT_DEV_PORT} in .env`;
+      } else if (isMain) {
+        move = `set PORT and BETTER_AUTH_URL in .env to another free port below ${PORT_RANGE.first}`;
+      } else if (database === SHARED_DATABASE) {
+        move =
+          "run `bun scripts/worktree-setup.ts --isolate` for this worktree's own database and port";
+      }
       return (
         `Port ${port} is in use. Fine if it is this checkout's dev server; otherwise stop the ` +
         `process \`ss -ltnp | grep :${port}\` shows (by its PID) if it is yours, or ${move}.`

@@ -6,7 +6,7 @@ export const SHARED_DATABASE = "vo2";
 export const DATABASE_PREFIX = "vo2_wt_";
 export const PORT_RANGE = { first: 3100, last: 3999 } as const;
 /**
- * The main checkout's dev-server port (`.env.example`). Not 3000, which Dokploy and most other
+ * The main checkout's dev-server port (`.env.example`). Not 3000, which other servers and most
  * Node projects on the same machine want. Outside PORT_RANGE, as are its e2e ports at +1000 and
  * +2000 (e2e/env.ts), so they never meet a worktree's.
  */
