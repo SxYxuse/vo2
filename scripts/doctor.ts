@@ -133,7 +133,12 @@ const checks: Check[] = [
       const latest = journal.entries.at(-1);
       let applied: number;
       try {
-        if (psql("postgres", `SELECT 1 FROM pg_database WHERE datname = '${database}'`) !== "1") {
+        if (
+          psql(
+            "postgres",
+            `SELECT 1 FROM pg_database WHERE datname = '${assertSafeIdentifier(database)}'`,
+          ) !== "1"
+        ) {
           return `Database ${database} does not exist. Fix: \`vp run db:setup\`.`;
         }
         // drizzle-kit applies every migration newer than the latest created_at it recorded.
