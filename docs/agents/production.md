@@ -57,7 +57,7 @@ Read from the running preview container on 2026-11-09 (Dokploy stores them encry
 
 Prod and staging send request logs to Loki only; their `docker logs` shows just startup and migration output, which helps when a deploy fails to boot. Browse them in Grafana at https://logs.vo2.melvyn.be (the developer's login; data source **Loki**).
 
-Labels: `app="vo2"`, `environment` (`production` or `staging`), `level`, `method`, `path`, `requestId`, `userId`. For example:
+Labels: `app="vo2"`, `environment` (`production` or `staging`), `level`, `method`, `path`, `requestId`, `userId`, `service_name`. For example:
 
 ```logql
 {app="vo2", environment="production", level="error"}
@@ -74,12 +74,13 @@ docker exec vo2-observability-slpmav-vo2-grafana-1 \
 
 ## Sharing a dev server with the developer
 
-The developer's browser is not on this VPS, so a `localhost` link doesn't open for them. They reach the VPS over Tailscale at `my-vps.tailec2b6d.ts.net` (`tailscale status --json | jq -r .Self.DNSName`). Three things stand in the way: the dev server listens on 127.0.0.1 only, Vite rejects host names it doesn't know, and sign-in redirects to `BETTER_AUTH_URL`. Start it like this, which overrides `.env` without editing it. Bind the Tailscale address, never a bare `--host`, which binds every interface, the public one included.
+The developer's browser is not on this VPS, so a `localhost` link doesn't open for them. They reach the VPS over Tailscale, by its MagicDNS name. Three things stand in the way: the dev server listens on 127.0.0.1 only, Vite rejects host names it doesn't know, and sign-in redirects to `BETTER_AUTH_URL`. Start it like this, which overrides `.env` without editing it. Bind the Tailscale address, never a bare `--host`, which binds every interface, the public one included.
 
 ```bash
 PORT=$(grep '^PORT=' .env | cut -d= -f2)
+TS_HOST=$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')
 __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.ts.net \
-BETTER_AUTH_URL=http://my-vps.tailec2b6d.ts.net:$PORT STRAVA_MOCK=1 vp dev --host "$(tailscale ip -4)"
+BETTER_AUTH_URL=http://$TS_HOST:$PORT STRAVA_MOCK=1 vp dev --host "$(tailscale ip -4)"
 ```
 
-Then share `http://my-vps.tailec2b6d.ts.net:<PORT>/`.
+Then share `http://$TS_HOST:$PORT/`.
