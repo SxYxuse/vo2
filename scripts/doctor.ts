@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { connect } from "node:net";
 import { join } from "node:path";
 
 import {
@@ -12,12 +11,23 @@ import {
   pgPort,
   readEnvValue,
 } from "./worktree-env.ts";
-import { CONTAINER, composeProject, inspect, publishedPorts } from "./worktree-setup.ts";
+import {
+  CONTAINER,
+  composeProject,
+  inspect,
+  isListening,
+  publishedPorts,
+} from "./worktree-setup.ts";
 
 // `vp run doctor`: checks what setup and sign-in need and prints the fix for each failure. It
 // only reads, and needs nothing from node_modules, so it runs before `bun install` too.
 
-type Check = { name: string; run: () => Promise<string | undefined> | string | undefined };
+type Check = {
+  name: string;
+  /** Reported but not counted as a failure. */
+  warnOnly?: boolean;
+  run: () => Promise<string | undefined> | string | undefined;
+};
 
 const root = realpathSync(
   execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim(),
@@ -33,21 +43,17 @@ const envPath = join(root, ".env");
 const envText = existsSync(envPath) ? readFileSync(envPath, "utf8") : undefined;
 const databaseUrl = readEnvValue(envText ?? "", "DATABASE_URL");
 const database = databaseFromUrl(databaseUrl);
-const expectedPort = pgPort(envText);
+const expectedPort = (() => {
+  try {
+    return pgPort(envText);
+  } catch (error) {
+    console.log(
+      `✗ ${(error as Error).message}. Fix: set VO2_PG_PORT to a port number, or unset it.`,
+    );
+    process.exit(1);
+  }
+})();
 const running = inspect("{{.State.Running}}") === "true";
-
-function answers(port: number, host = "localhost") {
-  return new Promise<boolean>((done) => {
-    const socket = connect({ port, host, timeout: 1000 });
-    const finish = (open: boolean) => {
-      socket.destroy();
-      done(open);
-    };
-    socket.once("connect", () => finish(true));
-    socket.once("timeout", () => finish(false));
-    socket.once("error", () => finish(false));
-  });
-}
 
 function psql(db: string, sql: string) {
   return execFileSync(
@@ -109,7 +115,7 @@ const checks: Check[] = [
           `${expectedPort} and keeps its data; other checkouts then run \`vp run db:setup\`.`
         );
       }
-      return (await answers(expectedPort))
+      return (await isListening(expectedPort))
         ? undefined
         : `Nothing answers on localhost:${expectedPort}. Fix: \`vp run db:up\`, then \`docker logs ${CONTAINER}\`.`;
     },
@@ -147,14 +153,16 @@ const checks: Check[] = [
   },
   {
     name: "dev-server PORT is free",
+    // Sign-in problems are checked with this checkout's own dev server running on PORT.
+    warnOnly: true,
     run: async () => {
       const port = Number(readEnvValue(envText ?? "", "PORT"));
       if (!Number.isInteger(port) || port <= 0)
         return "PORT is not set in .env. Fix: `vp run db:setup`.";
-      const taken = (await answers(port, "127.0.0.1")) || (await answers(port, "::1"));
-      return taken
-        ? `Port ${port} is taken. Fix: stop the process \`ss -ltnp | grep :${port}\` shows (by its PID), ` +
-            "or `vp run db:setup` in a worktree to pick another port."
+      return (await isListening(port))
+        ? `Port ${port} is in use. Fine if it is this checkout's dev server; otherwise stop the ` +
+            `process \`ss -ltnp | grep :${port}\` shows (by its PID), or run \`vp run db:setup\` in a ` +
+            "worktree to pick another port."
         : undefined;
     },
   },
@@ -162,9 +170,15 @@ const checks: Check[] = [
 
 let failed = 0;
 for (const check of checks) {
-  const problem = await check.run();
-  if (problem) failed += 1;
-  console.log(`${problem ? "✗" : "✓"} ${check.name}${problem ? `\n    ${problem}` : ""}`);
+  let problem: string | undefined;
+  try {
+    problem = await check.run();
+  } catch (error) {
+    problem = `Check could not run: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  if (problem && !check.warnOnly) failed += 1;
+  const mark = problem ? (check.warnOnly ? "!" : "✗") : "✓";
+  console.log(`${mark} ${check.name}${problem ? `\n    ${problem}` : ""}`);
 }
 console.log(failed ? `\n${failed} check(s) failed.` : "\nAll checks passed.");
 process.exit(failed ? 1 : 0);

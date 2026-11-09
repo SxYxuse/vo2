@@ -59,7 +59,7 @@ export function migrateLegacyPgPort(envText: string, port: number) {
   if (!value) return envText;
   try {
     const url = new URL(value);
-    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
     if (!local || (url.port || LEGACY_PG_PORT) !== LEGACY_PG_PORT || port === 5432) return envText;
     url.port = String(port);
     return setEnvValues(envText, { DATABASE_URL: url.toString() });

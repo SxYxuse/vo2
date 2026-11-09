@@ -123,7 +123,8 @@ function createDatabase(name: string) {
   console.log(`Created database ${database}`);
 }
 
-function isListening(port: number) {
+/** True when anything listens on `port` on the IPv4 or IPv6 loopback. */
+export function isListening(port: number) {
   const probe = (host: string) =>
     new Promise<boolean>((done) => {
       const socket = connect({ port, host, timeout: 300 });
