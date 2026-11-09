@@ -29,7 +29,7 @@ The most common defect is a change that works on the path you tested and is miss
 
 1. `vp run db:up`, then `vp run dev:mock`. Always use the mock: you have no access to strava.com.
 2. The port is `PORT` in this checkout's `.env` (3000 in the main checkout). The dev server binds it strictly and fails if it is taken, because `BETTER_AUTH_URL` names the same port.
-3. In the app: **Connect Strava** (the mock redirects straight back), finish the onboarding dialog, then **Sync from Strava** to load about eight weeks of mock rides and runs.
+3. `vp run dev:seed` replaces the mock athlete with a signed-in, synced, onboarded one and prints a storageState file and a sign-in URL for your browser. Its flags, listed atop `scripts/dev-seed.ts`, seed years of history, unsynced recent streams, or a never-synced or mid-onboarding athlete. A script that taps the app waits for `body[data-hydrated]` first: taps before hydration are lost.
 4. Stop the server you started by the PID you captured when starting it. Other worktrees run their own dev servers on this machine, so never kill by name or pattern. `vp run` does not pass the signal on: if the port still answers, stop the process `ss -ltnp` shows on your `PORT`.
 5. To check production-only behavior, such as the service worker, `vp run start:mock` builds and serves a production build against the mock on the same port. Stop it as soon as you are done: other worktrees share this machine's memory.
 

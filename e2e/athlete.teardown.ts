@@ -1,4 +1,4 @@
-import { onboardNewAthlete } from "./onboard.ts";
+import { onboardNewAthlete, waitForHydration } from "./onboard.ts";
 import { test, expect, type Page } from "./test.ts";
 
 // The ways out, run once every other spec is done with the athlete.
@@ -6,6 +6,7 @@ import { test, expect, type Page } from "./test.ts";
 test.describe.configure({ mode: "serial" });
 
 async function expectFreshStart(page: Page) {
+  await waitForHydration(page);
   await page.getByRole("button", { name: "Connect Strava" }).click();
   await page.waitForURL("/onboarding");
   await expect(page.getByText("Never copied")).toBeVisible();
@@ -22,6 +23,7 @@ test("a deleted athlete is signed out and starts over on the next connection", a
 
 test("an athlete who revokes VO2 on Strava is signed out and starts over", async ({ page }) => {
   await page.goto("/");
+  await waitForHydration(page);
   await page.getByRole("button", { name: "Connect Strava" }).click();
   await page.waitForURL("/onboarding");
 
@@ -51,6 +53,7 @@ test("an athlete who onboards with the coach plan sees their four weeks written"
 }) => {
   // This page still holds the session deleted above: sign in again as the athlete just onboarded.
   await page.goto("/");
+  await waitForHydration(page);
   await page.getByRole("button", { name: "Connect Strava" }).click();
   await page.waitForURL("/");
   await page.goto("/settings/profile");

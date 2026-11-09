@@ -2,29 +2,45 @@ import { expect, type Page } from "@playwright/test";
 
 import { E2E_NOW } from "./env.ts";
 
+/** Waits for React to hydrate the page (`data-hydrated`, __root.tsx): clicks before it are lost. */
+export async function waitForHydration(page: Page) {
+  await expect(page.locator("body[data-hydrated]")).toBeAttached();
+}
+
+/** Signs in through mock Strava as a new athlete, ending on onboarding with nothing copied. */
+export async function connectStrava(page: Page) {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Connect Strava" }).click();
+  await page.waitForURL("/onboarding");
+  await waitForHydration(page);
+  await expect(page.getByText("Never copied")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+}
+
+/** Onboarding's first step: copies the athlete's training, activities and streams. */
+export async function copyTraining(page: Page, timeout = 60_000) {
+  await page.getByRole("button", { name: "Start sync" }).click();
+  await expect(page.getByText("Full success")).toBeVisible({ timeout });
+}
+
 /**
  * Connects mock Strava, copies the training, and finishes onboarding, ending on the calendar with
  * planning off, or on Plan with the coach plan written. Shared by the e2e setup, the teardown,
- * and the signed-in Lighthouse run (scripts/lighthouse.ts).
+ * the signed-in Lighthouse run (scripts/lighthouse.ts), and `vp run dev:seed`.
  */
 export async function onboardNewAthlete(
   page: Page,
   {
     onPlanningStyle,
     coachPlan = false,
-  }: { onPlanningStyle?: () => Promise<void>; coachPlan?: boolean } = {},
+    syncTimeout,
+  }: { onPlanningStyle?: () => Promise<void>; coachPlan?: boolean; syncTimeout?: number } = {},
 ) {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Connect Strava" }).click();
-  await page.waitForURL("/onboarding");
+  await connectStrava(page);
+  await copyTraining(page, syncTimeout);
   const next = page.getByRole("button", { name: "Continue" });
-  await expect(page.getByText("Never copied")).toBeVisible();
-  await expect(next).toBeDisabled();
-
-  await page.getByRole("button", { name: "Start sync" }).click();
-  await expect(page.getByText("Full success")).toBeVisible({ timeout: 60_000 });
   await next.click();
 
   await page.getByRole("button", { name: "Birthday" }).click();

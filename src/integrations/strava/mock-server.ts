@@ -10,6 +10,9 @@ import type { StreamSet, SummaryActivity } from "./client.ts";
  *
  * Two mock-only endpoints stand in for what an athlete does on strava.com, and push the event
  * Strava would send: `POST /dev/deauthorize` and `POST /dev/activities/<id>/delete`.
+ * Two more serve `vp run dev:seed`: `POST /dev/history?weeks=<n>` sets how far back the athlete's
+ * training goes, until the server restarts or the next seed, and `GET /dev/sign-in` signs a
+ * browser in as the mock athlete in one visit.
  */
 export const MOCK_STRAVA_PATH = "/api/mock-strava";
 
@@ -60,6 +63,12 @@ let revokedAt = 0;
 const deletedActivityIds = new Set<number>();
 let subscriptionCallback: string | null = null;
 
+/** The weeks every catalog holds; their activity ids never change with the history. */
+const BASE_WEEKS = 8;
+/** At most ten years, so a typo can't make every request build an endless catalog. */
+const MAX_HISTORY_WEEKS = 10 * 53;
+let historyWeeks = BASE_WEEKS;
+
 export async function handleMockStravaRequest(request: Request): Promise<Response> {
   if (!env.STRAVA_MOCK) return new Response("Not found", { status: 404 });
 
@@ -89,6 +98,15 @@ export async function handleMockStravaRequest(request: Request): Promise<Respons
       updates: { authorized: "false" },
     });
   }
+  if (path === "/dev/history" && request.method === "POST") {
+    const weeks = numberParam(query, "weeks") ?? BASE_WEEKS;
+    if (!Number.isInteger(weeks) || weeks < 1 || weeks > MAX_HISTORY_WEEKS) {
+      return json({ message: "Bad Request", field: "weeks" }, 400);
+    }
+    historyWeeks = weeks;
+    return json({ weeks });
+  }
+  if (path === "/dev/sign-in" && request.method === "GET") return signIn(query);
   const deleted = /^\/dev\/activities\/(\d+)\/delete$/.exec(path);
   if (deleted && request.method === "POST") {
     deletedActivityIds.add(Number(deleted[1]));
@@ -159,6 +177,23 @@ function deauthorize(request: Request) {
   if (!isLive(token, "access")) return unauthorized("access_token");
   revokedAt = lastIssuedAt;
   return json({ access_token: token });
+}
+
+/**
+ * Starts Better Auth's Strava sign-in on the browser's behalf and hands it the state cookie, so
+ * one visit to this URL ends signed in as the mock athlete, wherever `next` points.
+ */
+async function signIn(query: URLSearchParams) {
+  const response = await fetch(`${env.BETTER_AUTH_URL}/api/auth/sign-in/social`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: env.BETTER_AUTH_URL },
+    body: JSON.stringify({ provider: "strava", callbackURL: query.get("next") ?? "/" }),
+  });
+  const body = response.ok ? ((await response.json()) as { url?: string }) : {};
+  if (!body.url) return json({ message: "Sign-in failed", status: response.status }, 502);
+  const headers = new Headers({ location: body.url });
+  for (const cookie of response.headers.getSetCookie()) headers.append("set-cookie", cookie);
+  return new Response(null, { status: 302, headers });
 }
 
 /** Strava calls the callback with a challenge and only subscribes if it is echoed back. */
@@ -273,45 +308,54 @@ function listActivities(params: {
   return items.slice(start, start + params.perPage);
 }
 
-/** Eight weeks of training relative to now, newest first, so every page has recent data. */
+/**
+ * Training relative to now, newest first, so every page has recent data: eight weeks, or the
+ * history `POST /dev/history` set, repeating the same eight-week pattern further back.
+ */
 function buildCatalog(now: Date): MockSpec[] {
   const items: MockSpec[] = [];
   const monday = startOfUtcMonday(now);
+  // Older weeks number their own ids, so the eight newest keep theirs whatever the history.
   let seq = 1;
+  let olderSeq = 100_000;
+  let older = false;
 
   const push = (kind: MockKind, name: string, start: Date, minutes: number, noSensors = false) => {
     if (start.getTime() > now.getTime()) return;
-    items.push({ id: ID_BASE + seq, kind, name, start, minutes, noSensors });
-    seq += 1;
+    const id = ID_BASE + (older ? olderSeq++ : seq++);
+    items.push({ id, kind, name, start, minutes, noSensors });
   };
 
-  for (let week = 7; week >= 0; week -= 1) {
+  for (let week = historyWeeks - 1; week >= 0; week -= 1) {
+    older = week >= BASE_WEEKS;
+    const pattern = week % BASE_WEEKS;
     const weekMonday = addUtcDays(monday, -week * 7);
-    push("ride", "Morning ride", atUtcHour(addUtcDays(weekMonday, 1), 7), 60, week === 6);
-    if (week === 2) {
+    push("ride", "Morning ride", atUtcHour(addUtcDays(weekMonday, 1), 7), 60, pattern === 6);
+    if (pattern === 2) {
       push("trailRun", "Trail run", atUtcHour(addUtcDays(weekMonday, 2), 7), 55);
     } else {
-      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45, week === 6);
+      push("run", "Lunch run", atUtcHour(addUtcDays(weekMonday, 2), 7), 45, pattern === 6);
     }
-    if (week === 1) {
+    if (pattern === 1) {
       push("ftpRide", "Threshold ride", atUtcHour(addUtcDays(weekMonday, 3), 7), 50);
     } else {
       push("ride", "After-work ride", atUtcHour(addUtcDays(weekMonday, 3), 17), 75);
     }
-    if (week % 2 === 0) {
+    if (pattern % 2 === 0) {
       push("ride", "Long ride", atUtcHour(addUtcDays(weekMonday, 5), 8), 150);
     } else {
       push("run", "Long run", atUtcHour(addUtcDays(weekMonday, 5), 8), 80);
     }
-    if (week === 3) push("walk", "Park walk", atUtcHour(addUtcDays(weekMonday, 4), 12), 40, true);
-    if (week === 4) {
+    if (pattern === 3)
+      push("walk", "Park walk", atUtcHour(addUtcDays(weekMonday, 4), 12), 40, true);
+    if (pattern === 4) {
       push("virtualRide", "Indoor ride", atUtcHour(addUtcDays(weekMonday, 4), 18), 45);
     }
-    if (week === 5) push("swim", "Pool swim", atUtcHour(addUtcDays(weekMonday, 4), 12), 30);
+    if (pattern === 5) push("swim", "Pool swim", atUtcHour(addUtcDays(weekMonday, 4), 12), 30);
     // A weekly swim and two very long rides, so every bests tab has distances to rank.
     push("swim", "Morning swim", atUtcHour(weekMonday, 7), 35 + (week % 3) * 10);
-    if (week === 3) push("ride", "Gran fondo", atUtcHour(addUtcDays(weekMonday, 6), 7), 240);
-    if (week === 6) push("ride", "Century ride", atUtcHour(addUtcDays(weekMonday, 6), 7), 260);
+    if (pattern === 3) push("ride", "Gran fondo", atUtcHour(addUtcDays(weekMonday, 6), 7), 240);
+    if (pattern === 6) push("ride", "Century ride", atUtcHour(addUtcDays(weekMonday, 6), 7), 260);
   }
 
   return items.sort((left, right) => right.start.getTime() - left.start.getTime());
@@ -491,7 +535,8 @@ function heartAt(spec: MockSpec, progress: number) {
 function formFactor(spec: MockSpec) {
   const ageDays = (Date.now() - spec.start.getTime()) / 86_400_000;
   const jitter = ((spec.id * 7919) % 13) - 6;
-  return (1 + jitter / 100) * (1 - ageDays * 0.0008);
+  // Floored, so years of history stay at a believable speed instead of reaching zero.
+  return (1 + jitter / 100) * Math.max(0.7, 1 - ageDays * 0.0008);
 }
 
 function wattsAt(kind: MockKind, progress: number) {

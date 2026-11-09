@@ -25,3 +25,6 @@ jscpd-report
 e2e/.auth
 playwright-report
 test-results
+
+# vp run dev:seed: the mock athlete's signed-in browser state
+.dev-seed
