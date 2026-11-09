@@ -105,7 +105,7 @@ export type RuleContext = {
 };
 
 /** A week may come in this much over its budget, for rounding. */
-const BUDGET_TOLERANCE = 1.05;
+export const BUDGET_TOLERANCE = 1.05;
 /**
  * A full week must reach this share of its budget: the coaching knowledge asks for 95–100 %, and
  * the gap leaves room for rounding. The longest-session rules may hold a week lower; see
@@ -583,7 +583,9 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
           rule: "4. quality sessions",
           message: `Week of ${week.weekStart}: a steady ${rules.noun} race keeps the week's other ${rules.plural} easy, but it has ${written.length} quality ${written.length === 1 ? rules.noun : rules.plural}.`,
         });
-      } else if (quality > maxQuality) {
+      } else if (written.length && quality > maxQuality) {
+        // Races alone may pass the cap, as an A race and a supporting one in the same week can;
+        // then the coach's part is to add no quality session.
         breaks.push({
           rule: "4. quality sessions",
           message: `Week of ${week.weekStart}: ${quality} quality ${rules.plural}${races ? " (races count)" : ""}, at most ${maxQuality} with ${perWeek} ${rules.plural} a week.`,

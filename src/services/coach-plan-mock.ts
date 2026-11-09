@@ -13,6 +13,7 @@ import {
   type WrittenSession,
 } from "./coach-plan.types.ts";
 import {
+  BUDGET_TOLERANCE,
   MAX_LONG_MINUTES,
   MAX_LONG_RIDE_MINUTES,
   MAX_LONG_SWIM_MINUTES,
@@ -22,6 +23,8 @@ import {
   maxLongRideShare,
   maxLongShare,
   maxQualitySessions,
+  sessionsAvailable,
+  weekFloor,
   type RuleContext,
 } from "./coach-plan-rules.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
@@ -138,8 +141,11 @@ export function mockCoachPlan(
       );
       const frozenAmount = frozen.reduce((sum, session) => sum + sessionAmount(session), 0);
       const budget = budgetOf(week, sport) * 0.97 - frozenAmount;
-      // As many sessions as the longest-session share is read for, so equal ones always pass it.
-      const wanted = longShareCount(week, ctx, sport) - frozen.length;
+      // As many sessions as the longest-session share is read for, so equal ones always pass it,
+      // and never more than fit (a race run for fun can leave none).
+      const wanted =
+        Math.min(longShareCount(week, ctx, sport), sessionsAvailable(week, ctx, sport)) -
+        frozen.length;
       if (wanted <= 0) continue;
 
       // Grow every session a step a round, all together so none outgrows the longest-session
@@ -158,7 +164,23 @@ export function mockCoachPlan(
         if (size + mock.step > share * total(size + mock.step) + 0.01) break;
         size = mock.round(size + mock.step);
       }
-      if (size < mock.start) continue;
+      // A lighter or taper week too small for the shortest session gets none of the sport.
+      const over = total(size) > budgetOf(week, sport) * BUDGET_TOLERANCE;
+      if (size < mock.start || over) continue;
+      // Equal sessions grow a step each at a time, coarser than the band a week must reach with
+      // many sessions or a small budget: the long session then takes what is left to the floor.
+      const floor = weekFloor(week, ctx, sport);
+      let longSize = size;
+      const weekTotal = () => total(size) - size + longSize;
+      while (
+        floor != null &&
+        weekTotal() < floor &&
+        weekTotal() + mock.step - frozenAmount <= budget &&
+        longSize + mock.step <= cap &&
+        longSize + mock.step <= share * (weekTotal() + mock.step) + 0.01
+      ) {
+        longSize = mock.round(longSize + mock.step);
+      }
 
       // One quality session when the sport and the week allow it, no steady race of the sport
       // keeps the week easy, and the sessions are long enough.
@@ -177,19 +199,20 @@ export function mockCoachPlan(
       if (canQuality) quality += 1;
 
       for (let index = 0; index < wanted; index += 1) {
+        const amount = index === 0 ? longSize : size;
         planned.push({
           weekStart: week.weekStart,
-          distanceKm: sport === "run" ? size : sport === "swim" ? size / 1000 : 0,
-          minutes: sport === "ride" ? size : 0,
+          distanceKm: sport === "run" ? amount : sport === "swim" ? amount / 1000 : 0,
+          minutes: sport === "ride" ? amount : 0,
           kind: "easy",
           sport,
         });
         sessions.push(
           sport === "run"
-            ? mockRun(week.weekStart, index, size, canQuality, week.budgetKm, paces)
+            ? mockRun(week.weekStart, index, amount, canQuality, week.budgetKm, paces)
             : sport === "ride"
-              ? mockRide(week.weekStart, index, size, canQuality)
-              : mockSwim(week.weekStart, index, size, canQuality),
+              ? mockRide(week.weekStart, index, amount, canQuality)
+              : mockSwim(week.weekStart, index, amount, canQuality),
         );
       }
     }
