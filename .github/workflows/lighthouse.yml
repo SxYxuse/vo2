@@ -19,7 +19,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://vo2:vo2@localhost:55432/vo2
       BETTER_AUTH_SECRET: ci-placeholder-secret
-      BETTER_AUTH_URL: http://localhost:3000
+      # The built server binds PORT, which BETTER_AUTH_URL must name.
+      PORT: "3090"
+      BETTER_AUTH_URL: http://localhost:3090
       APP_ENV: development
       STRAVA_MOCK: "1"
     services:
@@ -54,8 +56,8 @@ jobs:
         continue-on-error: true
         run: |
           bun run .output/server/index.mjs &
-          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3000/sign-in; do sleep 1; done'
-          vp dlx lighthouse@13.6.0 http://localhost:3000/sign-in --only-categories=agentic-browsing \
+          timeout 60 bash -c 'until curl -sf -o /dev/null http://localhost:3090/sign-in; do sleep 1; done'
+          vp dlx lighthouse@13.6.0 http://localhost:3090/sign-in --only-categories=agentic-browsing \
             --chrome-flags="--headless=new" --output=json \
             --output-path=lighthouse-report/agentic-browsing.json --quiet
 

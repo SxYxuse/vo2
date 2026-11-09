@@ -12,7 +12,7 @@ import { chromium } from "@playwright/test";
 
 import { onboardNewAthlete } from "../e2e/onboard.ts";
 
-const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000").origin;
+const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3090").origin;
 const extraFlags = process.argv.slice(2);
 
 function lhci(...args: string[]) {

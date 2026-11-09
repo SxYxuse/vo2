@@ -16,7 +16,7 @@ describe("parseEnv", () => {
     });
 
     expect(env.DATABASE_URL).toBe(required.DATABASE_URL);
-    expect(env.BETTER_AUTH_URL).toBe("http://localhost:3000");
+    expect(env.BETTER_AUTH_URL).toBe("http://localhost:3090");
     expect(env.APP_ENV).toBe("development");
     expect(env.STRAVA_MOCK).toBe(false);
     expect(env.STRAVA_BASE_URL).toBe("https://www.strava.com");

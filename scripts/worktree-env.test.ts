@@ -1,10 +1,15 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  DEFAULT_DEV_PORT,
+  inPortRange,
   assertSafeIdentifier,
   pathHash,
   pickPort,
   planEnv,
+  readEnvValue,
   setEnvValues,
   usesRenamedVoDatabase,
   worktreeDatabaseName,
@@ -104,5 +109,23 @@ describe("pickPort", () => {
     const listening = async (port: number) => port === 3101;
     expect(await pickPort(undefined, new Set([3100]), listening)).toBe(3102);
     expect(await pickPort(3000, new Set(), nothingListens)).toBe(3100);
+  });
+});
+
+describe("DEFAULT_DEV_PORT", () => {
+  it("is what .env.example gives the main checkout", () => {
+    const example = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+    expect(readEnvValue(example, "PORT")).toBe(String(DEFAULT_DEV_PORT));
+    expect(readEnvValue(example, "BETTER_AUTH_URL")).toBe(`http://localhost:${DEFAULT_DEV_PORT}`);
+  });
+
+  // e2e/env.ts puts a checkout's e2e server at PORT+1000 and its browser at PORT+2000.
+  it("keeps its dev, e2e and browser ports clear of every worktree's", () => {
+    const offsets = [0, 1000, 2000];
+    for (const ours of offsets) {
+      for (const theirs of offsets) {
+        expect(inPortRange(DEFAULT_DEV_PORT + ours - theirs)).toBe(false);
+      }
+    }
   });
 });

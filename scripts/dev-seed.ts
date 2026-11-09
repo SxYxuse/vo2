@@ -49,7 +49,7 @@ const years = values.history == null ? null : Number(values.history);
 if (years != null && !(years * 52 >= 1 && years <= 10))
   fail("--history takes a number of years, from one week (0.02) to 10.");
 
-const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000").origin;
+const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3090").origin;
 const STATE_PATH = resolve(".dev-seed/athlete.json");
 /** The athlete mock Strava always signs in (mock-server.ts). */
 const MOCK_ATHLETE_ID = "1";

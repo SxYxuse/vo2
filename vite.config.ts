@@ -7,6 +7,8 @@ import { nitro } from "nitro/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+import { DEFAULT_DEV_PORT } from "./scripts/worktree-env.ts";
+
 const isTest = process.env.VITEST === "true";
 
 /**
@@ -54,7 +56,7 @@ const config = defineConfig({
   resolve: { tsconfigPaths: true },
   server: {
     // BETTER_AUTH_URL names this port, so sliding onto another one would break sign-in.
-    port: Number(loadEnv("development", process.cwd(), "PORT").PORT) || 3000,
+    port: Number(loadEnv("development", process.cwd(), "PORT").PORT) || DEFAULT_DEV_PORT,
     strictPort: true,
   },
   build: {

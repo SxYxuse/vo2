@@ -21,7 +21,7 @@ export const env$ = z
     BETTER_AUTH_SECRET: requiredString("BETTER_AUTH_SECRET"),
     BETTER_AUTH_URL: z.preprocess(
       emptyToUndefined,
-      z.string().min(1).default("http://localhost:3000"),
+      z.string().min(1).default("http://localhost:3090"),
     ),
     APP_ENV: optionalString,
     NODE_ENV: optionalString,
