@@ -1,5 +1,5 @@
 /*
- * Reads VO2's deployments from the Dokploy API. Read-only: nothing here changes Dokploy.
+ * Reads VO2's deployments from the Dokploy API. Its commands are read-only.
  *
  *   bun scripts/dokploy.ts check                          is the API key valid? Run this first.
  *   bun scripts/dokploy.ts deploys <target> [--limit 5]   recent deployments, newest first
@@ -51,6 +51,7 @@ export type Preview = {
   previewDeploymentId: string;
   appName: string;
   pullRequestNumber: string;
+  pullRequestURL: string;
   pullRequestTitle: string;
   previewStatus: string;
   createdAt: string;
@@ -86,7 +87,9 @@ export async function dokploy<T>(endpoint: string, body?: object): Promise<T> {
     method: body ? "POST" : "GET",
     headers: { "x-api-key": token, "content-type": "application/json" },
     body: body && JSON.stringify(body),
-  });
+    // A hung request would otherwise outlast `wait --timeout`.
+    signal: AbortSignal.timeout(30_000),
+  }).catch((error: Error) => stop(`Cannot reach Dokploy at ${url}: ${error.message}`));
   if (response.status === 401)
     stop(`Dokploy rejected the API key (401): it expired or was deleted.\n\n${RENEWAL}`);
   if (!response.ok)
@@ -115,13 +118,15 @@ export async function listPreviews() {
   return dokploy<Preview[]>(`previewDeployment.all?applicationId=${staging}`);
 }
 
+export const REPO = "SxYxuse/vo2";
+const TARGET = /^(prod|staging|pr-\d+)$/;
+
 async function deployments(target: string): Promise<Deployment[]> {
   if (target === "prod" || target === "staging") {
     const app = await webAppId(target === "prod" ? "production" : "staging");
     return dokploy(`deployment.all?applicationId=${app}`);
   }
-  const pr = /^pr-(\d+)$/.exec(target)?.[1];
-  if (!pr) stop(`Unknown target "${target}": use prod, staging, or pr-<number>.`);
+  const pr = target.slice("pr-".length);
   const preview = (await listPreviews()).find((p) => p.pullRequestNumber === pr);
   if (!preview) return [];
   return dokploy(`deployment.allByType?type=previewDeployment&id=${preview.previewDeploymentId}`);
@@ -138,15 +143,23 @@ function defaultCommit(target: string) {
   }
   if (target === "prod") {
     git("fetch", "--quiet", "--tags", "origin");
-    const tag = execFileSync("gh", ["release", "view", "--json", "tagName", "-q", ".tagName"], {
-      encoding: "utf8",
-    }).trim();
+    const tag = execFileSync(
+      "gh",
+      ["release", "view", "-R", REPO, "--json", "tagName", "-q", ".tagName"],
+      {
+        encoding: "utf8",
+      },
+    ).trim();
     return git("rev-list", "-n", "1", tag);
   }
   const pr = target.slice("pr-".length);
-  return execFileSync("gh", ["pr", "view", pr, "--json", "headRefOid", "-q", ".headRefOid"], {
-    encoding: "utf8",
-  }).trim();
+  return execFileSync(
+    "gh",
+    ["pr", "view", pr, "-R", REPO, "--json", "headRefOid", "-q", ".headRefOid"],
+    {
+      encoding: "utf8",
+    },
+  ).trim();
 }
 
 /** Dokploy writes the commit into the description: "Commit: <sha>", or "Hash: <sha>" on previews. */
@@ -191,6 +204,10 @@ if (import.meta.main) {
     },
   });
   const [command, argument] = positionals;
+  const timeout = Number(values.timeout);
+  if (["deploys", "wait"].includes(command ?? "") && argument && !TARGET.test(argument))
+    stop(`Unknown target "${argument}": use prod, staging, or pr-<number>.`);
+  if (!(timeout > 0)) stop(`--timeout must be a number of seconds, not "${values.timeout}".`);
 
   if (command === "check") {
     await dokploy("project.all");
@@ -203,7 +220,7 @@ if (import.meta.main) {
       await dokploy<string>(`deployment.readLogs?deploymentId=${argument}&tail=${values.tail}`),
     );
   } else if (command === "wait" && argument) {
-    await wait(argument, values.commit ?? defaultCommit(argument), Number(values.timeout));
+    await wait(argument, values.commit ?? defaultCommit(argument), timeout);
   } else {
     stop(
       "Usage: bun scripts/dokploy.ts check | deploys <target> | logs <deploymentId> | wait <target>",

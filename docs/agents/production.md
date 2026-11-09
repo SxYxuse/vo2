@@ -8,6 +8,7 @@ These rules hold for prod, staging and previews alike.
 
 - **Read-only by default.** `docker ps`, `docker inspect`, `docker logs`, `\l`, `\dt`, `SELECT count(*)` and the `SELECT`s you need are fine.
 - **Writes need the developer's explicit confirmation, every time:** `INSERT`/`UPDATE`/`DELETE`, DDL, `db:migrate` pointed at a deployed database, restarting or recreating a container, changing a Dokploy setting or environment variable, and deleting an athlete in the app.
+- **Pre-approved exception:** `bun scripts/dokploy-prune-previews.ts --apply`, which deletes only the previews of merged or closed PRs.
 - **A preview is staging.** Every preview uses staging's database and Strava app, so anything you do on a preview happens on staging and every other preview too.
 - **Exports of athlete data** need the same confirmation. Keep them in your scratchpad, never in the worktree, and delete them when done.
 - **Secrets:** `docker inspect` prints every environment variable with its value. List names only (`docker inspect <container> --format '{{range .Config.Env}}{{println .}}{{end}}' | cut -d= -f1`), and keep passwords, tokens and connection strings out of docs, PRs, commits and replies.

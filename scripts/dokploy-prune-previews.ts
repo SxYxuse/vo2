@@ -6,22 +6,29 @@
  *   bun scripts/dokploy-prune-previews.ts --apply   deletes those previews
  *
  * A preview is deleted only when GitHub reports its PR as MERGED or CLOSED. An open PR, or one
- * whose state gh can't read, keeps its preview. Prod and staging are never touched: this only
+ * whose state gh can't read, keeps its preview. Pruning these previews is pre-approved (see the
+ * Safety section of docs/agents/production.md). Prod and staging are never touched: this only
  * reads the staging app's previews and deletes by preview ID.
  */
 
 import { execFileSync } from "node:child_process";
 
-import { dokploy, listPreviews } from "./dokploy.ts";
+import { REPO, dokploy, listPreviews, type Preview } from "./dokploy.ts";
 
 const apply = process.argv.includes("--apply");
 
-function prState(number: string) {
+/** Looks the PR up by the URL Dokploy stored, so a PR of another repo never decides. */
+function prState(preview: Preview) {
+  if (!preview.pullRequestURL?.startsWith(`https://github.com/${REPO}/pull/`)) return "UNKNOWN";
   try {
-    return execFileSync("gh", ["pr", "view", number, "--json", "state", "-q", ".state"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
+    return execFileSync(
+      "gh",
+      ["pr", "view", preview.pullRequestURL, "--json", "state", "-q", ".state"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    ).trim();
   } catch {
     return "UNKNOWN";
   }
@@ -30,7 +37,7 @@ function prState(number: string) {
 const previews = await listPreviews();
 let pruned = 0;
 for (const preview of previews) {
-  const state = prState(preview.pullRequestNumber);
+  const state = prState(preview);
   const prunable =
     (state === "MERGED" || state === "CLOSED") && preview.appName.startsWith("preview-");
   const verdict = !prunable ? "keep  " : apply ? "delete" : "would delete";
