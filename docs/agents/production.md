@@ -34,7 +34,7 @@ Swarm container names are `<appName>.1.<task id>`; find one with `docker ps --fi
 Not part of any deployment:
 
 - `vo2-postgres` (host port 55432) is the local dev Postgres every checkout shares (see AGENTS.md).
-- `vo2-database-4usk1q` (host port 15432) and `vo2-database-sgmfhm` (host port 15433) hold leftover VO2 tables in database `postgres`. No app points at them and Dokploy doesn't manage them. Leave them alone; what they were is _unverified_.
+- `vo2-database-4usk1q` and `vo2-database-sgmfhm` hold leftover VO2 tables in database `postgres`. No app points at them and Dokploy doesn't manage them. Leave them alone; what they were is _unverified_.
 
 ## Strava apps
 
@@ -74,7 +74,7 @@ docker exec vo2-observability-slpmav-vo2-grafana-1 \
 
 ## Sharing a dev server with the developer
 
-The developer's browser is not on this VPS, so a `localhost` link doesn't open for them. They reach the VPS over Tailscale at `my-vps.tailec2b6d.ts.net` (`tailscale status --json | jq -r .Self.DNSName`). Three things stand in the way: the dev server listens on 127.0.0.1 only, Vite rejects host names it doesn't know, and sign-in redirects to `BETTER_AUTH_URL`. Start it like this, which overrides `.env` without editing it. Bind the Tailscale address, never a bare `--host`: this VPS has no firewall, so that would put the mock sign-in on its public IP.
+The developer's browser is not on this VPS, so a `localhost` link doesn't open for them. They reach the VPS over Tailscale at `my-vps.tailec2b6d.ts.net` (`tailscale status --json | jq -r .Self.DNSName`). Three things stand in the way: the dev server listens on 127.0.0.1 only, Vite rejects host names it doesn't know, and sign-in redirects to `BETTER_AUTH_URL`. Start it like this, which overrides `.env` without editing it. Bind the Tailscale address, never a bare `--host`, which binds every interface, the public one included.
 
 ```bash
 PORT=$(grep '^PORT=' .env | cut -d= -f2)
