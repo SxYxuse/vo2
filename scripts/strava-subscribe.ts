@@ -17,6 +17,10 @@ if (process.env.STRAVA_MOCK && !process.argv.includes("--mock")) {
 }
 
 const env = parseEnv();
+if (process.argv.includes("--mock") && !env.STRAVA_MOCK) {
+  console.error("--mock needs STRAVA_MOCK=1 outside production; this would reach strava.com.");
+  process.exit(1);
+}
 if (!env.STRAVA_WEBHOOK_SECRET) throw new Error("Set STRAVA_WEBHOOK_SECRET first");
 
 const endpoint = `${env.STRAVA_BASE_URL}/api/v3/push_subscriptions`;
