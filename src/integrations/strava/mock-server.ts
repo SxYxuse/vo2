@@ -11,7 +11,8 @@ import type { StreamSet, SummaryActivity } from "./client.ts";
  * Two mock-only endpoints stand in for what an athlete does on strava.com, and push the event
  * Strava would send: `POST /dev/deauthorize` and `POST /dev/activities/<id>/delete`.
  * Two more serve `vp run dev:seed`: `POST /dev/history?weeks=<n>` sets how far back the athlete's
- * training goes, and `GET /dev/sign-in` signs a browser in as the mock athlete in one visit.
+ * training goes, until the server restarts or the next seed, and `GET /dev/sign-in` signs a
+ * browser in as the mock athlete in one visit.
  */
 export const MOCK_STRAVA_PATH = "/api/mock-strava";
 

@@ -46,8 +46,8 @@ if (values["never-synced"] && values["mid-onboarding"]) {
 const onboarded = !values["never-synced"] && !values["mid-onboarding"];
 if (values["fresh-streams"] && !onboarded) fail("--fresh-streams needs an onboarded athlete.");
 const years = values.history == null ? null : Number(values.history);
-if (years != null && !(years > 0 && years <= 10))
-  fail("--history takes a number of years, at most 10.");
+if (years != null && !(years * 52 >= 1 && years <= 10))
+  fail("--history takes a number of years, from one week (0.02) to 10.");
 
 const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3000").origin;
 const STATE_PATH = resolve(".dev-seed/athlete.json");
