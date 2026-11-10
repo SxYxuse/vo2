@@ -40,8 +40,11 @@ test("an athlete who onboards with planning off lands on the calendar with no we
   page,
 }) => {
   await onboardNewAthlete(page);
-  await page.getByRole("button", { name: "Toggle Sidebar" }).click();
-  await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Plan", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Season" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Plan", exact: true })).toHaveCount(0);
 
   await page.goto("/week");

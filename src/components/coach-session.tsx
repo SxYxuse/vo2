@@ -2,7 +2,7 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { ArrowLeftIcon } from "lucide-react";
+import { ChevronLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
@@ -79,7 +79,7 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
             else void navigate({ to: "/week", search: { week: run.weekStart }, replace: true });
           }}
         >
-          <ArrowLeftIcon data-icon="inline-start" />
+          <ChevronLeftIcon data-icon="inline-start" />
           Plan
         </Button>
         <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
@@ -154,12 +154,14 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
             </Card>
           ) : null}
           <Card>
+            {/* The title's badge already says done; this card only says how to change it. */}
             <CardHeader>
-              <CardTitle>Done?</CardTitle>
               <CardDescription>
                 {ahead
                   ? "You can mark it done from its week on."
-                  : "Do it on a day that suits you, then mark it done."}
+                  : run.done
+                    ? "Marked done. Tap again if you didn't do it."
+                    : "Do it on a day that suits you, then mark it done."}
               </CardDescription>
             </CardHeader>
             {ahead ? null : (

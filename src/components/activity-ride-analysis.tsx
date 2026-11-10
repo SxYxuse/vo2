@@ -99,7 +99,7 @@ export function ActivityRideAnalysis({ ride }: { ride: RideSummary }) {
       ) : null}
 
       {ride.bands.length ? (
-        <Table className="font-mono tabular-nums">
+        <Table className="tabular-nums">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="font-sans">Terrain</TableHead>

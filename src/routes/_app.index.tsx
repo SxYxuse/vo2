@@ -2,6 +2,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header.tsx";
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
 import { appShellQueryOptions, homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
@@ -52,17 +53,15 @@ function CalendarHeading() {
   // The shell is cached by the app layout; the pending state may render before it, so no suspense.
   const { data: shell } = useQuery(appShellQueryOptions);
   return (
-    <>
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-        <CalendarDaysIcon aria-hidden className="size-5" />
-        Activity calendar
-      </h1>
-      <p className="text-muted-foreground hidden text-sm sm:block">
-        {shell?.planningStyle === "off"
+    <PageHeader
+      icon={CalendarDaysIcon}
+      title="Activity calendar"
+      description={
+        shell?.planningStyle === "off"
           ? "Completed Strava activities."
-          : "Completed Strava activities. Your planned sessions live on the Plan page."}
-      </p>
-    </>
+          : "Completed Strava activities. Your planned sessions are on Plan."
+      }
+    />
   );
 }
 
@@ -73,9 +72,7 @@ function CalendarPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 flex-col gap-2">
-        <CalendarHeading />
-      </div>
+      <CalendarHeading />
       {signedIn && Object.keys(settings.sportTypes).length === 0 ? (
         <Empty className="min-h-64 border">
           <EmptyHeader>
@@ -103,9 +100,7 @@ function CalendarPage() {
 function CalendarPending() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 flex-col gap-2">
-        <CalendarHeading />
-      </div>
+      <CalendarHeading />
       <ToolbarSkeleton widths={["w-60"]} />
       <ListSkeleton rows={7} className="md:hidden" />
       <div className="ring-foreground/10 hidden grid-cols-7 gap-px overflow-hidden rounded-lg ring-1 md:grid">

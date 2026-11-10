@@ -91,7 +91,7 @@ function SameHeartRate({
         </p>
       ) : (
         <>
-          <p className="font-mono text-base tabular-nums">
+          <p className="text-base font-medium tabular-nums">
             At {comparison.referenceBpm} bpm: {formatOutput(comparison.now.output, sport)}
           </p>
           <p className="text-muted-foreground text-sm">
@@ -99,7 +99,7 @@ function SameHeartRate({
               <>
                 6 weeks before: {formatOutput(comparison.before.output, sport)}
                 {comparison.changePct != null ? (
-                  <span className={cn("ml-2 font-mono", changeTone(comparison.changePct))}>
+                  <span className={cn("ml-2", changeTone(comparison.changePct))}>
                     {signedPct(comparison.changePct)}
                   </span>
                 ) : null}
@@ -156,7 +156,7 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                 >
                   {labels[row.key]}
                 </Link>
-                <span className="text-right font-mono tabular-nums">
+                <span className="text-right tabular-nums">
                   {formatBest(row.now, sport)}
                   {change != null ? (
                     <span className={cn("block text-xs", changeTone(change))}>
@@ -164,10 +164,10 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                     </span>
                   ) : null}
                 </span>
-                <span className="text-muted-foreground text-right font-mono tabular-nums">
+                <span className="text-muted-foreground text-right tabular-nums">
                   {formatBest(row.before, sport)}
                 </span>
-                <span className="text-right font-mono tabular-nums">
+                <span className="text-right tabular-nums">
                   {formatBest(row.year, sport)}
                   {row.yearStart ? (
                     <span className="text-muted-foreground block text-xs">

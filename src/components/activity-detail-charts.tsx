@@ -88,7 +88,7 @@ function StreamTooltip({
               <span className="size-2.5 rounded-[2px]" style={{ backgroundColor: series.color }} />
               <span className="text-muted-foreground">{series.label}</span>
             </span>
-            <span className="font-mono font-medium tabular-nums">
+            <span className="font-medium tabular-nums">
               {actual == null ? "—" : formatSeriesValue(key, actual, sportType, series.unit)}
             </span>
           </div>
@@ -225,10 +225,15 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
     () => chartRowsFor(detail.chart, detail.sportType),
     [detail.chart, detail.sportType],
   );
+  // A flat elevation stream (a pool swim, a trainer ride) is a line along the floor: leave it out.
+  const series = useMemo(
+    () => detail.series.filter((key) => key !== "altitude" || !!detail.totalElevationGain),
+    [detail.series, detail.totalElevationGain],
+  );
   const [visible, setVisible] = useState<string[]>(() => defaultVisibleSeries(detail));
   const shown = useMemo(
-    () => STREAM_SERIES.filter((key) => detail.series.includes(key) && visible.includes(key)),
-    [detail.series, visible],
+    () => STREAM_SERIES.filter((key) => series.includes(key) && visible.includes(key)),
+    [series, visible],
   );
 
   return (
@@ -242,7 +247,7 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
         onValueChange={setVisible}
         className="flex-wrap"
       >
-        {detail.series.map((key) => (
+        {series.map((key) => (
           <ToggleGroupItem key={key} value={key}>
             <span
               aria-hidden
@@ -265,7 +270,8 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
         </Empty>
       ) : (
         <Card size="sm" className="gap-2 py-3">
-          <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 sm:px-4">
+          {/* On phones the toggles above are the key; wider screens add each stream's summary. */}
+          <div className="hidden flex-wrap gap-x-4 gap-y-1 px-3 sm:flex sm:px-4">
             {shown.map((key) => (
               <span key={key} className="flex min-w-0 items-center gap-1.5 text-xs">
                 <span
@@ -274,9 +280,7 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
                   style={{ backgroundColor: meta[key].color }}
                 />
                 <span className="text-muted-foreground">{meta[key].label}</span>
-                <span className="hidden font-mono tabular-nums sm:inline">
-                  {seriesSummary(detail, key)}
-                </span>
+                <span className="tabular-nums">{seriesSummary(detail, key)}</span>
               </span>
             ))}
           </div>

@@ -150,11 +150,11 @@ const PHASE_TONE = {
 const PHASE_INFO =
   "Read from the last week's change in fitness, the trend over four weeks, and form. Training moves through phases: build while you absorb the load, consolidate, recover, then freshen up before a goal. A dipping fitness line in a recovery week is part of the plan.";
 
+// Easing off is ordinary between blocks; only a steep change either way is worth a colour.
 function rampTone(ramp: number) {
-  if (ramp > 8) return "text-warning";
+  if (ramp > 8 || ramp < -8) return "text-warning";
   if (ramp >= 2) return "text-success";
-  if (ramp >= 0) return "text-muted-foreground";
-  return "text-destructive";
+  return "text-muted-foreground";
 }
 
 function Sparkline({
@@ -281,7 +281,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
       <CardHeader className="gap-3">
         <div className="hidden min-w-0 flex-col gap-1 sm:flex">
           <div className="flex items-center gap-1">
-            <CardTitle>Fitness and form</CardTitle>
+            <CardTitle>Training load</CardTitle>
             <InfoTooltip label="About this graph">{GRAPH_GOAL_INFO}</InfoTooltip>
           </div>
           <CardDescription>
@@ -296,7 +296,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
             <EmptyHeader>
               <EmptyTitle>No training load yet</EmptyTitle>
               <EmptyDescription>
-                Import activities to build fitness, fatigue, and form over time.
+                Sync from Strava to build fitness, fatigue, and form over time.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -472,7 +472,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
                             return (
                               <div className="flex w-full items-center justify-between gap-4">
                                 <span className="text-muted-foreground">{meta.label}</span>
-                                <span className="font-mono font-medium tabular-nums">
+                                <span className="font-medium tabular-nums">
                                   {roundLoad(value).toFixed(1)}
                                   {extra}
                                 </span>

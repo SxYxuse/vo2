@@ -1,5 +1,10 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, useParams, type ErrorComponentProps } from "@tanstack/react-router";
+import {
+  Outlet,
+  createFileRoute,
+  useParams,
+  type ErrorComponentProps,
+} from "@tanstack/react-router";
 
 import { SettingsForm } from "@/components/settings.tsx";
 import { authClient } from "@/lib/auth-client.ts";
@@ -20,7 +25,7 @@ function SettingsPage() {
   useSuspenseQuery(settingsSnapshotQueryOptions);
   const { data: session } = authClient.useSession();
   const { section } = useParams({ strict: false });
-  if (!section || !isSettingsSection(section)) return null;
+  if (!section || !isSettingsSection(section)) return <Outlet />;
 
   return <SettingsForm section={section} userName={session?.user.name ?? ""} />;
 }

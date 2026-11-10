@@ -98,7 +98,7 @@ function WrittenWeeks({
               aria-current={current ? "true" : undefined}
               onClick={() => onShow(week.weekStart)}
               className={cn(
-                "hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-start max-sm:min-h-11",
+                "hover:bg-muted/50 flex w-full items-center gap-2 px-3 py-2 text-start max-sm:min-h-[2.75rem]",
                 current && "bg-muted",
               )}
             >

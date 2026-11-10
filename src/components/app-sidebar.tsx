@@ -323,7 +323,24 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {inSettings ? (
-          <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
+          <>
+            {/* The way out of settings sits first, where the eye starts. */}
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Back to the app"
+                    className={cn(isMobile && "h-[2.75rem] [&_svg]:size-5")}
+                    onClick={() => navigate(lastHref.current ?? "/")}
+                  >
+                    <ArrowLeftIcon />
+                    <span>Back to the app</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
+          </>
         ) : (
           <>
             <SidebarGroup>
@@ -357,29 +374,12 @@ export function AppSidebar() {
             : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
-        {inSettings ? (
-          <SidebarMenuButton
-            tooltip="Back"
-            className={cn("flex-1", isMobile && "h-[2.75rem] [&_svg]:size-5")}
-            onClick={() => navigate(lastHref.current ?? "/")}
-          >
-            <ArrowLeftIcon />
-            <span>Back</span>
-          </SidebarMenuButton>
-        ) : (
+        {inSettings ? null : (
           <SidebarMenuButton
             tooltip="Settings"
             aria-label="Settings"
             className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
-            render={
-              <Link
-                to="/settings/$section"
-                params={{ section: "profile" }}
-                preload="intent"
-                // Phones keep the sheet open so the athlete can pick a section.
-                onClick={(event) => onLinkClick(event, { keepOpen: true })}
-              />
-            }
+            render={<Link to="/settings" preload="intent" onClick={onLinkClick} />}
           >
             <Settings2Icon />
           </SidebarMenuButton>

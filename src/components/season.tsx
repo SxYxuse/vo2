@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { addYears, format, parseISO } from "date-fns";
@@ -144,7 +144,14 @@ function isHilly(goal: Goal) {
 /** Which dialog is open: a new goal (optionally on a date) or an existing one. */
 type Editing = { goal: Goal | null } | null;
 
-export function SeasonView({ data }: { data: SeasonData }) {
+export function SeasonView({
+  data,
+  header,
+}: {
+  data: SeasonData;
+  /** The page header, given the season's actions for its title row. */
+  header: (actions: ReactNode) => ReactNode;
+}) {
   const [editing, setEditing] = useState<Editing>(null);
   const [pasting, setPasting] = useState(false);
   const open = (goal: Goal | null) => setEditing({ goal });
@@ -165,29 +172,34 @@ export function SeasonView({ data }: { data: SeasonData }) {
 
   return (
     <>
-      <div className="flex justify-end gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="outline" size="icon" aria-label="More season actions" />}
-          >
-            <EllipsisIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={!allGoals.length} onClick={() => void copy()}>
-              <CopyIcon />
-              Copy season
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPasting(true)}>
-              <ClipboardPasteIcon />
-              Paste season
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button onClick={() => open(null)}>
-          <PlusIcon data-icon="inline-start" />
-          Add a goal
-        </Button>
-      </div>
+      {header(
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button variant="outline" size="icon" aria-label="More season actions" />}
+            >
+              <EllipsisIcon />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={!allGoals.length} onClick={() => void copy()}>
+                <CopyIcon />
+                Copy season
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setPasting(true)}>
+                <ClipboardPasteIcon />
+                Paste season
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* An empty season asks for its first goal once, in the middle of the page. */}
+          {data.upcoming.length > 0 ? (
+            <Button onClick={() => open(null)}>
+              <PlusIcon data-icon="inline-start" />
+              Add a goal
+            </Button>
+          ) : null}
+        </>,
+      )}
 
       {data.upcoming.length === 0 ? (
         <Empty className="min-h-56 border">
@@ -202,7 +214,7 @@ export function SeasonView({ data }: { data: SeasonData }) {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button variant="outline" onClick={() => open(null)}>
+            <Button onClick={() => open(null)}>
               <PlusIcon data-icon="inline-start" />
               Add a goal
             </Button>

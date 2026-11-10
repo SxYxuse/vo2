@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useBlocker } from "@tanstack/react-router";
-import { CheckIcon } from "lucide-react";
+import { Link, useBlocker } from "@tanstack/react-router";
+import { CheckIcon, ChevronLeftIcon } from "lucide-react";
+
+import { PageHeader } from "@/components/page-header.tsx";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { settingsSnapshotQueryOptions } from "@/lib/queries.ts";
@@ -96,8 +98,9 @@ export function SettingsForm({
     withResolver: true,
   });
   const planningStyle = useWatch({ control: form.control, name: "planningStyle" });
-  const sectionLabel =
-    SETTINGS_SECTIONS.find((item) => item.id === section)?.label ?? SETTINGS_SECTIONS[0].label;
+  const sectionItem = SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0];
+  const sectionLabel = sectionItem.label;
+  const sectionIcon = sectionItem.icon;
 
   useEffect(() => {
     if (!data) return;
@@ -181,7 +184,7 @@ export function SettingsForm({
     <>
       <form
         noValidate
-        className="flex flex-col gap-4"
+        className="flex w-full max-w-2xl flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
           requestSave();
@@ -194,27 +197,37 @@ export function SettingsForm({
         }}
       >
         <div className="flex flex-col gap-2">
-          <div className="flex min-h-7 items-center justify-between gap-3">
-            <h1 className="min-w-0 truncate text-xl font-semibold tracking-tight sm:text-2xl">
-              {sectionLabel}
-            </h1>
-            <p
-              aria-live="polite"
-              className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"
-            >
-              {status === "saving" ? (
-                <>
-                  <Spinner />
-                  Saving…
-                </>
-              ) : status === "saved" ? (
-                <>
-                  <CheckIcon className="size-4" />
-                  Saved
-                </>
-              ) : null}
-            </p>
-          </div>
+          <PageHeader
+            icon={sectionIcon}
+            title={sectionLabel}
+            back={
+              <Link
+                to="/settings"
+                className="text-muted-foreground hover:text-foreground -ms-1 flex min-h-[2.75rem] w-fit items-center gap-1 pe-2 text-sm md:hidden"
+              >
+                <ChevronLeftIcon aria-hidden className="size-4" />
+                Settings
+              </Link>
+            }
+            actions={
+              <p
+                aria-live="polite"
+                className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground"
+              >
+                {status === "saving" ? (
+                  <>
+                    <Spinner />
+                    Saving…
+                  </>
+                ) : status === "saved" ? (
+                  <>
+                    <CheckIcon className="size-4" />
+                    Saved
+                  </>
+                ) : null}
+              </p>
+            }
+          />
           {saveError ? (
             <Alert variant="destructive">
               <AlertTitle>Could not save</AlertTitle>

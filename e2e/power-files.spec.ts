@@ -22,7 +22,7 @@ async function openPowerFromSidebar(page: Page) {
   await page.goto("/");
   await settle(page);
   if (test.info().project.name === "phone") {
-    await page.getByRole("button", { name: "Toggle Sidebar" }).click();
+    await page.getByRole("button", { name: "More", exact: true }).click();
   }
   await page.getByRole("link", { name: "Power", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Power", level: 1 })).toBeVisible();

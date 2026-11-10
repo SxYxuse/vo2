@@ -6,7 +6,6 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
 import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
-import { cn } from "cn";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -77,7 +76,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DISABLED_INTERACTIONS = { drag: false, resize: false, selectSlot: false } as const;
@@ -305,26 +303,29 @@ function ActivityDayListView() {
             data-today={today || undefined}
           >
             <div className="bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2">
-              <span className={cn("font-semibold", today && "text-primary")}>{weekday}</span>
+              <span className="flex items-baseline gap-2">
+                <span className="font-semibold">{weekday}</span>
+                {today ? (
+                  <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-[0.6875rem] font-medium">
+                    Today
+                  </span>
+                ) : null}
+                {/* A day with nothing done says so in its header, so the week fits on screen. */}
+                {items.length === 0 ? (
+                  <span className="text-muted-foreground font-normal">Rest</span>
+                ) : null}
+              </span>
               <span className="text-muted-foreground font-medium tabular-nums">{dayDate}</span>
             </div>
-            {items.length === 0 ? (
-              <ItemGroup className="gap-0">
-                <Item size="xs" className="rounded-none border-b px-4 py-2">
-                  <ItemContent>
-                    <ItemTitle className="text-muted-foreground font-normal">Rest</ItemTitle>
-                  </ItemContent>
-                </Item>
-              </ItemGroup>
-            ) : (
-              items.map((segment) => (
-                <EventCalendarEvent
-                  key={segment.occurrence.key}
-                  segment={segment}
-                  className="hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5"
-                />
-              ))
-            )}
+            {items.length === 0
+              ? null
+              : items.map((segment) => (
+                  <EventCalendarEvent
+                    key={segment.occurrence.key}
+                    segment={segment}
+                    className="hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5"
+                  />
+                ))}
           </div>
         );
       })}
@@ -524,7 +525,7 @@ export function ActivityCalendar({
   }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
   return (
-    <Card className="flex h-[calc(100dvh-7.5rem)] min-h-80 flex-none flex-col py-0 md:h-[720px]">
+    <Card className="flex max-h-[calc(100dvh-11rem-var(--tab-bar,0px))] min-h-80 flex-none flex-col py-0 md:h-[720px] md:max-h-none">
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         {layoutReady ? (
           <EventCalendar

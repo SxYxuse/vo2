@@ -215,12 +215,10 @@ export function ActivityHeartAnalysis({ heart, start }: { heart: ActivityHeart; 
                   </ItemTitle>
                 </ItemContent>
                 <ItemActions>
-                  <span className="w-14 text-right font-mono tabular-nums text-muted-foreground">
+                  <span className="w-14 text-right tabular-nums text-muted-foreground">
                     {formatDuration(zone.seconds)}
                   </span>
-                  <span className="w-9 text-right font-mono tabular-nums">
-                    {Math.round(zone.pct)}%
-                  </span>
+                  <span className="w-9 text-right tabular-nums">{Math.round(zone.pct)}%</span>
                 </ItemActions>
               </Item>
             ))}

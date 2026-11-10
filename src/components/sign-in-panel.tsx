@@ -12,7 +12,8 @@ export function SignInPanel({ children }: { children?: ReactNode } = {}) {
     <div className="flex flex-col items-start gap-3">
       {children}
       <Button
-        className="w-full sm:w-auto"
+        size="lg"
+        className="w-full sm:w-auto sm:px-4"
         disabled={pending}
         onClick={() => {
           setPending(true);

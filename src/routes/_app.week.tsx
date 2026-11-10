@@ -1,4 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { Settings2Icon, TargetIcon } from "lucide-react";
@@ -46,17 +47,15 @@ export const Route = createFileRoute("/_app/week")({
 
 function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
   return (
-    <div className="flex flex-col gap-2">
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-        <TargetIcon aria-hidden className="size-5" />
-        Plan
-      </h1>
-      <p className="text-muted-foreground hidden text-sm sm:block">
-        {planned
-          ? "Your coach plan: each week's runs, rides, and swims for the next four weeks, toward your season. Do them on the days that suit you."
-          : "No week is planned while planning is off."}
-      </p>
-    </div>
+    <PageHeader
+      icon={TargetIcon}
+      title="Plan"
+      description={
+        planned
+          ? "Each week's sessions toward your season. Do them on the days that suit you."
+          : "No week is planned while planning is off."
+      }
+    />
   );
 }
 

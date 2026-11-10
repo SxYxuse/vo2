@@ -155,7 +155,7 @@ function NumberTable({
   rows: { key: string; cells: ReactNode[] }[];
 }) {
   return (
-    <Table className="font-mono tabular-nums">
+    <Table className="tabular-nums">
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           {head.map((cell, index) => (

@@ -1,4 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { MapIcon } from "lucide-react";
@@ -35,15 +36,7 @@ function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <MapIcon aria-hidden className="size-5" />
-          Map
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Every GPS track on one map. Filter by sport.
-        </p>
-      </div>
+      <PageHeader icon={MapIcon} title="Map" description={"Every GPS track on one map."} />
       {data.signedIn ? (
         <ActivityMap
           tracks={data.tracks}
@@ -73,15 +66,7 @@ function MapPage() {
 function MapPending() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex shrink-0 flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <MapIcon aria-hidden className="size-5" />
-          Map
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Every GPS track on one map. Filter by sport.
-        </p>
-      </div>
+      <PageHeader icon={MapIcon} title="Map" description={"Every GPS track on one map."} />
       <Skeleton className="min-h-80 w-full flex-1 rounded-xl" />
     </div>
   );

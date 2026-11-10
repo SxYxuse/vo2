@@ -115,13 +115,22 @@ async function choosePlanningStyle(page: Page, label: "Off" | "Coach plan", styl
 test("an athlete with planning off sees no plan, and turns the coach plan on from Plan", async ({
   page,
 }) => {
-  // The sidebar is open on desktop; on a phone it opens as a sheet, left open for the next load.
+  // The sidebar is open on desktop. A phone has the tab bar, and More opens the sidebar as a
+  // sheet, left open for the next load: both must agree.
   const planLinks = async () => {
-    if (test.info().project.name === "phone") {
-      await page.getByRole("button", { name: "Toggle Sidebar" }).click();
-      await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
+    if (test.info().project.name !== "phone") {
+      return page.getByRole("link", { name: "Plan", exact: true }).count();
     }
-    return page.getByRole("link", { name: "Plan", exact: true }).count();
+    const tabs = await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Plan", exact: true })
+      .count();
+    await page.getByRole("button", { name: "More", exact: true }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByRole("link", { name: "Season" })).toBeVisible();
+    const sidebar = await sheet.getByRole("link", { name: "Plan", exact: true }).count();
+    expect(tabs).toBe(sidebar);
+    return sidebar;
   };
   const planningOff = page.getByText("Planning is off", { exact: true });
   await page.goto("/week");

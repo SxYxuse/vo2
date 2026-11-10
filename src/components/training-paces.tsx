@@ -369,7 +369,7 @@ function EffortPicker({
             <Button
               type="button"
               variant="outline"
-              className="mt-2 min-h-10 w-full sm:min-h-8 sm:w-auto"
+              className="mt-2 w-full max-sm:min-h-[2.75rem] sm:w-auto"
               disabled={disabled}
               onClick={() => onPick(paces.suggestion!)}
             >
@@ -551,7 +551,7 @@ function RaceResultField({
           <Button
             type="button"
             variant="outline"
-            className="ms-auto min-h-10 sm:min-h-8"
+            className="ms-auto max-sm:min-h-[2.75rem]"
             disabled={save.isPending || !online}
             onClick={() => save.mutate(null)}
           >
@@ -576,7 +576,7 @@ function RaceResultField({
                 id={id("distance")}
                 value={String(metres)}
                 onChange={(event) => setMetres(Number(event.target.value))}
-                className="min-h-10 w-full sm:min-h-8"
+                className="w-full max-sm:min-h-[2.75rem]"
               >
                 {RACE_DISTANCES.map((metres) => (
                   <NativeSelectOption key={metres} value={String(metres)}>
@@ -595,7 +595,7 @@ function RaceResultField({
                 value={time}
                 aria-invalid={invalid != null}
                 onChange={(event) => setTime(event.target.value)}
-                className="min-h-10 sm:min-h-8"
+                className="max-sm:min-h-[2.75rem]"
               />
             </Field>
             <Field>
@@ -607,14 +607,14 @@ function RaceResultField({
                 max={todayKey()}
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
-                className="min-h-10 sm:min-h-8"
+                className="max-sm:min-h-[2.75rem]"
               />
             </Field>
           </div>
           {invalid ? <FieldError>{invalid}</FieldError> : null}
           <Button
             type="button"
-            className="min-h-10 sm:min-h-8 sm:self-end"
+            className="max-sm:min-h-[2.75rem] sm:self-end"
             disabled={!time.trim() || save.isPending || !online}
             onClick={submit}
           >

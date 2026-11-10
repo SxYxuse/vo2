@@ -105,7 +105,7 @@ export function CoachChatList({ currentId }: { currentId: string }) {
     >
       {/* Icon-only and 44px on phones, where the header is narrow. */}
       <SheetTrigger
-        render={<Button variant="ghost" size="sm" className="max-sm:size-11 max-sm:px-0" />}
+        render={<Button variant="ghost" size="sm" className="max-sm:size-[2.75rem] max-sm:px-0" />}
       >
         <HistoryIcon />
         <span className="max-sm:sr-only">Chats</span>

@@ -509,6 +509,34 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
+  /* The phone tab bar's height, which pages and toasts keep free (src/components/tab-bar.tsx). */
+  --tab-bar: 0px;
+}
+
+@media (max-width: 767.98px) {
+  body:has([data-slot="tab-bar"]) {
+    --tab-bar: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+  /* A focused field brings up the keyboard: the tab bar steps aside so the field has room. */
+  body:has(
+    :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+      textarea,
+      [contenteditable="true"]
+    ):focus
+  ) {
+    --tab-bar: 0px;
+  }
+  body:has(
+      :is(
+        input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+        textarea,
+        [contenteditable="true"]
+      ):focus
+    )
+    [data-slot="tab-bar"] {
+    display: none;
+  }
 }
 
 @layer base {
