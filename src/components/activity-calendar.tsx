@@ -51,8 +51,6 @@ import {
 } from "@/services/diary-window.ts";
 import { dayKey, weekStartKey } from "@/services/day-key.ts";
 import {
-  ActivityFeed,
-  MonthDotsView,
   WeekStripView,
   WeekSummaryView,
   useItemsByDay,
@@ -449,10 +447,9 @@ export function ActivityCalendar({
   const navigate = useNavigate();
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  // Desktop follows the athlete's calendar period; phones page one training week, or a month in
-  // the month layout (Settings → Calendar).
+  // Phones always page one training week; desktop follows the athlete's calendar period.
   const phoneView = initialSettings.phoneCalendarView;
-  const byMonth = isDesktop ? initialSettings.calendarPeriod !== "weeks" : phoneView === "month";
+  const byMonth = isDesktop && initialSettings.calendarPeriod !== "weeks";
   const weeks = isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS;
   const currentMonth = useMemo(() => monthKey(new Date(), timeZone), [timeZone]);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
@@ -541,19 +538,6 @@ export function ActivityCalendar({
   const byDay = useItemsByDay(activities, goals, timeZone);
   const todayKey = dayKey(new Date(), timeZone);
   const phoneBody = !isDesktop && phoneView !== "days";
-
-  if (layoutReady && !isDesktop && phoneView === "feed") {
-    const oldestKey = [...byDay.keys()].sort()[0];
-    return (
-      <ActivityFeed
-        byDay={byDay}
-        timeZone={timeZone}
-        sportTypes={sportTypes}
-        currentWeek={currentWeek}
-        oldestKey={oldestKey}
-      />
-    );
-  }
 
   // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
   // week inside itself on short iPhones, hiding Monday under the sticky day header.
@@ -649,7 +633,7 @@ export function ActivityCalendar({
                 cursorMonth={byMonth ? cursorMonth : monthOfWeek(cursorWeek)}
                 currentMonth={currentMonth}
                 currentWeek={currentWeek}
-                pickWeek={!byMonth}
+                pickWeek={!isDesktop}
                 onPickMonth={(month) => {
                   setJumping(false);
                   void show(
@@ -664,7 +648,7 @@ export function ActivityCalendar({
             ) : null}
             <div
               className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              {...(isDesktop || byMonth ? {} : weekSwipe.handlers)}
+              {...(isDesktop ? {} : weekSwipe.handlers)}
             >
               <div ref={weekSwipe.ref} className="flex min-h-0 min-w-0 flex-1 flex-col">
                 {!phoneBody ? (
@@ -673,15 +657,6 @@ export function ActivityCalendar({
                       month: EventCalendarMonthView,
                       days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
                     }}
-                  />
-                ) : phoneView === "month" ? (
-                  <MonthDotsView
-                    month={cursorMonth}
-                    byDay={byDay}
-                    timeZone={timeZone}
-                    todayKey={todayKey}
-                    sportTypes={sportTypes}
-                    search={cursor}
                   />
                 ) : phoneView === "summary" ? (
                   <WeekSummaryView

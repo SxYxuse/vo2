@@ -83,19 +83,9 @@ export const PHONE_CALENDAR_VIEWS = [
     label: "Week summary",
     hint: "The week's time, distance, and a bar per day, then what you did.",
   },
-  {
-    id: "feed",
-    label: "Feed",
-    hint: "Everything you did in one list back in time, grouped by week.",
-  },
-  {
-    id: "month",
-    label: "Month",
-    hint: "A small month with a dot per sport. Tap a day to list its week.",
-  },
 ] as const;
 
-export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary", "feed", "month"]);
+export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary"]);
 export type PhoneCalendarView = z.infer<typeof phoneCalendarViewSchema>;
 
 /** How VO2 plans the athlete's training (ADR 0037, ADR 0050). */
@@ -125,7 +115,8 @@ const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
   calendarPeriod: calendarPeriodSchema.default("month"),
-  phoneCalendarView: phoneCalendarViewSchema.default("days"),
+  /** A layout tried and since dropped (feed, month) reads as the day list. */
+  phoneCalendarView: phoneCalendarViewSchema.default("days").catch("days"),
   /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
   topEffortsSince: z.iso.datetime().nullable().default(null),
   /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */

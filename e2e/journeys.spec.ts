@@ -789,12 +789,6 @@ test("an athlete tries each phone calendar layout from Settings, and goes back t
       name: "summary",
       shows: () => page.getByText("Activities", { exact: true }),
     },
-    {
-      label: "Feed",
-      name: "feed",
-      shows: () => page.getByRole("heading", { name: "This week", level: 2 }),
-    },
-    { label: "Month", name: "month", shows: () => page.getByRole("grid", { name: "Month" }) },
     { label: "Day list", name: null, shows: () => page.getByRole("group", { name: /^Mon, / }) },
   ];
   for (const layout of layouts) {

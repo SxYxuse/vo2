@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
@@ -19,8 +19,7 @@ import {
   type CalendarGoal,
 } from "@/services/home-data.types.ts";
 import { addDayKey, dayKey } from "@/services/day-key.ts";
-import { firstWeekOfMonth, lastWeekOfMonth, type DiarySearch } from "@/services/diary-window.ts";
-import { Button } from "@/components/ui/button";
+import type { DiarySearch } from "@/services/diary-window.ts";
 
 /*
  * The phone calendar's other layouts, chosen in Settings → Calendar while the athlete finds the
@@ -57,15 +56,8 @@ const weekDays = (week: string) => Array.from({ length: 7 }, (_, i) => addDayKey
 
 const keyDate = (key: string) => new Date(`${key}T12:00:00Z`);
 const WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
-const MONTH_DAY = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC",
-});
 const weekdayOf = (key: string) => WEEKDAY.format(keyDate(key));
 const dayOf = (key: string) => Number(key.slice(8));
-/** The Monday of a day key's training week, from the key alone. */
-const weekOf = (key: string) => addDayKey(key, -((keyDate(key).getUTCDay() + 6) % 7));
 
 /** "1 h 35", "45 min". */
 function formatHours(seconds: number) {
@@ -224,15 +216,7 @@ function EmptyWeek({ thisWeek, previous }: { thisWeek: boolean; previous: Totals
   );
 }
 
-function SportDots({
-  day,
-  sportTypes,
-  size = "size-1.5",
-}: {
-  day: Day | undefined;
-  sportTypes: SportTypeSettings;
-  size?: string;
-}) {
+function SportDots({ day, sportTypes }: { day: Day | undefined; sportTypes: SportTypeSettings }) {
   const sports = [...new Set(day?.activities.map((activity) => activity.sportType) ?? [])];
   return (
     <span aria-hidden className="flex h-1.5 items-center gap-0.5">
@@ -240,7 +224,7 @@ function SportDots({
       {sports.slice(0, 3).map((sport) => (
         <span
           key={sport}
-          className={cn("shrink-0 rounded-full", size)}
+          className="size-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: sportTypeColor(sportTypes, sport) }}
         />
       ))}
@@ -255,7 +239,7 @@ type WeekViewProps = RowProps & {
   todayKey: string;
 };
 
-/** Option 2: the week's days in a row with a dot per sport, then only what was done. */
+/** Week strip: the week's days in a row with a dot per sport, then only what was done. */
 export function WeekStripView({
   week,
   byDay,
@@ -320,7 +304,7 @@ export function WeekStripView({
   );
 }
 
-/** Option 3: the week's totals and a bar per day, coloured by sport, then the activities. */
+/** Week summary: the week's totals and a bar per day, coloured by sport, then the activities. */
 export function WeekSummaryView({
   week,
   byDay,
@@ -394,192 +378,4 @@ export function WeekSummaryView({
       )}
     </div>
   );
-}
-
-/** Option 5: a compact month with a dot per sport; tapping a day lists its training week. */
-export function MonthDotsView({
-  month,
-  byDay,
-  timeZone,
-  todayKey,
-  sportTypes,
-  search,
-}: RowProps & { month: string; byDay: ByDay; timeZone: string; todayKey: string }) {
-  const first = firstWeekOfMonth(month);
-  const weeks: string[] = [];
-  for (let week = first; week <= lastWeekOfMonth(month); week = addDayKey(week, 7))
-    weeks.push(week);
-  const todayWeek = weekOf(todayKey);
-  const [picked, setPicked] = useState<string | null>(null);
-  const selected =
-    picked && weeks.includes(picked) ? picked : weeks.includes(todayWeek) ? todayWeek : weeks[0]!;
-  const days = weekDays(selected);
-  const totals = totalsOf(byDay, days);
-  return (
-    <div className="flex flex-col">
-      <div role="grid" aria-label="Month" className="flex flex-col gap-0.5 px-2 pb-2">
-        <div
-          role="row"
-          className="text-muted-foreground grid grid-cols-7 text-center text-[0.625rem]"
-        >
-          {weekDays(first).map((key) => (
-            <span role="columnheader" key={key}>
-              {weekdayOf(key).charAt(0)}
-            </span>
-          ))}
-        </div>
-        {weeks.map((week) => (
-          <div
-            role="row"
-            key={week}
-            className={cn("grid grid-cols-7 rounded-lg", week === selected && "bg-muted")}
-          >
-            {weekDays(week).map((key) => {
-              const inMonth = key.startsWith(month);
-              const future = key > todayKey;
-              return (
-                <button
-                  role="gridcell"
-                  type="button"
-                  key={key}
-                  aria-selected={week === selected}
-                  aria-label={`${MONTH_DAY.format(keyDate(key))}`}
-                  disabled={future}
-                  onClick={() => setPicked(week)}
-                  className={cn(
-                    "flex min-h-[2.75rem] flex-col items-center justify-center gap-1 text-xs tabular-nums outline-none disabled:opacity-40",
-                    !inMonth && "text-muted-foreground/50",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "flex size-6 items-center justify-center rounded-full",
-                      key === todayKey && "bg-primary text-primary-foreground font-semibold",
-                    )}
-                  >
-                    {dayOf(key)}
-                  </span>
-                  <SportDots
-                    day={inMonth ? byDay.get(key) : undefined}
-                    sportTypes={sportTypes}
-                    size="size-1"
-                  />
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-      {totals.count || days.some((key) => byDay.get(key)?.goals.length) ? (
-        <>
-          <DayRows
-            days={days}
-            byDay={byDay}
-            sportTypes={sportTypes}
-            search={search}
-            timeZone={timeZone}
-          />
-          <p className="text-muted-foreground border-t px-4 py-2 text-center text-xs">
-            {totalsLine(totals)}
-          </p>
-        </>
-      ) : (
-        <EmptyWeek
-          thisWeek={days.includes(todayKey)}
-          previous={totalsOf(byDay, weekDays(addDayKey(selected, -7)))}
-        />
-      )}
-    </div>
-  );
-}
-
-const FEED_PAGE = 8;
-
-/** Option 4: every activity in one list back in time, grouped by training week. */
-export function ActivityFeed({
-  byDay,
-  timeZone,
-  sportTypes,
-  currentWeek,
-  oldestKey,
-}: Omit<RowProps, "search"> & {
-  byDay: ByDay;
-  timeZone: string;
-  currentWeek: string;
-  /** The oldest day with an activity, so the list knows when to stop. */
-  oldestKey: string | undefined;
-}) {
-  const [shown, setShown] = useState(FEED_PAGE);
-  const oldestWeek = oldestKey ? weekOf(oldestKey) : currentWeek;
-  const weeks: string[] = [];
-  for (
-    let week = currentWeek;
-    weeks.length < shown && week >= oldestWeek;
-    week = addDayKey(week, -7)
-  ) {
-    weeks.push(week);
-  }
-  const more = weeks.length > 0 && addDayKey(weeks.at(-1)!, -7) >= oldestWeek;
-
-  // Runs of empty weeks fold into one row.
-  const blocks: ({ week: string; totals: Totals } | { empty: string[] })[] = [];
-  for (const week of weeks) {
-    const totals = totalsOf(byDay, weekDays(week));
-    const goals = weekDays(week).some((key) => byDay.get(key)?.goals.length);
-    if (totals.count || goals) blocks.push({ week, totals });
-    else {
-      const last = blocks.at(-1);
-      if (last && "empty" in last) last.empty.push(week);
-      else blocks.push({ empty: [week] });
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      {blocks.map((block) =>
-        "empty" in block ? (
-          <p
-            key={block.empty[0]}
-            className="text-muted-foreground rounded-lg border border-dashed px-4 py-2.5 text-xs"
-          >
-            {rangeLabel(block.empty.at(-1)!, addDayKey(block.empty[0]!, 6), currentWeek)} · no
-            activities
-          </p>
-        ) : (
-          <section
-            key={block.week}
-            aria-label={rangeLabel(block.week, addDayKey(block.week, 6), currentWeek)}
-          >
-            <div className="flex items-baseline justify-between px-1 pb-1.5">
-              <h2 className="text-sm font-semibold">
-                {rangeLabel(block.week, addDayKey(block.week, 6), currentWeek)}
-              </h2>
-              <span className="text-muted-foreground text-xs">{totalsLine(block.totals)}</span>
-            </div>
-            <div className="bg-card ring-foreground/10 overflow-hidden rounded-lg ring-1 [&>div]:border-t-0">
-              <DayRows
-                days={weekDays(block.week)}
-                byDay={byDay}
-                sportTypes={sportTypes}
-                search={block.week < currentWeek ? { week: block.week } : {}}
-                timeZone={timeZone}
-              />
-            </div>
-          </section>
-        ),
-      )}
-      {more ? (
-        <Button variant="outline" onClick={() => setShown((count) => count + FEED_PAGE)}>
-          Show earlier weeks
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-function rangeLabel(start: string, end: string, currentWeek: string) {
-  if (start === currentWeek) return "This week";
-  if (start === addDayKey(currentWeek, -7) && end === addDayKey(currentWeek, -1))
-    return "Last week";
-  return `${MONTH_DAY.format(keyDate(start))} – ${MONTH_DAY.format(keyDate(end))}`;
 }
