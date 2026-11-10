@@ -19,12 +19,7 @@ export const Route = createFileRoute("/_app/power/")({
 
 function PowerHeading({ action }: { action?: boolean }) {
   return (
-    <PageHeader
-      icon={ZapIcon}
-      title="Power"
-      description="Import a ride's FIT file to see what your power meter recorded."
-      actions={action ? <ImportPowerFileButton /> : null}
-    />
+    <PageHeader icon={ZapIcon} title="Power" actions={action ? <ImportPowerFileButton /> : null} />
   );
 }
 

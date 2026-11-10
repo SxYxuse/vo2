@@ -28,13 +28,7 @@ export const Route = createFileRoute("/_app/bests")({
 });
 
 function BestsHeading() {
-  return (
-    <PageHeader
-      icon={TrophyIcon}
-      title="Bests"
-      description={"Your personal bests on every distance and duration, and your top ten."}
-    />
-  );
+  return <PageHeader icon={TrophyIcon} title="Bests" />;
 }
 
 function BestsPage() {

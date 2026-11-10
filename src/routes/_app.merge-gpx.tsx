@@ -18,11 +18,7 @@ export const Route = createFileRoute("/_app/merge-gpx")({
 function MergeGpxPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <PageHeader
-        icon={RouteIcon}
-        title="Merge GPX"
-        description={"Join routes where they meet. Your files stay on this device."}
-      />
+      <PageHeader icon={RouteIcon} title="Merge GPX" />
       <GpxMerge />
     </div>
   );

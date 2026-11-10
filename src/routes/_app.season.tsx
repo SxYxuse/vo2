@@ -26,14 +26,7 @@ export const Route = createFileRoute("/_app/season")({
 });
 
 function SeasonHeader({ actions }: { actions?: ReactNode }) {
-  return (
-    <PageHeader
-      icon={FlagIcon}
-      title="Season"
-      description={"The races and events you train for."}
-      actions={actions}
-    />
-  );
+  return <PageHeader icon={FlagIcon} title="Season" actions={actions} />;
 }
 
 function SeasonPage() {

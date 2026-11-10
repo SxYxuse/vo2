@@ -171,8 +171,7 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
 
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "Copy or paste" }).click();
-  await page.getByRole("menuitem", { name: "Paste season" }).click();
+  await openSeasonPaste(page);
   await page.getByRole("textbox", { name: "Copied season" }).fill(
     JSON.stringify({
       vo2Season: 1,
@@ -310,11 +309,18 @@ async function setRunningLthr(page: Page, bpm: string) {
 }
 
 /** Pastes goals into Season: one, or each leg of a multisport event. */
+/** Opens Paste: from the empty state of a season with no goals, or from its menu. */
+async function openSeasonPaste(page: Page) {
+  const fromEmpty = page.getByRole("button", { name: "Paste a season" });
+  if (await fromEmpty.isVisible()) return fromEmpty.click();
+  await page.getByRole("button", { name: "More season actions" }).click();
+  await page.getByRole("menuitem", { name: "Paste season" }).click();
+}
+
 async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "Copy or paste" }).click();
-  await page.getByRole("menuitem", { name: "Paste season" }).click();
+  await openSeasonPaste(page);
   await page
     .getByRole("textbox", { name: "Copied season" })
     .fill(JSON.stringify({ vo2Season: 1, goals }));

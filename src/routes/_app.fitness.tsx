@@ -41,11 +41,7 @@ function FitnessPage() {
 
   return (
     <>
-      <PageHeader
-        icon={TrendingUpIcon}
-        title="Fitness and form"
-        description={"Fitness, fatigue, and form, and whether your training makes you better."}
-      />
+      <PageHeader icon={TrendingUpIcon} title="Fitness and form" />
       {signedIn ? (
         <>
           <FitnessChart loads={fitnessLoads} goals={goals} />
@@ -74,11 +70,7 @@ function FitnessPage() {
 function FitnessPending() {
   return (
     <>
-      <PageHeader
-        icon={TrendingUpIcon}
-        title="Fitness and form"
-        description={"Fitness, fatigue, and form, and whether your training makes you better."}
-      />
+      <PageHeader icon={TrendingUpIcon} title="Fitness and form" />
       <ToolbarSkeleton />
       <Skeleton className="h-24 w-full rounded-lg" />
       <StatGridSkeleton cells={5} className="sm:grid-cols-3 lg:grid-cols-5" />

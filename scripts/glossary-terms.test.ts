@@ -21,7 +21,6 @@ const glossary = readFileSync(join(ROOT, "GLOSSARY.md"), "utf8");
  */
 const KNOWN: Record<string, string[]> = {
   "all-time best": ["src/components/training-paces.tsx"],
-  "gps track": ["src/routes/_app.map.tsx"],
   "power zone": ["src/components/power-file-detail.tsx"],
   "stress score": ["src/components/activity-ride-analysis.tsx"],
 };

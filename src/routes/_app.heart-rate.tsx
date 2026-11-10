@@ -34,11 +34,7 @@ function HeartRatePage() {
 
   return (
     <>
-      <PageHeader
-        icon={HeartPulseIcon}
-        title="Heart rate"
-        description={"Your zones, time in zone, and how efficient your heart is, per sport."}
-      />
+      <PageHeader icon={HeartPulseIcon} title="Heart rate" />
       {data.signedIn ? (
         <HeartRateZones data={data} sportTypes={data.sportTypes} />
       ) : (
@@ -64,11 +60,7 @@ function HeartRatePage() {
 function HeartRatePending() {
   return (
     <>
-      <PageHeader
-        icon={HeartPulseIcon}
-        title="Heart rate"
-        description={"Your zones, time in zone, and how efficient your heart is, per sport."}
-      />
+      <PageHeader icon={HeartPulseIcon} title="Heart rate" />
       <ToolbarSkeleton widths={["w-44", "w-48"]} />
       <StatGridSkeleton cells={4} className="lg:grid-cols-4" />
       <PanelSkeleton bodyClassName="h-56" />

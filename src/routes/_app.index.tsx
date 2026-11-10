@@ -1,10 +1,10 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, type ErrorComponentProps } from "@tanstack/react-router";
 import { CalendarDaysIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header.tsx";
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
-import { appShellQueryOptions, homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -50,19 +50,7 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function CalendarHeading() {
-  // The shell is cached by the app layout; the pending state may render before it, so no suspense.
-  const { data: shell } = useQuery(appShellQueryOptions);
-  return (
-    <PageHeader
-      icon={CalendarDaysIcon}
-      title="Activity calendar"
-      description={
-        shell?.planningStyle === "off"
-          ? "Completed Strava activities."
-          : "Completed Strava activities. Your planned sessions are on Plan."
-      }
-    />
-  );
+  return <PageHeader icon={CalendarDaysIcon} title="Activity calendar" />;
 }
 
 function CalendarPage() {

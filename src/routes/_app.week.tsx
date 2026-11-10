@@ -45,18 +45,8 @@ export const Route = createFileRoute("/_app/week")({
   component: WeekTargetPage,
 });
 
-function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
-  return (
-    <PageHeader
-      icon={TargetIcon}
-      title="Plan"
-      description={
-        planned
-          ? "Each week's sessions toward your season. Do them on the days that suit you."
-          : undefined
-      }
-    />
-  );
+function WeekTargetHeading() {
+  return <PageHeader icon={TargetIcon} title="Plan" />;
 }
 
 function WeekTargetPage() {
@@ -76,7 +66,7 @@ function WeekTargetPage() {
 function PlanningOff() {
   return (
     <>
-      <WeekTargetHeading planned={false} />
+      <WeekTargetHeading />
       <Empty className="min-h-64 border">
         <EmptyHeader>
           <EmptyMedia variant="icon">

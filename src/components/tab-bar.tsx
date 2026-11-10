@@ -42,17 +42,9 @@ const TABS: Tab[] = [
 const TAB_CLASS =
   "flex min-h-[2.75rem] flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
+// Like an iOS tab bar: the active tab is drawn solid with a heavier stroke, the rest muted.
 function TabIcon({ icon: Icon, active }: { icon: LucideIcon; active: boolean }) {
-  return (
-    <span
-      className={cn(
-        "flex h-7 w-14 items-center justify-center rounded-full transition-colors",
-        active && "bg-muted",
-      )}
-    >
-      <Icon aria-hidden className="size-5" />
-    </span>
-  );
+  return <Icon aria-hidden className="size-6" strokeWidth={active ? 2.25 : 1.75} />;
 }
 
 /**

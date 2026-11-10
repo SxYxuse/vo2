@@ -9,6 +9,7 @@ import {
   ChevronRightIcon,
   ClipboardPasteIcon,
   CopyIcon,
+  EllipsisIcon,
   FlagIcon,
   PlusIcon,
   XIcon,
@@ -173,22 +174,26 @@ export function SeasonView({
     <>
       {header(
         <>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="outline" />}>
-              <CopyIcon data-icon="inline-start" />
-              Copy or paste
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={!allGoals.length} onClick={() => void copy()}>
-                <CopyIcon />
-                Copy season
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setPasting(true)}>
-                <ClipboardPasteIcon />
-                Paste season
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Copying needs a goal: a season with none offers only Paste, in its empty state. */}
+          {allGoals.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button variant="outline" size="icon" aria-label="More season actions" />}
+              >
+                <EllipsisIcon />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => void copy()}>
+                  <CopyIcon />
+                  Copy season
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPasting(true)}>
+                  <ClipboardPasteIcon />
+                  Paste season
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
           {/* An empty season asks for its first goal once, in the middle of the page. */}
           {data.upcoming.length > 0 ? (
             <Button onClick={() => open(null)}>
@@ -216,6 +221,12 @@ export function SeasonView({
               <PlusIcon data-icon="inline-start" />
               Add a goal
             </Button>
+            {allGoals.length === 0 ? (
+              <Button variant="ghost" onClick={() => setPasting(true)}>
+                <ClipboardPasteIcon data-icon="inline-start" />
+                Paste a season
+              </Button>
+            ) : null}
           </EmptyContent>
         </Empty>
       ) : (

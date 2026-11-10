@@ -363,25 +363,6 @@ export function AppSidebar() {
                 onLinkClick={onLinkClick}
               />
             ))}
-            {/* The phone sheet names Settings and the theme in full, where icons alone hid them. */}
-            {isMobile ? (
-              <SidebarGroup className="mt-auto">
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={isSettingsPath(pathname)}
-                      render={<Link to="/settings" preload="intent" onClick={onLinkClick} />}
-                    >
-                      <Settings2Icon />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarThemeButton labelled />
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroup>
-            ) : null}
           </>
         )}
       </SidebarContent>
@@ -395,7 +376,7 @@ export function AppSidebar() {
             : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
-        {inSettings || isMobile ? null : (
+        {inSettings ? null : (
           <SidebarMenuButton
             tooltip="Settings"
             aria-label="Settings"
@@ -405,7 +386,7 @@ export function AppSidebar() {
             <Settings2Icon />
           </SidebarMenuButton>
         )}
-        {isMobile && !inSettings ? null : <SidebarThemeButton />}
+        <SidebarThemeButton />
         <div className="ml-auto group-data-[collapsible=icon]:ml-0">
           <SidebarUserMenu />
         </div>
@@ -415,19 +396,10 @@ export function AppSidebar() {
   );
 }
 
-function SidebarThemeButton({ labelled = false }: { labelled?: boolean }) {
+function SidebarThemeButton() {
   const { mounted, current, next, toggle } = useThemeToggle();
   const { isMobile } = useSidebar();
   const label = mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme";
-
-  if (labelled) {
-    return (
-      <SidebarMenuButton aria-label={label} disabled={!mounted} onClick={toggle}>
-        {mounted ? <current.icon /> : <span aria-hidden className="size-4" />}
-        <span>{mounted ? `${current.label} theme` : "Theme"}</span>
-      </SidebarMenuButton>
-    );
-  }
 
   return (
     <SidebarMenuButton

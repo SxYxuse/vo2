@@ -36,7 +36,7 @@ function MapPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <PageHeader icon={MapIcon} title="Map" description={"Every GPS track on one map."} />
+      <PageHeader icon={MapIcon} title="Map" />
       {data.signedIn ? (
         <ActivityMap
           tracks={data.tracks}
@@ -66,7 +66,7 @@ function MapPage() {
 function MapPending() {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <PageHeader icon={MapIcon} title="Map" description={"Every GPS track on one map."} />
+      <PageHeader icon={MapIcon} title="Map" />
       <Skeleton className="min-h-80 w-full flex-1 rounded-xl" />
     </div>
   );
