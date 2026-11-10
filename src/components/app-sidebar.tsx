@@ -381,7 +381,19 @@ export function AppSidebar() {
             tooltip="Settings"
             aria-label="Settings"
             className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
-            render={<Link to="/settings" preload="intent" onClick={onLinkClick} />}
+            // Phones open the settings list; desktop lists the sections in the sidebar itself.
+            render={
+              isMobile ? (
+                <Link to="/settings" preload="intent" onClick={onLinkClick} />
+              ) : (
+                <Link
+                  to="/settings/$section"
+                  params={{ section: "profile" }}
+                  preload="intent"
+                  onClick={onLinkClick}
+                />
+              )
+            }
           >
             <Settings2Icon />
           </SidebarMenuButton>

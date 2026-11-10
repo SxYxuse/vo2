@@ -308,7 +308,6 @@ async function setRunningLthr(page: Page, bpm: string) {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
 
-/** Pastes goals into Season: one, or each leg of a multisport event. */
 /** Opens Paste: from the empty state of a season with no goals, or from its menu. */
 async function openSeasonPaste(page: Page) {
   const fromEmpty = page.getByRole("button", { name: "Paste a season" });
@@ -317,6 +316,7 @@ async function openSeasonPaste(page: Page) {
   await page.getByRole("menuitem", { name: "Paste season" }).click();
 }
 
+/** Pastes goals into Season: one, or each leg of a multisport event. */
 async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);

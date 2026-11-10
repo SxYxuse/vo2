@@ -92,8 +92,10 @@ export function SettingsForm({
     mode: "onTouched",
   });
   // A save in flight finishes after leaving settings; only a failed one would be lost silently.
+  // The settings list unmounts the form too, so it counts as leaving.
   const blocker = useBlocker({
-    shouldBlockFn: ({ next }) => status === "error" && !isSettingsPath(next.pathname),
+    shouldBlockFn: ({ next }) =>
+      status === "error" && (!isSettingsPath(next.pathname) || next.pathname === "/settings"),
     enableBeforeUnload: () => status === "error" || saving.current || timer.current != null,
     withResolver: true,
   });
