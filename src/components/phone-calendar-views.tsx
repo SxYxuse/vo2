@@ -251,7 +251,8 @@ export function WeekStripView({
   const days = weekDays(week);
   const totals = totalsOf(byDay, days);
   return (
-    <div className="flex flex-col">
+    // pan-y, as in the day list: a sideways swipe changes the week instead of going back.
+    <div className="flex touch-pan-y flex-col">
       <ol aria-label="Days of the week" className="grid grid-cols-7 gap-0.5 px-2 pb-2">
         {days.map((key) => {
           const day = byDay.get(key);
@@ -290,9 +291,11 @@ export function WeekStripView({
             search={search}
             timeZone={timeZone}
           />
-          <p className="text-muted-foreground border-t px-4 py-2 text-center text-xs">
-            {totalsLine(totals)}
-          </p>
+          {totals.count ? (
+            <p className="text-muted-foreground border-t px-4 py-2 text-center text-xs">
+              {totalsLine(totals)}
+            </p>
+          ) : null}
         </>
       ) : (
         <EmptyWeek
@@ -320,7 +323,8 @@ export function WeekSummaryView({
   );
   const longest = Math.max(...dayTime, 1);
   return (
-    <div className="flex flex-col">
+    // pan-y, as in the day list: a sideways swipe changes the week instead of going back.
+    <div className="flex touch-pan-y flex-col">
       <dl className="grid grid-cols-3 gap-2 px-4 pb-1">
         {[
           ["Time", formatHours(totals.movingTime)],
