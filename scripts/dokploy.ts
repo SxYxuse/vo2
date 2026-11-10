@@ -33,7 +33,7 @@ const RENEWAL = `To renew the Dokploy API key:
   1. Ask the developer for a new key with the request_secret tool (delivery "file"). Point them
      at <Dokploy URL>/dashboard/settings/profile, section "API/CLI Keys", with the URL from
      ~/.config/dokploy/url. Never ask for the key in chat.
-  2. Store it: install -m 600 "<file request_secret returned>" ${TOKEN_FILE}
+  2. Store it: mkdir -p -m 700 ~/.config/dokploy && install -m 600 "<file request_secret returned>" ${TOKEN_FILE}
      then delete the file request_secret wrote.
   3. Verify: bun scripts/dokploy.ts check`;
 
@@ -89,7 +89,9 @@ export async function dokploy<T>(endpoint: string, body?: object): Promise<T> {
     body: body && JSON.stringify(body),
     // A hung request would otherwise outlast `wait --timeout`.
     signal: AbortSignal.timeout(30_000),
-  }).catch((error: Error) => stop(`Cannot reach Dokploy at ${url}: ${error.message}`));
+  }).catch((error: Error) =>
+    stop(`Cannot reach the Dokploy URL (DOKPLOY_URL or ~/.config/dokploy/url): ${error.message}`),
+  );
   if (response.status === 401)
     stop(`Dokploy rejected the API key (401): it expired or was deleted.\n\n${RENEWAL}`);
   if (!response.ok)
@@ -207,7 +209,8 @@ if (import.meta.main) {
   const timeout = Number(values.timeout);
   if (["deploys", "wait"].includes(command ?? "") && argument && !TARGET.test(argument))
     stop(`Unknown target "${argument}": use prod, staging, or pr-<number>.`);
-  if (!(timeout > 0)) stop(`--timeout must be a number of seconds, not "${values.timeout}".`);
+  for (const option of ["limit", "tail", "timeout"] as const)
+    if (!(Number(values[option]) > 0)) stop(`--${option} must be a positive number.`);
 
   if (command === "check") {
     await dokploy("project.all");
