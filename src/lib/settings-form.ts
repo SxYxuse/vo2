@@ -4,10 +4,12 @@ import {
   MAX_WEIGHT_KG,
   MIN_WEIGHT_KG,
   calendarPeriodSchema,
+  phoneCalendarViewSchema,
   planningStyleSchema,
   profileSaveSchema,
   shownSportTypesSchema,
   type CalendarPeriod,
+  type PhoneCalendarView,
   type PlanningStyle,
   type ProfileSave,
   type ProfileSettings,
@@ -109,6 +111,7 @@ export const settingsFormSchema = profileFormSchema
   .extend(heartRateFormFields)
   .extend({
     calendarPeriod: calendarPeriodSchema,
+    phoneCalendarView: phoneCalendarViewSchema,
     celebrateTopEfforts: z.boolean(),
     planningStyle: planningStyleSchema,
   });
@@ -223,6 +226,7 @@ export function settingsSaveFromForm(
       ? sports.data.sportGroupShares
       : (saved.settings.sportGroupShares ?? DEFAULT_SPORT_GROUP_SHARES),
     calendarPeriod: values.calendarPeriod,
+    phoneCalendarView: values.phoneCalendarView,
     celebrateTopEfforts: values.celebrateTopEfforts,
     planningStyle: values.planningStyle,
     heartRate: heartRateValid ? heartRate : saved.heartRate,
@@ -245,6 +249,7 @@ export function settingsFormDefaults(input: {
   sportTypes: SettingsFormValues["sportTypes"];
   sportGroupShares: SettingsFormValues["sportGroupShares"] | undefined;
   calendarPeriod?: CalendarPeriod;
+  phoneCalendarView?: PhoneCalendarView;
   celebrateTopEfforts?: boolean;
   planningStyle?: PlanningStyle;
 }): SettingsFormInput {
@@ -253,6 +258,7 @@ export function settingsFormDefaults(input: {
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
     calendarPeriod: input.calendarPeriod ?? "month",
+    phoneCalendarView: input.phoneCalendarView ?? "days",
     celebrateTopEfforts: input.celebrateTopEfforts ?? false,
     planningStyle: input.planningStyle ?? "coachPlan",
   };

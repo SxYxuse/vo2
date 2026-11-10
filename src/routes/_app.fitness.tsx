@@ -1,4 +1,5 @@
 import { noop, useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrendingUpIcon } from "lucide-react";
@@ -40,15 +41,7 @@ function FitnessPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <TrendingUpIcon aria-hidden className="size-5" />
-          Fitness and form
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Dose your training with fitness, fatigue, and form, and see whether it makes you better.
-        </p>
-      </div>
+      <PageHeader icon={TrendingUpIcon} title="Fitness and form" />
       {signedIn ? (
         <>
           <FitnessChart loads={fitnessLoads} goals={goals} />
@@ -77,15 +70,7 @@ function FitnessPage() {
 function FitnessPending() {
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <TrendingUpIcon aria-hidden className="size-5" />
-          Fitness and form
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Dose your training with fitness, fatigue, and form, and see whether it makes you better.
-        </p>
-      </div>
+      <PageHeader icon={TrendingUpIcon} title="Fitness and form" />
       <ToolbarSkeleton />
       <Skeleton className="h-24 w-full rounded-lg" />
       <StatGridSkeleton cells={5} className="sm:grid-cols-3 lg:grid-cols-5" />

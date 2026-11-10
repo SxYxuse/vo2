@@ -91,7 +91,7 @@ function SameHeartRate({
         </p>
       ) : (
         <>
-          <p className="font-mono text-base tabular-nums">
+          <p className="text-base font-medium tabular-nums">
             At {comparison.referenceBpm} bpm: {formatOutput(comparison.now.output, sport)}
           </p>
           <p className="text-muted-foreground text-sm">
@@ -99,7 +99,7 @@ function SameHeartRate({
               <>
                 6 weeks before: {formatOutput(comparison.before.output, sport)}
                 {comparison.changePct != null ? (
-                  <span className={cn("ml-2 font-mono", changeTone(comparison.changePct))}>
+                  <span className={cn("ml-2", changeTone(comparison.changePct))}>
                     {signedPct(comparison.changePct)}
                   </span>
                 ) : null}
@@ -125,7 +125,7 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
         <Link
           to="/bests"
           search={{ sport }}
-          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="-my-[0.9rem] ml-auto py-[0.9rem] text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           All bests
         </Link>
@@ -152,11 +152,12 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                     sport,
                     best: boardId(sport, sport === "cycling" ? "power" : "time", row.key),
                   }}
-                  className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  // Padding the row's height into the link makes a 44px target without moving it.
+                  className="text-muted-foreground -my-[0.8rem] py-[0.8rem] underline-offset-4 hover:text-foreground hover:underline"
                 >
                   {labels[row.key]}
                 </Link>
-                <span className="text-right font-mono tabular-nums">
+                <span className="text-right tabular-nums">
                   {formatBest(row.now, sport)}
                   {change != null ? (
                     <span className={cn("block text-xs", changeTone(change))}>
@@ -164,10 +165,10 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                     </span>
                   ) : null}
                 </span>
-                <span className="text-muted-foreground text-right font-mono tabular-nums">
+                <span className="text-muted-foreground text-right tabular-nums">
                   {formatBest(row.before, sport)}
                 </span>
-                <span className="text-right font-mono tabular-nums">
+                <span className="text-right tabular-nums">
                   {formatBest(row.year, sport)}
                   {row.yearStart ? (
                     <span className="text-muted-foreground block text-xs">
@@ -205,8 +206,8 @@ export function ProgressCards() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold tracking-tight">Progress</h2>
+      <div className="mt-2 flex flex-col gap-1 border-t pt-4">
+        <h2 className="text-base font-semibold">Progress</h2>
         <p className="text-muted-foreground text-sm">
           Are you getting better? What you can do now, and what it costs your heart.
         </p>

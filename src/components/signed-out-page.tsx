@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
-import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
+import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { removeCoachChats } from "@/lib/coach-storage.ts";
 import { Button } from "@/components/ui/button";
@@ -23,18 +23,21 @@ export function SignedOutPage() {
         </div>
         <ThemeToggleButton />
       </header>
-      <main className="flex flex-1 flex-col px-4 pt-16 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-24">
+      <main className="flex flex-1 flex-col px-4 pt-[12vh] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-[18vh]">
         <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+          <Vo2Mark className="size-14 rounded-2xl shadow-sm" />
           <div className="flex flex-col gap-2">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              Sign in with Strava
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              {APP_NAME} imports your activities, then you can use the calendar, map, fitness, heart
-              rate, and tests.
+            <h1 className="text-2xl font-semibold tracking-tight">Sign in with Strava</h1>
+            <p className="text-muted-foreground text-pretty">
+              {APP_NAME} copies your Strava activities, scores your fitness and form, and plans your
+              training weeks toward your goals.
             </p>
           </div>
           <SignInPanel />
+          <p className="text-muted-foreground text-xs text-pretty">
+            {APP_NAME} only reads from Strava. Your activities stay on Strava, and you can delete
+            your {APP_NAME} data at any time in Settings.
+          </p>
         </div>
       </main>
     </div>

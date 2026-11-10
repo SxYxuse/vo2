@@ -129,7 +129,7 @@ export function EfficiencyTrendCard({
           <>
             {summary ? (
               <div className="flex flex-col gap-2">
-                <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-sm tabular-nums">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm tabular-nums">
                   <span
                     className={cn(
                       summary.efPct >= 2
@@ -193,7 +193,7 @@ export function EfficiencyTrendCard({
                         return (
                           <div className="flex w-full items-center justify-between gap-4">
                             <span className="text-muted-foreground">{meta.label}</span>
-                            <span className="font-mono font-medium tabular-nums">
+                            <span className="font-medium tabular-nums">
                               {key === "ef" ? formatEfficiency(value, kind) : value.toFixed(1)}
                             </span>
                           </div>

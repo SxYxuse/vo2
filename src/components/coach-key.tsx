@@ -154,14 +154,13 @@ export function CoachKeyField({
                 event.preventDefault();
                 submit();
               }}
-              className="min-h-10 sm:min-h-8"
             />
             <div className="flex gap-2">
               {replacing ? (
                 <Button
                   type="button"
                   variant="outline"
-                  className="min-h-10 flex-1 sm:min-h-8"
+                  className="flex-1 sm:flex-none"
                   onClick={() => setReplacing(false)}
                 >
                   Cancel
@@ -169,8 +168,10 @@ export function CoachKeyField({
               ) : null}
               <Button
                 type="button"
+                // Outlined until there is a key to save, so it doesn't read as a dead button.
+                variant={value.trim() ? "default" : "outline"}
                 onClick={submit}
-                className="min-h-10 flex-1 sm:min-h-8"
+                className="flex-1 sm:flex-none"
                 disabled={!value.trim() || save.isPending}
               >
                 {save.isPending ? <Spinner data-icon="inline-start" /> : null}
@@ -193,7 +194,7 @@ export function CoachKeyField({
             <Button
               type="button"
               variant="outline"
-              className="min-h-10 sm:min-h-8"
+
               onClick={() => setReplacing(true)}
             >
               Replace
@@ -201,7 +202,7 @@ export function CoachKeyField({
             <Button
               type="button"
               variant="destructive"
-              className="min-h-10 sm:min-h-8"
+
               disabled={remove.isPending}
               onClick={() => remove.mutate()}
             >

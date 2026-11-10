@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/page-header.tsx";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -392,7 +393,7 @@ function CopyButton({ text }: { text: string }) {
     <Button
       variant="ghost"
       size="sm"
-      className="text-muted-foreground max-sm:h-11"
+      className="text-muted-foreground max-sm:h-[2.75rem]"
       onClick={() =>
         void navigator.clipboard.writeText(text).then(
           () => setCopied(true),
@@ -548,27 +549,29 @@ export function CoachChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="mx-auto flex w-full max-w-3xl shrink-0 items-center gap-2">
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="text-lg font-semibold tracking-tight sm:text-xl">Coach</h1>
-          {title && messages.length ? (
-            <p className="text-muted-foreground truncate text-xs sm:text-sm">{title}</p>
-          ) : null}
-        </div>
-        <CoachChatList currentId={threadId} />
-        {messages.length ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="max-sm:size-11 max-sm:px-0"
-            nativeButton={false}
-            render={<Link to="/coach" search={{}} />}
-          >
-            <SquarePenIcon />
-            <span className="max-sm:sr-only">New chat</span>
-          </Button>
-        ) : null}
-      </div>
+      <PageHeader
+        className="mx-auto w-full max-w-3xl"
+        icon={SparklesIcon}
+        title="Coach"
+        description={title && messages.length ? title : undefined}
+        actions={
+          <>
+            <CoachChatList currentId={threadId} />
+            {messages.length ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="max-sm:size-[2.75rem] max-sm:px-0"
+                nativeButton={false}
+                render={<Link to="/coach" search={{}} />}
+              >
+                <SquarePenIcon />
+                <span className="max-sm:sr-only">New chat</span>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         {empty && error ? (
@@ -590,8 +593,9 @@ export function CoachChat({
             training.
           </CoachKeyPrompt>
         ) : empty ? (
-          // Bottom-aligned on phones, so the starters sit where the thumb already is.
-          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end gap-6 overflow-y-auto pb-4 sm:justify-center">
+          // Centred: the composer below already sits at the thumb, and a bottom-aligned hero left a
+          // blank half screen under the title.
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6 overflow-y-auto pb-4">
             <div className="flex flex-col items-center gap-3 text-center text-balance">
               <span
                 aria-hidden

@@ -150,7 +150,7 @@ export function HeartRateZones({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <StatGrid className="lg:grid-cols-4">
+      <StatGrid className={selected.lthr ? "lg:grid-cols-4" : "lg:grid-cols-3"}>
         <StatCard
           hintClassName="line-clamp-2"
           label="Max HR"
@@ -159,14 +159,17 @@ export function HeartRateZones({
           info={selected.maxAnchor ? maxHrAnchorInfo(selected.maxAnchor) : MAX_HR_INFO}
           color="var(--color-ds-red-700)"
         />
-        <StatCard
-          hintClassName="line-clamp-2"
-          label={selected.lthrSource === "athlete" ? "LTHR" : "Est. LTHR"}
-          value={selected.lthr ? `${selected.lthr} bpm` : "—"}
-          hint={lthrHint(selected)}
-          info={lthrInfo(selected)}
-          color="var(--color-ds-amber-700)"
-        />
+        {/* All sports together have no one threshold: the tile shows once a sport is picked. */}
+        {selected.lthr ? (
+          <StatCard
+            hintClassName="line-clamp-2"
+            label={selected.lthrSource === "athlete" ? "LTHR" : "Est. LTHR"}
+            value={`${selected.lthr} bpm`}
+            hint={lthrHint(selected)}
+            info={lthrInfo(selected)}
+            color="var(--color-ds-amber-700)"
+          />
+        ) : null}
         <StatCard
           hintClassName="line-clamp-2"
           label="Activities"
@@ -248,7 +251,7 @@ export function HeartRateZones({
                                 <button
                                   type="button"
                                   aria-label={`${zone.def.label} · ${zone.def.name}`}
-                                  className="decoration-muted-foreground/50 truncate text-left text-sm font-medium underline decoration-dotted underline-offset-4"
+                                  className="decoration-muted-foreground/50 -my-[0.8rem] truncate py-[0.8rem] text-left text-sm font-medium underline decoration-dotted underline-offset-4"
                                 />
                               }
                             >

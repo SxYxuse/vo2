@@ -207,6 +207,7 @@ export async function saveAthleteSettingsImpl(
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
     sportGroupShares: value.sportGroupShares,
     calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
+    phoneCalendarView: value.phoneCalendarView ?? stored?.phoneCalendarView ?? "days",
     planningStyle: value.planningStyle ?? stored?.planningStyle ?? null,
     topEffortsSince: nextTopEffortsSince(
       stored?.topEffortsSince ?? null,

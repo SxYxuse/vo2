@@ -103,8 +103,8 @@ export function InfoTooltip({
             variant="ghost"
             size="icon-xs"
             aria-label={label}
-            // the icon stays small; the hit area grows to a thumb-sized target
-            className="relative after:absolute after:-inset-2.5"
+            // the icon stays small; the hit area grows to a 44px thumb-sized target
+            className="relative after:absolute after:-inset-[0.8rem]"
           />
         }
       >

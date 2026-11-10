@@ -297,7 +297,9 @@ export function AppSidebar() {
   const { pathname, navigate, onLinkClick } = useSidebarNavigate();
   const { isMobile } = useSidebar();
   const lastHref = useLastHrefOutsideSettings();
-  const inSettings = isSettingsPath(pathname);
+  // A phone's More opens the app menu everywhere; inside settings, the "‹ Settings" link and the
+  // settings list move between sections.
+  const inSettings = isSettingsPath(pathname) && !isMobile;
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   // With planning off, Plan leaves the sidebar: its page says so, reached from Settings.
   const trainingItems =
@@ -323,7 +325,24 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {inSettings ? (
-          <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
+          <>
+            {/* The way out of settings sits first, where the eye starts. */}
+            <SidebarGroup>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Back to the app"
+                    className={cn(isMobile && "h-[2.75rem] [&_svg]:size-5")}
+                    onClick={() => navigate(lastHref.current ?? "/")}
+                  >
+                    <ArrowLeftIcon />
+                    <span>Back to the app</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+            <SettingsNavMenu pathname={pathname} onLinkClick={onLinkClick} />
+          </>
         ) : (
           <>
             <SidebarGroup>
@@ -357,28 +376,23 @@ export function AppSidebar() {
             : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
-        {inSettings ? (
-          <SidebarMenuButton
-            tooltip="Back"
-            className={cn("flex-1", isMobile && "h-[2.75rem] [&_svg]:size-5")}
-            onClick={() => navigate(lastHref.current ?? "/")}
-          >
-            <ArrowLeftIcon />
-            <span>Back</span>
-          </SidebarMenuButton>
-        ) : (
+        {inSettings ? null : (
           <SidebarMenuButton
             tooltip="Settings"
             aria-label="Settings"
             className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
+            // Phones open the settings list; desktop lists the sections in the sidebar itself.
             render={
-              <Link
-                to="/settings/$section"
-                params={{ section: "profile" }}
-                preload="intent"
-                // Phones keep the sheet open so the athlete can pick a section.
-                onClick={(event) => onLinkClick(event, { keepOpen: true })}
-              />
+              isMobile ? (
+                <Link to="/settings" preload="intent" onClick={onLinkClick} />
+              ) : (
+                <Link
+                  to="/settings/$section"
+                  params={{ section: "profile" }}
+                  preload="intent"
+                  onClick={onLinkClick}
+                />
+              )
             }
           >
             <Settings2Icon />

@@ -105,20 +105,18 @@ export function HeartRateReportCard({
         <dl className="grid grid-cols-3 gap-2 text-sm">
           <div className="flex flex-col gap-0.5">
             <dt className="text-muted-foreground">Per week</dt>
-            <dd className="font-mono font-medium tabular-nums">
-              {formatHmm(report.weeklySeconds)}
-            </dd>
+            <dd className="font-medium tabular-nums">{formatHmm(report.weeklySeconds)}</dd>
           </div>
           <div className="flex flex-col gap-0.5">
             <dt className="text-muted-foreground">Sessions</dt>
-            <dd className="font-mono font-medium tabular-nums">{report.sessions}</dd>
+            <dd className="font-medium tabular-nums">{report.sessions}</dd>
           </div>
           <div className="flex flex-col gap-0.5">
             <dt className="flex items-center gap-1 text-muted-foreground">
               Avg HR
               <InfoTooltip label="About average heart rate">{AVG_INFO}</InfoTooltip>
             </dt>
-            <dd className="font-mono font-medium tabular-nums">
+            <dd className="font-medium tabular-nums">
               {report.avgBpm != null ? `${Math.round(report.avgBpm)} bpm` : "—"}
             </dd>
           </div>
@@ -144,7 +142,7 @@ export function HeartRateReportCard({
                 style={{ width: pct(intensity.high), backgroundColor: HR_ZONES[4].color }}
               />
             </div>
-            <div className="flex justify-between font-mono text-xs tabular-nums text-muted-foreground">
+            <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
               <span>Easy {pct(intensity.low)}</span>
               <span>Moderate {pct(intensity.moderate)}</span>
               <span>Hard {pct(intensity.high)}</span>
@@ -187,9 +185,7 @@ export function HeartRateReportCard({
                     return (
                       <div className="flex w-full items-center justify-between gap-4">
                         <span className="text-muted-foreground">{meta.label}</span>
-                        <span className="font-mono font-medium tabular-nums">
-                          {formatHmm(value * 3600)}
-                        </span>
+                        <span className="font-medium tabular-nums">{formatHmm(value * 3600)}</span>
                       </div>
                     );
                   }}

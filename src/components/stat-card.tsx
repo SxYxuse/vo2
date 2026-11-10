@@ -39,7 +39,15 @@ export function StatGrid({
   return (
     <div className="bg-card text-card-foreground ring-foreground/10 overflow-hidden rounded-lg ring-1">
       {/* The negative margins push the outer cell borders into the clipped edge. */}
-      <div className={cn("-me-px -mb-px grid grid-cols-2", className)}>{children}</div>
+      {/* On the phone's two columns, an odd last cell spans both rather than leave a hole. */}
+      <div
+        className={cn(
+          "-me-px -mb-px grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",
+          className,
+        )}
+      >
+        {children}
+      </div>
       {footer ? <div className="border-foreground/10 border-t px-3 py-3">{footer}</div> : null}
     </div>
   );

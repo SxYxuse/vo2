@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 import { FlagIcon } from "lucide-react";
 
@@ -23,18 +25,8 @@ export const Route = createFileRoute("/_app/season")({
   component: SeasonPage,
 });
 
-function SeasonHeader() {
-  return (
-    <div className="flex flex-col gap-2">
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-        <FlagIcon aria-hidden className="size-5" />
-        Season
-      </h1>
-      <p className="text-muted-foreground hidden text-sm sm:block">
-        The races and events you train for, and how long until each one.
-      </p>
-    </div>
-  );
+function SeasonHeader({ actions }: { actions?: ReactNode }) {
+  return <PageHeader icon={FlagIcon} title="Season" actions={actions} />;
 }
 
 function SeasonPage() {
@@ -62,8 +54,7 @@ function SeasonPage() {
 
   return (
     <>
-      <SeasonHeader />
-      <SeasonView data={data} />
+      <SeasonView data={data} header={(actions) => <SeasonHeader actions={actions} />} />
     </>
   );
 }

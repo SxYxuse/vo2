@@ -75,12 +75,17 @@ function ActivityDetailBody({
           value={formatDuration(detail.movingTime)}
           color="var(--color-ds-purple-700)"
         />
-        <StatCard
-          label="Elevation"
-          value={formatElevation(detail.totalElevationGain)}
-          color={SERIES_META.altitude.color}
-        />
-        {detail.kpis.avgHeartrate == null && detail.estimatedHeartrate != null ? (
+        {/* A stat the activity didn't record (a pool swim's climb, power without a meter) is
+            left out rather than shown as a dash. */}
+        {detail.totalElevationGain ? (
+          <StatCard
+            label="Elevation"
+            value={formatElevation(detail.totalElevationGain)}
+            color={SERIES_META.altitude.color}
+          />
+        ) : null}
+        {detail.kpis.avgHeartrate == null && detail.estimatedHeartrate == null ? null : detail.kpis
+            .avgHeartrate == null && detail.estimatedHeartrate != null ? (
           <StatCard
             label="Avg HR"
             value={`~${formatBpm(detail.estimatedHeartrate)}`}
@@ -95,15 +100,17 @@ function ActivityDetailBody({
             color={SERIES_META.heartrate.color}
           />
         )}
-        <StatCard
-          label={isCyclingSport(detail.sportType) ? "Avg / NP" : "Avg power"}
-          value={
-            isCyclingSport(detail.sportType)
-              ? `${formatWatts(detail.kpis.avgWatts)} / ${formatWatts(detail.kpis.normalizedWatts)}`
-              : formatWatts(detail.kpis.avgWatts)
-          }
-          color={SERIES_META.watts.color}
-        />
+        {detail.kpis.avgWatts == null ? null : (
+          <StatCard
+            label={isCyclingSport(detail.sportType) ? "Avg / NP" : "Avg power"}
+            value={
+              isCyclingSport(detail.sportType)
+                ? `${formatWatts(detail.kpis.avgWatts)} / ${formatWatts(detail.kpis.normalizedWatts)}`
+                : formatWatts(detail.kpis.avgWatts)
+            }
+            color={SERIES_META.watts.color}
+          />
+        )}
         <StatCard
           label={locomotionFor(detail.sportType).kpiLabel}
           value={formatLocomotion(detail.kpis.avgSpeed, detail.sportType)}

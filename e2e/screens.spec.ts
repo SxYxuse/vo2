@@ -13,6 +13,7 @@ const SCREENS = [
   { name: "heart-rate", path: "/heart-rate", heading: null },
   { name: "power", path: "/power", heading: "Power" },
   { name: "map", path: "/map", heading: null },
+  { name: "settings-list", path: "/settings", heading: "Settings" },
   { name: "settings", path: "/settings/profile", heading: null },
   { name: "settings-training", path: "/settings/training", heading: null },
   { name: "settings-paces", path: "/settings/paces", heading: null },

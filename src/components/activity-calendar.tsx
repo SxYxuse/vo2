@@ -49,7 +49,12 @@ import {
   stepDiaryWeek,
   type DiarySearch,
 } from "@/services/diary-window.ts";
-import { weekStartKey } from "@/services/day-key.ts";
+import { dayKey, weekStartKey } from "@/services/day-key.ts";
+import {
+  WeekStripView,
+  WeekSummaryView,
+  useItemsByDay,
+} from "@/components/phone-calendar-views.tsx";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -77,7 +82,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const DISABLED_INTERACTIONS = { drag: false, resize: false, selectSlot: false } as const;
@@ -305,26 +309,29 @@ function ActivityDayListView() {
             data-today={today || undefined}
           >
             <div className="bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2">
-              <span className={cn("font-semibold", today && "text-primary")}>{weekday}</span>
+              <span className="flex items-baseline gap-2">
+                <span className="font-semibold">{weekday}</span>
+                {today ? (
+                  <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-[0.6875rem] font-medium">
+                    Today
+                  </span>
+                ) : null}
+                {/* A day with nothing done says so in its header, so the week fits on screen. */}
+                {items.length === 0 ? (
+                  <span className="text-muted-foreground font-normal">Rest</span>
+                ) : null}
+              </span>
               <span className="text-muted-foreground font-medium tabular-nums">{dayDate}</span>
             </div>
-            {items.length === 0 ? (
-              <ItemGroup className="gap-0">
-                <Item size="xs" className="rounded-none border-b px-4 py-2">
-                  <ItemContent>
-                    <ItemTitle className="text-muted-foreground font-normal">Rest</ItemTitle>
-                  </ItemContent>
-                </Item>
-              </ItemGroup>
-            ) : (
-              items.map((segment) => (
-                <EventCalendarEvent
-                  key={segment.occurrence.key}
-                  segment={segment}
-                  className="hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5"
-                />
-              ))
-            )}
+            {items.length === 0
+              ? null
+              : items.map((segment) => (
+                  <EventCalendarEvent
+                    key={segment.occurrence.key}
+                    segment={segment}
+                    className="hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5"
+                  />
+                ))}
           </div>
         );
       })}
@@ -371,7 +378,8 @@ function DiaryNav({
   onJump?: () => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-2">
+    // Phones lead with the range and keep Today and the arrows together at the right edge.
+    <div className="flex min-w-0 items-center gap-1 px-2 py-2 sm:flex-wrap">
       <Button variant="ghost" size="sm" onClick={onToday}>
         Today
       </Button>
@@ -400,14 +408,17 @@ function DiaryNav({
           size="sm"
           aria-live="polite"
           aria-haspopup="dialog"
-          className="ms-1 min-w-0 font-semibold"
+          className="min-w-0 font-semibold max-sm:order-first max-sm:me-auto sm:ms-1"
           onClick={onJump}
         >
           <span className="truncate">{label}</span>
           <ChevronDownIcon aria-hidden className="text-muted-foreground" />
         </Button>
       ) : (
-        <div aria-live="polite" className="ms-3 min-w-0 truncate text-sm font-semibold">
+        <div
+          aria-live="polite"
+          className="min-w-0 truncate text-sm font-semibold max-sm:order-first max-sm:me-auto max-sm:px-2 sm:ms-3"
+        >
           {label}
         </div>
       )}
@@ -437,6 +448,7 @@ export function ActivityCalendar({
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   // Phones always page one training week; desktop follows the athlete's calendar period.
+  const phoneView = initialSettings.phoneCalendarView;
   const byMonth = isDesktop && initialSettings.calendarPeriod !== "weeks";
   const weeks = isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS;
   const currentMonth = useMemo(() => monthKey(new Date(), timeZone), [timeZone]);
@@ -523,8 +535,14 @@ export function ActivityCalendar({
     return [...goalEvents, ...activityEvents];
   }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
+  const byDay = useItemsByDay(activities, goals, timeZone);
+  const todayKey = dayKey(new Date(), timeZone);
+  const phoneBody = !isDesktop && phoneView !== "days";
+
+  // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
+  // week inside itself on short iPhones, hiding Monday under the sticky day header.
   return (
-    <Card className="flex h-[calc(100dvh-7.5rem)] min-h-80 flex-none flex-col py-0 md:h-[720px]">
+    <Card className={cn("flex flex-none flex-col py-0 md:h-[720px]", !phoneBody && "min-h-80")}>
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         {layoutReady ? (
           <EventCalendar
@@ -579,7 +597,7 @@ export function ActivityCalendar({
             }}
             weekStartsOn={MONDAY}
             eventTooltip
-            className="h-full min-h-80 w-full min-w-0 flex-1"
+            className={cn("h-full w-full min-w-0 flex-1", !phoneBody && "min-h-80")}
           >
             <VisibleActivitiesPrefetch activities={activities} />
             {byMonth ? (
@@ -633,12 +651,32 @@ export function ActivityCalendar({
               {...(isDesktop ? {} : weekSwipe.handlers)}
             >
               <div ref={weekSwipe.ref} className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <EventCalendarContent
-                  components={{
-                    month: EventCalendarMonthView,
-                    days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
-                  }}
-                />
+                {!phoneBody ? (
+                  <EventCalendarContent
+                    components={{
+                      month: EventCalendarMonthView,
+                      days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
+                    }}
+                  />
+                ) : phoneView === "summary" ? (
+                  <WeekSummaryView
+                    week={cursorWeek}
+                    byDay={byDay}
+                    timeZone={timeZone}
+                    todayKey={todayKey}
+                    sportTypes={sportTypes}
+                    search={cursor}
+                  />
+                ) : (
+                  <WeekStripView
+                    week={cursorWeek}
+                    byDay={byDay}
+                    timeZone={timeZone}
+                    todayKey={todayKey}
+                    sportTypes={sportTypes}
+                    search={cursor}
+                  />
+                )}
               </div>
             </div>
           </EventCalendar>

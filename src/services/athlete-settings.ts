@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   calendarPeriodSchema,
+  phoneCalendarViewSchema,
   planningStyleSchema,
   profileSaveSchema,
   shownSportTypesSchema,
@@ -28,6 +29,7 @@ export const athleteSettingsSaveSchema = z.object({
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),
   calendarPeriod: calendarPeriodSchema.optional(),
+  phoneCalendarView: phoneCalendarViewSchema.optional(),
   celebrateTopEfforts: z.boolean().optional(),
   heartRate: heartRateSettingsSchema.optional(),
   planningStyle: planningStyleSchema.optional(),

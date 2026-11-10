@@ -22,7 +22,7 @@ export const SETTINGS_SECTIONS = [
   { id: "profile", label: "Profile", icon: UserIcon, group: "you" },
   { id: "heart-rate", label: "Heart rate", icon: HeartPulseIcon, group: "you" },
   { id: "paces", label: "Paces", icon: GaugeIcon, group: "you" },
-  { id: "training", label: "Training", icon: TargetIcon, group: "training" },
+  { id: "training", label: "Planning", icon: TargetIcon, group: "training" },
   { id: "sports", label: "Sports", icon: ActivityIcon, group: "training" },
   { id: "calendar", label: "Calendar", icon: CalendarDaysIcon, group: "training" },
   { id: "bests", label: "Bests", icon: TrophyIcon, group: "training" },

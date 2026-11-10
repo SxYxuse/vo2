@@ -1,4 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { HeartPulseIcon } from "lucide-react";
@@ -33,16 +34,7 @@ function HeartRatePage() {
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <HeartPulseIcon aria-hidden className="size-5" />
-          Heart rate
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Max heart rate, zones, time in zone, a period report, and aerobic efficiency — overall and
-          per sport.
-        </p>
-      </div>
+      <PageHeader icon={HeartPulseIcon} title="Heart rate" />
       {data.signedIn ? (
         <HeartRateZones data={data} sportTypes={data.sportTypes} />
       ) : (
@@ -68,16 +60,7 @@ function HeartRatePage() {
 function HeartRatePending() {
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-          <HeartPulseIcon aria-hidden className="size-5" />
-          Heart rate
-        </h1>
-        <p className="text-muted-foreground hidden text-sm sm:block">
-          Max heart rate, zones, time in zone, a period report, and aerobic efficiency — overall and
-          per sport.
-        </p>
-      </div>
+      <PageHeader icon={HeartPulseIcon} title="Heart rate" />
       <ToolbarSkeleton widths={["w-44", "w-48"]} />
       <StatGridSkeleton cells={4} className="lg:grid-cols-4" />
       <PanelSkeleton bodyClassName="h-56" />

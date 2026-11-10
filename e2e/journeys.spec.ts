@@ -115,13 +115,22 @@ async function choosePlanningStyle(page: Page, label: "Off" | "Coach plan", styl
 test("an athlete with planning off sees no plan, and turns the coach plan on from Plan", async ({
   page,
 }) => {
-  // The sidebar is open on desktop; on a phone it opens as a sheet, left open for the next load.
+  // The sidebar is open on desktop. A phone has the tab bar, and More opens the sidebar as a
+  // sheet, left open for the next load: both must agree.
   const planLinks = async () => {
-    if (test.info().project.name === "phone") {
-      await page.getByRole("button", { name: "Toggle Sidebar" }).click();
-      await expect(page.getByRole("link", { name: "Season" })).toBeVisible();
+    if (test.info().project.name !== "phone") {
+      return page.getByRole("link", { name: "Plan", exact: true }).count();
     }
-    return page.getByRole("link", { name: "Plan", exact: true }).count();
+    const tabs = await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Plan", exact: true })
+      .count();
+    await page.getByRole("button", { name: "More", exact: true }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByRole("link", { name: "Season" })).toBeVisible();
+    const sidebar = await sheet.getByRole("link", { name: "Plan", exact: true }).count();
+    expect(tabs).toBe(sidebar);
+    return sidebar;
   };
   const planningOff = page.getByText("Planning is off", { exact: true });
   await page.goto("/week");
@@ -162,8 +171,7 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
 
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "More season actions" }).click();
-  await page.getByRole("menuitem", { name: "Paste season" }).click();
+  await openSeasonPaste(page);
   await page.getByRole("textbox", { name: "Copied season" }).fill(
     JSON.stringify({
       vo2Season: 1,
@@ -300,12 +308,19 @@ async function setRunningLthr(page: Page, bpm: string) {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
 
+/** Opens Paste: from the empty state of a season with no goals, or from its menu. */
+async function openSeasonPaste(page: Page) {
+  const fromEmpty = page.getByRole("button", { name: "Paste a season" });
+  if (await fromEmpty.isVisible()) return fromEmpty.click();
+  await page.getByRole("button", { name: "More season actions" }).click();
+  await page.getByRole("menuitem", { name: "Paste season" }).click();
+}
+
 /** Pastes goals into Season: one, or each leg of a multisport event. */
 async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "More season actions" }).click();
-  await page.getByRole("menuitem", { name: "Paste season" }).click();
+  await openSeasonPaste(page);
   await page
     .getByRole("textbox", { name: "Copied season" })
     .fill(JSON.stringify({ vo2Season: 1, goals }));
@@ -757,4 +772,41 @@ test("an athlete saves a key for each provider, sees them kept, and removes them
     await expect(field.getByRole("textbox", { name: `${provider} key` })).toBeVisible();
   }
   await expect(page.getByText("not-a-real-key")).toHaveCount(0);
+});
+
+test("an athlete tries each phone calendar layout from Settings, and goes back to the day list", async ({
+  page,
+}) => {
+  test.skip(test.info().project.name !== "phone", "The calendar layouts are for phones.");
+  const layouts = [
+    {
+      label: "Week strip",
+      name: "strip",
+      shows: () => page.getByRole("list", { name: "Days of the week" }),
+    },
+    {
+      label: "Week summary",
+      name: "summary",
+      shows: () => page.getByText("Activities", { exact: true }),
+    },
+    { label: "Day list", name: null, shows: () => page.getByRole("group", { name: /^Mon, / }) },
+  ];
+  for (const layout of layouts) {
+    await page.goto("/settings/calendar");
+    await settle(page);
+    await page.getByRole("radio", { name: new RegExp(`^${layout.label}`) }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Calendar" })
+      .click();
+    await expect(layout.shows()).toBeVisible();
+    await settle(page);
+    if (layout.name) {
+      await expect(page).toHaveScreenshot(`calendar-${layout.name}.png`, {
+        fullPage: true,
+        mask: [syncButton(page)],
+      });
+    }
+  }
 });

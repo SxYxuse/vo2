@@ -1,4 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
 import { TrophyIcon } from "lucide-react";
@@ -27,17 +28,7 @@ export const Route = createFileRoute("/_app/bests")({
 });
 
 function BestsHeading() {
-  return (
-    <div className="flex flex-col gap-2">
-      <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight sm:text-2xl">
-        <TrophyIcon aria-hidden className="size-5" />
-        Bests
-      </h1>
-      <p className="text-muted-foreground hidden text-sm sm:block">
-        Your personal bests on every distance and duration, how they progressed, and your top ten.
-      </p>
-    </div>
-  );
+  return <PageHeader icon={TrophyIcon} title="Bests" />;
 }
 
 function BestsPage() {
