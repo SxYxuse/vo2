@@ -23,7 +23,7 @@ export function SignedOutPage() {
         </div>
         <ThemeToggleButton />
       </header>
-      <main className="flex flex-1 flex-col justify-center px-4 pt-8 pb-[max(4rem,env(safe-area-inset-bottom))] sm:px-6">
+      <main className="flex flex-1 flex-col px-4 pt-[12vh] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-[18vh]">
         <div className="mx-auto flex w-full max-w-md flex-col gap-6">
           <Vo2Mark className="size-14 rounded-2xl shadow-sm" />
           <div className="flex flex-col gap-2">

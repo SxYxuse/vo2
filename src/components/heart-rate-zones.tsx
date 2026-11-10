@@ -251,7 +251,7 @@ export function HeartRateZones({
                                 <button
                                   type="button"
                                   aria-label={`${zone.def.label} · ${zone.def.name}`}
-                                  className="decoration-muted-foreground/50 truncate text-left text-sm font-medium underline decoration-dotted underline-offset-4"
+                                  className="decoration-muted-foreground/50 -my-[0.8rem] truncate py-[0.8rem] text-left text-sm font-medium underline decoration-dotted underline-offset-4"
                                 />
                               }
                             >

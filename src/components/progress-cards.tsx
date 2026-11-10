@@ -125,7 +125,7 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
         <Link
           to="/bests"
           search={{ sport }}
-          className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="-my-[0.9rem] ml-auto py-[0.9rem] text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           All bests
         </Link>
@@ -152,7 +152,8 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                     sport,
                     best: boardId(sport, sport === "cycling" ? "power" : "time", row.key),
                   }}
-                  className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  // Padding the row's height into the link makes a 44px target without moving it.
+                  className="text-muted-foreground -my-[0.8rem] py-[0.8rem] underline-offset-4 hover:text-foreground hover:underline"
                 >
                   {labels[row.key]}
                 </Link>

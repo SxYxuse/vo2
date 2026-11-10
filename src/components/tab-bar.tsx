@@ -66,7 +66,10 @@ export function TabBar() {
   const { openMobile, setOpenMobile } = useSidebar();
   // With planning off, Plan leaves the tabs as it leaves the sidebar.
   const tabs = shell.planningStyle === "off" ? TABS.filter((tab) => tab.to !== "/week") : TABS;
+  // A page with no tab of its own lights More, which leads to it; Plan with planning off has
+  // neither, so nothing lights.
   const onTab = tabs.some((tab) => tab.matches(pathname));
+  const moreActive = openMobile || (!onTab && !TABS.some((tab) => tab.matches(pathname)));
 
   return (
     <nav
@@ -100,10 +103,10 @@ export function TabBar() {
         className={cn(
           TAB_CLASS,
           "h-[3.5rem]",
-          openMobile || !onTab ? "text-foreground" : "text-muted-foreground",
+          moreActive ? "text-foreground" : "text-muted-foreground",
         )}
       >
-        <TabIcon icon={EllipsisIcon} active={openMobile || !onTab} />
+        <TabIcon icon={EllipsisIcon} active={moreActive} />
         More
       </button>
     </nav>
