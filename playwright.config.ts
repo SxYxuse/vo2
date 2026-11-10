@@ -16,9 +16,14 @@ const { version } = JSON.parse(
 ) as { version: string };
 const browserContainer = `vo2-e2e-browser-${E2E_BROWSER_PORT}`;
 
-/** Phone first (AGENTS.md): every spec runs at a phone size and again at desktop size. */
+/**
+ * Phone first (AGENTS.md): every spec runs at a phone size and again at desktop size. Athletes
+ * mostly install the app on an iPhone, where layout bugs showed that Chromium never did, so the
+ * screens also run in WebKit at iPhone size.
+ */
 const phone = devices["Pixel 7"];
 const desktop = devices["Desktop Chrome"];
+const iphone = devices["iPhone 15"];
 
 export default defineConfig({
   testDir: "e2e",
@@ -42,6 +47,7 @@ export default defineConfig({
     // A cached service worker would serve the last run's build; offline gets its own spec later.
     serviceWorkers: "block",
     trace: "retain-on-failure",
+    // One run-server launches whichever browser a project asks for: Chromium or WebKit.
     // <loopback> sends the container's localhost back to this machine, where the app runs.
     connectOptions: {
       wsEndpoint: `ws://127.0.0.1:${E2E_BROWSER_PORT}/`,
@@ -69,6 +75,14 @@ export default defineConfig({
       name: "desktop",
       dependencies: ["setup"],
       use: { ...desktop, storageState: "e2e/.auth/athlete.json" },
+    },
+    {
+      // Screens only: layout is where WebKit has differed. The journeys would make this the
+      // slowest CI job, and a swipe needs touch events whatever the engine (AGENTS.md).
+      name: "webkit",
+      dependencies: ["setup"],
+      testMatch: /screens\.spec\.ts/,
+      use: { ...iphone, storageState: "e2e/.auth/athlete.json" },
     },
   ],
   webServer: [

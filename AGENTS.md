@@ -57,12 +57,16 @@ Regenerate these, rather than editing them by hand:
 - Changes to coach-plan rules, budget or paces must pass the property guard (`src/services/coach-plan-rules.property.test.ts`); extend its generators when you add an input.
 - Open the app in a browser to verify only when the developer asks for it.
 - **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps plus the end-to-end suite on every pull request. Lighthouse (`vp run lighthouse`, on the sign-in page and the calendar, week, and activity screens) runs on main once a day and before each release (`.github/workflows/lighthouse.yml`).
-- **Before a pull request that changes what the athlete sees or does,** run `vp run e2e` (needs Docker and `vp run db:up`). It drives a production build against mock Strava, at phone and desktop size, and compares a screenshot of every screen.
+- **Before a pull request that changes what the athlete sees or does,** run `vp run e2e` (needs Docker and `vp run db:up`). It drives a production build against mock Strava, at phone and desktop size, and compares a screenshot of every screen; the `webkit` project also screenshots every screen in WebKit at iPhone size.
   - The full suite takes about ten minutes, longer than a foreground command may run. Run it in the background and wait for it to finish before ending your turn.
   - Pass Playwright arguments straight on: `vp run e2e -g "plan view" --project=phone` runs one test at one size. Use these scripts, never `npx playwright`.
   - Builds, e2e, and Lighthouse take a machine-wide lock (`scripts/heavy.ts`), so a run may first wait for another worktree's. Each run also removes what a killed run of this checkout left on its ports.
   - A screenshot diff you did not intend is a bug. For an intended one, run `vp run e2e:update -g "<test>"` for the tests whose screens you changed; it rewrites their screenshots even when the change is under the diff tolerance, as a one-line text change is. A new screen fails its first run until then. Commit the new images in `e2e/screenshots/`, so the reviewer sees before and after in the pull request. Do not run the full suite again just to confirm the update.
   - A new screen gets a line in `e2e/screens.spec.ts`; a new flow, or a way out of one, gets a journey in `e2e/`.
+- **Layout and touch fixes need iPhone evidence.** Athletes mostly use the installed app on an iPhone, and fixes that worked in Chromium have stayed broken there.
+  - Reproduce a visual bug in WebKit (`vp run e2e -g "<test>" --project=webkit`), or ask the developer for a screen recording, before fixing it.
+  - A Chromium screenshot doesn't prove a layout fix. Check it in WebKit or on a preview.
+  - Touch gestures use touch events, as `src/components/pull-to-refresh.tsx` does. A desktop click test doesn't prove a swipe works.
 
 ## Pull requests and commits
 
