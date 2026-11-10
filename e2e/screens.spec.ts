@@ -1,8 +1,9 @@
 import { test, expect, settle, syncButton } from "./test.ts";
 
-// One screenshot per screen, at phone and desktop size, and in WebKit at iPhone size. A diff fails the run and the HTML report
-// shows expected, actual, and the difference side by side. After an intended change, update the
-// baselines with `vp run e2e:update` and review the new images in the pull request.
+// One screenshot per screen, at phone and desktop size, and in WebKit at iPhone size. A diff fails
+// the run and the HTML report shows expected, actual, and the difference side by side. After an
+// intended change, update the baselines with `vp run e2e:update` and review the new images in the
+// pull request.
 
 const SCREENS = [
   { name: "calendar", path: "/", heading: "Activity calendar" },

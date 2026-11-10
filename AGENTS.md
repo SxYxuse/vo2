@@ -64,7 +64,7 @@ Regenerate these, rather than editing them by hand:
   - A screenshot diff you did not intend is a bug. For an intended one, run `vp run e2e:update -g "<test>"` for the tests whose screens you changed; it rewrites their screenshots even when the change is under the diff tolerance, as a one-line text change is. A new screen fails its first run until then. Commit the new images in `e2e/screenshots/`, so the reviewer sees before and after in the pull request. Do not run the full suite again just to confirm the update.
   - A new screen gets a line in `e2e/screens.spec.ts`; a new flow, or a way out of one, gets a journey in `e2e/`.
 - **Layout and touch fixes need iPhone evidence.** Athletes mostly use the installed app on an iPhone, and fixes that worked in Chromium have stayed broken there.
-  - Reproduce a visual bug in WebKit (`vp run e2e -g "<test>" --project=webkit`), or ask the developer for a screen recording, before fixing it.
+  - Reproduce a visual bug in WebKit, or ask the developer for a screen recording, before fixing it. The `webkit` project runs only `e2e/screens.spec.ts`: `vp run e2e -g "<screen>" --project=webkit`, after adding the screen or state there if it is missing.
   - A Chromium screenshot doesn't prove a layout fix. Check it in WebKit or on a preview.
   - Touch gestures use touch events, as `src/components/pull-to-refresh.tsx` does. A desktop click test doesn't prove a swipe works.
 
