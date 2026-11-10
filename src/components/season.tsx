@@ -9,7 +9,6 @@ import {
   ChevronRightIcon,
   ClipboardPasteIcon,
   CopyIcon,
-  EllipsisIcon,
   FlagIcon,
   PlusIcon,
   XIcon,
@@ -175,10 +174,9 @@ export function SeasonView({
       {header(
         <>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline" size="icon" aria-label="More season actions" />}
-            >
-              <EllipsisIcon />
+            <DropdownMenuTrigger render={<Button variant="outline" />}>
+              <CopyIcon data-icon="inline-start" />
+              Copy or paste
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem disabled={!allGoals.length} onClick={() => void copy()}>

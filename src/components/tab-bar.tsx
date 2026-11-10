@@ -57,7 +57,8 @@ function TabIcon({ icon: Icon, active }: { icon: LucideIcon; active: boolean }) 
 
 /**
  * Phones get the main screens at the bottom, where the thumb rests; More opens the full menu.
- * Desktop keeps the sidebar alone. It hides while a field has focus, so the keyboard has room.
+ * Desktop keeps the sidebar alone. It never moves while a field has focus: a bar that stepped
+ * aside for the keyboard came back mid-tap when the tap blurred the field, and the tap missed.
  */
 export function TabBar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });

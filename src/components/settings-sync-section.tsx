@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { RefreshCwIcon } from "lucide-react";
 
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
@@ -36,7 +36,7 @@ export function syncKindBadge(status: SyncKind): {
 function lastAttemptLabel(iso: string | null) {
   if (!iso) return "No copy has run yet.";
   const at = new Date(iso);
-  return `Last attempt ${formatDistanceToNow(at, { addSuffix: true })} · ${at.toLocaleString()}`;
+  return `Last attempt ${formatDistanceToNow(at, { addSuffix: true })} · ${format(at, "MMM d, h:mm a")}`;
 }
 
 function retryLabel(status: SyncKind) {
@@ -122,7 +122,7 @@ function SyncStatusCard({
         <Alert variant="warning">
           <AlertTitle>Rate limit reached</AlertTitle>
           <AlertDescription>
-            Resume after {new Date(status.pausedUntil).toLocaleString()}.
+            Resume after {format(new Date(status.pausedUntil), "MMM d, h:mm a")}.
             {status.dailyLimitRemaining != null
               ? ` ${status.dailyLimitRemaining} daily reads remain.`
               : null}

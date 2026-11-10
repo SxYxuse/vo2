@@ -921,7 +921,8 @@ function EventCalendarMonthCell({
         "group/ec-cell relative flex min-h-0 min-w-0 flex-col overflow-hidden",
         !isLast && "border-e",
         // Blank the day but keep its borders so the grid stays whole.
-        isOutside && !settings.showOutsideDays && "*:invisible",
+        // Shaded, so a row of another month reads as outside it rather than as missing data.
+        isOutside && !settings.showOutsideDays && "bg-muted/50 *:invisible",
         isOff && offClassName,
         isToday &&
           cn("bg-primary/3 border-b-primary/40 relative border-b-2", viewConfig.todayClassName),

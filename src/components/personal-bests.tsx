@@ -18,7 +18,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/services/activity-detail.types.ts";
 import { boardLabel, durationLabel, formatKm, formatValue } from "@/components/best-labels.ts";
@@ -170,23 +169,26 @@ export function BestsView({ data, copyIncomplete, search, onSearchChange }: Best
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        <Tabs
-          value={sport}
-          onValueChange={(value) =>
-            onSearchChange(
-              { ...search, sport: value as BestsSport, best: undefined },
-              { replace: true },
-            )
-          }
+        {/* Same control as the period below, and as Heart rate's sport filter. */}
+        <ToggleGroup
+          size="sm"
+          variant="outline"
+          spacing={0}
+          value={[sport]}
+          onValueChange={(next) => {
+            const value = next[0] as BestsSport | undefined;
+            if (value) {
+              onSearchChange({ ...search, sport: value, best: undefined }, { replace: true });
+            }
+          }}
+          className="flex-wrap"
         >
-          <TabsList>
-            {sports.map((item) => (
-              <TabsTrigger key={item} value={item}>
-                {SPORT_TAB[item]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+          {sports.map((item) => (
+            <ToggleGroupItem key={item} value={item}>
+              {SPORT_TAB[item]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
         <ToggleGroup
           size="sm"
           variant="outline"

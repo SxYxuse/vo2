@@ -517,26 +517,6 @@ body {
   body:has([data-slot="tab-bar"]) {
     --tab-bar: calc(3.5rem + env(safe-area-inset-bottom));
   }
-  /* A focused field brings up the keyboard: the tab bar steps aside so the field has room. */
-  body:has(
-    :is(
-      input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
-      textarea,
-      [contenteditable="true"]
-    ):focus
-  ) {
-    --tab-bar: 0px;
-  }
-  body:has(
-      :is(
-        input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
-        textarea,
-        [contenteditable="true"]
-      ):focus
-    )
-    [data-slot="tab-bar"] {
-    display: none;
-  }
 }
 
 @layer base {

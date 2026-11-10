@@ -351,7 +351,12 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
               <StatCard
                 label="Form (TSB)"
                 value={roundLoad(latest.tsb).toFixed(1)}
-                trend={{ label: formLabel(latest.tsb), tone: formBadgeTone(latest.tsb) }}
+                // The "Right now" callout above may already name the form; say it once.
+                trend={
+                  formLabel(latest.tsb) === phase.title
+                    ? undefined
+                    : { label: formLabel(latest.tsb), tone: formBadgeTone(latest.tsb) }
+                }
                 info={SERIES_INFO.tsb}
                 color={CHART_CONFIG.tsb.color}
                 sparkline={

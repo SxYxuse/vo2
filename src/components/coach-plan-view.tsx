@@ -177,7 +177,7 @@ function WeekSessions({ week, state }: { week: PlanWeek; state: CoachPlanState }
     <section aria-label="The week's sessions" className="flex flex-col gap-3">
       {started ? (
         <p className="text-muted-foreground text-xs" aria-live="polite">
-          {done} of {week.sessions.length} done. Do them on the days that suit you.
+          {done} of {week.sessions.length} done.
         </p>
       ) : null}
       <ul className="flex flex-col gap-2">

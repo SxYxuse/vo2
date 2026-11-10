@@ -593,8 +593,9 @@ export function CoachChat({
             training.
           </CoachKeyPrompt>
         ) : empty ? (
-          // Bottom-aligned on phones, so the starters sit where the thumb already is.
-          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end gap-6 overflow-y-auto pb-4 sm:justify-center">
+          // Centred: the composer below already sits at the thumb, and a bottom-aligned hero left a
+          // blank half screen under the title.
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6 overflow-y-auto pb-4">
             <div className="flex flex-col items-center gap-3 text-center text-balance">
               <span
                 aria-hidden

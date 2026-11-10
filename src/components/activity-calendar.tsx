@@ -372,7 +372,8 @@ function DiaryNav({
   onJump?: () => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-2">
+    // Phones lead with the range and keep Today and the arrows together at the right edge.
+    <div className="flex min-w-0 items-center gap-1 px-2 py-2 sm:flex-wrap">
       <Button variant="ghost" size="sm" onClick={onToday}>
         Today
       </Button>
@@ -401,14 +402,17 @@ function DiaryNav({
           size="sm"
           aria-live="polite"
           aria-haspopup="dialog"
-          className="ms-1 min-w-0 font-semibold"
+          className="min-w-0 font-semibold max-sm:order-first max-sm:me-auto sm:ms-1"
           onClick={onJump}
         >
           <span className="truncate">{label}</span>
           <ChevronDownIcon aria-hidden className="text-muted-foreground" />
         </Button>
       ) : (
-        <div aria-live="polite" className="ms-3 min-w-0 truncate text-sm font-semibold">
+        <div
+          aria-live="polite"
+          className="min-w-0 truncate text-sm font-semibold max-sm:order-first max-sm:me-auto max-sm:px-2 sm:ms-3"
+        >
           {label}
         </div>
       )}

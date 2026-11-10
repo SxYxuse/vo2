@@ -53,7 +53,7 @@ function WeekTargetHeading({ planned = true }: { planned?: boolean }) {
       description={
         planned
           ? "Each week's sessions toward your season. Do them on the days that suit you."
-          : "No week is planned while planning is off."
+          : undefined
       }
     />
   );

@@ -297,7 +297,9 @@ export function AppSidebar() {
   const { pathname, navigate, onLinkClick } = useSidebarNavigate();
   const { isMobile } = useSidebar();
   const lastHref = useLastHrefOutsideSettings();
-  const inSettings = isSettingsPath(pathname);
+  // A phone's More opens the app menu everywhere; inside settings, the "‹ Settings" link and the
+  // settings list move between sections.
+  const inSettings = isSettingsPath(pathname) && !isMobile;
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   // With planning off, Plan leaves the sidebar: its page says so, reached from Settings.
   const trainingItems =
@@ -361,6 +363,25 @@ export function AppSidebar() {
                 onLinkClick={onLinkClick}
               />
             ))}
+            {/* The phone sheet names Settings and the theme in full, where icons alone hid them. */}
+            {isMobile ? (
+              <SidebarGroup className="mt-auto">
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={isSettingsPath(pathname)}
+                      render={<Link to="/settings" preload="intent" onClick={onLinkClick} />}
+                    >
+                      <Settings2Icon />
+                      <span>Settings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarThemeButton labelled />
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroup>
+            ) : null}
           </>
         )}
       </SidebarContent>
@@ -374,7 +395,7 @@ export function AppSidebar() {
             : "pb-[max(0.5rem,env(safe-area-inset-bottom))]",
         )}
       >
-        {inSettings ? null : (
+        {inSettings || isMobile ? null : (
           <SidebarMenuButton
             tooltip="Settings"
             aria-label="Settings"
@@ -384,7 +405,7 @@ export function AppSidebar() {
             <Settings2Icon />
           </SidebarMenuButton>
         )}
-        <SidebarThemeButton />
+        {isMobile && !inSettings ? null : <SidebarThemeButton />}
         <div className="ml-auto group-data-[collapsible=icon]:ml-0">
           <SidebarUserMenu />
         </div>
@@ -394,10 +415,19 @@ export function AppSidebar() {
   );
 }
 
-function SidebarThemeButton() {
+function SidebarThemeButton({ labelled = false }: { labelled?: boolean }) {
   const { mounted, current, next, toggle } = useThemeToggle();
   const { isMobile } = useSidebar();
   const label = mounted ? `Theme: ${current.label}. Switch to ${next.label}` : "Theme";
+
+  if (labelled) {
+    return (
+      <SidebarMenuButton aria-label={label} disabled={!mounted} onClick={toggle}>
+        {mounted ? <current.icon /> : <span aria-hidden className="size-4" />}
+        <span>{mounted ? `${current.label} theme` : "Theme"}</span>
+      </SidebarMenuButton>
+    );
+  }
 
   return (
     <SidebarMenuButton

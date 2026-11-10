@@ -171,7 +171,7 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
 
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "More season actions" }).click();
+  await page.getByRole("button", { name: "Copy or paste" }).click();
   await page.getByRole("menuitem", { name: "Paste season" }).click();
   await page.getByRole("textbox", { name: "Copied season" }).fill(
     JSON.stringify({
@@ -313,7 +313,7 @@ async function setRunningLthr(page: Page, bpm: string) {
 async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);
-  await page.getByRole("button", { name: "More season actions" }).click();
+  await page.getByRole("button", { name: "Copy or paste" }).click();
   await page.getByRole("menuitem", { name: "Paste season" }).click();
   await page
     .getByRole("textbox", { name: "Copied season" })
