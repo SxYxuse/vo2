@@ -8,6 +8,7 @@ import { Controller, useWatch, type Control, type FieldPath } from "react-hook-f
 import {
   ageFromBirthDate,
   CALENDAR_PERIODS,
+  PHONE_CALENDAR_VIEWS,
   formatBirthDate,
   parseBirthDate,
   PLANNING_STYLES,
@@ -242,7 +243,7 @@ export function CalendarPeriodField({
           <FieldLegend>Calendar period</FieldLegend>
           <FieldDescription>
             What the activity calendar shows on a wide screen. Previous and next move by that same
-            period. Phones always show one training week.
+            period. Phones follow the phone calendar below.
           </FieldDescription>
           <RadioGroup
             name={field.name}
@@ -255,6 +256,53 @@ export function CalendarPeriodField({
           >
             {CALENDAR_PERIODS.map((period) => {
               const id = `${idPrefix}-calendar-period-${period.id}`;
+              return (
+                <FieldLabel key={period.id} htmlFor={id} className="w-full">
+                  <Field orientation="horizontal" className="items-start p-3">
+                    <RadioGroupItem value={period.id} id={id} />
+                    <FieldContent>
+                      <FieldTitle>{period.label}</FieldTitle>
+                      <FieldDescription>{period.hint}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              );
+            })}
+          </RadioGroup>
+        </FieldSet>
+      )}
+    />
+  );
+}
+
+export function PhoneCalendarViewField({
+  idPrefix,
+  control,
+}: {
+  idPrefix: string;
+  control: Control<SettingsFormInput>;
+}) {
+  return (
+    <Controller
+      name="phoneCalendarView"
+      control={control}
+      render={({ field }) => (
+        <FieldSet>
+          <FieldLegend>Phone calendar</FieldLegend>
+          <FieldDescription>
+            How the activity calendar looks on a phone. Try each one; nothing else changes.
+          </FieldDescription>
+          <RadioGroup
+            name={field.name}
+            value={field.value}
+            onValueChange={(next) => {
+              if (!next) return;
+              field.onChange(next);
+            }}
+            className="gap-2"
+          >
+            {PHONE_CALENDAR_VIEWS.map((period) => {
+              const id = `${idPrefix}-phone-calendar-${period.id}`;
               return (
                 <FieldLabel key={period.id} htmlFor={id} className="w-full">
                   <Field orientation="horizontal" className="items-start p-3">

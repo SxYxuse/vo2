@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   CalendarPeriodField,
+  PhoneCalendarViewField,
   CelebrateTopEffortsField,
   PlanningStyleChoice,
   ProfileFields,
@@ -114,6 +115,7 @@ export function SettingsForm({
         sportTypes: data.settings.sportTypes,
         sportGroupShares: data.settings.sportGroupShares,
         calendarPeriod: data.settings.calendarPeriod,
+        phoneCalendarView: data.settings.phoneCalendarView,
         celebrateTopEfforts: data.settings.topEffortsSince != null,
         planningStyle: data.settings.planningStyle ?? "coachPlan",
       }),
@@ -276,7 +278,11 @@ export function SettingsForm({
                 ) : null}
               </FieldGroup>
             ) : section === "calendar" ? (
-              <CalendarPeriodField idPrefix="settings" control={form.control} />
+              <FieldGroup>
+                <CalendarPeriodField idPrefix="settings" control={form.control} />
+                <FieldSeparator />
+                <PhoneCalendarViewField idPrefix="settings" control={form.control} />
+              </FieldGroup>
             ) : section === "bests" ? (
               <CelebrateTopEffortsField idPrefix="settings" control={form.control} />
             ) : section === "coach" ? (

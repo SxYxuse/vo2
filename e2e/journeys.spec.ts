@@ -773,3 +773,46 @@ test("an athlete saves a key for each provider, sees them kept, and removes them
   }
   await expect(page.getByText("not-a-real-key")).toHaveCount(0);
 });
+
+test("an athlete tries each phone calendar layout from Settings, and goes back to the day list", async ({
+  page,
+}) => {
+  test.skip(test.info().project.name !== "phone", "The calendar layouts are for phones.");
+  const layouts = [
+    {
+      label: "Week strip",
+      name: "strip",
+      shows: () => page.getByRole("list", { name: "Days of the week" }),
+    },
+    {
+      label: "Week summary",
+      name: "summary",
+      shows: () => page.getByText("Activities", { exact: true }),
+    },
+    {
+      label: "Feed",
+      name: "feed",
+      shows: () => page.getByRole("heading", { name: "This week", level: 2 }),
+    },
+    { label: "Month", name: "month", shows: () => page.getByRole("grid", { name: "Month" }) },
+    { label: "Day list", name: null, shows: () => page.getByRole("group", { name: /^Mon, / }) },
+  ];
+  for (const layout of layouts) {
+    await page.goto("/settings/calendar");
+    await settle(page);
+    await page.getByRole("radio", { name: new RegExp(`^${layout.label}`) }).click();
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Calendar" })
+      .click();
+    await expect(layout.shows()).toBeVisible();
+    await settle(page);
+    if (layout.name) {
+      await expect(page).toHaveScreenshot(`calendar-${layout.name}.png`, {
+        fullPage: true,
+        mask: [syncButton(page)],
+      });
+    }
+  }
+});

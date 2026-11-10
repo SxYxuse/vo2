@@ -70,6 +70,34 @@ export const CALENDAR_PERIODS = [
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
+/** The phone calendar's layouts, kept side by side while athletes find the one that suits them. */
+export const PHONE_CALENDAR_VIEWS = [
+  { id: "days", label: "Day list", hint: "Every day of the week in a list, rest days included." },
+  {
+    id: "strip",
+    label: "Week strip",
+    hint: "The week's days in a row with a dot per sport, then only what you did.",
+  },
+  {
+    id: "summary",
+    label: "Week summary",
+    hint: "The week's time, distance, and a bar per day, then what you did.",
+  },
+  {
+    id: "feed",
+    label: "Feed",
+    hint: "Everything you did in one list back in time, grouped by week.",
+  },
+  {
+    id: "month",
+    label: "Month",
+    hint: "A small month with a dot per sport. Tap a day to list its week.",
+  },
+] as const;
+
+export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary", "feed", "month"]);
+export type PhoneCalendarView = z.infer<typeof phoneCalendarViewSchema>;
+
 /** How VO2 plans the athlete's training (ADR 0037, ADR 0050). */
 export const PLANNING_STYLES = [
   {
@@ -97,6 +125,7 @@ const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
   calendarPeriod: calendarPeriodSchema.default("month"),
+  phoneCalendarView: phoneCalendarViewSchema.default("days"),
   /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
   topEffortsSince: z.iso.datetime().nullable().default(null),
   /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */
@@ -195,6 +224,7 @@ export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
   calendarPeriod: "month",
+  phoneCalendarView: "days",
   topEffortsSince: null,
   coachModels: DEFAULT_COACH_MODELS,
   planningStyle: null,

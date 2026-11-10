@@ -6,6 +6,7 @@ import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
 import { addDays, format } from "date-fns";
 import { enUS } from "date-fns/locale";
+import { cn } from "cn";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -48,7 +49,14 @@ import {
   stepDiaryWeek,
   type DiarySearch,
 } from "@/services/diary-window.ts";
-import { weekStartKey } from "@/services/day-key.ts";
+import { dayKey, weekStartKey } from "@/services/day-key.ts";
+import {
+  ActivityFeed,
+  MonthDotsView,
+  WeekStripView,
+  WeekSummaryView,
+  useItemsByDay,
+} from "@/components/phone-calendar-views.tsx";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -441,8 +449,10 @@ export function ActivityCalendar({
   const navigate = useNavigate();
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  // Phones always page one training week; desktop follows the athlete's calendar period.
-  const byMonth = isDesktop && initialSettings.calendarPeriod !== "weeks";
+  // Desktop follows the athlete's calendar period; phones page one training week, or a month in
+  // the month layout (Settings → Calendar).
+  const phoneView = initialSettings.phoneCalendarView;
+  const byMonth = isDesktop ? initialSettings.calendarPeriod !== "weeks" : phoneView === "month";
   const weeks = isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS;
   const currentMonth = useMemo(() => monthKey(new Date(), timeZone), [timeZone]);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
@@ -528,10 +538,27 @@ export function ActivityCalendar({
     return [...goalEvents, ...activityEvents];
   }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
+  const byDay = useItemsByDay(activities, goals, timeZone);
+  const todayKey = dayKey(new Date(), timeZone);
+  const phoneBody = !isDesktop && phoneView !== "days";
+
+  if (layoutReady && !isDesktop && phoneView === "feed") {
+    const oldestKey = [...byDay.keys()].sort()[0];
+    return (
+      <ActivityFeed
+        byDay={byDay}
+        timeZone={timeZone}
+        sportTypes={sportTypes}
+        currentWeek={currentWeek}
+        oldestKey={oldestKey}
+      />
+    );
+  }
+
   // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
   // week inside itself on short iPhones, hiding Monday under the sticky day header.
   return (
-    <Card className="flex min-h-80 flex-none flex-col py-0 md:h-[720px]">
+    <Card className={cn("flex flex-none flex-col py-0 md:h-[720px]", !phoneBody && "min-h-80")}>
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         {layoutReady ? (
           <EventCalendar
@@ -586,7 +613,7 @@ export function ActivityCalendar({
             }}
             weekStartsOn={MONDAY}
             eventTooltip
-            className="h-full min-h-80 w-full min-w-0 flex-1"
+            className={cn("h-full w-full min-w-0 flex-1", !phoneBody && "min-h-80")}
           >
             <VisibleActivitiesPrefetch activities={activities} />
             {byMonth ? (
@@ -622,7 +649,7 @@ export function ActivityCalendar({
                 cursorMonth={byMonth ? cursorMonth : monthOfWeek(cursorWeek)}
                 currentMonth={currentMonth}
                 currentWeek={currentWeek}
-                pickWeek={!isDesktop}
+                pickWeek={!byMonth}
                 onPickMonth={(month) => {
                   setJumping(false);
                   void show(
@@ -637,15 +664,44 @@ export function ActivityCalendar({
             ) : null}
             <div
               className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-              {...(isDesktop ? {} : weekSwipe.handlers)}
+              {...(isDesktop || byMonth ? {} : weekSwipe.handlers)}
             >
               <div ref={weekSwipe.ref} className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <EventCalendarContent
-                  components={{
-                    month: EventCalendarMonthView,
-                    days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
-                  }}
-                />
+                {!phoneBody ? (
+                  <EventCalendarContent
+                    components={{
+                      month: EventCalendarMonthView,
+                      days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
+                    }}
+                  />
+                ) : phoneView === "month" ? (
+                  <MonthDotsView
+                    month={cursorMonth}
+                    byDay={byDay}
+                    timeZone={timeZone}
+                    todayKey={todayKey}
+                    sportTypes={sportTypes}
+                    search={cursor}
+                  />
+                ) : phoneView === "summary" ? (
+                  <WeekSummaryView
+                    week={cursorWeek}
+                    byDay={byDay}
+                    timeZone={timeZone}
+                    todayKey={todayKey}
+                    sportTypes={sportTypes}
+                    search={cursor}
+                  />
+                ) : (
+                  <WeekStripView
+                    week={cursorWeek}
+                    byDay={byDay}
+                    timeZone={timeZone}
+                    todayKey={todayKey}
+                    sportTypes={sportTypes}
+                    search={cursor}
+                  />
+                )}
               </div>
             </div>
           </EventCalendar>
