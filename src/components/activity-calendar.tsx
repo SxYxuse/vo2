@@ -528,8 +528,10 @@ export function ActivityCalendar({
     return [...goalEvents, ...activityEvents];
   }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
+  // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
+  // week inside itself on short iPhones, hiding Monday under the sticky day header.
   return (
-    <Card className="flex max-h-[calc(100dvh-11rem-var(--tab-bar,0px))] min-h-80 flex-none flex-col py-0 md:h-[720px] md:max-h-none">
+    <Card className="flex min-h-80 flex-none flex-col py-0 md:h-[720px]">
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
         {layoutReady ? (
           <EventCalendar
