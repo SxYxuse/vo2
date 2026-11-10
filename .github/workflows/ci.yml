@@ -55,15 +55,15 @@ jobs:
           path: jscpd-report/jscpd-report.json
           if-no-files-found: ignore
 
-  # Phone and desktop take about as long as each other, so each gets its own runner, database,
-  # and mock athlete; --project brings in the setup and teardown it depends on.
+  # Each project gets its own runner, database, and mock athlete, so WebKit adds no time to the
+  # slowest job; --project brings in the setup and teardown it depends on.
   e2e:
     name: e2e (${{ matrix.project }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        project: [phone, desktop]
+        project: [phone, desktop, webkit]
     env:
       DATABASE_URL: postgresql://vo2:vo2@localhost:55432/vo2
       BETTER_AUTH_SECRET: ci-placeholder-secret
