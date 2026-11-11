@@ -368,18 +368,20 @@ function finalText(activities: MockActivity[]) {
 
 // ----- The stream (keep it shaped like the real provider's) -----
 //
-// The mock coach must keep streaming the way the real adapters do (TanStack AI's OpenRouter and
-// OpenAI text adapters), event for event: chat bugs that only show live reproduce here, or nowhere
-// before an athlete hits them. The scroll fix in coach-chat.tsx (the chat jumped back to an old
-// question mid-reply) only reproduced once the mock streamed reasoning first and tool arguments in
-// pieces, at a model's pace. So, like the real adapters:
+// The mock coach must keep streaming the way the real provider does, event for event: chat bugs
+// that only show live reproduce here, or nowhere before an athlete hits them. The scroll fix in
+// coach-chat.tsx (the chat jumped back to an old question mid-reply) only reproduced once the mock
+// streamed reasoning first and tool arguments in pieces, at a model's pace. It follows TanStack
+// AI's OpenRouter adapter, the default provider's. (OpenAI's Responses adapter differs: it closes
+// the reasoning before the tool calls, and ends each call as its arguments finish.) So, like
+// OpenRouter's:
 // - nothing arrives before the first token's latency, and RUN_STARTED comes with the first chunk;
 // - every step starts with reasoning, in token-sized deltas, and has no STEP_* events;
 // - a step that calls tools streams each call's arguments in token-sized pieces, ends every call
 //   only when the step finishes, and closes the reasoning after them;
 // - a step that answers closes the reasoning when the first text arrives, and each text delta
 //   carries the text so far.
-// Check the adapter's processStreamChunks after a TanStack AI upgrade and follow what it does.
+// Check its processStreamChunks after a TanStack AI upgrade and follow what it does.
 //
 // Pacing is a fast model's: about 100 tokens a second for reasoning and text. Tool arguments
 // come four tokens per tick, so a visual's HTML takes a second or two rather than six: the e2e

@@ -14,7 +14,7 @@
  *   --mid-onboarding   Stops on onboarding once the training is copied, before the setup steps.
  *   --coach-plan       Onboards with the coach plan, written by the mock coach, toward a half
  *                      marathon in ten weeks. It also records the plan-writer request that
- *                      `vp run coach:replay` sends to a real model.
+ *                      `vp run coach:replay` sends to a real model (needs `vp run dev:mock`).
  */
 
 import { mkdirSync } from "node:fs";

@@ -716,15 +716,18 @@ test("an athlete asks the coach a question and gets an answer", async ({ page })
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 });
 
+type ViewCounts = { inView: number; outOfView: number; stopped?: boolean };
+
 /**
- * Counts the animation frames in which a chat message, once shown, is out of the chat's view.
- * Sampled in the page, so a jump that lasts a frame or two is caught.
+ * Counts the animation frames in which a chat message, once shown, is in and out of the chat's
+ * view, until the counts are read. Sampled in the page, so a jump of a frame or two is caught.
  */
-async function watchOutOfView(page: Page, text: string) {
+async function watchInView(page: Page, text: string) {
   await page.evaluate((text) => {
-    const counter = window as unknown as { outOfView: number };
-    counter.outOfView = 0;
+    const counts: ViewCounts = { inView: 0, outOfView: 0 };
+    (window as unknown as { viewCounts: ViewCounts }).viewCounts = counts;
     const check = () => {
+      if (counts.stopped) return;
       const viewport = document.querySelector('[data-slot="message-scroller-viewport"]');
       const item = [...document.querySelectorAll('[data-slot="message-scroller-item"]')].find(
         (element) => element.textContent?.includes(text),
@@ -732,13 +735,19 @@ async function watchOutOfView(page: Page, text: string) {
       if (viewport && item) {
         const view = viewport.getBoundingClientRect();
         const box = item.getBoundingClientRect();
-        if (box.bottom <= view.top || box.top >= view.bottom) counter.outOfView += 1;
+        if (box.bottom <= view.top || box.top >= view.bottom) counts.outOfView += 1;
+        else counts.inView += 1;
       }
       requestAnimationFrame(check);
     };
     requestAnimationFrame(check);
   }, text);
-  return () => page.evaluate(() => (window as unknown as { outOfView: number }).outOfView);
+  return () =>
+    page.evaluate(() => {
+      const counts = (window as unknown as { viewCounts: ViewCounts }).viewCounts;
+      counts.stopped = true;
+      return counts;
+    });
 }
 
 test("an athlete reopens an earlier coach chat from Chats, then deletes it", async ({ page }) => {
@@ -763,12 +772,15 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
   // A follow-up in the reopened chat stays in view while the coach replies: when every question
   // anchored the scroller, the view jumped back to the top mid-reply.
   const followUp = "And how is my form?";
-  const outOfView = await watchOutOfView(page, followUp);
+  const viewCounts = await watchInView(page, followUp);
   await page.getByRole("textbox", { name: "Message the coach" }).fill(followUp);
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText(/This is the mock coach/)).toHaveCount(2, { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
-  expect(await outOfView()).toBe(0);
+  // Seen at all, so a renamed slot or message can't pass by counting nothing.
+  const { inView, outOfView } = await viewCounts();
+  expect(inView).toBeGreaterThan(0);
+  expect(outOfView).toBe(0);
 
   // Deleting the open chat starts a new one, and the chat is gone from the list.
   await page.getByRole("button", { name: "Chats" }).click();

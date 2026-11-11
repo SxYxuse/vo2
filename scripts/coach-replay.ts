@@ -7,15 +7,16 @@
  *
  *   OPENROUTER_API_KEY=… vp run coach:replay [--request <file>] [--model <id>] [--reasoning <level>]
  *   OPENAI_API_KEY=… vp run coach:replay --provider openai --model <id>
- *   vp run coach:replay --dry-run     prints the request it would send; needs no key
+ *   vp run coach:replay --dry-run     writes the request it would send to
+ *                                     .dev-seed/plan-writer-dry-run.json; needs no key
  *
- * The request is recorded by the dev server (`vp run dev:mock`) each time the mock coach writes a
- * plan: set up the coach plan for the mock athlete, or tap Write again, and it lands in
+ * The request is recorded by the dev server (`vp run dev:mock`, not start:mock) each time the mock
+ * coach writes a plan: `vp run dev:seed --coach-plan`, or Write again on Plan, and it lands in
  * .dev-seed/plan-writer-request.json. It holds the mock athlete's training only, and .dev-seed is
  * gitignored: never commit a request recorded from a real athlete, or a key.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import type { ReasoningLevel } from "@tanstack/ai";
@@ -32,6 +33,8 @@ const { values } = parseArgs({
     "dry-run": { type: "boolean", default: false },
   },
 });
+
+const DRY_RUN_PATH = ".dev-seed/plan-writer-dry-run.json";
 
 function fail(message: string): never {
   console.error(`coach:replay: ${message}`);
@@ -53,7 +56,7 @@ try {
   recorded = JSON.parse(readFileSync(values.request, "utf8"));
 } catch {
   fail(
-    `no request at ${values.request}: run \`vp run dev:mock\`, set up the coach plan for the mock athlete (\`vp run dev:seed\`), and it is recorded there.`,
+    `no request at ${values.request}: start \`vp run dev:mock\` (not start:mock: only the dev server records), then \`vp run dev:seed --coach-plan\` records one there.`,
   );
 }
 
@@ -76,19 +79,10 @@ if (reasoning != null && !REASONING_LEVELS.includes(reasoning)) {
 }
 
 if (values["dry-run"]) {
-  console.log(
-    JSON.stringify(
-      {
-        provider,
-        model,
-        reasoning,
-        ...writer.planRequest(prompt, ctx),
-        output: "writtenPlanSchema",
-      },
-      null,
-      2,
-    ),
-  );
+  // To a file: the app's logger prints to stdout as the writer loads, so stdout isn't clean JSON.
+  const request = { provider, model, reasoning, ...writer.planRequest(prompt, ctx) };
+  writeFileSync(DRY_RUN_PATH, JSON.stringify({ ...request, output: "writtenPlanSchema" }, null, 2));
+  console.log(`coach:replay: the request it would send to ${model} is in ${DRY_RUN_PATH}.`);
   process.exit(0);
 }
 
