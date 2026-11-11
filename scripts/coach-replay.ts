@@ -16,7 +16,7 @@
  * gitignored: never commit a request recorded from a real athlete, or a key.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import type { ReasoningLevel } from "@tanstack/ai";
@@ -81,6 +81,7 @@ if (reasoning != null && !REASONING_LEVELS.includes(reasoning)) {
 if (values["dry-run"]) {
   // To a file: the app's logger prints to stdout as the writer loads, so stdout isn't clean JSON.
   const request = { provider, model, reasoning, ...writer.planRequest(prompt, ctx) };
+  mkdirSync(".dev-seed", { recursive: true });
   writeFileSync(DRY_RUN_PATH, JSON.stringify({ ...request, output: "writtenPlanSchema" }, null, 2));
   console.log(`coach:replay: the request it would send to ${model} is in ${DRY_RUN_PATH}.`);
   process.exit(0);
