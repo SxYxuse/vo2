@@ -241,6 +241,27 @@ export type WriteResult = { ok: true; sessions: PlannedSession[] } | { ok: false
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** What the coach is first sent: the coaching knowledge, then the prompt as JSON. */
+export function planRequest(prompt: PlanPrompt, ctx: RuleContext) {
+  return {
+    systemPrompts: [systemPrompt(ctx)],
+    messages: [{ role: "user", content: JSON.stringify(prompt) }] as ModelMessage[],
+  };
+}
+
+/** Where the dev server keeps the last request the mock coach answered, for `vp run coach:replay`. */
+const RECORDED_REQUEST = ".dev-seed/plan-writer-request.json";
+
+/**
+ * Development only: the mock coach skips the prompt, so the request is kept for
+ * scripts/coach-replay.ts to send to a real model. Mock Strava's athlete only, and gitignored.
+ */
+async function recordRequest(prompt: PlanPrompt, ctx: RuleContext, anchors: PlanAnchors) {
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  await mkdir(".dev-seed", { recursive: true });
+  await writeFile(RECORDED_REQUEST, JSON.stringify({ prompt, ctx, anchors }, null, 2));
+}
+
 /**
  * Asks the coach for the sessions, checks them, and sends a failing plan back with the rules it
  * broke, at most twice. The mock coach writes a plan that passes, without a model.
@@ -254,13 +275,14 @@ export async function writeSessions(
   const plan = (written: WrittenPlan) =>
     written.sessions.map((session) => plannedSession(session, anchors));
   if (coach.kind === "mock") {
+    if (import.meta.env.DEV) await recordRequest(prompt, ctx, anchors);
     await pause(MOCK_PAUSE_MS);
     const sessions = plan({ sessions: mockCoachPlan(ctx, anchors.paces) });
     const breaks = checkPlan(sessions, ctx);
     if (breaks.length) return { ok: false, error: breaksText(breaks) };
     return { ok: true, sessions };
   }
-  const messages: ModelMessage[] = [{ role: "user", content: JSON.stringify(prompt) }];
+  const { systemPrompts, messages } = planRequest(prompt, ctx);
   let breaks: RuleBreak[] = [];
   for (let attempt = 0; attempt <= RETRIES; attempt += 1) {
     let written: WrittenPlan;
@@ -271,7 +293,7 @@ export async function writeSessions(
         adapter: coach.adapter,
         reasoning: coach.reasoning,
         threadId: crypto.randomUUID(),
-        systemPrompts: [systemPrompt(ctx)],
+        systemPrompts,
         messages,
         outputSchema: writtenPlanSchema,
         abortController: abort,

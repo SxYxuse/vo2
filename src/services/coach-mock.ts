@@ -366,14 +366,51 @@ function finalText(activities: MockActivity[]) {
   ].join("\n");
 }
 
-// Paced like a real model, so the chat's scrolling and loading states show as they would live.
-const TOOL_PAUSE_MS = 600;
-const TEXT_PAUSE_MS = 40;
+// ----- The stream (keep it shaped like the real provider's) -----
+//
+// The mock coach must keep streaming the way the real adapters do (TanStack AI's OpenRouter and
+// OpenAI text adapters), event for event: chat bugs that only show live reproduce here, or nowhere
+// before an athlete hits them. The scroll fix in coach-chat.tsx (the chat jumped back to an old
+// question mid-reply) only reproduced once the mock streamed reasoning first and tool arguments in
+// pieces, at a model's pace. So, like the real adapters:
+// - nothing arrives before the first token's latency, and RUN_STARTED comes with the first chunk;
+// - every step starts with reasoning, in token-sized deltas, and has no STEP_* events;
+// - a step that calls tools streams each call's arguments in token-sized pieces, ends every call
+//   only when the step finishes, and closes the reasoning after them;
+// - a step that answers closes the reasoning when the first text arrives, and each text delta
+//   carries the text so far.
+// Check the adapter's processStreamChunks after a TanStack AI upgrade and follow what it does.
+//
+// Pacing is a fast model's: about 100 tokens a second for reasoning and text. Tool arguments
+// come four tokens per tick, so a visual's HTML takes a second or two rather than six: the e2e
+// suite asks the coach many times, and a turn stays about as long as before (about 4 s).
+
+/** Before anything streams, as a provider takes to start answering. */
+const FIRST_TOKEN_MS = 300;
+const TICK_MS = 10;
+/** About a token: real deltas are a few characters, not a sentence. */
+const TOKEN_CHARS = 4;
+const ARGS_TOKENS_PER_TICK = 4;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The text in token-sized deltas, pausing a tick after every `perTick` of them. */
+async function* paced(text: string, perTick = 1) {
+  const deltas = text.match(new RegExp(`[\\s\\S]{1,${TOKEN_CHARS}}`, "g")) ?? [];
+  for (const [index, delta] of deltas.entries()) {
+    if (index % perTick === 0) await pause(TICK_MS);
+    yield delta;
+  }
+}
 
 type Step =
   | { kind: "tools"; calls: { name: string; input: Record<string, unknown> }[] }
   | { kind: "text"; text: string };
+
+function reasoningFor(step: Step) {
+  if (step.kind === "text") return "I have what I need from the tools, so I can answer now.";
+  const names = step.calls.map((call) => call.name).join(" and ");
+  return `To answer, I need to look at the athlete's data first, so I'll call ${names}.`;
+}
 
 function nextStep(messages: ModelMessage[], tools: string[]): Step {
   if (tools.includes("propose_plan_change")) {
@@ -409,86 +446,88 @@ function nextStep(messages: ModelMessage[], tools: string[]): Step {
 
 /** A scripted coach for running without a model key: two tools, a visual, then markdown. */
 export function mockCoachText(): AnyTextAdapter {
+  const model = "mock-coach";
   return {
     kind: "text",
     name: "mock",
-    model: "mock-coach",
+    model,
     async *chatStream(options: TextOptions) {
       const runId = options.runId ?? crypto.randomUUID();
       const threadId = options.threadId ?? crypto.randomUUID();
       const messageId = crypto.randomUUID();
-      const timestamp = Date.now();
-      yield { type: EventType.RUN_STARTED, runId, threadId, timestamp };
-
-      // Like a reasoning model, think a little before each step.
       const reasoningId = crypto.randomUUID();
-      const stepId = crypto.randomUUID();
-      yield { type: EventType.REASONING_START, messageId: reasoningId, timestamp };
-      yield {
-        type: EventType.REASONING_MESSAGE_START,
-        messageId: reasoningId,
-        role: "reasoning",
-        timestamp,
-      };
-      yield {
-        type: EventType.STEP_STARTED,
-        stepName: stepId,
-        stepId,
-        stepType: "thinking",
-        timestamp,
-      };
-      for (const delta of ["Looking at ", "what the athlete ", "asked."]) {
-        await pause(TEXT_PAUSE_MS);
-        yield {
-          type: EventType.REASONING_MESSAGE_CONTENT,
-          messageId: reasoningId,
-          delta,
-          timestamp,
-        };
-      }
-      yield { type: EventType.REASONING_MESSAGE_END, messageId: reasoningId, timestamp };
-      yield { type: EventType.REASONING_END, messageId: reasoningId, timestamp };
-      yield { type: EventType.STEP_FINISHED, stepName: stepId, stepId, timestamp };
-
+      const at = () => ({ model, timestamp: Date.now() });
       const step = nextStep(
         options.messages as ModelMessage[],
         (options.tools ?? []).map((tool) => tool.name),
       );
+
+      await pause(FIRST_TOKEN_MS);
+      yield { type: EventType.RUN_STARTED, runId, threadId, ...at() };
+      yield { type: EventType.REASONING_START, messageId: reasoningId, ...at() };
+      yield {
+        type: EventType.REASONING_MESSAGE_START,
+        messageId: reasoningId,
+        role: "reasoning",
+        ...at(),
+      };
+      for await (const delta of paced(reasoningFor(step))) {
+        yield { type: EventType.REASONING_MESSAGE_CONTENT, messageId: reasoningId, delta, ...at() };
+      }
+      const endReasoning = [
+        { type: EventType.REASONING_MESSAGE_END, messageId: reasoningId, ...at() },
+        { type: EventType.REASONING_END, messageId: reasoningId, ...at() },
+      ];
+
       if (step.kind === "tools") {
-        for (const [index, call] of step.calls.entries()) {
-          const toolCallId = `mock-${call.name}-${crypto.randomUUID()}`;
-          const base = { toolCallId, toolCallName: call.name, toolName: call.name, timestamp };
+        const calls = step.calls.map((call) => ({
+          ...call,
+          toolCallId: `mock-${call.name}-${crypto.randomUUID()}`,
+          args: JSON.stringify(call.input),
+        }));
+        for (const [index, call] of calls.entries()) {
           yield {
             type: EventType.TOOL_CALL_START,
-            ...base,
+            toolCallId: call.toolCallId,
+            toolCallName: call.name,
             parentMessageId: messageId,
             index,
+            ...at(),
           };
-          // Arguments stream in pieces, so a visual's HTML arrives over a few seconds.
-          for (const delta of JSON.stringify(call.input).match(/[\s\S]{1,200}/g) ?? []) {
-            await pause(TEXT_PAUSE_MS);
-            yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta, timestamp };
+          for await (const delta of paced(call.args, ARGS_TOKENS_PER_TICK)) {
+            yield { type: EventType.TOOL_CALL_ARGS, toolCallId: call.toolCallId, delta, ...at() };
           }
-          await pause(TOOL_PAUSE_MS);
-          yield { type: EventType.TOOL_CALL_END, ...base, input: call.input };
         }
+        for (const call of calls) {
+          yield {
+            type: EventType.TOOL_CALL_END,
+            toolCallId: call.toolCallId,
+            toolCallName: call.name,
+            args: call.args,
+            input: call.input,
+            ...at(),
+          };
+        }
+        yield* endReasoning;
         yield {
           type: EventType.RUN_FINISHED,
           runId,
           threadId,
-          timestamp,
           finishReason: "tool_calls",
+          ...at(),
         };
         return;
       }
 
-      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant", timestamp };
-      for (const delta of step.text.match(/[\s\S]{1,12}/g) ?? []) {
-        await pause(TEXT_PAUSE_MS);
-        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, timestamp };
+      yield* endReasoning;
+      yield { type: EventType.TEXT_MESSAGE_START, messageId, role: "assistant", ...at() };
+      let content = "";
+      for await (const delta of paced(step.text)) {
+        content += delta;
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, content, ...at() };
       }
-      yield { type: EventType.TEXT_MESSAGE_END, messageId, timestamp };
-      yield { type: EventType.RUN_FINISHED, runId, threadId, timestamp, finishReason: "stop" };
+      yield { type: EventType.TEXT_MESSAGE_END, messageId, ...at() };
+      yield { type: EventType.RUN_FINISHED, runId, threadId, finishReason: "stop", ...at() };
     },
     async structuredOutput() {
       throw new Error("The mock coach does not support structured output.");

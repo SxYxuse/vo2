@@ -1,7 +1,5 @@
 import { expect, type Page } from "@playwright/test";
 
-import { E2E_NOW } from "./env.ts";
-
 /** Waits for React to hydrate the page (`data-hydrated`, __root.tsx): clicks before it are lost. */
 export async function waitForHydration(page: Page) {
   await expect(page.locator("body[data-hydrated]")).toBeAttached();
@@ -87,7 +85,9 @@ async function onboardWithCoachPlan(page: Page) {
 
   await expect(page.getByRole("heading", { name: "Your A race" })).toBeVisible();
   await expect(next).toBeDisabled();
-  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
+  // Ten weeks from the page's today: E2E_NOW under e2e, the real date under `vp run dev:seed`.
+  const today = await page.evaluate(() => Date.now());
+  const raceDay = new Date(today + 70 * 86_400_000).toISOString().slice(0, 10);
   await page.getByRole("textbox", { name: "Race name" }).fill("Autumn half");
   await page.getByLabel("Race date").fill(raceDay);
   await page.getByRole("button", { name: "Half", exact: true }).click();

@@ -716,6 +716,31 @@ test("an athlete asks the coach a question and gets an answer", async ({ page })
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 });
 
+/**
+ * Counts the animation frames in which a chat message, once shown, is out of the chat's view.
+ * Sampled in the page, so a jump that lasts a frame or two is caught.
+ */
+async function watchOutOfView(page: Page, text: string) {
+  await page.evaluate((text) => {
+    const counter = window as unknown as { outOfView: number };
+    counter.outOfView = 0;
+    const check = () => {
+      const viewport = document.querySelector('[data-slot="message-scroller-viewport"]');
+      const item = [...document.querySelectorAll('[data-slot="message-scroller-item"]')].find(
+        (element) => element.textContent?.includes(text),
+      );
+      if (viewport && item) {
+        const view = viewport.getBoundingClientRect();
+        const box = item.getBoundingClientRect();
+        if (box.bottom <= view.top || box.top >= view.bottom) counter.outOfView += 1;
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  }, text);
+  return () => page.evaluate(() => (window as unknown as { outOfView: number }).outOfView);
+}
+
 test("an athlete reopens an earlier coach chat from Chats, then deletes it", async ({ page }) => {
   await page.goto("/coach");
   await page
@@ -734,6 +759,16 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
   const sheet = page.getByRole("dialog", { name: "Chats" });
   await sheet.getByRole("link", { name: "Am I fresh enough for a hard session tomorrow?" }).click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible();
+
+  // A follow-up in the reopened chat stays in view while the coach replies: when every question
+  // anchored the scroller, the view jumped back to the top mid-reply.
+  const followUp = "And how is my form?";
+  const outOfView = await watchOutOfView(page, followUp);
+  await page.getByRole("textbox", { name: "Message the coach" }).fill(followUp);
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText(/This is the mock coach/)).toHaveCount(2, { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+  expect(await outOfView()).toBe(0);
 
   // Deleting the open chat starts a new one, and the chat is gone from the list.
   await page.getByRole("button", { name: "Chats" }).click();
