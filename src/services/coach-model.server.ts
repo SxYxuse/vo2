@@ -17,7 +17,7 @@ type ListedOpenAIModel = Parameters<typeof createOpenaiChat>[0];
  * The stored id is a plain string: a model dropped from the curated list keeps running until the
  * athlete picks another. The adapters' types name only the ids they list, hence the casts.
  */
-function textAdapter({ provider, model }: CoachModelChoice, key: string) {
+export function textAdapter({ provider, model }: CoachModelChoice, key: string) {
   switch (provider) {
     case "openai":
       return createOpenaiChat(model as ListedOpenAIModel, key);

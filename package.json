@@ -7,6 +7,7 @@
     "dev": "vp dev",
     "dev:mock": "STRAVA_MOCK=1 vp dev",
     "dev:seed": "bun scripts/dev-seed.ts",
+    "coach:replay": "bun scripts/coach-replay.ts",
     "build": "vp build",
     "preview": "vp preview",
     "test": "vp test",

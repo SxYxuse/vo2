@@ -4,13 +4,17 @@
  * finishes onboarding with planning off. Writes a Playwright storageState and prints a URL that
  * signs any browser in as the same athlete.
  *
- *   vp run dev:seed [--history <years>] [--fresh-streams] [--never-synced | --mid-onboarding]
+ *   vp run dev:seed [--history <years>] [--fresh-streams]
+ *                   [--never-synced | --mid-onboarding | --coach-plan]
  *
  *   --history <years>  Mock Strava serves this many years of training instead of eight weeks.
  *   --fresh-streams    Celebrations on, and the last week's streams not copied yet, so the next
  *                      Sync from Strava copies them again and finds top 10 efforts.
  *   --never-synced     Stops signed in on onboarding, before anything is copied.
  *   --mid-onboarding   Stops on onboarding once the training is copied, before the setup steps.
+ *   --coach-plan       Onboards with the coach plan, written by the mock coach, toward a half
+ *                      marathon in ten weeks. It also records the plan-writer request that
+ *                      `vp run coach:replay` sends to a real model (needs `vp run dev:mock`).
  */
 
 import { mkdirSync } from "node:fs";
@@ -31,6 +35,7 @@ const { values } = parseArgs({
     "fresh-streams": { type: "boolean", default: false },
     "never-synced": { type: "boolean", default: false },
     "mid-onboarding": { type: "boolean", default: false },
+    "coach-plan": { type: "boolean", default: false },
   },
 });
 
@@ -40,8 +45,11 @@ function fail(message: string): never {
 }
 
 if (process.env.STRAVA_MOCK !== "1") fail("mock Strava only: set STRAVA_MOCK=1 in .env.");
-if (values["never-synced"] && values["mid-onboarding"]) {
-  fail("--never-synced and --mid-onboarding are different states: pick one.");
+if (
+  [values["never-synced"], values["mid-onboarding"], values["coach-plan"]].filter(Boolean).length >
+  1
+) {
+  fail("--never-synced, --mid-onboarding, and --coach-plan are different states: pick one.");
 }
 const onboarded = !values["never-synced"] && !values["mid-onboarding"];
 if (values["fresh-streams"] && !onboarded) fail("--fresh-streams needs an onboarded athlete.");
@@ -118,8 +126,11 @@ try {
     await copyTraining(page, 60_000 * (1 + (years ?? 0) * 3));
     state = "signed in on onboarding, training copied, setup steps left";
   } else {
-    await onboardNewAthlete(page, { syncTimeout: 60_000 * (1 + (years ?? 0) * 3) });
-    state = "onboarded with planning off";
+    const coachPlan = values["coach-plan"];
+    await onboardNewAthlete(page, { coachPlan, syncTimeout: 60_000 * (1 + (years ?? 0) * 3) });
+    state = coachPlan
+      ? "onboarded with the coach plan written; plan-writer request recorded"
+      : "onboarded with planning off";
   }
   mkdirSync(resolve(".dev-seed"), { recursive: true });
   await context.storageState({ path: STATE_PATH });
