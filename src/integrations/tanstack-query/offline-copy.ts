@@ -29,6 +29,7 @@ export const OFFLINE_QUERY_KEYS = [
   "settings-snapshot",
   "coach-chats",
   "coach-chat",
+  "coach-spending",
 ] as const;
 
 /** A week plan older than this is no use to read offline. */

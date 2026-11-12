@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { availabilitySchema, progressionSchema, type CoachPlanState } from "./coach-plan.types.ts";
 
-const timeZoneSchema = z
+export const timeZoneSchema = z
   .string()
   .min(1)
   .max(64)

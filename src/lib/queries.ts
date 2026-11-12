@@ -5,6 +5,7 @@ import { loadActivityMap } from "@/services/activity-map.ts";
 import { loadCoachCatalog, loadSettingsSnapshot } from "@/services/athlete-settings.ts";
 import { listCoachChats } from "@/services/coach-chats.ts";
 import { getCoachStatus } from "@/services/coach-key.ts";
+import { getCoachSpending } from "@/services/coach-usage.ts";
 import { RECOMMENDED_MODELS } from "@/services/coach-models.ts";
 import { loadCoachPlan } from "@/services/coach-plan.ts";
 import { loadHeartRate } from "@/services/heart-rate.ts";
@@ -97,6 +98,15 @@ export const trainingPacesQueryOptions = queryOptions({
   queryKey: ["training-paces"],
   queryFn: () => loadTrainingPaces(),
   staleTime: 5 * 60_000,
+});
+
+/** Months start in the device's timezone, where the athlete reads them. */
+export const coachSpendingQueryOptions = queryOptions({
+  queryKey: ["coach-spending"],
+  // Every coach answer adds to it, so opening the section reads it again.
+  staleTime: 0,
+  queryFn: () =>
+    getCoachSpending({ data: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } }),
 });
 
 export const coachStatusQueryOptions = queryOptions({

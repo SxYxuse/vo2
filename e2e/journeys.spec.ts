@@ -714,6 +714,10 @@ test("an athlete asks the coach a question and gets an answer", async ({ page })
   await page.goto("/coach");
   await page.getByRole("button", { name: "How did my last run go?" }).click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
+
+  // The mock coach reports a cost like OpenRouter does, so the answer counts toward spending.
+  await page.goto("/settings/coach");
+  await expect(page.getByText(/Coach chat (< \$0\.01|\$(?!0\.00)\d+\.\d\d)/).first()).toBeVisible();
 });
 
 type ViewCounts = { inView: number; outOfView: number; stopped?: boolean };

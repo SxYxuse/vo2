@@ -8,6 +8,7 @@ import season from "@/coaching/season.md?raw";
 import swimming from "@/coaching/swimming.md?raw";
 import { logger } from "@/lib/logger.server.ts";
 import type { CoachModel } from "./coach-model.server.ts";
+import { recordCoachUsage } from "./coach-usage.server.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
 import {
   checkPlan,
@@ -271,6 +272,8 @@ export async function writeSessions(
   prompt: PlanPrompt,
   ctx: RuleContext,
   anchors: PlanAnchors,
+  /** Whose spending the calls count toward; none for a replay outside the app. */
+  userId?: string,
 ): Promise<WriteResult> {
   const plan = (written: WrittenPlan) =>
     written.sessions.map((session) => plannedSession(session, anchors));
@@ -297,6 +300,7 @@ export async function writeSessions(
         messages,
         outputSchema: writtenPlanSchema,
         abortController: abort,
+        middleware: userId ? [recordCoachUsage(userId, "plan", coach.provider, coach.model)] : [],
       })) as WrittenPlan;
     } catch (error) {
       // The athlete's key must never reach a log or the screen, even inside a provider's error.

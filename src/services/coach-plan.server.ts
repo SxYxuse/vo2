@@ -740,7 +740,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       athleteChoices: ownPeakNotes(inputs),
       rules: rulesFor(ctx),
     };
-    const result = await writeSessions(coach, prompt, ctx, anchors);
+    const result = await writeSessions(coach, prompt, ctx, anchors, userId);
     if (!result.ok) {
       logger.warn("coach_plan.failed", { fromWeek });
       await finish(userId, claimedAt, failedValues(inputs, result.error));
