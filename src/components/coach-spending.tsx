@@ -31,9 +31,9 @@ function Month({ label, month }: { label: string; month: CoachSpendingMonth }) {
       ) : null}
       {month.unpricedCalls > 0 ? (
         <span className="text-xs text-muted-foreground">
-          Plus {count.format(month.unpricedCalls)} OpenAI{" "}
-          {month.unpricedCalls === 1 ? "call" : "calls"} ({count.format(month.unpricedTokens)}{" "}
-          tokens): OpenAI doesn't report what a call costs.
+          Plus {count.format(month.unpricedCalls)} {month.unpricedCalls === 1 ? "call" : "calls"} (
+          {count.format(month.unpricedTokens)} tokens) whose provider reported no cost, as OpenAI
+          never does.
         </span>
       ) : null}
     </div>

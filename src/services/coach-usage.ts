@@ -9,9 +9,8 @@ export type CoachSpendingMonth = {
   month: string;
   /** US dollars, over the calls whose provider reported a cost. */
   costUsd: number;
-  calls: number;
   byFeature: Record<CoachFeature, number>;
-  /** Calls whose provider reports no cost (OpenAI), and the tokens they used. */
+  /** Calls whose provider reported no cost (OpenAI never does), and the tokens they used. */
   unpricedCalls: number;
   unpricedTokens: number;
 };

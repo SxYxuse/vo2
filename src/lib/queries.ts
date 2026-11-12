@@ -103,6 +103,8 @@ export const trainingPacesQueryOptions = queryOptions({
 /** Months start in the device's timezone, where the athlete reads them. */
 export const coachSpendingQueryOptions = queryOptions({
   queryKey: ["coach-spending"],
+  // Every coach answer adds to it, so opening the section reads it again.
+  staleTime: 0,
   queryFn: () =>
     getCoachSpending({ data: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } }),
 });

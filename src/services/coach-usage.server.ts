@@ -47,7 +47,7 @@ function emptyMonth(month: string): CoachSpendingMonth {
     CoachFeature,
     number
   >;
-  return { month, costUsd: 0, calls: 0, byFeature, unpricedCalls: 0, unpricedTokens: 0 };
+  return { month, costUsd: 0, byFeature, unpricedCalls: 0, unpricedTokens: 0 };
 }
 
 /** This month's and last month's spending, months starting in the athlete's timezone. */
@@ -79,7 +79,6 @@ export async function coachSpendingFor(userId: string, timeZone: string): Promis
   );
   for (const row of rows) {
     const bucket = row.month === thisMonth.month ? thisMonth : lastMonth;
-    bucket.calls += row.calls;
     if (row.priced) {
       bucket.costUsd += row.costUsd;
       if (row.feature in bucket.byFeature)
