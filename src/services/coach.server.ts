@@ -30,6 +30,7 @@ import {
 } from "./activity-analysis.types.ts";
 import { storedPlanningStyle } from "./athlete-settings.server.ts";
 import { isBestEfforts } from "./best-efforts.ts";
+import { recordCoachUsage } from "./coach-usage.server.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts";
 import { mockCoachText } from "./coach-mock.ts";
@@ -433,6 +434,7 @@ export async function handleCoachChat(request: Request) {
     middleware: [
       withSkills(COACHING_SKILLS),
       withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true }),
+      recordCoachUsage(session.user.id, "chat", coach.provider, coach.model),
     ],
   });
 

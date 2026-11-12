@@ -17,6 +17,7 @@ import {
   type CoachProvider,
 } from "@/services/coach-models.ts";
 import { CoachModelRow } from "@/components/coach-model-picker.tsx";
+import { CoachSpendingSection } from "@/components/coach-spending.tsx";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -256,6 +257,8 @@ export function SettingsCoachSection() {
           ))}
         </div>
       </FieldSet>
+      <FieldSeparator />
+      <CoachSpendingSection />
     </FieldGroup>
   );
 }

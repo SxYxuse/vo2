@@ -393,6 +393,8 @@ const TICK_MS = 10;
 /** About a token: real deltas are a few characters, not a sentence. */
 const TOKEN_CHARS = 4;
 const ARGS_TOKENS_PER_TICK = 4;
+/** Each mock model call reports usage like OpenRouter does, so spending shows in development. */
+const MOCK_USAGE = { promptTokens: 2400, completionTokens: 180, totalTokens: 2580, cost: 0.0021 };
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** The text in token-sized deltas, pausing a tick after every `perTick` of them. */
@@ -516,6 +518,7 @@ export function mockCoachText(): AnyTextAdapter {
           runId,
           threadId,
           finishReason: "tool_calls",
+          usage: MOCK_USAGE,
           ...at(),
         };
         return;
@@ -529,7 +532,14 @@ export function mockCoachText(): AnyTextAdapter {
         yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta, content, ...at() };
       }
       yield { type: EventType.TEXT_MESSAGE_END, messageId, ...at() };
-      yield { type: EventType.RUN_FINISHED, runId, threadId, finishReason: "stop", ...at() };
+      yield {
+        type: EventType.RUN_FINISHED,
+        runId,
+        threadId,
+        finishReason: "stop",
+        usage: MOCK_USAGE,
+        ...at(),
+      };
     },
     async structuredOutput() {
       throw new Error("The mock coach does not support structured output.");

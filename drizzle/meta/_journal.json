@@ -316,6 +316,13 @@
       "when": 1793915417647,
       "tag": "0044_coach_key_providers",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794506018339,
+      "tag": "0045_coach_usage",
+      "breakpoints": true
     }
   ]
 }

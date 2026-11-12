@@ -40,7 +40,7 @@ export type CoachModel =
       /** For scrubbing it out of anything logged. */
       key: string;
     }
-  | { kind: "mock"; model: "mock" }
+  | { kind: "mock"; provider: CoachProvider; model: "mock" }
   | { kind: "missing"; provider: CoachProvider };
 
 /**
@@ -54,7 +54,7 @@ export async function coachModelFor(userId: string, feature: CoachFeature): Prom
   const key = await coachKeyFor(userId, choice.provider);
   if (!key) {
     return env.STRAVA_MOCK
-      ? { kind: "mock", model: "mock" }
+      ? { kind: "mock", provider: choice.provider, model: "mock" }
       : { kind: "missing", provider: choice.provider };
   }
   return {

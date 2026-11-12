@@ -1,6 +1,7 @@
 import {
   boolean,
   customType,
+  doublePrecision,
   date,
   index,
   integer,
@@ -186,6 +187,31 @@ export const coachKeys = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.provider] })],
+);
+
+/**
+ * What each coach model call used, so the athlete can follow what the coach costs them on their
+ * own keys. One row per model call; a chat answer that calls tools makes several.
+ */
+export const coachUsage = pgTable(
+  "coach_usage",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** A COACH_FEATURES id. */
+    feature: text("feature").notNull(),
+    /** A COACH_PROVIDERS id. */
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    /** US dollars, as the provider billed it. Null when the provider reports no cost (OpenAI). */
+    costUsd: doublePrecision("cost_usd"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("coach_usage_user_created_idx").on(table.userId, table.createdAt)],
 );
 
 /**
