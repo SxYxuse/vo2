@@ -5,6 +5,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  MessageSquareTextIcon,
   RotateCcwIcon,
   SparklesIcon,
   Undo2Icon,
@@ -94,6 +95,23 @@ function PlanStatus({ state }: { state: CoachPlanState }) {
               onClick={() => again.mutate()}
             >
               Write my plan
+            </Button>
+          </AlertAction>
+        </Alert>
+      ) : null}
+      {state.status !== "writing" && state.plan?.briefNotFit ? (
+        <Alert>
+          <MessageSquareTextIcon />
+          <AlertTitle>Not all of your brief fit</AlertTitle>
+          <AlertDescription>{state.plan.briefNotFit}</AlertDescription>
+          <AlertAction>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              render={<Link to="/settings/$section" params={{ section: "training" }} />}
+            >
+              Edit brief
             </Button>
           </AlertAction>
         </Alert>

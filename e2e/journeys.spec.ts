@@ -708,6 +708,84 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await expect(page.getByRole("button", { name: "Indoor only" })).toHaveCount(0);
 });
 
+/** Saves the coach brief in Settings → Training; ends on Plan with the plan written again. */
+async function saveBriefAndWrite(page: Page, brief: string) {
+  await page.goto("/settings/training");
+  await settle(page);
+  const written = writingStarts(page);
+  await page.getByRole("textbox", { name: "Coach brief" }).fill(brief);
+  await page.getByRole("button", { name: "Save brief and rewrite plan" }).click();
+  await expect(page.getByRole("button", { name: "Save brief and rewrite plan" })).toBeDisabled();
+  await page.goto("/week");
+  await expectPlanWritten(page, written);
+}
+
+test("an athlete writes a coach brief, the coach changes it in the chat, and they clear it", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await choosePlanningStyle(page, "Coach plan", "coachPlan");
+  await addRaceAndWritePlan(page, { runs: 4, rides: 0 });
+  const notFit = page.getByRole("alert").filter({ hasText: "Not all of your brief fit" });
+  await expect(notFit).toHaveCount(0);
+
+  // Saving a brief rewrites the plan; the mock coach says what it couldn't fit (ADR 0065).
+  await saveBriefAndWrite(page, "Fridays: 30 min at most.");
+  await expect(notFit).toContainText("The mock coach doesn't read your brief.");
+  await settle(page);
+  await expect(page).toHaveScreenshot("coach-brief-not-fit.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+
+  // The coach offers a brief change with the brief before and after; declining keeps it.
+  await page.goto("/coach");
+  const composer = page.getByRole("textbox", { name: "Message the coach" });
+  await composer.fill("From now on, no track sessions.");
+  await page.getByRole("button", { name: "Send" }).click();
+  const card = page.getByRole("group", { name: "Brief change" }).last();
+  await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText("Fridays: 30 min at most.");
+  await expect(card).toContainText("Applying rewrites your coming weeks.");
+  await settle(page);
+  // The chat's scroll button may float over the card while the reply settles.
+  await expect(card).toHaveScreenshot("coach-brief-change.png", {
+    mask: [page.getByRole("button", { name: "Scroll to end" })],
+  });
+  await card.getByRole("button", { name: "Decline" }).click();
+  await expect(card).toContainText("Declined: your brief stays as it was");
+
+  // A brief change offered before the brief changed again is not applied.
+  await composer.fill("From now on, no track sessions.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+  await withDatabase((client) => client.query("update coach_plans set brief = 'Edited.'"));
+  await card.getByRole("button", { name: "Apply" }).click();
+  await expect(card).toContainText("Your brief changed since the coach offered this");
+  await withDatabase((client) =>
+    client.query("update coach_plans set brief = 'Fridays: 30 min at most.'"),
+  );
+
+  // Applied: the brief holds both lines, and the plan is written again from it.
+  await composer.fill("From now on, no track sessions.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
+  await card.getByRole("button", { name: "Apply" }).click();
+  await expect(card).toContainText("Saved to your brief");
+  await expect(page.getByText("Done: it's in your brief")).toBeVisible();
+  await page.goto("/settings/training");
+  await expect(page.getByRole("textbox", { name: "Coach brief" })).toHaveValue(
+    "Fridays: 30 min at most.\nNo track sessions.",
+  );
+
+  // The way out: a cleared brief rewrites the plan, and Plan says nothing about it. The rewrite
+  // the applied change started finishes first.
+  await page.goto("/week");
+  await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+  await saveBriefAndWrite(page, "");
+  await expect(notFit).toHaveCount(0);
+});
+
 // The mock coach answers without a key, so this proves the client and server still speak the
 // same stream after a TanStack AI upgrade.
 test("an athlete asks the coach a question and gets an answer", async ({ page }) => {

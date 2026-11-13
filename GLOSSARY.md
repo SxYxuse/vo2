@@ -92,6 +92,10 @@ _Avoid_: Week plan, schedule, key sessions
 What the athlete gives the coach plan: how many runs, rides, and swims a week, 0 to 6 each. It has no days and no time per day (ADR 0041, ADR 0048, ADR 0050, ADR 0061).
 _Avoid_: Schedule, available days, rest days, week shape
 
+**Coach brief**:
+Standing context the athlete writes for the coach, such as how much time they have on some days, terrain, or an injury, which shapes every week the coach plan writes and every plan change the coach chat proposes. It sets no days: the athlete still places each session. The coach follows it as far as the weekly budget and the coach plan's rules allow, and says what it couldn't fit.
+_Avoid_: Context, notes, coach note, instructions, prompt, constraints
+
 **Weekly budget**:
 What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running, minutes of riding, and metres of swimming. Each sport grows with the week's phase at its own progression, up to its peak ceiling. Lighter weeks, recovery, and the taper shrink every sport (ADR 0037, ADR 0050, ADR 0058, ADR 0061).
 _Avoid_: Week target, quota, bucket
@@ -123,6 +127,10 @@ _Avoid_: Goal time, target time, race estimate
 **Plan change**:
 A change to the coach plan the coach proposes in the coach chat, shown session by session before and after. A changed session keeps its week and sport. It is applied only when the athlete taps Apply, and only if it keeps the coach plan's rules (ADR 0038).
 _Avoid_: Re-plan, adaptation, edit
+
+**Brief change**:
+A new coach brief the coach proposes in the coach chat, shown before and after. It is saved only when the athlete taps Apply, and the coach plan's weeks ahead are then written again.
+_Avoid_: Brief edit, context update
 
 **Goal**:
 A race or event on the athlete's season: name, sport type, date, distance, elevation gain, and priority. Goals on the same date are one event (a triathlon entered once, with a leg per sport, named "Event · Leg").
@@ -165,7 +173,7 @@ How a coach-plan session stands: done when the athlete marks it, otherwise open,
 _Avoid_: Completed, compliance
 
 **Coach**:
-The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan, through a plan change the athlete applies. It also writes the coach plan. It runs only on the athlete's own provider keys.
+The AI the athlete talks to about their training. In a chat it answers questions from the local copy, the coach plan, and the season, and changes nothing but the coach plan and the coach brief, through a plan change or brief change the athlete applies. It also writes the coach plan. It runs only on the athlete's own provider keys.
 _Avoid_: Assistant, agent, bot, AI
 
 **Coach feature**:

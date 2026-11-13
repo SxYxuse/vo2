@@ -41,13 +41,14 @@ import { CoachComposer, type MentionableActivity } from "@/components/coach-comp
 import { CoachMarkdown, type ActivityLookup } from "@/components/coach-markdown.tsx";
 import { CoachVisual } from "@/components/coach-visual.tsx";
 import {
+  BriefChangeCard,
   PlanChangeCard,
   PlanChangeProvider,
   usePlanChanges,
 } from "@/components/coach-plan-change.tsx";
 import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
-import { applyPlanChangeDef } from "@/services/coach-tools.ts";
+import { applyPlanChangeDef, changeCoachBriefDef } from "@/services/coach-tools.ts";
 import {
   coachChatQueryKey,
   coachChatsQueryOptions,
@@ -176,7 +177,8 @@ type Block =
   | { kind: "thinking"; text: string }
   | { kind: "tools"; calls: ToolCall[] }
   | { kind: "visual"; call: ToolCall }
-  | { kind: "change"; call: ToolCall };
+  | { kind: "change"; call: ToolCall }
+  | { kind: "brief"; call: ToolCall };
 
 /** Text, thinking, visuals, and runs of tool calls, in the order the coach produced them. */
 function blocksOf(parts: readonly Part[]): Block[] {
@@ -192,6 +194,8 @@ function blocksOf(parts: readonly Part[]): Block[] {
       blocks.push({ kind: "visual", call: part });
     } else if (part.type === "tool-call" && part.name === "apply_plan_change") {
       blocks.push({ kind: "change", call: part });
+    } else if (part.type === "tool-call" && part.name === "change_coach_brief") {
+      blocks.push({ kind: "brief", call: part });
     } else if (part.type === "tool-call") {
       if (last?.kind === "tools") last.calls.push(part);
       else blocks.push({ kind: "tools", calls: [part] });
@@ -348,6 +352,7 @@ export function CoachMessage({
             ) : null}
             {block.kind === "visual" ? <VisualBlock call={block.call} live={live} /> : null}
             {block.kind === "change" ? <PlanChangeCard call={block.call} /> : null}
+            {block.kind === "brief" ? <BriefChangeCard call={block.call} /> : null}
           </Fragment>
         ))}
         {!live && reply ? (
@@ -505,8 +510,8 @@ export function CoachChat({
     onFinish: () =>
       void queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey }),
     forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-    // The approval the coach asks for on a plan change binds to this definition.
-    tools: [applyPlanChangeDef],
+    // The approval the coach asks for on a plan or brief change binds to these definitions.
+    tools: [applyPlanChangeDef, changeCoachBriefDef],
   });
 
   const lookup = useCallback<ActivityLookup>((id) => byId.get(id), [byId]);

@@ -18,6 +18,8 @@ import {
 import {
   anchorsOf,
   gather,
+  saveBrief,
+  startCoachPlanIfDue,
   ownPeakNotes,
   paceContext,
   racePacesOf,
@@ -39,6 +41,7 @@ import {
 import type { WeekBudget } from "./coach-plan-budget.ts";
 import { addDayKey } from "./day-key.ts";
 import type {
+  BriefChangeInput,
   ChangeSide,
   ChangedSession,
   PlanChangeApplied,
@@ -183,12 +186,15 @@ const sideOf = (session: PlannedSession | undefined): ChangeSide =>
 export async function coachPlanForCoach(userId: string) {
   const inputs = await gather(userId);
   const blocked = blocker(inputs);
-  if (blocked) return { canChange: false, message: blocked };
+  // The brief can change even while the plan can't, so the coach always reads it.
+  if (blocked) return { canChange: false, message: blocked, brief: inputs.brief };
   const plan = inputs.plan!;
   const ctx = changeContext(inputs, plan);
   return {
     canChange: true,
     today: inputs.today,
+    brief: inputs.brief,
+    briefNotFit: plan.briefNotFit ?? null,
     availability: availabilityText(ctx),
     paces: paceText(rangesOf(inputs)),
     racePaces: racePaceText(racePacesOf(inputs)),
@@ -379,4 +385,30 @@ export async function applyPlanChange(
     sessions: change.changes.length,
   });
   return refused == null ? { applied: true } : { applied: false, reason: refused };
+}
+
+/**
+ * Saves a brief change the athlete applied (ADR 0065), only onto the brief it was offered against,
+ * then starts the rewrite the new brief is due.
+ */
+export async function applyBriefChange(
+  userId: string,
+  input: BriefChangeInput,
+): Promise<PlanChangeApplied> {
+  const inputs = await gather(userId);
+  if (!inputs.row) {
+    return { applied: false, reason: "Set up the coach plan in Settings → Training first." };
+  }
+  const brief = input.brief.trim();
+  if (brief === inputs.brief) return { applied: false, reason: "Your brief already says this." };
+  const saved = await saveBrief(userId, brief, input.before.trim());
+  if (!saved) {
+    return {
+      applied: false,
+      reason:
+        "Your brief changed since the coach offered this, so nothing was changed. Ask the coach again.",
+    };
+  }
+  await startCoachPlanIfDue(userId);
+  return { applied: true };
 }

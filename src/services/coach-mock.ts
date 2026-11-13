@@ -280,6 +280,48 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
   return { kind: "tools", calls: [{ name: "propose_plan_change", input: next }] };
 }
 
+// ----- Brief changes (ADR 0065) -----
+
+/**
+ * The mock coach's brief change: "From now on, …" in the chat adds that sentence to the brief,
+ * after reading the brief now from get_coach_plan.
+ */
+function briefChangeStep(messages: ModelMessage[]): Step | null {
+  const text = textOf(messages[lastUserIndex(messages)]?.content ?? "");
+  const asked = /from now on,?\s*(.+)/is.exec(text)?.[1]?.trim();
+  if (!asked) return null;
+  const results = resultListThisTurn(messages);
+  const plan = results.find((result) => result.name === "get_coach_plan")?.value as
+    | { brief?: string }
+    | undefined;
+  if (!plan) return { kind: "tools", calls: [{ name: "get_coach_plan", input: {} }] };
+  const applied = results.find((result) => result.name === "change_coach_brief");
+  if (applied) {
+    const answer = applied.value as { applied?: boolean; reason?: string } | undefined;
+    if (answer?.applied === true)
+      return {
+        kind: "text",
+        text: "Done: it's in your brief, and your coming weeks are being written again.",
+      };
+    return { kind: "text", text: answer?.reason ?? "No problem: your brief stays as it was." };
+  }
+  const before = plan.brief ?? "";
+  const sentence = asked.charAt(0).toUpperCase() + asked.slice(1);
+  return {
+    kind: "tools",
+    calls: [
+      {
+        name: "change_coach_brief",
+        input: {
+          summary: "Adds what you told me to your brief, so every week is written with it.",
+          before,
+          brief: (before ? `${before}\n${sentence}` : sentence).slice(0, 500),
+        },
+      },
+    ],
+  };
+}
+
 // ----- Power files (ADR 0057) -----
 
 type MockPowerFile = {
@@ -417,6 +459,10 @@ function reasoningFor(step: Step) {
 }
 
 function nextStep(messages: ModelMessage[], tools: string[]): Step {
+  if (tools.includes("change_coach_brief")) {
+    const brief = briefChangeStep(messages);
+    if (brief) return brief;
+  }
   if (tools.includes("propose_plan_change")) {
     const change = planChangeStep(messages);
     if (change) return change;
