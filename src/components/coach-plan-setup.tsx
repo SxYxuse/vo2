@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CalendarCheckIcon, FlagIcon } from "lucide-react";
+import { CalendarCheckIcon, FlagIcon, MessageSquareTextIcon } from "lucide-react";
 
 import { useOnline } from "@/hooks/use-online.ts";
+import { cn } from "@/lib/utils";
 import { coachPlanQueryOptions, seasonQueryOptions } from "@/lib/queries.ts";
-import { saveCoachPlanAvailability } from "@/services/coach-plan.ts";
+import { saveCoachPlanAvailability, saveCoachPlanBrief } from "@/services/coach-plan.ts";
 import {
   availabilitySchema,
+  MAX_BRIEF_LENGTH,
   DEFAULT_AVAILABILITY,
   MAX_SESSIONS_PER_SPORT,
   planSportOf,
@@ -34,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ProgressionSettings, savedProgressionKey } from "@/components/progression-settings.tsx";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -358,6 +361,70 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
   );
 }
 
+/**
+ * The coach brief (ADR 0065): standing context every writing reads. It saves with its own button,
+ * since a changed brief rewrites the weeks ahead on the athlete's key. An empty brief clears it.
+ */
+function CoachBriefField({ state }: { state: CoachPlanState }) {
+  const online = useOnline();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState(state.brief);
+  useEffect(() => setDraft(state.brief), [state.brief]);
+  const save = useMutation({
+    mutationFn: (brief: string) => saveCoachPlanBrief({ data: { brief } }),
+    onSuccess: (next) => queryClient.setQueryData(coachPlanQueryOptions.queryKey, next),
+  });
+  const changed = draft.trim() !== state.brief;
+  const tooLong = draft.trim().length > MAX_BRIEF_LENGTH;
+  return (
+    <Field data-invalid={tooLong}>
+      <FieldLabel htmlFor="coach-brief">Coach brief</FieldLabel>
+      <FieldDescription>
+        What the coach should know every week, such as “Fridays: 30 min at most”, where you train,
+        or an injury. It follows your brief as far as your budgets and the plan's rules allow, and
+        you still pick the days.
+      </FieldDescription>
+      <Textarea
+        id="coach-brief"
+        value={draft}
+        maxLength={MAX_BRIEF_LENGTH + 100}
+        placeholder="Fridays: 30 min at most. No track nearby."
+        aria-invalid={tooLong}
+        className="max-h-48 min-h-20 text-base sm:text-sm"
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!online || !changed || tooLong || save.isPending}
+          onClick={() => save.mutate(draft.trim())}
+        >
+          {save.isPending ? (
+            <Spinner data-icon="inline-start" />
+          ) : (
+            <MessageSquareTextIcon data-icon="inline-start" />
+          )}
+          {state.plan ? "Save brief and rewrite plan" : "Save brief"}
+        </Button>
+        <p
+          className={cn(
+            "text-muted-foreground text-xs tabular-nums",
+            tooLong && "text-destructive",
+          )}
+          aria-live="polite"
+        >
+          {!online
+            ? "Offline: your brief can't be saved."
+            : save.error
+              ? "Could not save. Nothing was saved."
+              : `${draft.trim().length} / ${MAX_BRIEF_LENGTH}`}
+        </p>
+      </div>
+    </Field>
+  );
+}
+
 /** Where the plan stands: being written, failed with why, or written. */
 export function coachPlanStatusText(state: CoachPlanState) {
   if (state.status === "writing") return "Writing your plan…";
@@ -423,6 +490,12 @@ export function CoachPlanSettings() {
                 : null}
         </p>
       </div>
+      {saved ? (
+        <>
+          <FieldSeparator />
+          <CoachBriefField state={state} />
+        </>
+      ) : null}
       {state.volume ? (
         <>
           <FieldSeparator />

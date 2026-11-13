@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { availabilitySchema, progressionSchema, type CoachPlanState } from "./coach-plan.types.ts";
+import {
+  availabilitySchema,
+  briefSchema,
+  progressionSchema,
+  type CoachPlanState,
+} from "./coach-plan.types.ts";
 
 export const timeZoneSchema = z
   .string()
@@ -37,6 +42,14 @@ export const saveCoachPlanProgression = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CoachPlanState> => {
     const { saveProgressionImpl } = await import("./coach-plan.server.ts");
     return saveProgressionImpl(data.progression);
+  });
+
+/** Saves the coach brief; a changed one rewrites the weeks ahead. */
+export const saveCoachPlanBrief = createServerFn({ method: "POST" })
+  .validator(z.object({ brief: briefSchema }))
+  .handler(async ({ data }): Promise<CoachPlanState> => {
+    const { saveBriefImpl } = await import("./coach-plan.server.ts");
+    return saveBriefImpl(data.brief);
   });
 
 export const writeCoachPlanAgain = createServerFn({ method: "POST" }).handler(

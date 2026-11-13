@@ -176,6 +176,7 @@ export async function gather(userId: string, now = new Date()) {
     currentWeek: weekStartKey(now, timeZone),
     availability: row ? parseAvailability(row.availability) : null,
     progression: parseProgression(row?.progression),
+    brief: row?.brief ?? "",
     aGoal: coachPlanGoal(goals, today),
     plan: readCoachPlan(row?.plan),
     runs: runs as (SportDay & Activity)[],
@@ -308,6 +309,7 @@ function basisOf(inputs: Inputs): PlanBasis {
     easy: easyOf(inputs),
     ftp: inputs.ftp,
     css: inputs.css,
+    brief: inputs.brief,
   };
 }
 
@@ -371,6 +373,10 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (availabilityKey(JSON.parse(plan.basis.availability)) !== basis.availability) {
     return { fromWeek: first, reason: "availability", trigger: basis.availability };
   }
+  // A plan written before the brief has none, the same as an empty one.
+  if ((plan.basis.brief ?? "") !== basis.brief) {
+    return { fromWeek: first, reason: "brief", trigger: basis.brief };
+  }
   if (upcomingGoalsKey(plan.basis.goals, today) !== goals) {
     return { fromWeek: first, reason: "goals", trigger: goals };
   }
@@ -415,6 +421,7 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
     signedIn: true,
     today: inputs.today,
     availability: inputs.availability,
+    brief: inputs.brief,
     aGoal: inputs.aGoal
       ? {
           id: inputs.aGoal.id,
@@ -729,6 +736,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
           effort: effortLabel(goal),
         })),
       availability: availabilityText(ctx),
+      ...(inputs.brief ? { brief: inputs.brief } : {}),
       ...(availability.runsPerWeek
         ? { paces: paceText(anchors.paces), racePaces: racePaceText(racePacesOf(inputs)) }
         : {}),
@@ -772,6 +780,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       basis: basisOf(inputs),
       writtenAt: new Date().toISOString(),
       model: coach.model,
+      briefNotFit: result.briefNotFit,
     };
     await finish(userId, claimedAt, { plan, status: "idle", error: null, requestedFrom: null });
     logger.info("coach_plan.written", { fromWeek, sessions: result.sessions.length });
@@ -791,6 +800,7 @@ const SIGNED_OUT: CoachPlanState = {
   signedIn: false,
   today: "",
   availability: null,
+  brief: "",
   aGoal: null,
   missing: [],
   plan: null,
@@ -868,6 +878,39 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
   logger.info("coach_plan.progression_saved", { rewrite: requestedFrom != null });
   const inputs = await gather(userId);
   return stateOf(inputs, await startIfDue(userId, inputs));
+}
+
+/**
+ * Saves the coach brief, from Settings → Training or a brief change the athlete applied in the
+ * chat. A changed brief rewrites the weeks ahead (dueWrite). With `expected`, it saves only onto
+ * that brief, and answers false when the brief changed since.
+ */
+export async function saveBrief(userId: string, brief: string, expected?: string) {
+  const [saved] = await db
+    .update(coachPlans)
+    .set({ brief, updatedAt: new Date() })
+    .where(
+      and(
+        eq(coachPlans.userId, userId),
+        ...(expected === undefined ? [] : [eq(coachPlans.brief, expected)]),
+      ),
+    )
+    .returning({ userId: coachPlans.userId });
+  logger.info("coach_plan.brief_saved", { saved: saved != null, length: brief.length });
+  return saved != null;
+}
+
+export async function saveBriefImpl(brief: string): Promise<CoachPlanState> {
+  const session = await getRequiredSession();
+  const userId = session.user.id;
+  if (!(await saveBrief(userId, brief))) throw new Error("Set your availability first.");
+  const inputs = await gather(userId);
+  return stateOf(inputs, await startIfDue(userId, inputs));
+}
+
+/** Starts the rewrite a brief change applied in the chat is due, as a load of Plan would. */
+export async function startCoachPlanIfDue(userId: string) {
+  await startIfDue(userId, await gather(userId));
 }
 
 /** The athlete's "Try again" after a failed writing, or "Write my plan" with nothing due. */

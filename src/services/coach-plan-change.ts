@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { writtenSessionSchema, type PlanSport, type SessionKind } from "./coach-plan.types.ts";
+import {
+  briefSchema,
+  MAX_BRIEF_LENGTH,
+  writtenSessionSchema,
+  type PlanSport,
+  type SessionKind,
+} from "./coach-plan.types.ts";
 
 /*
  * A plan change (ADR 0038): the coach proposes the sessions it changes, VO2 checks them against
@@ -58,6 +64,27 @@ export type ChangedSession = { weekStart: string; before: ChangeSide; after: Cha
 export type PlanChangeProposal =
   | { ok: true; proposalId: string; summary: string; sessions: ChangedSession[] }
   | { ok: false; broken: string[] };
+
+/**
+ * A brief change (ADR 0065): the whole new coach brief, offered with the brief it replaces. It is
+ * saved only when the athlete taps Apply, and only if the brief is still the one shown.
+ */
+export const briefChangeInputSchema = z.object({
+  summary: z
+    .string()
+    .min(1)
+    .max(200)
+    .describe("One plain sentence for the athlete: what changes in their brief and why."),
+  before: z
+    .string()
+    .max(MAX_BRIEF_LENGTH)
+    .describe(`The athlete's brief now, exactly as get_coach_plan gave it ("" for none).`),
+  brief: briefSchema.describe(
+    `The whole brief after the change, at most ${MAX_BRIEF_LENGTH} characters: the athlete's standing context in their own voice, such as "Fridays: 30 min at most". "" clears it.`,
+  ),
+});
+
+export type BriefChangeInput = z.infer<typeof briefChangeInputSchema>;
 
 /** What apply_plan_change answers once the athlete tapped Apply. */
 export type PlanChangeApplied = { applied: true } | { applied: false; reason: string };

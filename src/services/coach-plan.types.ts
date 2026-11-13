@@ -392,7 +392,22 @@ export const writtenSessionSchema = z.object({
 export const writtenPlanSchema = z.object({
   // Four weeks of six runs, six rides, and six swims.
   sessions: z.array(writtenSessionSchema).max(4 * MAX_SESSIONS_PER_SPORT * PLAN_SPORTS.length),
+  // No max: a long sentence is cut where it's stored rather than failing the whole writing.
+  briefNotFit: z
+    .string()
+    .nullable()
+    .describe(
+      "One plain sentence for the athlete on what part of their brief you couldn't fit and why, or null when it all fit or they have no brief.",
+    ),
 });
+
+/** The longest coach brief the athlete can write: a few lines, read by every writing. */
+export const MAX_BRIEF_LENGTH = 500;
+
+export const briefSchema = z
+  .string()
+  .trim()
+  .max(MAX_BRIEF_LENGTH, `Keep your brief under ${MAX_BRIEF_LENGTH} characters.`);
 
 export type Step = z.infer<typeof stepSchema>;
 export type WrittenSession = z.infer<typeof writtenSessionSchema>;
@@ -463,6 +478,8 @@ export type PlanBasis = {
   ftp?: number | null;
   /** CSS in seconds per 100 m (ADR 0061). Plans written before swims have none. */
   css?: number | null;
+  /** The coach brief. Plans written before it have none, the same as an empty brief. */
+  brief?: string;
 };
 
 export type CoachPlan = {
@@ -470,6 +487,8 @@ export type CoachPlan = {
   basis: PlanBasis;
   writtenAt: string;
   model: string;
+  /** What the coach couldn't fit of the brief, in its words, or none when it all fit. */
+  briefNotFit?: string | null;
 };
 
 /** A stored plan with every session's sport: sessions written before rides are runs. */
@@ -496,6 +515,8 @@ export type CoachPlanState = {
   signedIn: boolean;
   today: string;
   availability: Availability | null;
+  /** The coach brief, or "" for none. */
+  brief: string;
   /** The upcoming A run, ride, or swim with a distance the plan builds toward. */
   aGoal: GoalSummary | null;
   missing: CoachPlanMissing[];

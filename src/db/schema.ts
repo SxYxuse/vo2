@@ -237,6 +237,8 @@ export const coachPlans = pgTable("coach_plans", {
   attemptKey: text("attempt_key"),
   /** How fast each sport's budget grows, and the athlete's own peaks (ADR 0058). */
   progression: jsonb("progression"),
+  /** The coach brief: standing context the athlete writes for the coach. Empty means none. */
+  brief: text("brief").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

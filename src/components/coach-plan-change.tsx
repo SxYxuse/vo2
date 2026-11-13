@@ -4,7 +4,13 @@ import { createContext, use, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UIMessage } from "@tanstack/ai-react";
 import { format, parseISO } from "date-fns";
-import { CalendarCogIcon, CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
+import {
+  CalendarCogIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MessageSquareTextIcon,
+  XIcon,
+} from "lucide-react";
 
 import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { cn } from "@/lib/utils";
@@ -15,6 +21,7 @@ import {
   type PlanSport,
 } from "@/services/coach-plan.types.ts";
 import type {
+  BriefChangeInput,
   ChangedSession,
   ChangeSide,
   PlanChangeApplied,
@@ -226,7 +233,7 @@ function ChangeWeeks({ sessions }: { sessions: ChangedSession[] }) {
   );
 }
 
-function Outcome({ call }: { call: ToolCall }) {
+function Outcome({ call, what = "plan" }: { call: ToolCall; what?: "plan" | "brief" }) {
   const queryClient = useQueryClient();
   // A declined call also gets an output, TanStack AI's { error: "User declined tool execution" },
   // so only an output that says whether it applied is the apply's answer.
@@ -239,7 +246,9 @@ function Outcome({ call }: { call: ToolCall }) {
     return (
       <p className="text-success flex items-center gap-1.5 text-sm font-medium">
         <CheckIcon aria-hidden className="size-4" />
-        Applied to your plan
+        {what === "brief"
+          ? "Saved to your brief: your coming weeks are written again"
+          : "Applied to your plan"}
       </p>
     );
   }
@@ -250,7 +259,7 @@ function Outcome({ call }: { call: ToolCall }) {
     return (
       <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
         <XIcon aria-hidden className="size-4" />
-        Declined: your plan stays as it was
+        Declined: your {what} stays as it was
       </p>
     );
   }
@@ -324,6 +333,77 @@ export function PlanChangeCard({ call }: { call: ToolCall }) {
           </div>
         ) : (
           <Outcome call={call} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BriefText({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <h4 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        {label}
+      </h4>
+      <p
+        className={cn(
+          "bg-muted/50 rounded-md px-2.5 py-2 text-sm whitespace-pre-line",
+          !text && "text-muted-foreground italic",
+        )}
+      >
+        {text || "No brief"}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The brief change the coach offers with change_coach_brief (ADR 0065): the brief now and after,
+ * with Decline and Apply. Applying rewrites the weeks ahead, so the card says so.
+ */
+export function BriefChangeCard({ call }: { call: ToolCall }) {
+  const { approvals, canAnswer } = use(PlanChangeContext);
+  const input = call.input as Partial<BriefChangeInput> | undefined;
+  const approval = approvals.get(call.id);
+  const waiting = approval != null && call.state === "approval-requested";
+  return (
+    <Card size="sm" role="group" aria-label="Brief change" className="sm:max-w-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquareTextIcon aria-hidden className="size-4" />
+          Change to your brief
+        </CardTitle>
+        {input?.summary ? <CardDescription>{input.summary}</CardDescription> : null}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <BriefText label="Now" text={input?.before ?? ""} />
+        <BriefText label="After" text={input?.brief ?? ""} />
+        {waiting ? (
+          <>
+            <p className="text-muted-foreground text-xs">Applying rewrites your coming weeks.</p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                disabled={!canAnswer}
+                onClick={() => approval.resolveInterrupt(false)}
+              >
+                Decline
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1"
+                disabled={!canAnswer}
+                onClick={() => approval.resolveInterrupt(true)}
+              >
+                <CheckIcon data-icon="inline-start" />
+                Apply
+              </Button>
+            </div>
+          </>
+        ) : (
+          <Outcome call={call} what="brief" />
         )}
       </CardContent>
     </Card>

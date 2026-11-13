@@ -2,7 +2,7 @@ import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 
 import { MAX_STREAM_POINTS, STREAM_CHANNELS } from "./coach-measure.ts";
-import { planChangeInputSchema } from "./coach-plan-change.ts";
+import { briefChangeInputSchema, planChangeInputSchema } from "./coach-plan-change.ts";
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const activityId = z.string().min(1).describe("The activity id, as in /activities/<id> links.");
@@ -145,7 +145,7 @@ export const showVisualDef = toolDefinition({
 export const getCoachPlanDef = toolDefinition({
   name: "get_coach_plan",
   description:
-    "The athlete's coach plan from this week on: each written week's budgets, phase, and the runs, rides, and swims that fit, and its sessions (no day) in the plan's session format with their id and status (open or done), plus availability, paces, and the rules every change must keep.",
+    "The athlete's coach plan from this week on: each written week's budgets, phase, and the runs, rides, and swims that fit, and its sessions (no day) in the plan's session format with their id and status (open or done), plus availability, paces, the athlete's coach brief and what the last writing couldn't fit of it, and the rules every change must keep.",
   inputSchema: z.object({}),
 });
 
@@ -161,5 +161,13 @@ export const applyPlanChangeDef = toolDefinition({
   description:
     "Offer a checked change to the athlete: the chat shows it session by session with Apply and Decline. Takes the proposalId propose_plan_change returned. Saved only if the athlete applies it and the plan hasn't changed since; a decline changes nothing.",
   inputSchema: z.object({ proposalId: z.string().min(1).max(64) }),
+  needsApproval: true,
+});
+
+export const changeCoachBriefDef = toolDefinition({
+  name: "change_coach_brief",
+  description:
+    "Offer the athlete a new coach brief: the standing context every week of their plan is written from. The chat shows the brief before and after with Apply and Decline. Saved only if the athlete applies it and the brief hasn't changed since; applying rewrites the weeks ahead. Only for something that holds from now on, never for one week.",
+  inputSchema: briefChangeInputSchema,
   needsApproval: true,
 });

@@ -36,6 +36,7 @@ import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts"
 import { mockCoachText } from "./coach-mock.ts";
 import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
 import {
+  applyBriefChange,
   applyPlanChange,
   coachPlanForCoach,
   proposePlanChange,
@@ -43,6 +44,7 @@ import {
 import { COACH_PLAN_CHANGE_PROMPT, COACH_SYSTEM_PROMPT } from "./coach-prompt.ts";
 import {
   applyPlanChangeDef,
+  changeCoachBriefDef,
   correlateStreamsDef,
   findActivitiesDef,
   findClimbsDef,
@@ -150,7 +152,8 @@ async function loadStreams(activityId: string, userId: string) {
 
 /**
  * The chat reads the coach plan, and may change it only through a checked proposal the athlete
- * applies (ADR 0038). With planning off, the chat never gets these tools.
+ * applies (ADR 0038), and the coach brief only through a brief change the athlete applies
+ * (ADR 0065). With planning off, the chat never gets these tools.
  */
 function coachPlanTools() {
   return [
@@ -162,6 +165,9 @@ function coachPlanTools() {
     ),
     applyPlanChangeDef.server<CoachRuntime>(({ proposalId }, { context }) =>
       applyPlanChange(context.userId, proposalId),
+    ),
+    changeCoachBriefDef.server<CoachRuntime>((input, { context }) =>
+      applyBriefChange(context.userId, input),
     ),
   ];
 }
