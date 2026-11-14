@@ -90,3 +90,17 @@ Most code changes need no documentation change; agents can read the code.
 ## Work artifacts
 
 Keep plans, research notes, and scratch files outside the worktree. Track work in the GitHub issue that owns it (`SxYxuse/vo2`, via `gh`; see `docs/agents/issue-tracker.md`); the merged PR is the implementation record.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `SxYxuse/vo2`, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Labels
+
+The eight default labels (`ready-for-agent`, `in-progress`, `in-review`, `wayfinder:*`), each named after its role. See `docs/agents/labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
