@@ -41,6 +41,9 @@ test("activity screen", async ({ page }) => {
   await page.waitForURL(/\/activities\//);
   // The charts load in their own chunk, and their skeleton can show after the page settled.
   await expect(page.getByRole("button", { name: "Pace", exact: true })).toBeVisible();
+  // The basemap is blocked here, so the card falls back to the outline: on the map's error, or
+  // after its 10 s first-load timeout. Screenshot only once it has.
+  await expect(page.locator(".maplibregl-canvas")).toHaveCount(0, { timeout: 15_000 });
   await settle(page);
   await expect(page).toHaveScreenshot("activity.png", {
     fullPage: true,
