@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { weekBudgets, type SportDay } from "./coach-plan-budget.ts";
+import { daysOutside, weekBudgets, type SportDay, type TimeOutDays } from "./coach-plan-budget.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
 import {
   checkPlan,
@@ -166,6 +166,30 @@ function progressionOf(r: Random): Progression {
   return progression;
 }
 
+/**
+ * The athlete's time outs (ADR 0066): none, one in the past, a few days of one week, whole weeks,
+ * one still open, or one ahead.
+ */
+function timeOutsOf(r: Random, today: string): TimeOutDays[] {
+  const shape = r.pick(["none", "past", "partial", "weeks", "open", "ahead"] as const);
+  if (shape === "none") return [];
+  if (shape === "past") {
+    const end = addDayKey(CURRENT_WEEK, -r.int(1, 20));
+    return [{ start: addDayKey(end, -r.int(0, 14)), end }];
+  }
+  if (shape === "partial") {
+    const start = addDayKey(CURRENT_WEEK, 7 * r.int(0, 3) + r.int(0, 6));
+    return [{ start, end: addDayKey(start, r.int(0, 5)) }];
+  }
+  if (shape === "weeks") {
+    const start = addDayKey(CURRENT_WEEK, 7 * r.int(0, 2) - r.int(0, 3));
+    return [{ start, end: addDayKey(start, 7 * r.int(1, 3) + r.int(0, 3)) }];
+  }
+  if (shape === "open") return [{ start: addDayKey(today, -r.int(0, 20)), end: null }];
+  const start = addDayKey(today, r.int(1, 28));
+  return [{ start, end: r.next() < 0.3 ? null : addDayKey(start, r.int(0, 20)) }];
+}
+
 /** An athlete as the server reads them, and the context the coach's plan is checked against. */
 function athlete(seed: number) {
   const r = random(seed);
@@ -181,7 +205,7 @@ function athlete(seed: number) {
     rideLthr: null,
     css: r.next() < 0.4 ? null : r.int(70, 150),
   };
-  const budgets = weekBudgets({
+  const budgetInput = {
     runs,
     rides,
     swims,
@@ -191,7 +215,11 @@ function athlete(seed: number) {
     count: 4,
     availability,
     progression: progressionOf(r),
-  });
+  };
+  const timeOuts = timeOutsOf(r, today);
+  const budgets = weekBudgets({ ...budgetInput, timeOuts });
+  /** The budgets as they were before time outs: the same athlete without them. */
+  const before = timeOuts.length ? weekBudgets(budgetInput) : budgets;
   const lastDay = addDayKey(budgets.at(-1)!.weekStart, 6);
   const easyRun = stepSecPerKm(
     { ...EASY_STEP, distanceM: 1000, durationS: null, effort: "easy" },
@@ -213,7 +241,7 @@ function athlete(seed: number) {
     paces: anchors.paces,
     racePaces: [],
   };
-  return { ctx, anchors, seed };
+  return { ctx, anchors, seed, timeOuts, before };
 }
 
 const EASY_STEP = {
@@ -269,6 +297,31 @@ describe("coach plan property guard", () => {
           }
         }
       }
+    }
+    expect(broken.slice(0, 5)).toEqual([]);
+  });
+
+  it("cuts a week a time out overlaps to its share of days, and leaves the others as they were", () => {
+    const broken: string[] = [];
+    for (const item of athletes()) {
+      item.ctx.weeks.forEach((week, index) => {
+        const before = item.before[index]!;
+        const days = daysOutside(week.weekStart, item.timeOuts);
+        for (const { id: sport } of PLAN_SPORTS) {
+          const key = BUDGET_KEY[sport];
+          const ok =
+            days === 7
+              ? week[key] === before[key]
+              : days === 0
+                ? week[key] === 0
+                : week[key] <= (before[key] * days) / 7 + 1e-6;
+          if (!ok) {
+            broken.push(
+              `${label(item)}: ${sport} week ${week.weekStart}, ${days} days outside ${JSON.stringify(item.timeOuts)}: ${before[key]} → ${week[key]}`,
+            );
+          }
+        }
+      });
     }
     expect(broken.slice(0, 5)).toEqual([]);
   });

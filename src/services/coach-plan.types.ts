@@ -480,6 +480,8 @@ export type PlanBasis = {
   css?: number | null;
   /** The coach brief. Plans written before it have none, the same as an empty brief. */
   brief?: string;
+  /** The time outs, as a key (ADR 0066). Plans written before them have none, the same as none. */
+  timeOuts?: string;
 };
 
 export type CoachPlan = {

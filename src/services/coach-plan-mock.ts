@@ -1,5 +1,6 @@
 import {
   budgetOf,
+  isLongKind,
   isQualityKind,
   metresText,
   minutesText,
@@ -198,6 +199,8 @@ export function mockCoachPlan(
         size >= mock.minQuality;
       if (canQuality) quality += 1;
 
+      // A long session kept because it's done is the week's one (rule 5): none is written again.
+      const shift = frozen.some((session) => isLongKind(session.kind)) ? 1 : 0;
       for (let index = 0; index < wanted; index += 1) {
         const amount = index === 0 ? longSize : size;
         planned.push({
@@ -209,10 +212,10 @@ export function mockCoachPlan(
         });
         sessions.push(
           sport === "run"
-            ? mockRun(week.weekStart, index, amount, canQuality, week.budgetKm, paces)
+            ? mockRun(week.weekStart, index + shift, amount, canQuality, week.budgetKm, paces)
             : sport === "ride"
-              ? mockRide(week.weekStart, index, amount, canQuality)
-              : mockSwim(week.weekStart, index, amount, canQuality),
+              ? mockRide(week.weekStart, index + shift, amount, canQuality)
+              : mockSwim(week.weekStart, index + shift, amount, canQuality),
         );
       }
     }

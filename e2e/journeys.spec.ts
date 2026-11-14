@@ -940,6 +940,62 @@ test("an athlete tries each phone calendar layout from Settings, and goes back t
   }
 });
 
+test("an athlete on the coach plan marks themselves sick on Plan, comes back, and deletes the time out", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await choosePlanningStyle(page, "Coach plan", "coachPlan");
+  await addRaceAndWritePlan(page, { runs: 4, rides: 0 });
+  const weekHeading = page.getByRole("heading", { name: WEEK_HEADING });
+  const km = async () => Number((await weekHeading.textContent())?.match(/(\d+) km running/)?.[1]);
+  await expect(weekHeading).toHaveText(/^This week · /);
+  const fullWeek = await km();
+  const sheet = page.getByRole("dialog", { name: /^(Sick or injured|Edit time out)$/ });
+  const banner = page.getByRole("alert").filter({ hasText: /time out/ });
+
+  // A session done this week stays when the plan pauses.
+  await weekSessions(page).first().getByRole("button", { name: "Mark done" }).click();
+  await expect(page.getByText(/^1 of \d+ done/)).toBeVisible();
+
+  // Today is Wednesday 17 June: sick since Monday, no end yet. The open sessions and the weeks
+  // ahead go, and nothing is written while it lasts (ADR 0066).
+  await page.getByRole("button", { name: "Sick or injured" }).click();
+  await sheet.getByRole("button", { name: "Start", exact: true }).click();
+  await page.locator('[data-day="15/06/2026"]').click();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(banner).toContainText("On time out since Mon 15 Jun");
+  await expect(banner).toContainText("Your coach plan is paused.");
+  await expect(weekSessions(page)).toHaveCount(1);
+  await expect(page.getByText(/^1 of 1 done/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next week" })).toBeDisabled();
+  await page.reload();
+  await expect(banner).toBeVisible();
+  await expect(page.getByText("Writing your plan…")).toHaveCount(0);
+
+  // "I'm back": the time out ends yesterday, and the plan is written again from this week, which
+  // keeps five of its seven days' budget.
+  const rewritten = writingStarts(page);
+  await banner.getByRole("button", { name: "I'm back" }).click();
+  await expectPlanWritten(page, rewritten);
+  await expect(banner).toHaveCount(0);
+  await expect(weekHeading).toHaveText(/^This week · /);
+  expect(await km()).toBeLessThan(fullWeek);
+  await expect(page.getByText(/^1 of \d+ done/)).toBeVisible();
+
+  // The way out: deleting it from Fitness writes this week in full again.
+  await page.goto("/fitness");
+  await settle(page);
+  await page.getByRole("button", { name: "Edit time out: Sick · 15 Jun – 16 Jun" }).click();
+  await sheet.getByRole("button", { name: "Delete" }).click();
+  const again = writingStarts(page);
+  await sheet.getByRole("button", { name: "Delete for good" }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.goto("/week");
+  await expectPlanWritten(page, again);
+  expect(await km()).toBeGreaterThan(fullWeek * 0.9);
+});
+
 test("an athlete with planning off marks a time out from Fitness, edits it, ends it, and deletes it", async ({
   page,
 }) => {

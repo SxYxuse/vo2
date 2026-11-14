@@ -67,7 +67,7 @@ import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.ty
 import { sportGroupFor } from "./sport-groups.ts";
 import { swimCssFor } from "./swim-css.server.ts";
 import { timeOutsFor } from "./time-outs.server.ts";
-import { timeOutsForCoach } from "./time-outs.ts";
+import { timeOutOpen, timeOutsForCoach } from "./time-outs.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
@@ -314,8 +314,16 @@ function basisOf(inputs: Inputs): PlanBasis {
     ftp: inputs.ftp,
     css: inputs.css,
     brief: inputs.brief,
+    timeOuts: timeOutsKey(inputs.timeOuts),
   };
 }
+
+/** The time outs as the plan was written for them: any write to one rewrites the weeks ahead. */
+const timeOutsKey = (timeOuts: Inputs["timeOuts"]) =>
+  JSON.stringify(timeOuts.map(({ kind, start, end }) => [kind, start, end]));
+
+const openTimeOut = (inputs: Pick<Inputs, "timeOuts" | "today">) =>
+  inputs.timeOuts.some((timeOut) => timeOutOpen(timeOut, inputs.today));
 
 /** Whether CSS moved enough to rewrite. Plans written before swims have none to compare. */
 function cssChanged(written: PlanBasis["css"], now: PlanBasis["css"]) {
@@ -356,11 +364,13 @@ function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
 /**
  * Whether the weeks ahead need writing, and from which week: the first plan; the athlete asked
  * (switching back to the coach plan); availability, goals, or paces changed; or a new week is
- * due. A missed run is skipped, never a reason to write. Sessions marked done are kept.
+ * due. A missed run is skipped, never a reason to write. Sessions marked done are kept. Nothing is
+ * due while a time out is open.
  */
 export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = inputs.currentWeek;
   const { plan, row, today } = inputs;
+  if (openTimeOut(inputs)) return null;
   const goals = upcomingGoalsKey(basis.goals, today);
   if (!plan) {
     return {
@@ -380,6 +390,10 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   // A plan written before the brief has none, the same as an empty one.
   if ((plan.basis.brief ?? "") !== basis.brief) {
     return { fromWeek: first, reason: "brief", trigger: basis.brief };
+  }
+  // A plan written before time outs has none.
+  if ((plan.basis.timeOuts ?? "[]") !== basis.timeOuts) {
+    return { fromWeek: first, reason: "time outs", trigger: basis.timeOuts };
   }
   if (upcomingGoalsKey(plan.basis.goals, today) !== goals) {
     return { fromWeek: first, reason: "goals", trigger: goals };
@@ -547,7 +561,9 @@ function failedValues(inputs: Inputs | null, error: string): Partial<Row> {
  */
 async function startIfDue(userId: string, inputs: Inputs, force = false): Promise<Row | null> {
   const { row } = inputs;
-  if (!row || inputs.style !== "coachPlan" || missingOf(inputs).length) return row;
+  if (!row || inputs.style !== "coachPlan") return row;
+  if (openTimeOut(inputs)) return pause(userId, inputs, row);
+  if (missingOf(inputs).length) return row;
   const basis = basisOf(inputs);
   const due =
     dueWrite(inputs, basis) ??
@@ -574,6 +590,44 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   // Not awaited: the writing outlives the request, so closing the app doesn't stop it.
   void writePlan(userId, due.fromWeek, claimed.statusAt);
   return claimed;
+}
+
+/**
+ * While a time out is open the plan holds only what was before this week and the sessions marked
+ * done in it: the open ones and the weeks ahead go (ADR 0066). A writing under way is dropped too,
+ * since its result would bring them back. The basis takes the time outs, so ending, editing, or
+ * deleting this one makes the rewrite due from the week it's in.
+ */
+async function pause(userId: string, inputs: Inputs, row: Row): Promise<Row> {
+  const { plan, currentWeek } = inputs;
+  const timeOuts = timeOutsKey(inputs.timeOuts);
+  const weeks = (plan?.weeks ?? [])
+    .filter((week) => week.weekStart <= currentWeek)
+    .map((week) =>
+      week.weekStart < currentWeek
+        ? week
+        : { ...week, sessions: week.sessions.filter((session) => session.done) },
+    );
+  const paused =
+    plan == null ||
+    (plan.basis.timeOuts === timeOuts &&
+      weeks.length === plan.weeks.length &&
+      weeks.every((week, index) => week.sessions.length === plan.weeks[index]!.sessions.length));
+  if (paused && row.status === "idle" && row.requestedFrom == null) return row;
+  const [saved] = await db
+    .update(coachPlans)
+    .set({
+      ...(plan ? { plan: { ...plan, weeks, basis: { ...plan.basis, timeOuts } } } : {}),
+      status: "idle",
+      error: null,
+      requestedFrom: null,
+      statusAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(coachPlans.userId, userId))
+    .returning();
+  logger.info("coach_plan.paused", { kept: weeks.at(-1)?.sessions.length ?? 0 });
+  return saved ?? row;
 }
 
 /**
@@ -700,6 +754,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       count: WEEKS_AHEAD,
       availability,
       progression: inputs.progression,
+      timeOuts: inputs.timeOuts,
     });
     const weeks = budgets.filter((week) => week.weekStart >= fromWeek);
     const old = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
@@ -881,6 +936,7 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
       count: WEEKS_AHEAD,
       availability: before.availability,
       progression,
+      timeOuts: before.timeOuts,
     });
     requestedFrom = firstWeekOffBudget(before.plan.weeks, budgets, nextWeek) ? nextWeek : null;
   }
@@ -925,7 +981,10 @@ export async function saveBriefImpl(brief: string): Promise<CoachPlanState> {
   return stateOf(inputs, await startIfDue(userId, inputs));
 }
 
-/** Starts the rewrite a brief change applied in the chat is due, as a load of Plan would. */
+/**
+ * Starts the rewrite a brief change applied in the chat or a time out is due, as a load of Plan
+ * would.
+ */
 export async function startCoachPlanIfDue(userId: string) {
   await startIfDue(userId, await gather(userId));
 }

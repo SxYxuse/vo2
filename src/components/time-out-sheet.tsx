@@ -2,7 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { XIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ThermometerIcon, XIcon } from "lucide-react";
 
 import { DatePicker } from "@/components/date-picker.tsx";
 import {
@@ -13,7 +14,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog.tsx";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -58,6 +59,69 @@ export function TimeOutSheet({
         ) : null}
       </ResponsiveDialogContent>
     </ResponsiveDialog>
+  );
+}
+
+const formatDay = (key: string) => format(parseISO(key), "EEE d MMM");
+
+/**
+ * Plan's banner for the time out the athlete is on, or the next one ahead (ADR 0066): while it is
+ * open the coach plan is paused, and "I'm back" starts it again.
+ */
+export function TimeOutBanner({
+  timeOuts,
+  onEdit,
+}: {
+  timeOuts: TimeOut[];
+  onEdit: (timeOut: TimeOut) => void;
+}) {
+  const queryClient = useQueryClient();
+  const online = useOnline();
+  const [timeZone] = useState(deviceTimeZone);
+  const today = dayKey(new Date(), timeZone);
+  const timeOut = timeOuts.find((item) => item.end == null || item.end >= today);
+  const back = useMutation({
+    mutationFn: (id: string) => endTimeOut({ data: { id, timeZone } }),
+    onSuccess: () => afterTimeOutsChanged(queryClient),
+  });
+  if (!timeOut) return null;
+  const current = timeOut.start <= today;
+  const kind = TIME_OUT_KINDS.find((item) => item.id === timeOut.kind)?.label ?? "";
+  const title = !current
+    ? `Time out from ${formatDay(timeOut.start)}${timeOut.end ? ` to ${formatDay(timeOut.end)}` : ""}`
+    : timeOut.end == null
+      ? `On time out since ${formatDay(timeOut.start)}`
+      : `On time out until ${formatDay(timeOut.end)}`;
+  const description = !current
+    ? "The weeks it covers get less training, by the days it holds."
+    : timeOut.end == null
+      ? "Your coach plan is paused. Tap I'm back when you can train again."
+      : "This week's training is cut for the days it holds.";
+  return (
+    <Alert>
+      <ThermometerIcon />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        {kind}. {description}
+        {back.error ? <span className="text-destructive block">{back.error.message}</span> : null}
+      </AlertDescription>
+      <AlertAction className="flex gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={() => onEdit(timeOut)}>
+          Edit
+        </Button>
+        {current ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={!online || back.isPending}
+            onClick={() => back.mutate(timeOut.id)}
+          >
+            {back.isPending ? <Spinner data-icon="inline-start" /> : null}
+            {"I'm back"}
+          </Button>
+        ) : null}
+      </AlertAction>
+    </Alert>
   );
 }
 

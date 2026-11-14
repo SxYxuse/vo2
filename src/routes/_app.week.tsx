@@ -1,19 +1,24 @@
+import { useState, type ReactNode } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
-import { Settings2Icon, TargetIcon } from "lucide-react";
+import { Settings2Icon, TargetIcon, ThermometerIcon } from "lucide-react";
 
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { CoachPlanView } from "@/components/coach-plan-view.tsx";
 import { PanelSkeleton } from "@/components/route-states.tsx";
+import { TimeOutBanner, TimeOutSheet, type TimeOutEditing } from "@/components/time-out-sheet.tsx";
 import {
   appShellQueryOptions,
   coachPlanQueryOptions,
   planningStyleOf,
   loaderQuery,
+  timeOutsQueryOptions,
 } from "@/lib/queries.ts";
 import { Button } from "@/components/ui/button";
+import { dayKey } from "@/services/day-key.ts";
+import { timeOutOpen } from "@/services/time-outs.ts";
 import { Link } from "@tanstack/react-router";
 import { EmptyContent } from "@/components/ui/empty";
 import {
@@ -37,7 +42,10 @@ export const Route = createFileRoute("/_app/week")({
       : {},
   loader: async ({ context }) => {
     if ((await planningStyleOf(context)) !== "coachPlan") return;
-    await context.queryClient.query(loaderQuery(coachPlanQueryOptions));
+    await Promise.all([
+      context.queryClient.query(loaderQuery(coachPlanQueryOptions)),
+      context.queryClient.query(loaderQuery(timeOutsQueryOptions)),
+    ]);
   },
   pendingMs: 200,
   pendingComponent: WeekTargetPending,
@@ -45,8 +53,8 @@ export const Route = createFileRoute("/_app/week")({
   component: WeekTargetPage,
 });
 
-function WeekTargetHeading() {
-  return <PageHeader icon={TargetIcon} title="Plan" />;
+function WeekTargetHeading({ actions }: { actions?: ReactNode }) {
+  return <PageHeader icon={TargetIcon} title="Plan" actions={actions} />;
 }
 
 function WeekTargetPage() {
@@ -54,10 +62,27 @@ function WeekTargetPage() {
   const { week } = Route.useSearch();
   if (!shell.signedIn) return <SignedOut />;
   if (shell.planningStyle !== "coachPlan") return <PlanningOff />;
+  return <CoachPlanPage week={week} />;
+}
+
+/** The coach plan, with the time out the athlete is on or has ahead (ADR 0066). */
+function CoachPlanPage({ week }: { week?: string }) {
+  const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
+  const [editing, setEditing] = useState<TimeOutEditing>(null);
+  const today = dayKey(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
   return (
     <>
-      <WeekTargetHeading />
-      <CoachPlanView week={week} />
+      <WeekTargetHeading
+        actions={
+          <Button type="button" variant="outline" onClick={() => setEditing("new")}>
+            <ThermometerIcon data-icon="inline-start" />
+            Sick or injured
+          </Button>
+        }
+      />
+      <TimeOutBanner timeOuts={timeOuts} onEdit={setEditing} />
+      <CoachPlanView week={week} paused={timeOuts.some((timeOut) => timeOutOpen(timeOut, today))} />
+      <TimeOutSheet editing={editing} onClose={() => setEditing(null)} />
     </>
   );
 }
