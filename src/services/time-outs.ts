@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import { addDayKey } from "./day-key.ts";
+import { daysBetween } from "./season.types.ts";
 
 /** Days the athlete can't train because they are sick or injured (ADR 0066). */
 export type TimeOut = {
@@ -30,6 +31,28 @@ export function timeOutStartWindow(today: string, weekStart: string) {
 /** Whether a time out covers a day; an open one covers every day from its start. */
 export function timeOutCovers(timeOut: Pick<TimeOut, "start" | "end">, day: string) {
   return day >= timeOut.start && (timeOut.end == null || day <= timeOut.end);
+}
+
+/**
+ * The time outs as the coach reads them, in the plan writer's prompt and the chat's context: kind,
+ * days, how many days off, and how long ago the athlete came back (ADR 0066). An open one, or one
+ * still ahead, has no return yet.
+ */
+export function timeOutsForCoach(
+  timeOuts: Pick<TimeOut, "kind" | "start" | "end">[],
+  today: string,
+) {
+  return timeOuts.map(({ kind, start, end }) => {
+    const returned = end != null && end < today;
+    return {
+      kind,
+      start,
+      end,
+      state: start > today ? "ahead" : returned ? "over" : "now",
+      daysOff: end == null ? null : daysBetween(start, end) + 1,
+      daysSinceReturn: returned ? daysBetween(end, today) - 1 : null,
+    };
+  });
 }
 
 function overlaps(a: Pick<TimeOut, "start" | "end">, b: Pick<TimeOut, "start" | "end">) {

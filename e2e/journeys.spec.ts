@@ -950,6 +950,8 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
   const pickDay = async (field: "Start" | "End", day: string) => {
     await sheet.getByRole("button", { name: field, exact: true }).click();
     await page.locator(`[data-day="${day}"]`).click();
+    // The next field's calendar would show the same day while this one is still closing.
+    await expect(page.locator("[data-day]")).toHaveCount(0);
   };
   const band = page.locator(".recharts-reference-area");
 

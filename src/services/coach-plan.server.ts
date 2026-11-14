@@ -66,6 +66,8 @@ import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { swimCssFor } from "./swim-css.server.ts";
+import { timeOutsFor } from "./time-outs.server.ts";
+import { timeOutsForCoach } from "./time-outs.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
@@ -110,13 +112,14 @@ async function readRow(userId: string): Promise<Row | null> {
 
 /** Everything the plan is checked and written from, read fresh. */
 export async function gather(userId: string, now = new Date()) {
-  const [row, style, goals, coach, paces, css, [metrics], rows] = await Promise.all([
+  const [row, style, goals, coach, paces, css, timeOuts, [metrics], rows] = await Promise.all([
     readRow(userId),
     storedPlanningStyle(userId),
     goalsFor(userId),
     coachModelFor(userId, "plan"),
     trainingPacesFor(userId, now),
     swimCssFor(userId, now),
+    timeOutsFor(userId),
     db
       .select({
         ftp: athleteMetrics.ftp,
@@ -177,6 +180,7 @@ export async function gather(userId: string, now = new Date()) {
     availability: row ? parseAvailability(row.availability) : null,
     progression: parseProgression(row?.progression),
     brief: row?.brief ?? "",
+    timeOuts,
     aGoal: coachPlanGoal(goals, today),
     plan: readCoachPlan(row?.plan),
     runs: runs as (SportDay & Activity)[],
@@ -661,6 +665,18 @@ function recentTraining(inputs: Inputs) {
 }
 
 /**
+ * The time outs in the weeks written or in the four before them, when a return still shapes the
+ * weeks ahead (ADR 0066); none, and no field, for an athlete who never marked one.
+ */
+function timeOutsText(inputs: Inputs, fromWeek: string, lastDay: string) {
+  const since = addDayKey(fromWeek, -28);
+  const relevant = inputs.timeOuts.filter(
+    (timeOut) => timeOut.start <= lastDay && (timeOut.end == null || timeOut.end >= since),
+  );
+  return relevant.length ? { timeOuts: timeOutsForCoach(relevant, inputs.today) } : {};
+}
+
+/**
  * Writes the weeks from `fromWeek`, keeps the weeks before it and the sessions marked done in it,
  * and stores the plan if it passes.
  */
@@ -737,6 +753,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
         })),
       availability: availabilityText(ctx),
       ...(inputs.brief ? { brief: inputs.brief } : {}),
+      ...timeOutsText(inputs, fromWeek, lastDay),
       ...(availability.runsPerWeek
         ? { paces: paceText(anchors.paces), racePaces: racePaceText(racePacesOf(inputs)) }
         : {}),

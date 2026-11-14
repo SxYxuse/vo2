@@ -41,6 +41,8 @@ import {
   coachPlanForCoach,
   proposePlanChange,
 } from "./coach-plan-change.server.ts";
+import { timeOutsFor } from "./time-outs.server.ts";
+import { timeOutsForCoach } from "./time-outs.ts";
 import { COACH_PLAN_CHANGE_PROMPT, COACH_SYSTEM_PROMPT } from "./coach-prompt.ts";
 import {
   applyPlanChangeDef,
@@ -386,6 +388,19 @@ function createCoachTools(coachPlan: boolean) {
   ];
 }
 
+/**
+ * The athlete's time outs, past and open, so "how should I come back?" gets their real situation
+ * (ADR 0066). The chat reads them only: marking, ending, or changing one is the athlete's.
+ */
+async function timeOutsLine(userId: string, timeZone: string) {
+  const timeOuts = await timeOutsFor(userId);
+  if (!timeOuts.length) return [];
+  const list = timeOutsForCoach(timeOuts, dayKey(new Date(), timeZone));
+  return [
+    `Time outs: days the athlete marked they couldn't train, sick or injured. state is now (still off), ahead, or over; daysSinceReturn counts from the first day back. You can't mark, end, or change one: the athlete does that with "Sick or injured" in the app.\n${JSON.stringify(list)}`,
+  ];
+}
+
 function todayLine(timeZone: string) {
   const now = new Date();
   const weekday = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "long" }).format(now);
@@ -409,6 +424,7 @@ export async function handleCoachChat(request: Request) {
     return new Response("Not found", { status: 404 });
   }
   const timeZone = validTimeZone(params.forwardedProps.timeZone);
+  const timeOuts = await timeOutsLine(session.user.id, timeZone);
   const adapter = coach.kind === "mock" ? mockCoachText() : coach.adapter;
   const coachPlan = style === "coachPlan";
 
@@ -433,6 +449,7 @@ export async function handleCoachChat(request: Request) {
       COACH_SYSTEM_PROMPT,
       ...(coachPlan ? [COACH_PLAN_CHANGE_PROMPT] : []),
       todayLine(timeZone),
+      ...timeOuts,
     ],
     agentLoopStrategy: maxIterations(12),
     // The server keeps the chat, so the athlete can reopen it later on any device.
