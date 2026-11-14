@@ -330,6 +330,13 @@
       "when": 1794582504665,
       "tag": "0046_coach_brief",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794688962863,
+      "tag": "0047_time_outs",
+      "breakpoints": true
     }
   ]
 }

@@ -939,3 +939,64 @@ test("an athlete tries each phone calendar layout from Settings, and goes back t
     }
   }
 });
+
+test("an athlete with planning off marks a time out from Fitness, edits it, ends it, and deletes it", async ({
+  page,
+}) => {
+  await page.goto("/fitness");
+  await settle(page);
+  // By name: a date popover is a dialog too, and may still be closing.
+  const sheet = page.getByRole("dialog", { name: /^(Sick or injured|Edit time out)$/ });
+  const pickDay = async (field: "Start" | "End", day: string) => {
+    await sheet.getByRole("button", { name: field, exact: true }).click();
+    await page.locator(`[data-day="${day}"]`).click();
+  };
+  const band = page.locator(".recharts-reference-area");
+
+  // Today is Wednesday 17 June: sick from Friday to Sunday.
+  await page.getByRole("button", { name: "Sick or injured" }).click();
+  await expect(sheet.getByRole("radio", { name: "Sick" })).toBeChecked();
+  await pickDay("Start", "12/06/2026");
+  await pickDay("End", "14/06/2026");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Edit time out: Sick · 12 Jun – 14 Jun" }),
+  ).toBeVisible();
+  await expect(band).toHaveCount(1);
+
+  // Tapping the band opens it: it was an injury.
+  await band.click();
+  await expect(sheet.getByRole("heading", { name: "Edit time out" })).toBeVisible();
+  await sheet.getByRole("radio", { name: "Injured" }).click();
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+  const injured = page.getByRole("button", { name: "Edit time out: Injured · 12 Jun – 14 Jun" });
+  await expect(injured).toBeVisible();
+
+  // An open one can't overlap it, and ends yesterday with "I'm back".
+  await page.getByRole("button", { name: "Sick or injured" }).click();
+  await pickDay("Start", "14/06/2026");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toContainText("These days overlap another time out.");
+  await pickDay("Start", "15/06/2026");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit time out: Sick · since 15 Jun" }).click();
+  await sheet.getByRole("button", { name: "I'm back" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Edit time out: Sick · 15 Jun – 16 Jun" }),
+  ).toBeVisible();
+  await expect(band).toHaveCount(2);
+
+  // The way out: deleting them leaves the chart as it was.
+  for (const timeOut of [injured, page.getByRole("button", { name: /^Edit time out: Sick/ })]) {
+    await timeOut.click();
+    await sheet.getByRole("button", { name: "Delete" }).click();
+    await sheet.getByRole("button", { name: "Delete for good" }).click();
+    await expect(sheet).toHaveCount(0);
+  }
+  await expect(page.getByRole("button", { name: /^Edit time out/ })).toHaveCount(0);
+  await expect(band).toHaveCount(0);
+});

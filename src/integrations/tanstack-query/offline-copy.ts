@@ -21,6 +21,7 @@ export const OFFLINE_QUERY_KEYS = [
   "coach-plan",
   "season",
   "fitness",
+  "time-outs",
   "progress",
   "bests",
   "heart-rate",

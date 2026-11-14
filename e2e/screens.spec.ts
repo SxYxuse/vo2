@@ -1,4 +1,4 @@
-import { test, expect, settle, syncButton } from "./test.ts";
+import { test, expect, settle, syncButton, withDatabase } from "./test.ts";
 
 // One screenshot per screen, at phone and desktop size, and in WebKit at iPhone size. A diff fails
 // the run and the HTML report shows expected, actual, and the difference side by side. After an
@@ -45,6 +45,21 @@ test("activity screen", async ({ page }) => {
   await expect(page).toHaveScreenshot("activity.png", {
     fullPage: true,
     mask: [syncButton(page), page.locator(".maplibregl-canvas")],
+  });
+});
+
+test("fitness screen with a time out", async ({ page }) => {
+  await withDatabase((client) =>
+    client.query(
+      "insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-time-out', id, 'sick', '2026-06-12', '2026-06-14' from \"user\"",
+    ),
+  );
+  await page.goto("/fitness");
+  await expect(page.locator(".recharts-reference-area")).toHaveCount(1);
+  await settle(page);
+  await expect(page).toHaveScreenshot("fitness-time-out.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
   });
 });
 

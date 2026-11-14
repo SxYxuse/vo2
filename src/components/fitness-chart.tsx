@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 import { cn } from "cn";
 import { Link } from "@tanstack/react-router";
+import { format, parseISO } from "date-fns";
 import { ChevronRightIcon, FlagIcon } from "lucide-react";
 import {
   Area,
@@ -11,6 +12,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -28,6 +30,7 @@ import {
   ctlChange,
   dayKey,
   formLabel,
+  periodStartMs,
   trainingPhase,
   pmcWithCurrentForm,
   roundLoad,
@@ -45,7 +48,9 @@ import {
   seasonEvents,
   type Goal,
 } from "@/services/season.types.ts";
+import { TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -79,6 +84,55 @@ const SERIES_INFO = {
   atl: "About one week of training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
   tsb: "Fitness minus fatigue after that day's known training (today: as of now). Around −10 to −30 is normal while building; positive means fresh, which is what you want before a race or a hard test. It is not a performance score.",
 } as const;
+
+/** Time outs shade the chart in a colour no series uses. */
+const TIME_OUT_COLOR = "var(--color-ds-purple-700)";
+
+const formatDay = (key: string) => format(parseISO(key), "d MMM");
+
+function timeOutLabel(timeOut: TimeOut) {
+  const kind = TIME_OUT_KINDS.find((item) => item.id === timeOut.kind)?.label ?? "";
+  const days =
+    timeOut.end == null
+      ? `since ${formatDay(timeOut.start)}`
+      : timeOut.end === timeOut.start
+        ? formatDay(timeOut.start)
+        : `${formatDay(timeOut.start)} – ${formatDay(timeOut.end)}`;
+  return `${kind} · ${days}`;
+}
+
+/** The athlete's time outs in the period, or ahead of it, each opening the sheet to edit it. */
+function TimeOutList({
+  timeOuts,
+  onEdit,
+}: {
+  timeOuts: TimeOut[];
+  onEdit: (timeOut: TimeOut) => void;
+}) {
+  if (!timeOuts.length) return null;
+  return (
+    <ul aria-label="Time outs" className="flex flex-wrap gap-2">
+      {timeOuts.map((timeOut) => (
+        <li key={timeOut.id}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={`Edit time out: ${timeOutLabel(timeOut)}`}
+            onClick={() => onEdit(timeOut)}
+          >
+            <span
+              aria-hidden
+              className="size-2 rounded-full"
+              style={{ backgroundColor: TIME_OUT_COLOR }}
+            />
+            {timeOutLabel(timeOut)}
+          </Button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
 /** A colour no series uses, so estimated days stand out on any line. */
@@ -230,7 +284,18 @@ function NextGoal({ goals, pmc, timeZone }: { goals: Goal[]; pmc: PmcPoint[]; ti
   );
 }
 
-export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goals?: Goal[] }) {
+export function FitnessChart({
+  loads,
+  goals = [],
+  timeOuts = [],
+  onEditTimeOut,
+}: {
+  loads: FitnessLoad[];
+  goals?: Goal[];
+  /** Shaded on the chart; tapping one edits it (ADR 0066). */
+  timeOuts?: TimeOut[];
+  onEditTimeOut?: (timeOut: TimeOut) => void;
+}) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const isDesktop = useDesktopMedia();
   const sharedPeriod = useTrainingPeriod();
@@ -252,6 +317,25 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
       return t == null ? [] : [{ id: goal.id, t }];
     });
   }, [goals, series]);
+  // Time outs in the period, clipped to the days the chart shows.
+  const timeOutBands = useMemo(() => {
+    const first = series[0];
+    const last = series.at(-1);
+    if (!first || !last) return [];
+    const byDate = new Map(series.map((point) => [point.date, point.t]));
+    return timeOuts.flatMap((timeOut) => {
+      const from = timeOut.start > first.date ? timeOut.start : first.date;
+      const to = timeOut.end != null && timeOut.end < last.date ? timeOut.end : last.date;
+      const x1 = byDate.get(from);
+      const x2 = byDate.get(to);
+      return x1 == null || x2 == null || from > to ? [] : [{ timeOut, x1, x2 }];
+    });
+  }, [timeOuts, series]);
+  const listedTimeOuts = useMemo(() => {
+    const startMs = periodStartMs(period, timeZone);
+    const from = startMs == null ? "" : dayKey(new Date(startMs), timeZone);
+    return timeOuts.filter((timeOut) => timeOut.end == null || timeOut.end >= from);
+  }, [timeOuts, period, timeZone]);
   const ramp = ctlChange(pmc);
   const phase = useMemo(() => trainingPhase(pmc), [pmc]);
   const estimatedShare =
@@ -447,6 +531,22 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
                     {showPmc ? (
                       <ReferenceLine yAxisId="pmc" y={0} stroke="var(--color-border)" />
                     ) : null}
+                    {timeOutBands.map((band) => (
+                      <ReferenceArea
+                        key={band.timeOut.id}
+                        yAxisId={showPmc ? "pmc" : "load"}
+                        x1={band.x1}
+                        x2={band.x2}
+                        fill={TIME_OUT_COLOR}
+                        fillOpacity={0.12}
+                        stroke="none"
+                        // Over the bars and lines (recharts layers them 300 and 400), so a tap on
+                        // any day of the band reaches it.
+                        zIndex={450}
+                        className={onEditTimeOut ? "cursor-pointer" : undefined}
+                        onClick={() => onEditTimeOut?.(band.timeOut)}
+                      />
+                    ))}
                     {goalMarks.map((mark) => (
                       <ReferenceLine
                         key={mark.id}
@@ -559,6 +659,7 @@ export function FitnessChart({ loads, goals = [] }: { loads: FitnessLoad[]; goal
             )}
           </>
         )}
+        {onEditTimeOut ? <TimeOutList timeOuts={listedTimeOuts} onEdit={onEditTimeOut} /> : null}
       </CardContent>
     </Card>
   );
