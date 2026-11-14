@@ -63,6 +63,27 @@ export function timeOutOpen(timeOut: Pick<TimeOut, "start" | "end">, today: stri
   return timeOut.end == null && timeOut.start <= today;
 }
 
+/** Time outs shade the fitness chart and mark calendar days in a colour no sport or series uses. */
+export const TIME_OUT_COLOR = "var(--color-ds-purple-700)";
+
+/**
+ * Which time out a calendar day falls in, or null. An open one marks its days up to today, or only
+ * its first day while it is still ahead: what follows isn't known yet.
+ */
+export function timeOutOnDay(timeOuts: TimeOut[], day: string, today: string) {
+  return (
+    timeOuts.find((timeOut) =>
+      timeOutCovers(
+        {
+          start: timeOut.start,
+          end: timeOut.end ?? (today > timeOut.start ? today : timeOut.start),
+        },
+        day,
+      ),
+    ) ?? null
+  );
+}
+
 function overlaps(a: Pick<TimeOut, "start" | "end">, b: Pick<TimeOut, "start" | "end">) {
   return (b.end == null || a.start <= b.end) && (a.end == null || b.start <= a.end);
 }

@@ -53,7 +53,7 @@ export const fitnessQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-/** The athlete's time outs, shown on the fitness chart (ADR 0066). */
+/** The athlete's time outs, shown on the fitness chart and the calendar (ADR 0066). */
 export const timeOutsQueryOptions = queryOptions({
   queryKey: ["time-outs"],
   queryFn: () => listTimeOuts(),

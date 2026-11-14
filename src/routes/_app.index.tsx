@@ -4,7 +4,7 @@ import { CalendarDaysIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header.tsx";
 import { ActivityCalendar } from "@/components/activity-calendar.tsx";
-import { homeQueryOptions, loaderQuery } from "@/lib/queries.ts";
+import { homeQueryOptions, loaderQuery, timeOutsQueryOptions } from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -42,7 +42,11 @@ export const Route = createFileRoute("/_app/")({
       });
     }
   },
-  loader: ({ context }) => context.queryClient.query(loaderQuery(homeQueryOptions)),
+  loader: ({ context }) =>
+    Promise.all([
+      context.queryClient.query(loaderQuery(homeQueryOptions)),
+      context.queryClient.query(loaderQuery(timeOutsQueryOptions)),
+    ]),
   pendingMs: 200,
   pendingComponent: CalendarPending,
   errorComponent: CalendarError,
@@ -57,6 +61,7 @@ function CalendarPage() {
   const { month, week } = Route.useSearch();
   const { data } = useSuspenseQuery(homeQueryOptions);
   const { signedIn, activities, goals, settings } = data;
+  const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -77,6 +82,7 @@ function CalendarPage() {
         <ActivityCalendar
           activities={activities}
           goals={goals}
+          timeOuts={timeOuts}
           initialSettings={settings}
           diary={{ month, week }}
         />

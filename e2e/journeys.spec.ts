@@ -907,6 +907,12 @@ test("an athlete tries each phone calendar layout from Settings, and goes back t
   page,
 }) => {
   test.skip(test.info().project.name !== "phone", "The calendar layouts are for phones.");
+  // Injured since Monday with no end: each layout marks Monday to today.
+  await withDatabase((client) =>
+    client.query(
+      `insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-injured', id, 'injured', '2026-06-15', null from "user"`,
+    ),
+  );
   const layouts = [
     {
       label: "Week strip",

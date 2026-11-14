@@ -41,6 +41,9 @@ test("activity screen", async ({ page }) => {
   await page.waitForURL(/\/activities\//);
   // The charts load in their own chunk, and their skeleton can show after the page settled.
   await expect(page.getByRole("button", { name: "Pace", exact: true })).toBeVisible();
+  // The basemap is blocked here, so the card falls back to the outline: on the map's error, or
+  // after its 10 s first-load timeout. Screenshot only once it has.
+  await expect(page.locator(".maplibregl-canvas")).toHaveCount(0, { timeout: 15_000 });
   await settle(page);
   await expect(page).toHaveScreenshot("activity.png", {
     fullPage: true,
@@ -77,6 +80,26 @@ test("plan screen on a time out", async ({ page }) => {
   await expect(page.getByText("On time out since Mon 15 Jun")).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot("plan-time-out.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+});
+
+test("calendar screen with time outs", async ({ page }) => {
+  // Today is Wednesday 17 June: sick at the start of the month, and injured since Monday with no
+  // end, which marks Monday to today.
+  await withDatabase((client) =>
+    client.query(
+      `insert into time_outs (id, user_id, kind, start_day, end_day)
+       select 'e2e-sick', id, 'sick', date '2026-06-01', date '2026-06-03' from "user"
+       union all select 'e2e-injured', id, 'injured', date '2026-06-15', null from "user"`,
+    ),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Activity calendar", level: 1 })).toBeVisible();
+  await expect(page.locator("[data-slot=time-out-mark]").first()).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot("calendar-time-out.png", {
     fullPage: true,
     mask: [syncButton(page)],
   });

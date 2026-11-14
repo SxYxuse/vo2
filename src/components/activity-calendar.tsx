@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { TZDate } from "@date-fns/tz";
@@ -51,10 +51,13 @@ import {
 } from "@/services/diary-window.ts";
 import { dayKey, weekStartKey } from "@/services/day-key.ts";
 import {
+  TimeOutMark,
   WeekStripView,
   WeekSummaryView,
   useItemsByDay,
+  type TimeOutOn,
 } from "@/components/phone-calendar-views.tsx";
+import { timeOutOnDay, type TimeOut } from "@/services/time-outs.ts";
 import {
   EventCalendar,
   EventCalendarViewContext,
@@ -252,6 +255,9 @@ function VisibleActivitiesPrefetch({ activities }: { activities: CalendarActivit
   return null;
 }
 
+/** The event calendar renders the day list itself, so the time outs reach it through context. */
+const TimeOutOnContext = createContext<TimeOutOn>(() => null);
+
 /** Vertical day list of one training week: ReUI agenda rows plus rest days, for phone widths. */
 function ActivityDayListView() {
   const todayRef = useRef<HTMLDivElement | null>(null);
@@ -285,6 +291,7 @@ function ActivityDayListView() {
     viewport.scrollTop += day.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
   }, [visibleRange]);
 
+  const timeOutOn = useContext(TimeOutOnContext);
   const index = instance.internals.getIndex();
   const native = viewConfig.scrollbars === "native";
 
@@ -298,8 +305,9 @@ function ActivityDayListView() {
         const zoned = toZoned(day, settings.timeZone);
         const weekday = format(zoned, "EEE", { locale: settings.locale });
         const dayDate = format(zoned, "MMM d", { locale: settings.locale });
-        const today =
-          getDayKey(day, settings.timeZone) === getDayKey(new Date(), settings.timeZone);
+        const key = getDayKey(day, settings.timeZone);
+        const today = key === getDayKey(new Date(), settings.timeZone);
+        const timeOut = timeOutOn(key);
         return (
           <div
             key={day.getTime()}
@@ -317,7 +325,9 @@ function ActivityDayListView() {
                   </span>
                 ) : null}
                 {/* A day with nothing done says so in its header, so the week fits on screen. */}
-                {items.length === 0 ? (
+                {timeOut ? (
+                  <TimeOutMark timeOut={timeOut} label className="self-center" />
+                ) : items.length === 0 ? (
                   <span className="text-muted-foreground font-normal">Rest</span>
                 ) : null}
               </span>
@@ -429,6 +439,7 @@ function DiaryNav({
 type ActivityCalendarProps = {
   activities: CalendarActivity[];
   goals: CalendarGoal[];
+  timeOuts: TimeOut[];
   initialSettings: AthleteSettings;
   diary: DiarySearch;
 };
@@ -436,6 +447,7 @@ type ActivityCalendarProps = {
 export function ActivityCalendar({
   activities,
   goals,
+  timeOuts,
   initialSettings,
   diary,
 }: ActivityCalendarProps) {
@@ -537,6 +549,7 @@ export function ActivityCalendar({
 
   const byDay = useItemsByDay(activities, goals, timeZone);
   const todayKey = dayKey(new Date(), timeZone);
+  const timeOutOn: TimeOutOn = (key) => timeOutOnDay(timeOuts, key, todayKey);
   const phoneBody = !isDesktop && phoneView !== "days";
 
   // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
@@ -564,6 +577,21 @@ export function ActivityCalendar({
             renderEvent={renderCalendarEvent}
             renderEventTooltip={renderCalendarEventTooltip}
             renderAgendaEvent={renderAgendaEvent}
+            renderMonthCell={({ day, defaultContent }) => {
+              const timeOut = timeOutOn(getDayKey(day, timeZone));
+              if (!timeOut) return defaultContent;
+              // Bottom left, across from the day number, so it never takes an activity's line.
+              return (
+                <>
+                  {defaultContent}
+                  <TimeOutMark
+                    timeOut={timeOut}
+                    label
+                    className="pointer-events-none absolute bottom-2 left-2"
+                  />
+                </>
+              );
+            }}
             interactions={DISABLED_INTERACTIONS}
             onEventClick={(occurrence, event) => {
               event.preventDefault();
@@ -652,18 +680,21 @@ export function ActivityCalendar({
             >
               <div ref={weekSwipe.ref} className="flex min-h-0 min-w-0 flex-1 flex-col">
                 {!phoneBody ? (
-                  <EventCalendarContent
-                    components={{
-                      month: EventCalendarMonthView,
-                      days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
-                    }}
-                  />
+                  <TimeOutOnContext.Provider value={timeOutOn}>
+                    <EventCalendarContent
+                      components={{
+                        month: EventCalendarMonthView,
+                        days: isDesktop ? EventCalendarMonthView : ActivityDayListView,
+                      }}
+                    />
+                  </TimeOutOnContext.Provider>
                 ) : phoneView === "summary" ? (
                   <WeekSummaryView
                     week={cursorWeek}
                     byDay={byDay}
                     timeZone={timeZone}
                     todayKey={todayKey}
+                    timeOutOn={timeOutOn}
                     sportTypes={sportTypes}
                     search={cursor}
                   />
@@ -673,6 +704,7 @@ export function ActivityCalendar({
                     byDay={byDay}
                     timeZone={timeZone}
                     todayKey={todayKey}
+                    timeOutOn={timeOutOn}
                     sportTypes={sportTypes}
                     search={cursor}
                   />

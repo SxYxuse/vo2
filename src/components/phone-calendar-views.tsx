@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import { CalendarDaysIcon, FlagIcon, HeartOffIcon } from "lucide-react";
+import { CalendarDaysIcon, FlagIcon, HeartOffIcon, ThermometerIcon } from "lucide-react";
 
 import { prefetchActivityDetail } from "@/lib/prefetch.ts";
 import {
@@ -20,12 +20,45 @@ import {
 } from "@/services/home-data.types.ts";
 import { addDayKey, dayKey } from "@/services/day-key.ts";
 import type { DiarySearch } from "@/services/diary-window.ts";
+import { TIME_OUT_COLOR, TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
 
 /*
  * The phone calendar's other layouts, chosen in Settings → Calendar while the athlete finds the
  * one that suits them. Each reads day keys ("2026-11-10") in the athlete's time zone, like the
  * jump picker, so none of them needs the event calendar's own layout engine.
  */
+
+/** The time out a day key falls in, or null (ADR 0066). */
+export type TimeOutOn = (key: string) => TimeOut | null;
+
+const timeOutKindLabel = (timeOut: TimeOut) =>
+  TIME_OUT_KINDS.find((kind) => kind.id === timeOut.kind)?.label ?? "";
+
+/**
+ * A day of a time out, marked quietly so the day's activities still lead: the chart's time-out
+ * colour, and the kind when there is room for it.
+ */
+export function TimeOutMark({
+  timeOut,
+  label = false,
+  className,
+}: {
+  timeOut: TimeOut;
+  label?: boolean;
+  className?: string;
+}) {
+  const kind = timeOutKindLabel(timeOut);
+  return (
+    <span
+      data-slot="time-out-mark"
+      className={cn("inline-flex items-center gap-0.5 text-xs font-normal", className)}
+      style={{ color: TIME_OUT_COLOR }}
+    >
+      <ThermometerIcon aria-hidden className="size-3 shrink-0" />
+      {label ? kind : <span className="sr-only">{kind}</span>}
+    </span>
+  );
+}
 
 type Day = { activities: CalendarActivity[]; goals: CalendarGoal[] };
 type ByDay = Map<string, Day>;
@@ -237,6 +270,7 @@ type WeekViewProps = RowProps & {
   byDay: ByDay;
   timeZone: string;
   todayKey: string;
+  timeOutOn: TimeOutOn;
 };
 
 /** Week strip: the week's days in a row with a dot per sport, then only what was done. */
@@ -247,6 +281,7 @@ export function WeekStripView({
   todayKey,
   sportTypes,
   search,
+  timeOutOn,
 }: WeekViewProps) {
   const days = weekDays(week);
   const totals = totalsOf(byDay, days);
@@ -258,10 +293,15 @@ export function WeekStripView({
           const day = byDay.get(key);
           const today = key === todayKey;
           const count = day?.activities.length ?? 0;
+          const timeOut = timeOutOn(key);
+          const done = count ? `${count} ${count === 1 ? "activity" : "activities"}` : null;
+          const summary = timeOut
+            ? [timeOutKindLabel(timeOut).toLowerCase(), done].filter(Boolean).join(", ")
+            : (done ?? "rest");
           return (
             <li
               key={key}
-              aria-label={`${weekdayOf(key)} ${dayOf(key)}: ${count ? `${count} ${count === 1 ? "activity" : "activities"}` : "rest"}`}
+              aria-label={`${weekdayOf(key)} ${dayOf(key)}: ${summary}`}
               aria-current={today ? "date" : undefined}
               className={cn(
                 "text-muted-foreground flex flex-col items-center gap-1 rounded-lg py-1.5 text-[0.625rem]",
@@ -277,7 +317,15 @@ export function WeekStripView({
               >
                 {dayOf(key)}
               </span>
-              <SportDots day={day} sportTypes={sportTypes} />
+              <span className="flex h-3 items-center gap-0.5">
+                {timeOut ? (
+                  <TimeOutMark
+                    timeOut={timeOut}
+                    className={cn(today && "text-primary-foreground!")}
+                  />
+                ) : null}
+                <SportDots day={day} sportTypes={sportTypes} />
+              </span>
             </li>
           );
         })}
@@ -315,6 +363,7 @@ export function WeekSummaryView({
   todayKey,
   sportTypes,
   search,
+  timeOutOn,
 }: WeekViewProps) {
   const days = weekDays(week);
   const totals = totalsOf(byDay, days);
@@ -360,11 +409,21 @@ export function WeekSummaryView({
         aria-hidden
         className="text-muted-foreground grid grid-cols-7 gap-1.5 px-4 pt-1 pb-3 text-center text-[0.625rem]"
       >
-        {days.map((key) => (
-          <span key={key} className={cn(key === todayKey && "text-foreground font-bold")}>
-            {weekdayOf(key).charAt(0)}
-          </span>
-        ))}
+        {days.map((key) => {
+          const timeOut = timeOutOn(key);
+          return (
+            <span
+              key={key}
+              className={cn(
+                "flex items-center justify-center gap-0.5",
+                key === todayKey && "text-foreground font-bold",
+              )}
+            >
+              {weekdayOf(key).charAt(0)}
+              {timeOut ? <TimeOutMark timeOut={timeOut} /> : null}
+            </span>
+          );
+        })}
       </div>
       {totals.count || days.some((key) => byDay.get(key)?.goals.length) ? (
         <DayRows
