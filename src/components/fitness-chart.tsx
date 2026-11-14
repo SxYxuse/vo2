@@ -48,7 +48,7 @@ import {
   seasonEvents,
   type Goal,
 } from "@/services/season.types.ts";
-import { TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
+import { TIME_OUT_COLOR, TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,9 +84,6 @@ const SERIES_INFO = {
   atl: "About one week of training load. This is fatigue: it jumps after hard or long days and drops within a few easy days.",
   tsb: "Fitness minus fatigue after that day's known training (today: as of now). Around −10 to −30 is normal while building; positive means fresh, which is what you want before a race or a hard test. It is not a performance score.",
 } as const;
-
-/** Time outs shade the chart in a colour no series uses. */
-const TIME_OUT_COLOR = "var(--color-ds-purple-700)";
 
 const formatDay = (key: string) => format(parseISO(key), "d MMM");
 
