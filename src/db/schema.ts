@@ -356,3 +356,23 @@ export const powerFiles = pgTable(
     index("power_files_user_start_idx").on(table.userId, table.startDate),
   ],
 );
+
+/**
+ * Days the athlete can't train because they are sick or injured (ADR 0066). Days are day keys in
+ * the athlete's time zone; an open time out has no end day. Time outs never overlap.
+ */
+export const timeOuts = pgTable(
+  "time_outs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"sick" | "injured">().notNull(),
+    startDay: date("start_day", { mode: "string" }).notNull(),
+    endDay: date("end_day", { mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("time_outs_user_start_idx").on(table.userId, table.startDay)],
+);

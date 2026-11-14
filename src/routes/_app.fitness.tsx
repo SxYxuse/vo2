@@ -1,13 +1,21 @@
+import { useState } from "react";
 import { noop, useSuspenseQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header.tsx";
 import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-router";
 
-import { TrendingUpIcon } from "lucide-react";
+import { ThermometerIcon, TrendingUpIcon } from "lucide-react";
 
 import { FitnessChart } from "@/components/fitness-chart.tsx";
 import { ProgressCards } from "@/components/progress-cards.tsx";
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
-import { fitnessQueryOptions, loaderQuery, progressQueryOptions } from "@/lib/queries.ts";
+import { TimeOutSheet, type TimeOutEditing } from "@/components/time-out-sheet.tsx";
+import { Button } from "@/components/ui/button";
+import {
+  fitnessQueryOptions,
+  loaderQuery,
+  progressQueryOptions,
+  timeOutsQueryOptions,
+} from "@/lib/queries.ts";
 import {
   Empty,
   EmptyDescription,
@@ -27,7 +35,10 @@ export const Route = createFileRoute("/_app/fitness")({
   loader: ({ context }) => {
     // Progress reads streams and may build best efforts, so it streams in below the graph.
     void context.queryClient.query(loaderQuery(progressQueryOptions)).catch(noop);
-    return context.queryClient.query(loaderQuery(fitnessQueryOptions));
+    return Promise.all([
+      context.queryClient.query(loaderQuery(fitnessQueryOptions)),
+      context.queryClient.query(loaderQuery(timeOutsQueryOptions)),
+    ]);
   },
   pendingMs: 200,
   pendingComponent: FitnessPending,
@@ -38,13 +49,32 @@ export const Route = createFileRoute("/_app/fitness")({
 function FitnessPage() {
   const { data } = useSuspenseQuery(fitnessQueryOptions);
   const { signedIn, fitnessLoads, goals } = data;
+  const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
+  const [editing, setEditing] = useState<TimeOutEditing>(null);
 
   return (
     <>
-      <PageHeader icon={TrendingUpIcon} title="Fitness and form" />
+      <PageHeader
+        icon={TrendingUpIcon}
+        title="Fitness and form"
+        actions={
+          signedIn ? (
+            <Button type="button" variant="outline" onClick={() => setEditing("new")}>
+              <ThermometerIcon data-icon="inline-start" />
+              Sick or injured
+            </Button>
+          ) : null
+        }
+      />
       {signedIn ? (
         <>
-          <FitnessChart loads={fitnessLoads} goals={goals} />
+          <FitnessChart
+            loads={fitnessLoads}
+            goals={goals}
+            timeOuts={timeOuts}
+            onEditTimeOut={setEditing}
+          />
+          <TimeOutSheet editing={editing} onClose={() => setEditing(null)} />
           <ProgressCards />
         </>
       ) : (

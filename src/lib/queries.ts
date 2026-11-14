@@ -16,6 +16,7 @@ import { loadProgress } from "@/services/progress.ts";
 import { loadSeason } from "@/services/season.ts";
 import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
+import { listTimeOuts } from "@/services/time-outs.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadTrainingPaces } from "@/services/training-paces.ts";
 
@@ -49,6 +50,13 @@ export const activityMapQueryOptions = queryOptions({
 export const fitnessQueryOptions = queryOptions({
   queryKey: ["fitness"],
   queryFn: () => loadFitnessData(),
+  staleTime: 60_000,
+});
+
+/** The athlete's time outs, shown on the fitness chart (ADR 0066). */
+export const timeOutsQueryOptions = queryOptions({
+  queryKey: ["time-outs"],
+  queryFn: () => listTimeOuts(),
   staleTime: 60_000,
 });
 

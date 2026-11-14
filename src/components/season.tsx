@@ -3,9 +3,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { addYears, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
-  CalendarIcon,
   ChevronRightIcon,
   ClipboardPasteIcon,
   CopyIcon,
@@ -88,8 +87,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@/components/ui/input-group";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DatePicker } from "@/components/date-picker.tsx";
 import {
   Select,
   SelectContent,
@@ -455,63 +453,6 @@ function PastGoals({ goals, today }: { goals: PastGoal[]; today: string }) {
   );
 }
 
-function GoalDatePicker({
-  id,
-  value,
-  fromDate,
-  invalid,
-  onChange,
-}: {
-  id: string;
-  value: string;
-  fromDate?: string;
-  invalid: boolean;
-  onChange: (date: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = value ? parseISO(value) : undefined;
-  const from = fromDate ? parseISO(fromDate) : undefined;
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            aria-invalid={invalid}
-            className="w-full justify-start font-normal"
-          />
-        }
-      >
-        <CalendarIcon data-icon="inline-start" />
-        {selected ? (
-          format(selected, "d MMM yyyy")
-        ) : (
-          <span className="text-muted-foreground">Pick a date</span>
-        )}
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2">
-        <Calendar
-          mode="single"
-          captionLayout="dropdown"
-          weekStartsOn={1}
-          selected={selected}
-          defaultMonth={selected ?? from}
-          startMonth={from}
-          endMonth={addYears(new Date(), 5)}
-          disabled={from ? { before: from } : undefined}
-          onSelect={(next) => {
-            if (!next) return;
-            onChange(format(next, "yyyy-MM-dd"));
-            setOpen(false);
-          }}
-        />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 /** One sport of an event; a triathlon has three. */
 type LegForm = { sportType: string; distanceKm: string; elevationGainM: string };
 
@@ -718,7 +659,7 @@ function GoalFormBody({
                 </Field>
                 <Field data-invalid={errorFor("date") != null}>
                   <FieldLabel htmlFor="goal-date">Date</FieldLabel>
-                  <GoalDatePicker
+                  <DatePicker
                     id="goal-date"
                     value={form.date}
                     // A new goal is ahead; an existing one may be moved to any date.

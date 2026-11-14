@@ -8,6 +8,7 @@ import {
   homeQueryOptions,
   seasonQueryOptions,
   settingsSnapshotQueryOptions,
+  timeOutsQueryOptions,
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
 
@@ -67,6 +68,11 @@ export async function afterGoalsChanged(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: homeQueryOptions.queryKey }),
     queryClient.invalidateQueries({ queryKey: fitnessQueryOptions.queryKey }),
   ]);
+}
+
+/** A time out was marked, edited, ended, or deleted; the chart shows it (ADR 0066). */
+export function afterTimeOutsChanged(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({ queryKey: timeOutsQueryOptions.queryKey });
 }
 
 /** A sync call copied activities or streams, so every view of the local copy goes stale. */

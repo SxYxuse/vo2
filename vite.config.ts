@@ -83,6 +83,15 @@ const config = defineConfig({
                   priority: 1,
                 },
                 {
+                  // Same for TanStack Query: merged with date-fns into a route group, the entry's
+                  // vendor chunk and that group imported each other, and QueryObserver's base
+                  // class was undefined when the page hydrated.
+                  name: "tanstack-query",
+                  test: /[\\/]@tanstack[\\/](react-query|query-core)[\\/]/,
+                  minShareCount: 2,
+                  priority: 1,
+                },
+                {
                   name: "vendor",
                   test: /node_modules/,
                   minShareCount: 2,
