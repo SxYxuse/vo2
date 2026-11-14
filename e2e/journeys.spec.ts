@@ -989,6 +989,14 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   expect(await km()).toBeLessThan(fullWeek);
   await expect(page.getByText(/^1 of \d+ done/)).toBeVisible();
 
+  // The first week back ramps up from 80 % of what it would have held after two days off, so it
+  // stays under the full week before the time out (ADR 0066).
+  await page.getByRole("button", { name: "Next week" }).click();
+  await expect(weekHeading).toHaveText(/^Week of /);
+  expect(await km()).toBeLessThan(fullWeek);
+  await page.getByRole("button", { name: "Previous week" }).click();
+  await expect(weekHeading).toHaveText(/^This week · /);
+
   // The way out: deleting it from Fitness writes this week in full again.
   await page.goto("/fitness");
   await settle(page);
