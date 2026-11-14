@@ -96,6 +96,10 @@ _Avoid_: Schedule, available days, rest days, week shape
 Standing context the athlete writes for the coach, such as how much time they have on some days, terrain, or an injury, which shapes every week the coach plan writes and every plan change the coach chat proposes. It sets no days: the athlete still places each session. The coach follows it as far as the weekly budget and the coach plan's rules allow, and says what it couldn't fit.
 _Avoid_: Context, notes, coach note, instructions, prompt, constraints
 
+**Time out**:
+A span of days the athlete can't train because they are sick or injured, marked by the athlete, past or ahead, and left open until they are back. The coach plan backs off for its days, writes nothing while it is open, and then ramps up again; the fitness chart and calendar show it. Activities during it still count as usual (ADR 0066).
+_Avoid_: Rest days, days off, break, sick leave, injury period
+
 **Weekly budget**:
 What VO2 lets a week of the coach plan hold, per plan sport: kilometres of running, minutes of riding, and metres of swimming. Each sport grows with the week's phase at its own progression, up to its peak ceiling. Lighter weeks, recovery, and the taper shrink every sport (ADR 0037, ADR 0050, ADR 0058, ADR 0061).
 _Avoid_: Week target, quota, bucket
