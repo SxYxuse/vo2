@@ -44,7 +44,7 @@ import { Spinner } from "@/components/ui/spinner";
  * season (coach-plan-season.tsx). On desktop the season sits beside the week.
  */
 
-function PlanStatus({ state }: { state: CoachPlanState }) {
+function PlanStatus({ state, paused }: { state: CoachPlanState; paused: boolean }) {
   const online = useOnline();
   const queryClient = useQueryClient();
   const again = useMutation({
@@ -83,7 +83,7 @@ function PlanStatus({ state }: { state: CoachPlanState }) {
             </Button>
           </AlertAction>
         </Alert>
-      ) : !state.plan && !state.missing.length ? (
+      ) : !state.plan && !state.missing.length && !paused ? (
         <Alert>
           <AlertTitle>No plan written yet</AlertTitle>
           <AlertDescription>The coach writes your next four weeks of sessions.</AlertDescription>
@@ -254,7 +254,14 @@ function WeekHeader({
   );
 }
 
-export function CoachPlanView({ week: shown }: { week?: string }) {
+/** `paused` while a time out is open: nothing is written, so there's nothing to ask for. */
+export function CoachPlanView({
+  week: shown,
+  paused = false,
+}: {
+  week?: string;
+  paused?: boolean;
+}) {
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const thisWeek = state.today ? mondayOf(state.today) : "";
@@ -292,7 +299,7 @@ export function CoachPlanView({ week: shown }: { week?: string }) {
 
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
-      <PlanStatus state={state} />
+      <PlanStatus state={state} paused={paused} />
       {week ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-x-6">
           <div className="flex min-w-0 flex-col gap-3">

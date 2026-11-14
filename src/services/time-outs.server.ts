@@ -67,6 +67,16 @@ async function writeChecked(
   });
 }
 
+/**
+ * Every write to a time out makes the coach plan's writing due, or pauses it while one is open,
+ * as a load of Plan would; nothing happens under another planning style (ADR 0066). Imported
+ * here, since the coach plan reads time outs from this module.
+ */
+async function replan(userId: string) {
+  const { startCoachPlanIfDue } = await import("./coach-plan.server.ts");
+  await startCoachPlanIfDue(userId);
+}
+
 export async function createTimeOutImpl({ timeZone, ...data }: TimeOutInput) {
   const session = await getRequiredSession();
   const userId = session.user.id;
@@ -83,6 +93,7 @@ export async function createTimeOutImpl({ timeZone, ...data }: TimeOutInput) {
       }),
   );
   logger.info("time_out.created", { kind: data.kind, open: data.end == null });
+  await replan(userId);
 }
 
 export async function updateTimeOutImpl({ id, timeZone, ...data }: TimeOutInput & { id: string }) {
@@ -103,6 +114,7 @@ export async function updateTimeOutImpl({ id, timeZone, ...data }: TimeOutInput 
     id,
   );
   logger.info("time_out.updated", { kind: data.kind, open: data.end == null });
+  await replan(userId);
 }
 
 export async function endTimeOutImpl(id: string, timeZone: string) {
@@ -122,10 +134,12 @@ export async function endTimeOutImpl(id: string, timeZone: string) {
       .where(where);
   }
   logger.info("time_out.ended", { kind: current.kind, deleted: current.start >= today });
+  await replan(userId);
 }
 
 export async function deleteTimeOutImpl(id: string) {
   const session = await getRequiredSession();
   await db.delete(timeOuts).where(and(eq(timeOuts.id, id), eq(timeOuts.userId, session.user.id)));
   logger.info("time_out.deleted");
+  await replan(session.user.id);
 }

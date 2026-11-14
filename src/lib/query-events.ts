@@ -70,9 +70,15 @@ export async function afterGoalsChanged(queryClient: QueryClient) {
   ]);
 }
 
-/** A time out was marked, edited, ended, or deleted; the chart shows it (ADR 0066). */
-export function afterTimeOutsChanged(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: timeOutsQueryOptions.queryKey });
+/**
+ * A time out was marked, edited, ended, or deleted: the chart shows it, and the coach plan paused
+ * or started writing again (ADR 0066).
+ */
+export async function afterTimeOutsChanged(queryClient: QueryClient) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: timeOutsQueryOptions.queryKey }),
+    queryClient.invalidateQueries({ queryKey: coachPlanQueryOptions.queryKey }),
+  ]);
 }
 
 /** A sync call copied activities or streams, so every view of the local copy goes stale. */

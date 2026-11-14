@@ -330,6 +330,32 @@ export function projectSport(
   });
 }
 
+/** A time out as the budget reads it: day keys, no end while it lasts (ADR 0066). */
+export type TimeOutDays = { start: string; end: string | null };
+
+/** The week's days outside every time out, 0 to 7. */
+export function daysOutside(weekStart: string, timeOuts: TimeOutDays[]) {
+  let days = 0;
+  for (let index = 0; index < 7; index += 1) {
+    const day = addDayKey(weekStart, index);
+    const covered = timeOuts.some(
+      (timeOut) => day >= timeOut.start && (timeOut.end == null || day <= timeOut.end),
+    );
+    if (!covered) days += 1;
+  }
+  return days;
+}
+
+/**
+ * A week a time out overlaps keeps its days outside it ÷ 7 of the budget, rounded down to the
+ * sport's step so it never passes that share; a week fully inside one is empty (ADR 0066).
+ */
+function backOff(amount: number, sport: PlanSport, days: number) {
+  if (days >= 7) return amount;
+  const step = ROUND_TO[sport];
+  return Math.floor((amount * days) / (7 * step) + 1e-9) * step;
+}
+
 export type WeekBudget = {
   weekStart: string;
   /** Running km (rule 1); 0 when the athlete plans no runs. */
@@ -360,7 +386,7 @@ export function ceilingOf(
  * Budgets for `count` weeks from `firstWeek`, per sport: each sport's projection (projectSport)
  * from its history, at the athlete's progression and up to its ceiling. Lighter weeks keep 70 %,
  * the taper its share, and the weeks around a supporting race what its effort keeps (ADR 0052);
- * the level grows on underneath.
+ * the level grows on underneath. A week a time out overlaps keeps its share of days (backOff).
  */
 export function weekBudgets(input: {
   runs: SportDay[];
@@ -372,8 +398,10 @@ export function weekBudgets(input: {
   count: number;
   availability: Availability;
   progression: Progression;
+  /** The athlete's time outs; none leaves every budget as it was. */
+  timeOuts?: TimeOutDays[];
 }): WeekBudget[] {
-  const { goals, aGoal, firstWeek, count, availability, progression } = input;
+  const { goals, aGoal, firstWeek, count, availability, progression, timeOuts = [] } = input;
   const shape = seasonShape(goals, aGoal, firstWeek, count);
   const amounts = (sport: PlanSport, days: SportDay[]) => {
     const perWeek = sessionsPerWeek(availability, sport);
@@ -385,15 +413,19 @@ export function weekBudgets(input: {
   const run = amounts("run", input.runs);
   const ride = amounts("ride", input.rides);
   const swim = amounts("swim", input.swims);
-  return shape.map((week, index) => ({
-    weekStart: week.weekStart,
-    budgetKm: run[index]!,
-    budgetMinutes: ride[index]!,
-    budgetSwimM: swim[index]!,
-    phase: week.phase,
-    lighter: week.lighter,
-    taper: week.taper,
-  }));
+  return shape.map((week, index) => {
+    // The cut is on what the week would have held: the level underneath grows on as before.
+    const days = daysOutside(week.weekStart, timeOuts);
+    return {
+      weekStart: week.weekStart,
+      budgetKm: backOff(run[index]!, "run", days),
+      budgetMinutes: backOff(ride[index]!, "ride", days),
+      budgetSwimM: backOff(swim[index]!, "swim", days),
+      phase: week.phase,
+      lighter: week.lighter,
+      taper: week.taper,
+    };
+  });
 }
 
 /** What a written week holds of a sport, races aside (they're not in the budget). */

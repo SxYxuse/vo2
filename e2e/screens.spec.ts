@@ -63,6 +63,25 @@ test("fitness screen with a time out", async ({ page }) => {
   });
 });
 
+test("plan screen on a time out", async ({ page }) => {
+  // On the coach plan and sick since Monday, with no end yet: the plan is paused (ADR 0066).
+  await withDatabase(async (client) => {
+    await client.query(
+      `update calendar_settings set value = jsonb_set(value, '{planningStyle}', '"coachPlan"')`,
+    );
+    await client.query(
+      "insert into time_outs (id, user_id, kind, start_day) select 'e2e-time-out', id, 'sick', '2026-06-15' from \"user\"",
+    );
+  });
+  await page.goto("/week");
+  await expect(page.getByText("On time out since Mon 15 Jun")).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot("plan-time-out.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+});
+
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 

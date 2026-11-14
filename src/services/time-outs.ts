@@ -55,6 +55,14 @@ export function timeOutsForCoach(
   });
 }
 
+/**
+ * Whether the athlete is on this time out with no end yet: while one is, the coach plan writes
+ * nothing (ADR 0066). One ahead isn't open yet.
+ */
+export function timeOutOpen(timeOut: Pick<TimeOut, "start" | "end">, today: string) {
+  return timeOut.end == null && timeOut.start <= today;
+}
+
 function overlaps(a: Pick<TimeOut, "start" | "end">, b: Pick<TimeOut, "start" | "end">) {
   return (b.end == null || a.start <= b.end) && (a.end == null || b.start <= a.end);
 }
