@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { daysOutside, weekBudgets, type SportDay, type TimeOutDays } from "./coach-plan-budget.ts";
+import {
+  daysOutside,
+  seasonShape,
+  weekBudgets,
+  type SportDay,
+  type TimeOutDays,
+} from "./coach-plan-budget.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
 import {
   checkPlan,
@@ -168,10 +174,10 @@ function progressionOf(r: Random): Progression {
 
 /**
  * The athlete's time outs (ADR 0066): none, one in the past, a few days of one week, whole weeks,
- * one still open, or one ahead.
+ * one still open, one ahead, or one ending in the weeks before the A goal's taper.
  */
-function timeOutsOf(r: Random, today: string): TimeOutDays[] {
-  const shape = r.pick(["none", "past", "partial", "weeks", "open", "ahead"] as const);
+function timeOutsOf(r: Random, today: string, aGoal: Goal): TimeOutDays[] {
+  const shape = r.pick(["none", "past", "partial", "weeks", "open", "ahead", "taper"] as const);
   if (shape === "none") return [];
   if (shape === "past") {
     const end = addDayKey(CURRENT_WEEK, -r.int(1, 20));
@@ -186,6 +192,12 @@ function timeOutsOf(r: Random, today: string): TimeOutDays[] {
     return [{ start, end: addDayKey(start, 7 * r.int(1, 3) + r.int(0, 3)) }];
   }
   if (shape === "open") return [{ start: addDayKey(today, -r.int(0, 20)), end: null }];
+  if (shape === "taper") {
+    const end = addDayKey(aGoal.date, -r.int(1, 24));
+    const start = addDayKey(end, -r.int(0, 20));
+    if (start < addDayKey(CURRENT_WEEK, -28) || start > addDayKey(today, 28)) return [];
+    return [{ start, end }];
+  }
   const start = addDayKey(today, r.int(1, 28));
   return [{ start, end: r.next() < 0.3 ? null : addDayKey(start, r.int(0, 20)) }];
 }
@@ -195,10 +207,19 @@ function athlete(seed: number) {
   const r = random(seed);
   const today = addDayKey(CURRENT_WEEK, r.int(0, 6));
   const availability = availabilityOf(r);
-  const runs = historyOf(r, "run", today);
-  const rides = historyOf(r, "ride", today);
-  const swims = historyOf(r, "swim", today);
+  const history = { run: historyOf(r, "run", today), ride: historyOf(r, "ride", today) };
+  const swimHistory = historyOf(r, "swim", today);
   const goals = goalsOf(r, availability, today);
+  const timeOuts = timeOutsOf(r, today, goals[0]!);
+  // Nothing is trained inside a time out.
+  const outside = (days: SportDay[]) =>
+    days.filter(
+      (day) =>
+        !timeOuts.some(({ start, end }) => day.date >= start && (end == null || day.date <= end)),
+    );
+  const runs = outside(history.run);
+  const rides = outside(history.ride);
+  const swims = outside(swimHistory);
   const anchors: PlanAnchors = {
     paces: r.next() < 0.2 ? null : trainingPaceRanges(r.between(28, 75)),
     ftp: r.next() < 0.5 ? null : r.int(120, 380),
@@ -216,7 +237,6 @@ function athlete(seed: number) {
     availability,
     progression: progressionOf(r),
   };
-  const timeOuts = timeOutsOf(r, today);
   const budgets = weekBudgets({ ...budgetInput, timeOuts });
   /** The budgets as they were before time outs: the same athlete without them. */
   const before = timeOuts.length ? weekBudgets(budgetInput) : budgets;
@@ -241,7 +261,8 @@ function athlete(seed: number) {
     paces: anchors.paces,
     racePaces: [],
   };
-  return { ctx, anchors, seed, timeOuts, before };
+  const shares = seasonShape(goals, goals[0]!, CURRENT_WEEK, 4).map((week) => week.share);
+  return { ctx, anchors, seed, timeOuts, before, shares };
 }
 
 const EASY_STEP = {
@@ -270,6 +291,23 @@ function timeCap(sport: PlanSport, ctx: RuleContext) {
 }
 
 const BUDGET_KEY = { run: "budgetKm", ride: "budgetMinutes", swim: "budgetSwimM" } as const;
+/** The budgets' rounding: whole km, 5 minutes, 100 m. */
+const ROUND_TO = { run: 1, ride: 5, swim: 100 } as const;
+
+/** Each week back after the first adds this share of the level (ADR 0066). */
+const RAMP_STEP = 0.15;
+
+/**
+ * The ramp's share of the level in a week after a time out ends (ADR 0066): 80 / 60 / 40 % after
+ * 1–6 / 7–13 / 14 or more days off in the first week that starts after it, then 15 points a week.
+ * Null before the first week back.
+ */
+function rampShare({ start, end }: TimeOutDays, weekStart: string) {
+  if (end == null || end >= weekStart) return null;
+  const daysOff = daysTo(start, end) + 1;
+  const first = daysOff >= 14 ? 0.4 : daysOff >= 7 ? 0.6 : 0.8;
+  return Math.round((first + RAMP_STEP * Math.floor((daysTo(end, weekStart) - 1) / 7)) * 100) / 100;
+}
 
 describe("coach plan property guard", () => {
   it("never sets a weekly floor above the largest valid week", () => {
@@ -301,24 +339,57 @@ describe("coach plan property guard", () => {
     expect(broken.slice(0, 5)).toEqual([]);
   });
 
-  it("cuts a week a time out overlaps to its share of days, and leaves the others as they were", () => {
+  it("cuts a week a time out overlaps to its share of days, and none above what it would have held", () => {
     const broken: string[] = [];
     for (const item of athletes()) {
       item.ctx.weeks.forEach((week, index) => {
         const before = item.before[index]!;
         const days = daysOutside(week.weekStart, item.timeOuts);
+        // The weeks before every time out are budgeted as they were without them.
+        const untouched = item.timeOuts.every((timeOut) => timeOut.start > week.weekStart);
         for (const { id: sport } of PLAN_SPORTS) {
           const key = BUDGET_KEY[sport];
           const ok =
-            days === 7
-              ? week[key] === before[key]
-              : days === 0
-                ? week[key] === 0
-                : week[key] <= (before[key] * days) / 7 + 1e-6;
+            week[key] <= (before[key] * days) / 7 + 1e-6 &&
+            (!untouched || days < 7 || week[key] === before[key]);
           if (!ok) {
             broken.push(
               `${label(item)}: ${sport} week ${week.weekStart}, ${days} days outside ${JSON.stringify(item.timeOuts)}: ${before[key]} → ${week[key]}`,
             );
+          }
+        }
+      });
+    }
+    expect(broken.slice(0, 5)).toEqual([]);
+  });
+
+  it("ramps back up after a time out: the first week back at its share, then 15 points a week", () => {
+    const broken: string[] = [];
+    for (const item of athletes()) {
+      const [timeOut] = item.timeOuts;
+      if (!timeOut) continue;
+      item.ctx.weeks.forEach((week, index) => {
+        const ramp = rampShare(timeOut, week.weekStart);
+        const share = item.shares[index]!;
+        if (ramp == null || ramp >= 1 || daysOutside(week.weekStart, item.timeOuts) < 7) return;
+        for (const { id: sport } of PLAN_SPORTS) {
+          const key = BUDGET_KEY[sport];
+          const step = ROUND_TO[sport];
+          // The level the week would have held without the time out, give or take its rounding.
+          const level = (item.before[index]![key] + step) / share;
+          const fail = (why: string) =>
+            broken.push(
+              `${label(item)}: ${sport} week ${week.weekStart} at ramp ${ramp} ${why}, ${JSON.stringify(item.timeOuts)}: ${item.before[index]![key]} → ${week[key]}`,
+            );
+          if (week[key] > level * Math.min(ramp, share) + step) fail("above its share");
+          const previous = item.ctx.weeks[index - 1];
+          if (
+            previous &&
+            rampShare(timeOut, previous.weekStart) != null &&
+            item.shares[index - 1] === share &&
+            week[key] > previous[key] + RAMP_STEP * level + 2 * step
+          ) {
+            fail(`more than ${RAMP_STEP * 100} points over ${previous[key]}`);
           }
         }
       });
