@@ -231,7 +231,7 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
               <ToggleGroupItem
                 key={option.id}
                 value={option.id}
-                className="data-[pressed]:bg-background min-h-[2.5rem] rounded-md! border-0 text-sm data-[pressed]:shadow-sm"
+                className="data-[pressed]:bg-background min-h-[2.75rem] rounded-md! border-0 text-sm data-[pressed]:shadow-sm"
               >
                 {option.label}
               </ToggleGroupItem>
@@ -246,6 +246,7 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
               fromDate={timeOut && timeOut.start < window.first ? timeOut.start : window.first}
               toDate={window.last}
               display={timeOutDay}
+              className={TOUCH}
               invalid={false}
               onChange={(next) => {
                 setStart(next);
@@ -262,6 +263,7 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
                 fromDate={start}
                 placeholder="Still going · leave empty"
                 display={timeOutDay}
+                className={TOUCH}
                 invalid={false}
                 onChange={setEnd}
               />
