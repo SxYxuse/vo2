@@ -59,7 +59,12 @@ function FitnessPage() {
         title="Fitness and form"
         actions={
           signedIn ? (
-            <Button type="button" variant="outline" onClick={() => setEditing("new")}>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[2.75rem]"
+              onClick={() => setEditing("new")}
+            >
               <ThermometerIcon data-icon="inline-start" />
               Sick or injured
             </Button>

@@ -8,7 +8,12 @@ import { Settings2Icon, TargetIcon, ThermometerIcon } from "lucide-react";
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { CoachPlanView } from "@/components/coach-plan-view.tsx";
 import { PanelSkeleton } from "@/components/route-states.tsx";
-import { TimeOutBanner, TimeOutSheet, type TimeOutEditing } from "@/components/time-out-sheet.tsx";
+import {
+  TimeOutBanner,
+  TimeOutSheet,
+  currentTimeOut,
+  type TimeOutEditing,
+} from "@/components/time-out-sheet.tsx";
 import {
   appShellQueryOptions,
   coachPlanQueryOptions,
@@ -70,18 +75,27 @@ function CoachPlanPage({ week }: { week?: string }) {
   const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
   const [editing, setEditing] = useState<TimeOutEditing>(null);
   const today = dayKey(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const timeOut = currentTimeOut(timeOuts, today);
   return (
     <>
       <WeekTargetHeading
         actions={
-          <Button type="button" variant="outline" onClick={() => setEditing("new")}>
-            <ThermometerIcon data-icon="inline-start" />
-            Sick or injured
-          </Button>
+          // The banner is the way in while one lasts or is ahead.
+          timeOut ? undefined : (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-[2.75rem]"
+              onClick={() => setEditing("new")}
+            >
+              <ThermometerIcon data-icon="inline-start" />
+              Sick or injured
+            </Button>
+          )
         }
       />
-      <TimeOutBanner timeOuts={timeOuts} onEdit={setEditing} />
-      <CoachPlanView week={week} paused={timeOuts.some((timeOut) => timeOutOpen(timeOut, today))} />
+      {timeOut ? <TimeOutBanner timeOut={timeOut} today={today} onEdit={setEditing} /> : null}
+      <CoachPlanView week={week} paused={timeOut != null && timeOutOpen(timeOut, today)} />
       <TimeOutSheet editing={editing} onClose={() => setEditing(null)} />
     </>
   );

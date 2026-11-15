@@ -15,6 +15,7 @@ export function DatePicker({
   fromDate,
   toDate,
   placeholder = "Pick a date",
+  display = (key) => format(parseISO(key), "d MMM yyyy"),
   invalid,
   onChange,
 }: {
@@ -23,6 +24,8 @@ export function DatePicker({
   fromDate?: string;
   toDate?: string;
   placeholder?: string;
+  /** How the picked day reads on the button. */
+  display?: (key: string) => string;
   invalid: boolean;
   onChange: (date: string) => void;
 }) {
@@ -44,11 +47,7 @@ export function DatePicker({
         }
       >
         <CalendarIcon data-icon="inline-start" />
-        {selected ? (
-          format(selected, "d MMM yyyy")
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )}
+        {value ? display(value) : <span className="text-muted-foreground">{placeholder}</span>}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
         <Calendar

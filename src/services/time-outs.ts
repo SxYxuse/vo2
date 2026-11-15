@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { format, parseISO } from "date-fns";
 import { z } from "zod";
 
 import { addDayKey } from "./day-key.ts";
@@ -63,8 +64,21 @@ export function timeOutOpen(timeOut: Pick<TimeOut, "start" | "end">, today: stri
   return timeOut.end == null && timeOut.start <= today;
 }
 
-/** Time outs shade the fitness chart and mark calendar days in a colour no sport or series uses. */
-export const TIME_OUT_COLOR = "var(--color-ds-purple-700)";
+/** "Mon 15 Jun": one day of a time out, as the athlete reads it. */
+export const timeOutDay = (key: string) => format(parseISO(key), "EEE d MMM");
+
+/** "12–14 Jun", "30 Jun–2 Jul", or "15 Jun" for one day: a time out's days. */
+export function timeOutSpan(start: string, end: string) {
+  if (start === end) return format(parseISO(start), "d MMM");
+  const from = parseISO(start);
+  const to = parseISO(end);
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
+  return `${format(from, sameMonth ? "d" : "d MMM")}–${format(to, "d MMM")}`;
+}
+
+/** "Sick" or "Injured": athletes see the kind; "time out" is the glossary's word for both. */
+export const timeOutKind = (timeOut: Pick<TimeOut, "kind">) =>
+  TIME_OUT_KINDS.find((kind) => kind.id === timeOut.kind)?.label ?? "";
 
 /**
  * Which time out a calendar day falls in, or null. An open one marks its days up to today, or only
@@ -98,19 +112,19 @@ export function timeOutProblem(
   window: { first: string; last: string } | null,
 ) {
   if (window && candidate.start < window.first) {
-    return "A time out can start at most four weeks before this training week.";
+    return "It can start at most four weeks before this training week.";
   }
   if (window && candidate.start > window.last) {
-    return "A time out can start at most four weeks from today.";
+    return "It can start at most four weeks from today.";
   }
   if (candidate.end != null && candidate.end < candidate.start) {
     return "The end can't be before the start.";
   }
   if (candidate.end == null && others.some((other) => other.end == null)) {
-    return "You already have a time out with no end. End it first.";
+    return "You're already sick or injured with no end. End that first.";
   }
   if (others.some((other) => overlaps(candidate, other))) {
-    return "These days overlap another time out.";
+    return "These days overlap others you marked sick or injured.";
   }
   return null;
 }

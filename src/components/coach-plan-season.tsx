@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 import { ChevronRightIcon } from "lucide-react";
@@ -20,12 +21,18 @@ import {
 } from "@/services/coach-plan.types.ts";
 import { PHASES, mondayOf, type SeasonWeek } from "@/services/season-phase.ts";
 import { seasonEvents, type SeasonEvent } from "@/services/season.types.ts";
+import { addDayKey } from "@/services/day-key.ts";
+import { timeOutCovers, timeOutKind, type TimeOut } from "@/services/time-outs.ts";
 import { weekLabel } from "@/components/coach-run.tsx";
 import { Dot, PhaseBadge } from "@/components/season-badges.tsx";
+import { Badge } from "@/components/ui/badge";
+import { timeOutsQueryOptions } from "@/lib/queries.ts";
 import { LEGEND_PHASES, PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
 import {
+  amountsWithoutTimeOuts,
   ceilingFor,
   projectedAmounts,
+  timeOutWeek,
   SPORT_VOLUME_LABEL,
   VolumeChart,
   writtenAmount,
@@ -83,6 +90,7 @@ function WrittenWeeks({
   shown: string | undefined;
   onShow: (weekStart: string) => void;
 }) {
+  const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
   return (
     <ol
       className="bg-card ring-foreground/10 flex flex-col overflow-hidden rounded-lg ring-1"
@@ -105,7 +113,7 @@ function WrittenWeeks({
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                   <b className="font-medium">{weekLabel(week.weekStart, state.today)}</b>
-                  <PhaseBadge kind={week.phase} lighter={week.lighter} />
+                  <WeekTag week={week} state={state} timeOuts={timeOuts} />
                 </span>
                 <span className="text-muted-foreground text-xs tabular-nums">
                   {weekTotals(week) || "No sessions"}
@@ -123,6 +131,41 @@ function WrittenWeeks({
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * A written week's tag: its phase, or the kind of the time out it falls fully inside, and how far
+ * the ramp back has come after one (ADR 0066).
+ */
+function WeekTag({
+  week,
+  state,
+  timeOuts,
+}: {
+  week: PlanWeek;
+  state: CoachPlanState;
+  timeOuts: TimeOut[];
+}) {
+  const shape = state.volume?.shape.find((item) => item.weekStart === week.weekStart);
+  if (shape?.daysOn === 0) {
+    const timeOut = timeOuts.find((item) =>
+      [0, 1, 2, 3, 4, 5, 6].some((day) => timeOutCovers(item, addDayKey(week.weekStart, day))),
+    );
+    return (
+      <Badge variant="outline" className="hatch-time-out">
+        {timeOut ? timeOutKind(timeOut) : "Sick or injured"}
+      </Badge>
+    );
+  }
+  const ramp = shape?.ramp ?? 1;
+  return (
+    <>
+      <PhaseBadge kind={week.phase} lighter={week.lighter} />
+      {ramp < 1 ? (
+        <span className="text-muted-foreground">easing back {Math.round(ramp * 100)} %</span>
+      ) : null}
+    </>
   );
 }
 
@@ -189,6 +232,7 @@ function SeasonVolumeCharts({
               sport={sport.sport}
               shape={volume.shape}
               amounts={amounts}
+              full={amountsWithoutTimeOuts(volume.shape, sport, sport)}
               written={written}
               doneThisWeek={sport.doneThisWeek}
               events={events}
@@ -214,6 +258,12 @@ function SeasonVolumeCharts({
             {PHASES[kind].label}
           </span>
         ))}
+        {volume.shape.some(timeOutWeek) ? (
+          <span className="flex items-center gap-1.5">
+            <span className="hatch-time-out ring-foreground/20 size-2.5 rounded-[2px] ring-1" />
+            Time out
+          </span>
+        ) : null}
       </div>
       <p
         className="bg-muted min-h-8 rounded-md px-2.5 py-2 text-xs tabular-nums"

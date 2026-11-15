@@ -42,6 +42,25 @@ export function projectedAmounts(
   return projectSport(shape, sport.seed, sport.sport, choice.growth, ceilingFor(sport, choice));
 }
 
+/**
+ * What each week would hold without the athlete's time outs: a time-out week's bar is hatched up
+ * to it, so the athlete sees what it backs off from (ADR 0066).
+ */
+export function amountsWithoutTimeOuts(
+  shape: WeekShape[],
+  sport: SportVolume,
+  choice: SportChoice,
+): number[] {
+  return projectedAmounts(
+    shape.map((week) => ({ ...week, ramp: 1, daysOn: 7 })),
+    sport,
+    choice,
+  );
+}
+
+/** Whether a time out takes days from the week. */
+export const timeOutWeek = (week: WeekShape) => (week.daysOn ?? 7) < 7;
+
 /** The season's budgets at the athlete's choices, as the plan check reads them. */
 export function projectedBudgets(
   volume: SeasonVolume,
@@ -86,6 +105,7 @@ export function VolumeChart({
   sport,
   shape,
   amounts,
+  full,
   written,
   doneThisWeek,
   events,
@@ -96,6 +116,8 @@ export function VolumeChart({
   sport: PlanSport;
   shape: WeekShape[];
   amounts: number[];
+  /** What each week would hold without the time outs (amountsWithoutTimeOuts). */
+  full: number[];
   /** Weeks the coach wrote: outlined. */
   written: Set<string>;
   /** What's done of the sport this week: the first bar fills to it. */
@@ -107,7 +129,14 @@ export function VolumeChart({
 }) {
   const first = shape[0]?.weekStart;
   if (!first) return null;
-  const top = Math.max(1, ...amounts, ...lines.map((line) => line.value)) * 1.08;
+  // A time-out week stands as tall as it would have, hatched above what it keeps.
+  const height = (index: number) =>
+    timeOutWeek(shape[index]!)
+      ? Math.max(amounts[index] ?? 0, full[index] ?? 0)
+      : (amounts[index] ?? 0);
+  const top =
+    Math.max(1, ...shape.map((_, index) => height(index)), ...lines.map((line) => line.value)) *
+    1.08;
   const indexOf = (date: string) => Math.floor(daysBetween(first, date) / 7);
   const months = shape
     .map((week, index) => ({ week, index }))
@@ -164,6 +193,8 @@ export function VolumeChart({
           const current = index === 0 && doneThisWeek != null;
           const done = current && amount > 0 ? Math.min(1, doneThisWeek / amount) : 0;
           const isWritten = written.has(week.weekStart);
+          const hatched = timeOutWeek(week);
+          const kept = height(index) > 0 ? amount / height(index) : 0;
           return (
             <Bar
               key={week.weekStart}
@@ -178,13 +209,25 @@ export function VolumeChart({
                 week.weekStart === selected && "outline-foreground outline-2 outline-offset-1",
               )}
               style={{
-                height: `${Math.max(2, (amount / top) * 100)}%`,
-                background: current ? "transparent" : PHASE_FILL[week.phase],
+                height: `${Math.max(2, (height(index) / top) * 100)}%`,
+                background: current || hatched ? "transparent" : PHASE_FILL[week.phase],
                 boxShadow: current ? `inset 0 0 0 1.5px ${PHASE_FILL[week.phase]}` : undefined,
-                opacity: week.lighter ? 0.45 : isWritten || current ? 1 : 0.7,
+                opacity:
+                  week.lighter && !hatched ? 0.45 : isWritten || current || hatched ? 1 : 0.7,
               }}
             >
-              {current ? (
+              {hatched ? (
+                <>
+                  <span aria-hidden className="hatch-time-out absolute inset-0" />
+                  <span
+                    className="absolute inset-x-0 bottom-0"
+                    style={{
+                      height: `${(current ? done * kept : kept) * 100}%`,
+                      background: PHASE_FILL[week.phase],
+                    }}
+                  />
+                </>
+              ) : current ? (
                 <span
                   className="absolute inset-x-0 bottom-0"
                   style={{ height: `${done * 100}%`, background: PHASE_FILL[week.phase] }}

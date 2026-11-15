@@ -362,6 +362,10 @@ const RAMP_START = [
   { fromDays: 7, share: 0.6 },
   { fromDays: 1, share: 0.8 },
 ];
+/** The share the first week back keeps after so many days off. */
+export const firstWeekBack = (daysOff: number) =>
+  RAMP_START.find((item) => daysOff >= item.fromDays)?.share ?? 1;
+
 /** Each later week adds this much, until the athlete is back at 100 %. */
 const RAMP_STEP = 0.15;
 
@@ -374,7 +378,7 @@ function rampShare(weekStart: string, timeOuts: TimeOutDays[]) {
   for (const { start, end } of timeOuts) {
     if (end == null || end >= weekStart) continue;
     const daysOff = daysBetween(start, end) + 1;
-    const first = RAMP_START.find((item) => daysOff >= item.fromDays)!.share;
+    const first = firstWeekBack(daysOff);
     const weeksBack = Math.floor((daysBetween(end, weekStart) - 1) / 7);
     ramp = Math.min(ramp, Math.round((first + RAMP_STEP * weeksBack) * 100) / 100);
   }

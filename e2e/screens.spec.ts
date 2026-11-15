@@ -77,9 +77,28 @@ test("plan screen on a time out", async ({ page }) => {
     );
   });
   await page.goto("/week");
-  await expect(page.getByText("On time out since Mon 15 Jun")).toBeVisible();
+  await expect(page.getByText("Sick since Mon 15 Jun")).toBeVisible();
   await settle(page);
   await expect(page).toHaveScreenshot("plan-time-out.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+});
+
+test("plan screen with a time out ahead", async ({ page }) => {
+  // Injured from next Monday: the banner is quieter, with only "Edit" (ADR 0066).
+  await withDatabase(async (client) => {
+    await client.query(
+      `update calendar_settings set value = jsonb_set(value, '{planningStyle}', '"coachPlan"')`,
+    );
+    await client.query(
+      "insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-time-out', id, 'injured', '2026-06-22', '2026-06-26' from \"user\"",
+    );
+  });
+  await page.goto("/week");
+  await expect(page.getByText("Injured from Mon 22 Jun to Fri 26 Jun")).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot("plan-time-out-ahead.png", {
     fullPage: true,
     mask: [syncButton(page)],
   });

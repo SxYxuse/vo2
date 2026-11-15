@@ -24,6 +24,7 @@ import { mondayOf } from "@/services/season-phase.ts";
 import { seasonEvents } from "@/services/season.types.ts";
 import {
   ceilingFor,
+  amountsWithoutTimeOuts,
   projectedAmounts,
   projectedBudgets,
   SPORT_VOLUME_LABEL,
@@ -142,6 +143,7 @@ function SportProgression({
         sport={sport.sport}
         shape={volume.shape}
         amounts={amounts}
+        full={amountsWithoutTimeOuts(volume.shape, sport, choice)}
         written={written}
         events={events}
         lines={lines}

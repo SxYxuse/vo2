@@ -102,7 +102,7 @@ export async function updateTimeOutImpl({ id, timeZone, ...data }: TimeOutInput 
   await writeChecked(
     userId,
     (others, current) => {
-      if (!current) return "That time out is no longer there.";
+      if (!current) return "Those days are no longer marked.";
       const window = current.start === data.start ? null : startWindow(timeZone);
       return timeOutProblem(data, others, window);
     },
