@@ -1010,6 +1010,36 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   expect(await km()).toBeGreaterThan(fullWeek * 0.9);
 });
 
+test("an athlete on the coach plan marks a time out past the written weeks, and the season chart backs off for it", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await choosePlanningStyle(page, "Coach plan", "coachPlan");
+  await addRaceAndWritePlan(page, { runs: 4, rides: 0 });
+  const season = page.getByRole("region", { name: "Your season" });
+  const bar = (week: string) => season.getByRole("button", { name: new RegExp(`^${week}: `) });
+  const km = async (week: string) =>
+    Number((await bar(week).getAttribute("aria-label"))?.match(/: (\d+) km$/)?.[1]);
+  const before = await km("27 Jul");
+  expect(before).toBeGreaterThan(0);
+
+  // Today is Wednesday 17 June, and the plan is written to the week of 6 July. Injured for the
+  // two weeks of 13 and 20 July: both forecast weeks are empty, and the first week back keeps
+  // 40 % of what it would have held, as the coach plan will write them (ADR 0066).
+  await withDatabase((client) =>
+    client.query(
+      "insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-ahead', id, 'injured', '2026-07-13', '2026-07-26' from \"user\"",
+    ),
+  );
+  await page.reload();
+  await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
+  await expect(bar("13 Jul")).toHaveAccessibleName("13 Jul: 0 km");
+  await expect(bar("20 Jul")).toHaveAccessibleName("20 Jul: 0 km");
+  expect(await km("27 Jul")).toBeLessThan(before);
+  await settle(page);
+  await expect(season).toHaveScreenshot("plan-season-time-out.png");
+});
+
 test("an athlete with planning off marks a time out from Fitness, edits it, ends it, and deletes it", async ({
   page,
 }) => {

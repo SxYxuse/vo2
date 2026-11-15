@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
+import { projectedBudgets } from "../components/season-volume.tsx";
 import {
+  ceilingOf,
   daysOutside,
   seasonShape,
+  sportSeed,
   weekBudgets,
+  withTimeOuts,
   type SportDay,
   type TimeOutDays,
 } from "./coach-plan-budget.ts";
@@ -23,6 +27,7 @@ import {
   PLAN_SPORTS,
   plannedSession,
   plannedSports,
+  sessionsPerWeek,
   stepSecPerKm,
   swimSecPer100m,
   type Availability,
@@ -262,7 +267,7 @@ function athlete(seed: number) {
     racePaces: [],
   };
   const shares = seasonShape(goals, goals[0]!, CURRENT_WEEK, 4).map((week) => week.share);
-  return { ctx, anchors, seed, timeOuts, before, shares };
+  return { ctx, anchors, seed, timeOuts, before, shares, budgetInput };
 }
 
 const EASY_STEP = {
@@ -411,6 +416,45 @@ describe("coach plan property guard", () => {
       });
     }
     expect(broken.slice(0, 5)).toEqual([]);
+  });
+
+  it("forecasts the season the coach plan writes, time outs included", () => {
+    const broken: string[] = [];
+    // Athletes with a time out, a third of them: a season's seeds cost too much to read for all.
+    for (const item of athletes()
+      .filter((athlete) => athlete.timeOuts.length)
+      .slice(0, 200)) {
+      const { budgetInput, timeOuts } = item;
+      // Past the written weeks, through a time out's ramp back.
+      const input = { ...budgetInput, count: 12, timeOuts };
+      const written = weekBudgets(input);
+      // The season chart's volume, as the server sends it to Plan and Settings → Training.
+      const shape = withTimeOuts(
+        seasonShape(input.goals, input.aGoal, input.firstWeek, input.count),
+        timeOuts,
+      );
+      const sports = plannedSports(input.availability).map((sport) => {
+        const days = { run: input.runs, ride: input.rides, swim: input.swims }[sport];
+        const perWeek = sessionsPerWeek(input.availability, sport);
+        const seed = sportSeed(days, input.firstWeek, perWeek, sport);
+        const ceiling = ceilingOf(sport, seed, input.goals, input.firstWeek, input.progression);
+        return {
+          sport,
+          seed,
+          growth: input.progression[sport]?.growth ?? null,
+          defaultGrowth: 0,
+          peak: ceiling,
+          recommended: ceiling,
+          goal: null,
+          doneThisWeek: 0,
+        };
+      });
+      const forecast = projectedBudgets({ shape, sports }, {});
+      if (JSON.stringify(forecast) !== JSON.stringify(written)) {
+        broken.push(`${label(item)}, time outs ${JSON.stringify(timeOuts)}`);
+      }
+    }
+    expect(broken.slice(0, 3)).toEqual([]);
   });
 
   it("gets a plan from the mock coach that passes every rule", () => {

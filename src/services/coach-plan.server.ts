@@ -16,6 +16,7 @@ import {
   recommendedPeak,
   seasonShape,
   sportSeed,
+  withTimeOuts,
   STANDARD_GROWTH,
   weekBudgets,
   weeklyAmount,
@@ -481,7 +482,10 @@ function volumeOf(inputs: Inputs): SeasonVolume | null {
   const { aGoal, availability, progression } = inputs;
   const road = roadOf(inputs);
   if (!aGoal || !availability || !road.length) return null;
-  const shape = seasonShape(inputs.goals, aGoal, inputs.currentWeek, road.length);
+  const shape = withTimeOuts(
+    seasonShape(inputs.goals, aGoal, inputs.currentWeek, road.length),
+    inputs.timeOuts,
+  );
   const aSports = shape[0]?.anchorSports ?? [];
   return {
     shape,
