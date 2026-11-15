@@ -158,8 +158,6 @@ export type WeekShape = {
   share: number;
   /** The sports of the A event the week builds toward: they grow by default. */
   anchorSports: PlanSport[];
-  /** In a time out or the ramp back from one: the level doesn't grow (ADR 0066). */
-  held?: boolean;
   /** The ramp's share of the level after a time out, below 1 until the athlete is back. */
   ramp?: number;
 };
@@ -324,7 +322,7 @@ export function projectSport(
   const window = [...seed.window];
   return shape.map((week, index) => {
     const rate = growth ?? (week.anchorSports.includes(sport) ? STANDARD_GROWTH : 0);
-    if (index > 0 && !week.held) level *= 1 + (rate / 100) * (PHASE_GROWTH[week.phase] ?? 0);
+    if (index > 0) level *= 1 + (rate / 100) * (PHASE_GROWTH[week.phase] ?? 0);
     const biggest = Math.max(...window.slice(-4));
     const cap = biggest > 0 ? SPORT_BUDGETS[sport].cap(biggest) : Number.POSITIVE_INFINITY;
     level = Math.min(ceiling, Math.max(seed.floor, Math.min(cap, level)));
@@ -332,10 +330,10 @@ export function projectSport(
     window.push(sized);
     const step = ROUND_TO[sport];
     // The ramp takes the smaller of its share and the week's, never both, and goes under the
-    // floor: rounded down so the first week back never passes its share (ADR 0066).
-    const ramp = week.ramp ?? 1;
-    if (ramp < week.share) return Math.floor((level * ramp) / step + 1e-9) * step;
-    return Math.round(sized / step) * step;
+    // floor. The level grows on through the time out and the ramp, so the ramp's share is of what
+    // the week would have held without it, and it lands on the season as it was (ADR 0066).
+    const share = Math.min(week.ramp ?? 1, week.share);
+    return Math.round((share < week.share ? level * share : sized) / step) * step;
   });
 }
 
@@ -365,24 +363,19 @@ const RAMP_START = [
 const RAMP_STEP = 0.15;
 
 /**
- * How a week reads the time outs before it: the ramp's share of the level, and whether the level
- * holds, through the time out and the ramp up to the first week back at 100 %. The first week back
- * is the first one that starts after a time out ends.
+ * The ramp's share of the level in a week after time outs: the first week back is the first one
+ * that starts after a time out ends.
  */
-function returning(weekStart: string, timeOuts: TimeOutDays[]) {
+function rampShare(weekStart: string, timeOuts: TimeOutDays[]) {
   let ramp = 1;
-  let held = daysOutside(weekStart, timeOuts) < 7;
   for (const { start, end } of timeOuts) {
     if (end == null || end >= weekStart) continue;
     const daysOff = daysBetween(start, end) + 1;
     const first = RAMP_START.find((item) => daysOff >= item.fromDays)!.share;
     const weeksBack = Math.floor((daysBetween(end, weekStart) - 1) / 7);
-    const share = Math.min(1, Math.round((first + RAMP_STEP * weeksBack) * 100) / 100);
-    const lastWeek = Math.round((first + RAMP_STEP * (weeksBack - 1)) * 100) / 100;
-    ramp = Math.min(ramp, share);
-    if (share < 1 || lastWeek < 1) held = true;
+    ramp = Math.min(ramp, Math.round((first + RAMP_STEP * weeksBack) * 100) / 100);
   }
-  return { ramp, held };
+  return ramp;
 }
 
 /**
@@ -426,7 +419,7 @@ export function ceilingOf(
  * from its history, at the athlete's progression and up to its ceiling. Lighter weeks keep 70 %,
  * the taper its share, and the weeks around a supporting race what its effort keeps (ADR 0052);
  * the level grows on underneath. A week a time out overlaps keeps its share of days (backOff);
- * the weeks after it ramp back up from a share of the level, which holds until they're done.
+ * the weeks after it ramp back up from a share of the level, which grows on underneath.
  */
 export function weekBudgets(input: {
   runs: SportDay[];
@@ -444,7 +437,7 @@ export function weekBudgets(input: {
   const { goals, aGoal, firstWeek, count, availability, progression, timeOuts = [] } = input;
   const shape = seasonShape(goals, aGoal, firstWeek, count).map((week) => ({
     ...week,
-    ...returning(week.weekStart, timeOuts),
+    ramp: rampShare(week.weekStart, timeOuts),
   }));
   const amounts = (sport: PlanSport, days: SportDay[]) => {
     const perWeek = sessionsPerWeek(availability, sport);

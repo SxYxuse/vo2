@@ -363,34 +363,50 @@ describe("coach plan property guard", () => {
     expect(broken.slice(0, 5)).toEqual([]);
   });
 
-  it("ramps back up after a time out: the first week back at its share, then 15 points a week", () => {
+  it("ramps back up after a time out on the season it would have had: its share, then 15 points a week", () => {
     const broken: string[] = [];
     for (const item of athletes()) {
       const [timeOut] = item.timeOuts;
       if (!timeOut) continue;
-      item.ctx.weeks.forEach((week, index) => {
+      /** The week's ramp share, and its share of the level without the time out. */
+      const at = (index: number) => {
+        const week = item.ctx.weeks[index];
+        if (!week || daysOutside(week.weekStart, item.timeOuts) < 7) return null;
         const ramp = rampShare(timeOut, week.weekStart);
-        const share = item.shares[index]!;
-        if (ramp == null || ramp >= 1 || daysOutside(week.weekStart, item.timeOuts) < 7) return;
+        return ramp == null ? null : { ramp: Math.min(1, ramp), share: item.shares[index]! };
+      };
+      item.ctx.weeks.forEach((week, index) => {
+        const now = at(index);
+        if (!now) return;
+        const kept = Math.min(now.ramp, now.share);
         for (const { id: sport } of PLAN_SPORTS) {
           const key = BUDGET_KEY[sport];
           const step = ROUND_TO[sport];
-          // The level the week would have held without the time out, give or take its rounding.
-          const level = (item.before[index]![key] + step) / share;
+          const before = item.before[index]![key];
           const fail = (why: string) =>
             broken.push(
-              `${label(item)}: ${sport} week ${week.weekStart} at ramp ${ramp} ${why}, ${JSON.stringify(item.timeOuts)}: ${item.before[index]![key]} → ${week[key]}`,
+              `${label(item)}: ${sport} week ${week.weekStart} at ramp ${now.ramp}, share ${now.share} ${why}, ${JSON.stringify(item.timeOuts)}: ${before} → ${week[key]}`,
             );
-          if (week[key] > level * Math.min(ramp, share) + step) fail("above its share");
-          const previous = item.ctx.weeks[index - 1];
+          // Its share of what the week would have held, give or take both roundings; a week the
+          // ramp doesn't cut is exactly as it would have been. Growth runs on underneath either way.
+          const expected = (before * kept) / now.share;
           if (
-            previous &&
-            rampShare(timeOut, previous.weekStart) != null &&
-            item.shares[index - 1] === share &&
-            week[key] > previous[key] + RAMP_STEP * level + 2 * step
+            kept === now.share ? week[key] !== before : Math.abs(week[key] - expected) > step + 1
           ) {
-            fail(`more than ${RAMP_STEP * 100} points over ${previous[key]}`);
+            fail(`not at its share (${expected.toFixed(1)})`);
           }
+          // Points of the level the week would have had: none climbs more than 15 over a week the
+          // ramp cut, the step onto the first full week included. A lighter week the ramp didn't
+          // cut steps back up as the season does.
+          const then = at(index - 1);
+          const previous = item.before[index - 1]?.[key] ?? 0;
+          if (!then || then.ramp >= then.share || before === 0 || previous === 0) continue;
+          const level = before / now.share;
+          const lastLevel = previous / then.share;
+          const jump = week[key] / level - item.ctx.weeks[index - 1]![key] / lastLevel;
+          const slack = (step + 1) / level + (step + 1) / lastLevel;
+          if (jump > RAMP_STEP + slack + 1e-9)
+            fail(`${Math.round(jump * 100)} points over the week before`);
         }
       });
     }
