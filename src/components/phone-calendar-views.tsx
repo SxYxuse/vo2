@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import { CalendarDaysIcon, FlagIcon, HeartOffIcon, ThermometerIcon } from "lucide-react";
+import { CalendarDaysIcon, FlagIcon, HeartOffIcon } from "lucide-react";
 
 import { prefetchActivityDetail } from "@/lib/prefetch.ts";
 import {
@@ -20,7 +20,7 @@ import {
 } from "@/services/home-data.types.ts";
 import { addDayKey, dayKey } from "@/services/day-key.ts";
 import type { DiarySearch } from "@/services/diary-window.ts";
-import { TIME_OUT_COLOR, TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
+import { timeOutKind, type TimeOut } from "@/services/time-outs.ts";
 
 /*
  * The phone calendar's other layouts, chosen in Settings → Calendar while the athlete finds the
@@ -31,31 +31,21 @@ import { TIME_OUT_COLOR, TIME_OUT_KINDS, type TimeOut } from "@/services/time-ou
 /** The time out a day key falls in, or null (ADR 0066). */
 export type TimeOutOn = (key: string) => TimeOut | null;
 
-const timeOutKindLabel = (timeOut: TimeOut) =>
-  TIME_OUT_KINDS.find((kind) => kind.id === timeOut.kind)?.label ?? "";
-
 /**
- * A day of a time out, marked quietly so the day's activities still lead: the chart's time-out
- * colour, and the kind when there is room for it.
+ * A day of a time out: the hatch behind the day, so its activities still lead, and the kind for
+ * screen readers. The parent is `relative isolate`, so the hatch sits over its background but
+ * under what it holds.
  */
-export function TimeOutMark({
-  timeOut,
-  label = false,
-  className,
-}: {
-  timeOut: TimeOut;
-  label?: boolean;
-  className?: string;
-}) {
-  const kind = timeOutKindLabel(timeOut);
+export function TimeOutMark({ timeOut, className }: { timeOut: TimeOut; className?: string }) {
   return (
     <span
       data-slot="time-out-mark"
-      className={cn("inline-flex items-center gap-0.5 text-xs font-normal", className)}
-      style={{ color: TIME_OUT_COLOR }}
+      className={cn(
+        "hatch-time-out pointer-events-none absolute inset-0 -z-10 rounded-[inherit]",
+        className,
+      )}
     >
-      <ThermometerIcon aria-hidden className="size-3 shrink-0" />
-      {label ? kind : <span className="sr-only">{kind}</span>}
+      <span className="sr-only">{timeOutKind(timeOut)}</span>
     </span>
   );
 }
@@ -296,7 +286,7 @@ export function WeekStripView({
           const timeOut = timeOutOn(key);
           const done = count ? `${count} ${count === 1 ? "activity" : "activities"}` : null;
           const summary = timeOut
-            ? [timeOutKindLabel(timeOut).toLowerCase(), done].filter(Boolean).join(", ")
+            ? [timeOutKind(timeOut).toLowerCase(), done].filter(Boolean).join(", ")
             : (done ?? "rest");
           return (
             <li
@@ -304,10 +294,11 @@ export function WeekStripView({
               aria-label={`${weekdayOf(key)} ${dayOf(key)}: ${summary}`}
               aria-current={today ? "date" : undefined}
               className={cn(
-                "text-muted-foreground flex flex-col items-center gap-1 rounded-lg py-1.5 text-[0.625rem]",
+                "text-muted-foreground relative isolate flex flex-col items-center gap-1 rounded-lg py-1.5 text-[0.625rem]",
                 today && "bg-primary text-primary-foreground/70",
               )}
             >
+              {timeOut ? <TimeOutMark timeOut={timeOut} /> : null}
               {weekdayOf(key)}
               <span
                 className={cn(
@@ -318,12 +309,6 @@ export function WeekStripView({
                 {dayOf(key)}
               </span>
               <span className="flex h-3 items-center gap-0.5">
-                {timeOut ? (
-                  <TimeOutMark
-                    timeOut={timeOut}
-                    className={cn(today && "text-primary-foreground!")}
-                  />
-                ) : null}
                 <SportDots day={day} sportTypes={sportTypes} />
               </span>
             </li>
@@ -415,12 +400,12 @@ export function WeekSummaryView({
             <span
               key={key}
               className={cn(
-                "flex items-center justify-center gap-0.5",
+                "relative isolate flex items-center justify-center rounded-sm",
                 key === todayKey && "text-foreground font-bold",
               )}
             >
-              {weekdayOf(key).charAt(0)}
               {timeOut ? <TimeOutMark timeOut={timeOut} /> : null}
+              {weekdayOf(key).charAt(0)}
             </span>
           );
         })}

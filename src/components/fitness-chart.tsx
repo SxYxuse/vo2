@@ -3,7 +3,6 @@
 import { useId, useMemo, useState } from "react";
 import { cn } from "cn";
 import { Link } from "@tanstack/react-router";
-import { format, parseISO } from "date-fns";
 import { ChevronRightIcon, FlagIcon } from "lucide-react";
 import {
   Area,
@@ -48,7 +47,7 @@ import {
   seasonEvents,
   type Goal,
 } from "@/services/season.types.ts";
-import { TIME_OUT_COLOR, TIME_OUT_KINDS, type TimeOut } from "@/services/time-outs.ts";
+import { timeOutDay, timeOutKind, timeOutSpan, type TimeOut } from "@/services/time-outs.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -85,17 +84,33 @@ const SERIES_INFO = {
   tsb: "Fitness minus fatigue after that day's known training (today: as of now). Around −10 to −30 is normal while building; positive means fresh, which is what you want before a race or a hard test. It is not a performance score.",
 } as const;
 
-const formatDay = (key: string) => format(parseISO(key), "d MMM");
-
+/** "Sick · 12–14 Jun", or "Sick · since Mon 15 Jun" while it lasts. */
 function timeOutLabel(timeOut: TimeOut) {
-  const kind = TIME_OUT_KINDS.find((item) => item.id === timeOut.kind)?.label ?? "";
   const days =
     timeOut.end == null
-      ? `since ${formatDay(timeOut.start)}`
-      : timeOut.end === timeOut.start
-        ? formatDay(timeOut.start)
-        : `${formatDay(timeOut.start)} – ${formatDay(timeOut.end)}`;
-  return `${kind} · ${days}`;
+      ? `since ${timeOutDay(timeOut.start)}`
+      : timeOutSpan(timeOut.start, timeOut.end);
+  return `${timeOutKind(timeOut)} · ${days}`;
+}
+
+/** The time out's hatch, as the band's SVG fill: the stripe of `hatch-time-out` (styles.css). */
+const TIME_OUT_PATTERN = "time-out-hatch";
+
+function TimeOutPattern() {
+  return (
+    <defs>
+      <pattern
+        id={TIME_OUT_PATTERN}
+        width="6"
+        height="6"
+        patternUnits="userSpaceOnUse"
+        patternTransform="rotate(45)"
+      >
+        <rect width="6" height="6" fill="var(--color-foreground)" fillOpacity="0.04" />
+        <rect width="1.5" height="6" fill="var(--color-foreground)" fillOpacity="0.22" />
+      </pattern>
+    </defs>
+  );
 }
 
 /** The athlete's time outs in the period, or ahead of it, each opening the sheet to edit it. */
@@ -108,22 +123,23 @@ function TimeOutList({
 }) {
   if (!timeOuts.length) return null;
   return (
-    <ul aria-label="Time outs" className="flex flex-wrap gap-2">
+    <ul aria-label="Sick or injured" className="flex flex-wrap gap-2">
       {timeOuts.map((timeOut) => (
         <li key={timeOut.id}>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            aria-label={`Edit time out: ${timeOutLabel(timeOut)}`}
+            className="min-h-[2.75rem]"
+            aria-label={`Edit ${timeOutLabel(timeOut)}`}
             onClick={() => onEdit(timeOut)}
           >
             <span
               aria-hidden
-              className="size-2 rounded-full"
-              style={{ backgroundColor: TIME_OUT_COLOR }}
+              className="hatch-time-out size-3 rounded-[2px] ring-1 ring-foreground/20"
             />
             {timeOutLabel(timeOut)}
+            <span className="underline underline-offset-2">Edit</span>
           </Button>
         </li>
       ))}
@@ -492,6 +508,7 @@ export function FitnessChart({
                   className="aspect-auto h-44 w-full sm:h-72 lg:h-80"
                 >
                   <ComposedChart data={series} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                    <TimeOutPattern />
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="t"
@@ -534,8 +551,8 @@ export function FitnessChart({
                         yAxisId={showPmc ? "pmc" : "load"}
                         x1={band.x1}
                         x2={band.x2}
-                        fill={TIME_OUT_COLOR}
-                        fillOpacity={0.12}
+                        fill={`url(#${TIME_OUT_PATTERN})`}
+                        fillOpacity={1}
                         stroke="none"
                         // Over the bars and lines (recharts layers them 300 and 400), so a tap on
                         // any day of the band reaches it.

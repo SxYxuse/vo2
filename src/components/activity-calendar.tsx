@@ -121,16 +121,26 @@ function GoalMark() {
   return <FlagIcon aria-hidden className="size-3 shrink-0 text-(--ec-event-color)" />;
 }
 
+/** The event calendar renders its days and chips itself, so the time outs reach them through context. */
+const TimeOutOnContext = createContext<TimeOutOn>(() => null);
+
 function CalendarEventChip({
   occurrence,
 }: {
   occurrence: EventCalendarRenderEventProps<CalendarItem>["occurrence"];
 }) {
   const queryClient = useQueryClient();
+  const { timeZone } = useEventCalendarSettings();
+  const timeOutOn = useContext(TimeOutOnContext);
   const activity = occurrence.event.data;
+  // On a time out's day the chip's tint sits on the page colour, not on the hatch behind it.
+  const backing = timeOutOn(getDayKey(occurrence.start, timeZone)) ? (
+    <span aria-hidden className="bg-background absolute inset-0 -z-10" />
+  ) : null;
   if (isGoal(activity)) {
     return (
       <span className="contents">
+        {backing}
         <GoalMark />
         <span className="hidden truncate font-semibold sm:inline">{activity.name}</span>
       </span>
@@ -143,6 +153,7 @@ function CalendarEventChip({
       onPointerDown={() => warmActivity(queryClient, occurrence.event.id)}
       onFocus={() => warmActivity(queryClient, occurrence.event.id)}
     >
+      {backing}
       <span
         aria-hidden
         data-slot="event-calendar-event-dot"
@@ -255,9 +266,6 @@ function VisibleActivitiesPrefetch({ activities }: { activities: CalendarActivit
   return null;
 }
 
-/** The event calendar renders the day list itself, so the time outs reach it through context. */
-const TimeOutOnContext = createContext<TimeOutOn>(() => null);
-
 /** Vertical day list of one training week: ReUI agenda rows plus rest days, for phone widths. */
 function ActivityDayListView() {
   const todayRef = useRef<HTMLDivElement | null>(null);
@@ -316,7 +324,8 @@ function ActivityDayListView() {
             aria-label={`${weekday}, ${dayDate}`}
             data-today={today || undefined}
           >
-            <div className="bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2">
+            <div className="bg-muted/60 sticky top-0 z-10 isolate flex items-baseline justify-between gap-4 border-b px-4 py-2">
+              {timeOut ? <TimeOutMark timeOut={timeOut} /> : null}
               <span className="flex items-baseline gap-2">
                 <span className="font-semibold">{weekday}</span>
                 {today ? (
@@ -325,9 +334,7 @@ function ActivityDayListView() {
                   </span>
                 ) : null}
                 {/* A day with nothing done says so in its header, so the week fits on screen. */}
-                {timeOut ? (
-                  <TimeOutMark timeOut={timeOut} label className="self-center" />
-                ) : items.length === 0 ? (
+                {!timeOut && items.length === 0 ? (
                   <span className="text-muted-foreground font-normal">Rest</span>
                 ) : null}
               </span>
@@ -577,18 +584,15 @@ export function ActivityCalendar({
             renderEvent={renderCalendarEvent}
             renderEventTooltip={renderCalendarEventTooltip}
             renderAgendaEvent={renderAgendaEvent}
+            // A time out's hatch sits under the day's activities, inside the cell.
+            dayClassName={(day) => (timeOutOn(getDayKey(day, timeZone)) ? "isolate" : undefined)}
             renderMonthCell={({ day, defaultContent }) => {
               const timeOut = timeOutOn(getDayKey(day, timeZone));
               if (!timeOut) return defaultContent;
-              // Bottom left, across from the day number, so it never takes an activity's line.
               return (
                 <>
+                  <TimeOutMark timeOut={timeOut} />
                   {defaultContent}
-                  <TimeOutMark
-                    timeOut={timeOut}
-                    label
-                    className="pointer-events-none absolute bottom-2 left-2"
-                  />
                 </>
               );
             }}

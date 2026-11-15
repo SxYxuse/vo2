@@ -44,7 +44,7 @@ import { Spinner } from "@/components/ui/spinner";
  * season (coach-plan-season.tsx). On desktop the season sits beside the week.
  */
 
-function PlanStatus({ state, paused }: { state: CoachPlanState; paused: boolean }) {
+function PlanStatus({ state }: { state: CoachPlanState }) {
   const online = useOnline();
   const queryClient = useQueryClient();
   const again = useMutation({
@@ -83,7 +83,7 @@ function PlanStatus({ state, paused }: { state: CoachPlanState; paused: boolean 
             </Button>
           </AlertAction>
         </Alert>
-      ) : !state.plan && !state.missing.length && !paused ? (
+      ) : !state.plan && !state.missing.length ? (
         <Alert>
           <AlertTitle>No plan written yet</AlertTitle>
           <AlertDescription>The coach writes your next four weeks of sessions.</AlertDescription>
@@ -254,7 +254,10 @@ function WeekHeader({
   );
 }
 
-/** `paused` while a time out is open: nothing is written, so there's nothing to ask for. */
+/**
+ * `paused` while a time out is open: nothing is written, so there's nothing to ask for, and the
+ * time out's banner (time-out-sheet.tsx) stands in for the week.
+ */
 export function CoachPlanView({
   week: shown,
   paused = false,
@@ -297,9 +300,28 @@ export function CoachPlanView({
     },
   });
 
+  // While a time out is open its banner owns the page: only what's done this week stays.
+  if (paused) {
+    const done = weeks
+      .find((item) => item.weekStart === thisWeek)
+      ?.sessions.filter((run) => run.done);
+    return done?.length ? (
+      <section aria-labelledby="done-this-week" className="flex flex-col gap-2">
+        <h2 id="done-this-week" className="text-muted-foreground text-xs">
+          {"This week's done sessions"}
+        </h2>
+        <ul className="flex flex-col gap-2">
+          {done.map((run) => (
+            <SessionCard key={run.id} run={run} state={state} />
+          ))}
+        </ul>
+      </section>
+    ) : null;
+  }
+
   return (
     <div className="flex flex-col gap-3 sm:gap-4">
-      <PlanStatus state={state} paused={paused} />
+      <PlanStatus state={state} />
       {week ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-x-6">
           <div className="flex min-w-0 flex-col gap-3">

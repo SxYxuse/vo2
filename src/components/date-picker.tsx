@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { addYears, format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
+import { cn } from "cn";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -15,6 +16,8 @@ export function DatePicker({
   fromDate,
   toDate,
   placeholder = "Pick a date",
+  display = (key) => format(parseISO(key), "d MMM yyyy"),
+  className,
   invalid,
   onChange,
 }: {
@@ -23,6 +26,9 @@ export function DatePicker({
   fromDate?: string;
   toDate?: string;
   placeholder?: string;
+  /** How the picked day reads on the button. */
+  display?: (key: string) => string;
+  className?: string;
   invalid: boolean;
   onChange: (date: string) => void;
 }) {
@@ -39,16 +45,12 @@ export function DatePicker({
             type="button"
             variant="outline"
             aria-invalid={invalid}
-            className="w-full justify-start font-normal"
+            className={cn("w-full justify-start font-normal", className)}
           />
         }
       >
         <CalendarIcon data-icon="inline-start" />
-        {selected ? (
-          format(selected, "d MMM yyyy")
-        ) : (
-          <span className="text-muted-foreground">{placeholder}</span>
-        )}
+        {value ? display(value) : <span className="text-muted-foreground">{placeholder}</span>}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
         <Calendar

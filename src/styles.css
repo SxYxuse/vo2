@@ -564,3 +564,16 @@ body {
     transform: rotate(360deg);
   }
 }
+
+/*
+ * A time out's days (ADR 0066), on every screen: a grey diagonal hatch that reads as "not
+ * training", drawn from the foreground so it has a dark-mode version, and clear of every colour a
+ * sport, series, or phase owns. The fitness chart's SVG band draws the same stripe as a pattern.
+ */
+@utility hatch-time-out {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in oklab, var(--foreground) 22%, transparent) 0 1.5px,
+    transparent 1.5px 6px
+  );
+}

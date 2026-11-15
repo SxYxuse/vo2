@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
 import { ThermometerIcon, XIcon } from "lucide-react";
+import { cn } from "cn";
 
 import { DatePicker } from "@/components/date-picker.tsx";
 import {
@@ -14,20 +14,24 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog.tsx";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useOnline } from "@/hooks/use-online.ts";
 import { afterTimeOutsChanged } from "@/lib/query-events.ts";
+import { firstWeekBack } from "@/services/coach-plan-budget.ts";
 import { dayKey, weekStartKey } from "@/services/day-key.ts";
+import { daysBetween } from "@/services/season.types.ts";
 import {
   TIME_OUT_KINDS,
   createTimeOut,
   deleteTimeOut,
   endTimeOut,
-  timeOutCovers,
+  timeOutDay,
+  timeOutKind,
+  timeOutOpen,
   timeOutStartWindow,
   updateTimeOut,
   type TimeOut,
@@ -36,9 +40,12 @@ import {
 /** A time out to edit, "new" to mark one, or null when the sheet is closed. */
 export type TimeOutEditing = TimeOut | "new" | null;
 
+/** Every button of the feature fits its text and stays a thumb's height (AGENTS.md). */
+const TOUCH = "min-h-[2.75rem]";
+
 /**
  * Marks, edits, ends, or deletes a time out (ADR 0066): a bottom sheet on phones, a dialog on
- * desktop.
+ * desktop. Athletes see its kind, "Sick" or "Injured"; "time out" is the glossary's word.
  */
 export function TimeOutSheet({
   editing,
@@ -49,7 +56,7 @@ export function TimeOutSheet({
 }) {
   return (
     <ResponsiveDialog open={editing != null} onOpenChange={(open) => (open ? null : onClose())}>
-      <ResponsiveDialogContent className="sm:max-w-md">
+      <ResponsiveDialogContent className="sm:max-w-sm">
         {editing ? (
           <TimeOutForm
             key={editing === "new" ? "new" : editing.id}
@@ -62,71 +69,102 @@ export function TimeOutSheet({
   );
 }
 
-const formatDay = (key: string) => format(parseISO(key), "EEE d MMM");
+function deviceTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** The time out the athlete is on, or the next one ahead, if any. */
+export function currentTimeOut(timeOuts: TimeOut[], today: string) {
+  return timeOuts.find((item) => item.end == null || item.end >= today) ?? null;
+}
 
 /**
- * Plan's banner for the time out the athlete is on, or the next one ahead (ADR 0066): while it is
- * open the coach plan is paused, and "I'm back" starts it again.
+ * Plan's banner for the time out the athlete is on, or the next one ahead (ADR 0066). While one
+ * lasts it owns the page: the day count, what the return looks like, and "I'm back". One ahead is
+ * quieter, with only "Edit".
  */
 export function TimeOutBanner({
-  timeOuts,
+  timeOut,
+  today,
   onEdit,
 }: {
-  timeOuts: TimeOut[];
+  timeOut: TimeOut;
+  today: string;
   onEdit: (timeOut: TimeOut) => void;
 }) {
   const queryClient = useQueryClient();
   const online = useOnline();
   const [timeZone] = useState(deviceTimeZone);
-  const today = dayKey(new Date(), timeZone);
-  const timeOut = timeOuts.find((item) => item.end == null || item.end >= today);
   const back = useMutation({
     mutationFn: (id: string) => endTimeOut({ data: { id, timeZone } }),
     onSuccess: () => afterTimeOutsChanged(queryClient),
   });
-  if (!timeOut) return null;
-  const current = timeOut.start <= today;
-  const kind = TIME_OUT_KINDS.find((item) => item.id === timeOut.kind)?.label ?? "";
-  const title = !current
-    ? `Time out from ${formatDay(timeOut.start)}${timeOut.end ? ` to ${formatDay(timeOut.end)}` : ""}`
-    : timeOut.end == null
-      ? `On time out since ${formatDay(timeOut.start)}`
-      : `On time out until ${formatDay(timeOut.end)}`;
-  const description = !current
-    ? "The weeks it covers get less training, by the days it holds."
-    : timeOut.end == null
-      ? "Your coach plan is paused. Tap I'm back when you can train again."
-      : "This week's training is cut for the days it holds.";
-  return (
-    <Alert>
-      <ThermometerIcon />
-      <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>
-        {kind}. {description}
-        {back.error ? <span className="text-destructive block">{back.error.message}</span> : null}
-      </AlertDescription>
-      <AlertAction className="flex gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => onEdit(timeOut)}>
-          Edit
-        </Button>
-        {current ? (
-          <Button
-            type="button"
-            size="sm"
-            disabled={!online || back.isPending}
-            onClick={() => back.mutate(timeOut.id)}
-          >
-            {back.isPending ? <Spinner data-icon="inline-start" /> : null}
-            {"I'm back"}
-          </Button>
-        ) : null}
-      </AlertAction>
-    </Alert>
+  const kind = timeOutKind(timeOut);
+  const started = timeOut.start <= today;
+  const edit = (
+    <Button
+      type="button"
+      variant="link"
+      className={cn(TOUCH, "px-1")}
+      onClick={() => onEdit(timeOut)}
+    >
+      Edit
+    </Button>
   );
-}
 
-function deviceTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!started) {
+    return (
+      <section
+        aria-label={kind}
+        className="ring-foreground/10 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-4 py-2 ring-1"
+      >
+        <span aria-hidden className="hatch-time-out size-5 shrink-0 rounded-sm" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h2 className="text-sm font-medium">
+            {kind} from {timeOutDay(timeOut.start)}
+            {timeOut.end ? ` to ${timeOutDay(timeOut.end)}` : ""}
+          </h2>
+          <p className="text-muted-foreground text-xs">The weeks it covers will be lighter.</p>
+        </div>
+        {edit}
+      </section>
+    );
+  }
+
+  // "I'm back" ends it yesterday, so the days off are the ones before today.
+  const day = daysBetween(timeOut.start, today) + 1;
+  const share = Math.round(firstWeekBack(Math.max(1, day - 1)) * 100);
+  return (
+    <section aria-label={kind} className="bg-muted flex flex-col gap-1.5 rounded-xl p-4">
+      <p className="text-muted-foreground flex items-center gap-1 text-xs">
+        <ThermometerIcon aria-hidden className="size-3.5" />
+        {kind} · day {day}
+      </p>
+      <h2 className="text-lg font-semibold">
+        {timeOut.end == null
+          ? `${kind} since ${timeOutDay(timeOut.start)}`
+          : `${kind} until ${timeOutDay(timeOut.end)}`}
+      </h2>
+      <p className="text-muted-foreground text-sm">
+        {timeOut.end == null
+          ? `Your coach plan is paused. When you're back, your first week is ${share} % of a normal one, then it climbs.`
+          : "This week's training is cut for the days it holds."}
+      </p>
+      {back.error ? <p className="text-destructive text-sm">{back.error.message}</p> : null}
+      <div className="mt-1 flex items-center gap-3">
+        <Button
+          type="button"
+          className={TOUCH}
+          disabled={!online || back.isPending}
+          onClick={() => back.mutate(timeOut.id)}
+        >
+          {back.isPending ? <Spinner data-icon="inline-start" /> : null}
+          {"I'm back"}
+        </Button>
+        {edit}
+      </div>
+    </section>
+  );
 }
 
 function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () => void }) {
@@ -172,81 +210,81 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
   return (
     <form noValidate onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
       <ResponsiveDialogHeader>
-        <ResponsiveDialogTitle>
-          {timeOut ? "Edit time out" : "Sick or injured"}
-        </ResponsiveDialogTitle>
-        <ResponsiveDialogDescription>
-          {"Mark the days you can't train. Leave the end empty while it lasts."}
+        <ResponsiveDialogTitle>Sick or injured</ResponsiveDialogTitle>
+        <ResponsiveDialogDescription className="sr-only">
+          {"Mark the days you can't train."}
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-0">
         <FieldGroup>
-          <FieldSet>
-            <FieldLegend variant="label">Kind</FieldLegend>
-            <RadioGroup
-              name="time-out-kind"
-              value={kind}
-              onValueChange={(next) => {
-                if (next === "sick" || next === "injured") setKind(next);
+          <ToggleGroup
+            aria-label="Kind"
+            spacing={0}
+            value={[kind]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (value === "sick" || value === "injured") setKind(value);
+            }}
+            className="bg-muted grid w-full grid-cols-2 gap-0 rounded-lg p-1"
+          >
+            {TIME_OUT_KINDS.map((option) => (
+              <ToggleGroupItem
+                key={option.id}
+                value={option.id}
+                className="data-[pressed]:bg-background min-h-[2.75rem] rounded-md! border-0 text-sm data-[pressed]:shadow-sm"
+              >
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <Field>
+            <FieldLabel htmlFor="time-out-start">From</FieldLabel>
+            <DatePicker
+              id="time-out-start"
+              value={start}
+              // An older time out keeps its start; a new start is held to the window.
+              fromDate={timeOut && timeOut.start < window.first ? timeOut.start : window.first}
+              toDate={window.last}
+              display={timeOutDay}
+              className={TOUCH}
+              invalid={false}
+              onChange={(next) => {
+                setStart(next);
+                if (end != null && end < next) setEnd(next);
               }}
-              className="grid grid-cols-2 gap-2"
-            >
-              {TIME_OUT_KINDS.map((option) => (
-                <FieldLabel
-                  key={option.id}
-                  htmlFor={`time-out-kind-${option.id}`}
-                  className="min-h-[2.75rem] w-full items-center gap-2 rounded-lg border px-3"
-                >
-                  <RadioGroupItem value={option.id} id={`time-out-kind-${option.id}`} />
-                  {option.label}
-                </FieldLabel>
-              ))}
-            </RadioGroup>
-          </FieldSet>
-          <div className="grid grid-cols-2 gap-3">
-            <Field>
-              <FieldLabel htmlFor="time-out-start">Start</FieldLabel>
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="time-out-end">Until</FieldLabel>
+            <div className="flex gap-1">
               <DatePicker
-                id="time-out-start"
-                value={start}
-                // An older time out keeps its start; a new start is held to the window.
-                fromDate={timeOut && timeOut.start < window.first ? timeOut.start : window.first}
-                toDate={window.last}
+                id="time-out-end"
+                value={end ?? ""}
+                fromDate={start}
+                placeholder="Still going · leave empty"
+                display={timeOutDay}
+                className={TOUCH}
                 invalid={false}
-                onChange={(next) => {
-                  setStart(next);
-                  if (end != null && end < next) setEnd(next);
-                }}
+                onChange={setEnd}
               />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="time-out-end">End</FieldLabel>
-              <div className="flex gap-1">
-                <DatePicker
-                  id="time-out-end"
-                  value={end ?? ""}
-                  fromDate={start}
-                  placeholder="Not yet"
-                  invalid={false}
-                  onChange={setEnd}
-                />
-                {end != null ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Clear the end"
-                    onClick={() => setEnd(null)}
-                  >
-                    <XIcon />
-                  </Button>
-                ) : null}
-              </div>
-            </Field>
-          </div>
+              {end != null ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-[2.75rem]"
+                  aria-label="Clear the end"
+                  onClick={() => setEnd(null)}
+                >
+                  <XIcon />
+                </Button>
+              ) : null}
+            </div>
+            <FieldDescription>Your coach plan pauses while it lasts.</FieldDescription>
+          </Field>
           {online ? null : (
             <Alert>
-              <AlertDescription>Saving a time out needs a connection.</AlertDescription>
+              <AlertDescription>Saving needs a connection.</AlertDescription>
             </Alert>
           )}
           {error ? (
@@ -256,34 +294,38 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
           ) : null}
         </FieldGroup>
       </div>
-      <ResponsiveDialogFooter>
-        <Button type="submit" disabled={!online || pending}>
-          {save.isPending ? <Spinner data-icon="inline-start" /> : null}
-          Save
-        </Button>
-        {timeOut && timeOutCovers(timeOut, today) ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!online || pending}
-            onClick={() => back.mutate()}
-            className="sm:order-first"
-          >
-            {back.isPending ? <Spinner data-icon="inline-start" /> : null}
-            {"I'm back"}
+      <ResponsiveDialogFooter className="flex-col items-stretch gap-0 sm:flex-col">
+        <div className="flex items-center gap-3">
+          <Button type="submit" className={TOUCH} disabled={!online || pending}>
+            {save.isPending ? <Spinner data-icon="inline-start" /> : null}
+            Save
           </Button>
-        ) : null}
+          {timeOut && timeOutOpen(timeOut, today) ? (
+            <Button
+              type="button"
+              variant="outline"
+              className={TOUCH}
+              disabled={!online || pending}
+              onClick={() => back.mutate()}
+            >
+              {back.isPending ? <Spinner data-icon="inline-start" /> : null}
+              {"I'm back"}
+            </Button>
+          ) : null}
+        </div>
         {timeOut ? (
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={!online || pending}
-            onClick={() => (confirmingDelete ? remove.mutate() : setConfirmingDelete(true))}
-            className="sm:order-first sm:mr-auto"
-          >
-            {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
-            {confirmingDelete ? "Delete for good" : "Delete"}
-          </Button>
+          <div className="mt-4 border-t pt-2">
+            <Button
+              type="button"
+              variant="link"
+              className={cn(TOUCH, "text-destructive px-0")}
+              disabled={!online || pending}
+              onClick={() => (confirmingDelete ? remove.mutate() : setConfirmingDelete(true))}
+            >
+              {remove.isPending ? <Spinner data-icon="inline-start" /> : null}
+              {confirmingDelete ? "Delete for good" : "Delete"}
+            </Button>
+          </div>
         ) : null}
       </ResponsiveDialogFooter>
     </form>
