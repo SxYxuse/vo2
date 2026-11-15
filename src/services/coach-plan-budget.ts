@@ -160,6 +160,8 @@ export type WeekShape = {
   anchorSports: PlanSport[];
   /** The ramp's share of the level after a time out, below 1 until the athlete is back. */
   ramp?: number;
+  /** The week's days outside every time out, 7 without one (ADR 0066). */
+  daysOn?: number;
 };
 
 /** The season's weeks from `firstWeek`, `count` of them, toward the A goal. */
@@ -333,7 +335,8 @@ export function projectSport(
     // floor. The level grows on through the time out and the ramp, so the ramp's share is of what
     // the week would have held without it, and it lands on the season as it was (ADR 0066).
     const share = Math.min(week.ramp ?? 1, week.share);
-    return Math.round((share < week.share ? level * share : sized) / step) * step;
+    const amount = Math.round((share < week.share ? level * share : sized) / step) * step;
+    return backOff(amount, sport, week.daysOn ?? 7);
   });
 }
 
@@ -379,6 +382,19 @@ function rampShare(weekStart: string, timeOuts: TimeOutDays[]) {
 }
 
 /**
+ * The season's weeks as the athlete's time outs leave them: the days each keeps, and the ramp back
+ * after one. The writer's budgets and the season chart both read this, so the chart shows the
+ * weeks the coach plan will write (ADR 0066).
+ */
+export function withTimeOuts(shape: WeekShape[], timeOuts: TimeOutDays[]): WeekShape[] {
+  return shape.map((week) => ({
+    ...week,
+    ramp: rampShare(week.weekStart, timeOuts),
+    daysOn: daysOutside(week.weekStart, timeOuts),
+  }));
+}
+
+/**
  * A week a time out overlaps keeps its days outside it ÷ 7 of the budget, rounded down to the
  * sport's step so it never passes that share; a week fully inside one is empty (ADR 0066).
  */
@@ -418,8 +434,8 @@ export function ceilingOf(
  * Budgets for `count` weeks from `firstWeek`, per sport: each sport's projection (projectSport)
  * from its history, at the athlete's progression and up to its ceiling. Lighter weeks keep 70 %,
  * the taper its share, and the weeks around a supporting race what its effort keeps (ADR 0052);
- * the level grows on underneath. A week a time out overlaps keeps its share of days (backOff);
- * the weeks after it ramp back up from a share of the level, which grows on underneath.
+ * the level grows on underneath. A week a time out overlaps keeps its share of days, and the weeks
+ * after it ramp back up from a share of the level, which grows on underneath (withTimeOuts).
  */
 export function weekBudgets(input: {
   runs: SportDay[];
@@ -435,10 +451,7 @@ export function weekBudgets(input: {
   timeOuts?: TimeOutDays[];
 }): WeekBudget[] {
   const { goals, aGoal, firstWeek, count, availability, progression, timeOuts = [] } = input;
-  const shape = seasonShape(goals, aGoal, firstWeek, count).map((week) => ({
-    ...week,
-    ramp: rampShare(week.weekStart, timeOuts),
-  }));
+  const shape = withTimeOuts(seasonShape(goals, aGoal, firstWeek, count), timeOuts);
   const amounts = (sport: PlanSport, days: SportDay[]) => {
     const perWeek = sessionsPerWeek(availability, sport);
     if (!perWeek) return shape.map(() => 0);
@@ -449,18 +462,15 @@ export function weekBudgets(input: {
   const run = amounts("run", input.runs);
   const ride = amounts("ride", input.rides);
   const swim = amounts("swim", input.swims);
-  return shape.map((week, index) => {
-    const days = daysOutside(week.weekStart, timeOuts);
-    return {
-      weekStart: week.weekStart,
-      budgetKm: backOff(run[index]!, "run", days),
-      budgetMinutes: backOff(ride[index]!, "ride", days),
-      budgetSwimM: backOff(swim[index]!, "swim", days),
-      phase: week.phase,
-      lighter: week.lighter,
-      taper: week.taper,
-    };
-  });
+  return shape.map((week, index) => ({
+    weekStart: week.weekStart,
+    budgetKm: run[index]!,
+    budgetMinutes: ride[index]!,
+    budgetSwimM: swim[index]!,
+    phase: week.phase,
+    lighter: week.lighter,
+    taper: week.taper,
+  }));
 }
 
 /** What a written week holds of a sport, races aside (they're not in the budget). */
