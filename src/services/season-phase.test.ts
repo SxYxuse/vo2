@@ -101,16 +101,39 @@ describe("seasonPhase", () => {
     );
   });
 
-  it("never lets a supporting race lead: with no main goal ahead, fitness holds", () => {
+  it("never lets a supporting race lead: with no main goal ahead, the season builds base", () => {
     for (const effort of ["fun", "steady", "allOut"] as const) {
       const only = goal(supportDay, effort);
-      expect(phase([only], addDayKey(supportWeek, -70)).kind).toBe("hold");
-      expect(phase([only], addDayKey(supportWeek, -70)).ramp).toBe(0);
+      expect(phase([only], addDayKey(supportWeek, -70)).kind).toBe("base");
+      expect(phase([only], addDayKey(supportWeek, -21)).kind).toBe("base");
     }
     expect(phase([goal(supportDay, "steady")], supportWeek)).toMatchObject({
-      kind: "hold",
+      kind: "base",
       loadFactor: 0.85,
     });
+  });
+
+  it("builds base fitness without any goal, every fourth week lighter", () => {
+    const weeks = [0, 1, 2, 3, 4, 5, 6, 7].map((index) =>
+      phase([], addDayKey("2027-01-04", 7 * index)),
+    );
+    expect(weeks.every((week) => week.kind === "base")).toBe(true);
+    expect(weeks.map((week) => week.lighter)).toEqual([
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+  });
+
+  it("holds the two weeks after a main goal before building base again", () => {
+    expect(phase([main], addDayKey(RACE_WEEK, 7)).kind).toBe("recovery");
+    expect(phase([main], addDayKey(RACE_WEEK, 14)).kind).toBe("maintain");
+    expect(phase([main], addDayKey(RACE_WEEK, 21)).kind).toBe("base");
   });
 
   it("builds toward each main goal in turn", () => {

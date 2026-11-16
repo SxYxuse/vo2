@@ -250,7 +250,7 @@ export function ProgressionSettings({ state }: { state: CoachPlanState }) {
       ? nextWeek
       : null;
   }, [volume, state.plan, state.today, choices]);
-  // Hidden without an A goal: there are no phases to grow through (ADR 0058).
+  // Hidden without availability: no sport is planned (ADR 0058).
   if (!volume) return null;
   const changed = JSON.stringify(choices) !== savedKey;
   const written = new Set((state.plan?.weeks ?? []).map((week) => week.weekStart));
@@ -260,8 +260,8 @@ export function ProgressionSettings({ state }: { state: CoachPlanState }) {
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium">Progression</h3>
         <FieldDescription>
-          How fast each sport's weekly volume grows toward your A goal, up to its peak week. The
-          plan's week-to-week rules always apply.
+          How fast each sport's weekly volume grows toward your A goal, or builds base without one,
+          up to its peak week. The plan's week-to-week rules always apply.
         </FieldDescription>
       </div>
       {volume.sports.map((sport) => (

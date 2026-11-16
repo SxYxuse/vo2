@@ -164,25 +164,33 @@ export type WeekShape = {
   daysOn?: number;
 };
 
-/** The season's weeks from `firstWeek`, `count` of them, toward the A goal. */
+type AGoal = Pick<Goal, "date" | "distanceM" | "sportType" | "elevationGainM">;
+
+/**
+ * The season's weeks from `firstWeek`, `count` of them, toward the A goal. Without one, every
+ * sport builds base fitness.
+ */
 export function seasonShape(
   goals: Goal[],
-  aGoal: Pick<Goal, "date" | "distanceM" | "sportType" | "elevationGainM">,
+  aGoal: AGoal | null,
   firstWeek: string,
   count: number,
 ): WeekShape[] {
   return Array.from({ length: count }, (_, index) => {
     const weekStart = addDayKey(firstWeek, 7 * index);
     const phase = seasonPhase(goals, weekStart);
-    const weeksLeft = Math.floor(daysBetween(weekStart, aGoal.date) / 7);
-    const taper = weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
+    const anchorSports = [
+      ...new Set(phase.anchor.flatMap((goal) => planSportOf(goal.sportType) ?? [])),
+    ];
+    const weeksLeft = aGoal ? Math.floor(daysBetween(weekStart, aGoal.date) / 7) : -1;
+    const taper = aGoal && weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
     return {
       weekStart,
       phase: phase.kind,
       lighter: phase.lighter && taper == null,
       taper: taper != null || phase.kind === "taper" || phase.kind === "race",
       share: taper ?? phase.loadFactor ?? 1,
-      anchorSports: [...new Set(phase.anchor.flatMap((goal) => planSportOf(goal.sportType) ?? []))],
+      anchorSports: anchorSports.length ? anchorSports : PLAN_SPORTS.map((sport) => sport.id),
     };
   });
 }
@@ -446,7 +454,7 @@ export function weekBudgets(input: {
   rides: SportDay[];
   swims: SportDay[];
   goals: Goal[];
-  aGoal: Pick<Goal, "date" | "distanceM" | "sportType" | "elevationGainM">;
+  aGoal: AGoal | null;
   firstWeek: string;
   count: number;
   availability: Availability;

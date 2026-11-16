@@ -126,6 +126,8 @@ function historyOf(r: Random, sport: PlanSport, today: string): SportDay[] {
 
 /** An A goal in a planned sport 1 to 30 weeks out, and sometimes a supporting race before it. */
 function goalsOf(r: Random, availability: Availability, today: string): Goal[] {
+  // Some athletes have no race ahead: the plan builds base fitness.
+  if (r.next() < 0.15) return [];
   const sport = r.pick(plannedSports(availability));
   const distanceM = {
     run: r.pick([5000, 10_000, 21_097.5, 42_195, 50_000]),
@@ -181,7 +183,7 @@ function progressionOf(r: Random): Progression {
  * The athlete's time outs (ADR 0066): none, one in the past, a few days of one week, whole weeks,
  * one still open, one ahead, or one ending in the weeks before the A goal's taper.
  */
-function timeOutsOf(r: Random, today: string, aGoal: Goal): TimeOutDays[] {
+function timeOutsOf(r: Random, today: string, aGoal: Goal | null): TimeOutDays[] {
   const shape = r.pick(["none", "past", "partial", "weeks", "open", "ahead", "taper"] as const);
   if (shape === "none") return [];
   if (shape === "past") {
@@ -198,6 +200,7 @@ function timeOutsOf(r: Random, today: string, aGoal: Goal): TimeOutDays[] {
   }
   if (shape === "open") return [{ start: addDayKey(today, -r.int(0, 20)), end: null }];
   if (shape === "taper") {
+    if (!aGoal) return [];
     const end = addDayKey(aGoal.date, -r.int(1, 24));
     const start = addDayKey(end, -r.int(0, 20));
     if (start < addDayKey(CURRENT_WEEK, -28) || start > addDayKey(today, 28)) return [];
@@ -215,7 +218,8 @@ function athlete(seed: number) {
   const history = { run: historyOf(r, "run", today), ride: historyOf(r, "ride", today) };
   const swimHistory = historyOf(r, "swim", today);
   const goals = goalsOf(r, availability, today);
-  const timeOuts = timeOutsOf(r, today, goals[0]!);
+  const aGoal = goals.find((goal) => goal.priority === "A") ?? null;
+  const timeOuts = timeOutsOf(r, today, aGoal);
   // Nothing is trained inside a time out.
   const outside = (days: SportDay[]) =>
     days.filter(
@@ -236,7 +240,7 @@ function athlete(seed: number) {
     rides,
     swims,
     goals,
-    aGoal: goals[0]!,
+    aGoal,
     firstWeek: CURRENT_WEEK,
     count: 4,
     availability,
@@ -266,7 +270,7 @@ function athlete(seed: number) {
     paces: anchors.paces,
     racePaces: [],
   };
-  const shares = seasonShape(goals, goals[0]!, CURRENT_WEEK, 4).map((week) => week.share);
+  const shares = seasonShape(goals, aGoal, CURRENT_WEEK, 4).map((week) => week.share);
   return { ctx, anchors, seed, timeOuts, before, shares, budgetInput };
 }
 

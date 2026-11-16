@@ -84,7 +84,8 @@ async function onboardWithCoachPlan(page: Page) {
   await next.click();
 
   await expect(page.getByRole("heading", { name: "Your A race" })).toBeVisible();
-  await expect(next).toBeDisabled();
+  // The race is optional: without one the plan builds base fitness (ADR 0067).
+  await expect(page.getByRole("button", { name: "Continue without a race" })).toBeEnabled();
   // Ten weeks from the page's today: E2E_NOW under e2e, the real date under `vp run dev:seed`.
   const today = await page.evaluate(() => Date.now());
   const raceDay = new Date(today + 70 * 86_400_000).toISOString().slice(0, 10);

@@ -106,7 +106,12 @@ function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
   const justRaced = sinceLast != null && sinceLast <= 7;
 
   const anchorAhead = anchorEvent(ahead);
-  if (!anchorAhead) return justRaced ? recoveryPhase(lastA!.goals) : HOLD;
+  if (!anchorAhead) {
+    if (justRaced) return recoveryPhase(lastA!.goals);
+    if (sinceLast != null && sinceLast <= NO_RAMP_AFTER_A_DAYS)
+      return { ...HOLD, kind: "maintain" };
+    return baseFitness(weekStart);
+  }
   const anchor = anchorAhead.goals;
   const daysToAnchor = daysBetween(weekStart, anchorAhead.date);
   const weeksLeft = Math.floor(daysToAnchor / 7);
@@ -154,6 +159,22 @@ function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
   }
 
   return { ...phase, anchor, daysToAnchor };
+}
+
+/** A Monday the lighter weeks of base fitness are counted from, so they stay put week to week. */
+const BASE_FITNESS_EPOCH = "2024-01-01";
+
+/**
+ * With no main goal ahead the season builds base fitness: base weeks, every fourth one lighter,
+ * counted on the calendar since there is no goal to count back from.
+ */
+function baseFitness(weekStart: string): SeasonPhase {
+  const lighter =
+    Math.floor(daysBetween(BASE_FITNESS_EPOCH, weekStart) / 7) % LIGHTER_EVERY_WEEKS ===
+    LIGHTER_EVERY_WEEKS - 1;
+  return lighter
+    ? { ...HOLD, kind: "base", lighter, loadFactor: LIGHTER_LOAD_FACTOR }
+    : { ...HOLD, kind: "base", ramp: RAMP.base };
 }
 
 /**

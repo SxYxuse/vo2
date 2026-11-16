@@ -101,7 +101,7 @@ const STEP_LIST = [
     id: "goal",
     title: "Your A race",
     description:
-      "The coach plan builds toward your season, led by an upcoming A goal: a run, a ride, or a swim.",
+      "The coach plan builds toward your season, led by an upcoming A goal: a run, a ride, or a swim. Without one, it builds your base fitness.",
   },
   {
     id: "availability",
@@ -303,10 +303,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
   const copyUnfinished = syncStatus?.status !== "complete";
   const coachPlan = useQuery({ ...coachPlanQueryOptions, enabled: planningStyle === "coachPlan" });
   const saveAvailability = useSaveAvailability();
-  // Each coach plan step needs its part before the next: the key, the A race, availability.
+  // Each coach plan step needs its part before the next: the key and availability. The A race is
+  // optional: without one the plan builds base fitness.
   const canContinueCoachPlan =
     (step.id === "coachKey" && coachKey.available) ||
-    (step.id === "goal" && coachPlan.data?.aGoal != null) ||
+    (step.id === "goal" && coachPlan.data != null) ||
     (step.id === "availability" && availabilityIssue(availability) == null);
   const progress = progressOf(flow, stepIndex);
 
@@ -466,7 +467,9 @@ export function OnboardingForm({ userName }: { userName: string }) {
                   ? "Skip for now"
                   : step.id === "paces"
                     ? "Write my plan"
-                    : "Continue"}
+                    : step.id === "goal" && coachPlan.data && !coachPlan.data.aGoal
+                      ? "Continue without a race"
+                      : "Continue"}
               </Button>
             </>
           )}

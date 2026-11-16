@@ -333,24 +333,16 @@ export function PlanSeason({
         <h2 id="plan-season" className="text-sm font-medium">
           Your season
         </h2>
-        {state.road.length ? (
-          <>
-            {state.volume ? (
-              <SeasonVolumeCharts
-                volume={state.volume}
-                state={state}
-                weeks={weeks}
-                events={events}
-                onShow={onShow}
-              />
-            ) : null}
-            <p className="text-muted-foreground text-xs">{phaseText(state.road)}</p>
-          </>
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            No goals ahead: the plan holds your fitness.
-          </p>
-        )}
+        {state.volume ? (
+          <SeasonVolumeCharts
+            volume={state.volume}
+            state={state}
+            weeks={weeks}
+            events={events}
+            onShow={onShow}
+          />
+        ) : null}
+        <p className="text-muted-foreground text-xs">{phaseText(state.road)}</p>
       </div>
       {weeks.length ? (
         <WrittenWeeks weeks={weeks} state={state} shown={shown} onShow={onShow} />

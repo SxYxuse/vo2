@@ -149,12 +149,44 @@ test("an athlete with planning off sees no plan, and turns the coach plan on fro
   await page.getByRole("button", { name: "Choose a planning style" }).click();
   await page.waitForURL("/settings/training");
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
-  // No A goal yet: Settings says what's missing and where to fix it.
-  await expect(page.getByText("The coach plan can't be written yet")).toBeVisible();
+  // No A goal: the plan builds base fitness (ADR 0067), and Plan asks only for availability.
+  await expect(page.getByText(BASE_FITNESS)).toBeVisible();
 
   await page.goto("/week");
-  await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
+  await expect(page.getByText("The coach plan can't be written yet")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Set it in Settings → Training" })).toBeVisible();
   expect(await planLinks()).toBe(1);
+});
+
+const BASE_FITNESS = "No A goal ahead: the plan builds your base fitness.";
+
+test("an athlete with no race gets a coach plan that builds base fitness, then adds a race", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await choosePlanningStyle(page, "Coach plan", "coachPlan");
+  await expect(page.getByText(BASE_FITNESS)).toBeVisible();
+  await saveAvailabilityAndWrite(page, { runs: 4, rides: 0 });
+
+  const weekHeading = page.getByRole("heading", { name: WEEK_HEADING });
+  await expect(weekHeading).toHaveText(/^This week · Base · \d+ km running$/);
+  await expect(page.getByText("Base now.")).toBeVisible();
+  await expect(page.getByText(/^Progression: running Standard$/)).toBeVisible();
+
+  // A race added in Season leads the season from then on: the plan is written toward it.
+  const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
+  await pasteGoal(page, {
+    name: "Autumn half",
+    sportType: "Run",
+    date: raceDay,
+    distanceM: 21_097.5,
+    elevationGainM: null,
+    priority: "A",
+  });
+  const written = writingStarts(page);
+  await page.goto("/week");
+  await expectPlanWritten(page, written);
+  await expect(page.getByText(/^Build now, /)).toBeVisible();
 });
 
 test("an athlete sets a race result, sees a predicted race time, and clears it", async ({
@@ -388,9 +420,7 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   // Two plan writings and four style switches, each saved and checked on the device.
   test.setTimeout(90_000);
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
-  // No A goal yet: Settings says what's missing and where to fix it.
-  await expect(page.getByText("The coach plan can't be written yet")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Add one in Season" })).toBeVisible();
+  await expect(page.getByText(BASE_FITNESS)).toBeVisible();
 
   // Runs and rides: the half marathon leads, the rides hold beside it (ADR 0050).
   await addRaceAndWritePlan(page, { runs: 4, rides: 2 });
