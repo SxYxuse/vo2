@@ -292,6 +292,44 @@ export function estimateVdot(
   return estimateFrom(runsHolding >= 2 ? preferred : counted, now, targetMetres);
 }
 
+/** One week's Automatic estimate and the time it predicts, or nulls when there was none. */
+export type TrendPoint = { at: Date; vdot: number | null; seconds: number | null };
+
+/**
+ * The Automatic estimate as of each date, worked out again from the best efforts it could have
+ * read then: those on or before the date and inside the 16 weeks before it.
+ */
+export function predictedTimeTrend(
+  efforts: RunEffort[],
+  asOf: Date[],
+  targetMetres: number,
+): TrendPoint[] {
+  return asOf.map((at) => {
+    const oldest = at.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000;
+    const counted = efforts.filter((effort) => {
+      const start = Date.parse(effort.start);
+      return start >= oldest && start <= at.getTime();
+    });
+    const estimate = estimateVdot(counted, at, targetMetres);
+    if (!estimate) return { at, vdot: null, seconds: null };
+    return { at, vdot: estimate.vdot, seconds: predictRaceSeconds(estimate.vdot, targetMetres) };
+  });
+}
+
+/** Where the trend's distance comes from: the next running A goal, or 10 km and why. */
+export type TrendTarget =
+  | { kind: "goal"; name: string }
+  | { kind: "none" }
+  /** A trail or virtual goal, or one outside 1,500 m to the marathon. */
+  | { kind: "unpredicted"; name: string };
+
+/** The predicted race time week by week, each point dated by its day key. */
+export type PredictedTimeTrend = {
+  metres: number;
+  target: TrendTarget;
+  points: { date: string; vdot: number | null; seconds: number | null }[];
+};
+
 /** Whether a date (YYYY-MM-DD or ISO) is inside the last 16 weeks, as best efforts count. */
 function isInWindow(date: string, now: Date) {
   const oldest = new Date(now.getTime() - ESTIMATE_WINDOW_DAYS * 86_400_000);

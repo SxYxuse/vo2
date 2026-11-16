@@ -1,9 +1,11 @@
+import { TZDate } from "@date-fns/tz";
 import { and, eq, gte, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { db } from "@/db/index.ts";
-import { activities, activityStreams, athleteMetrics, goals } from "@/db/schema.ts";
+import { activities, activityStreams, athleteMetrics, coachPlans, goals } from "@/db/schema.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { ageFromBirthDate } from "./athlete-settings.types.ts";
+import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { ensureBestEfforts } from "./best-efforts.server.ts";
 import { buildFlatPaces, isFlatPaces, zone2Pace, type FlatPaces } from "./easy-pace.ts";
 import { estimateMaxHrAnchor } from "./heart-insights.ts";
@@ -28,10 +30,13 @@ import {
   isRaceResultCurrent,
   parsePaceSettings,
   parseRaceResult,
+  predictedTimeTrend,
+  predictsRaceTime,
   trainingPaces,
   type EasyFromHeart,
   type PaceChoice,
   type PaceSettings,
+  type PredictedTimeTrend,
   type RaceResult,
   type RunEffort,
   type TrainingPaces,
@@ -161,22 +166,31 @@ async function zone2Bounds(userId: string, metrics: Metrics | undefined) {
     : null;
 }
 
-/** The distance of the next running A goal, which breaks the estimate's near ties. */
-async function targetMetres(userId: string, now: Date) {
+/** The athlete's upcoming running A goals with a distance, soonest first. */
+async function upcomingRunningAGoals(userId: string, now: Date) {
   const today = now.toISOString().slice(0, 10);
   const rows = await db
-    .select({ sportType: goals.sportType, date: goals.date, distanceM: goals.distanceM })
+    .select({
+      name: goals.name,
+      sportType: goals.sportType,
+      date: goals.date,
+      distanceM: goals.distanceM,
+    })
     .from(goals)
     .where(and(eq(goals.userId, userId), eq(goals.priority, "A"), gte(goals.date, today)));
-  const [next] = rows
-    .filter(
-      (goal) =>
-        sportGroupFor(goal.sportType)?.id === "running" &&
-        goal.distanceM != null &&
-        canPredict(goal.distanceM),
+  return rows
+    .flatMap((goal) =>
+      sportGroupFor(goal.sportType)?.id === "running" && goal.distanceM != null
+        ? [{ ...goal, distanceM: goal.distanceM }]
+        : [],
     )
     .sort((a, b) => a.date.localeCompare(b.date));
-  return next?.distanceM ?? DEFAULT_TARGET_M;
+}
+
+/** The distance of the next running A goal, which breaks the estimate's near ties. */
+async function targetMetres(userId: string, now: Date) {
+  const upcoming = await upcomingRunningAGoals(userId, now);
+  return upcoming.find((goal) => canPredict(goal.distanceM))?.distanceM ?? DEFAULT_TARGET_M;
 }
 
 async function readMetrics(userId: string) {
@@ -223,6 +237,77 @@ export async function loadTrainingPacesImpl(): Promise<TrainingPaces> {
   const session = await getOptionalSession();
   if (!session) return NO_PACES;
   return trainingPacesFor(session.user.id);
+}
+
+async function athleteTimeZone(userId: string) {
+  const [row] = await db
+    .select({ timeZone: coachPlans.timeZone })
+    .from(coachPlans)
+    .where(eq(coachPlans.userId, userId))
+    .limit(1);
+  return row?.timeZone ?? "UTC";
+}
+
+/** Each training week's end, Sunday in the athlete's time zone, from the first effort, then now. */
+function weekEnds(efforts: RunEffort[], now: Date, timeZone: string) {
+  const today = dayKey(now, timeZone);
+  const first = efforts.reduce<string | null>(
+    (oldest, effort) => (oldest == null || effort.start < oldest ? effort.start : oldest),
+    null,
+  );
+  const ends: { date: string; at: Date }[] = [];
+  if (first) {
+    for (
+      let sunday = addDayKey(weekStartKey(new Date(first), timeZone), 6);
+      sunday < today;
+      sunday = addDayKey(sunday, 7)
+    ) {
+      const [year, month, day] = sunday.split("-").map(Number) as [number, number, number];
+      ends.push({ date: sunday, at: new Date(new TZDate(year, month - 1, day + 1, timeZone)) });
+    }
+  }
+  ends.push({ date: today, at: now });
+  return ends;
+}
+
+/**
+ * The Automatic estimate week by week, for the next running A goal's distance when it has a
+ * predicted race time, else 10 km. Worked out again on every read, never stored.
+ */
+export async function predictedTimeTrendFor(
+  userId: string,
+  now = new Date(),
+): Promise<PredictedTimeTrend> {
+  const [{ efforts }, upcoming, timeZone] = await Promise.all([
+    roadRuns(userId),
+    upcomingRunningAGoals(userId, now),
+    athleteTimeZone(userId),
+  ]);
+  const [next] = upcoming;
+  const predicted = next && predictsRaceTime(next.sportType) && canPredict(next.distanceM);
+  const metres = predicted ? next.distanceM : DEFAULT_TARGET_M;
+  const ends = weekEnds(efforts, now, timeZone);
+  const points = predictedTimeTrend(
+    efforts,
+    ends.map((end) => end.at),
+    metres,
+  ).map((point, index) => ({ date: ends[index]!.date, vdot: point.vdot, seconds: point.seconds }));
+  const firstEstimate = points.findIndex((point) => point.vdot != null);
+  return {
+    metres,
+    target: !next
+      ? { kind: "none" }
+      : predicted
+        ? { kind: "goal", name: next.name }
+        : { kind: "unpredicted", name: next.name },
+    points: firstEstimate < 0 ? [] : points.slice(firstEstimate),
+  };
+}
+
+export async function loadPredictedTimeTrendImpl(): Promise<PredictedTimeTrend> {
+  const session = await getOptionalSession();
+  if (!session) return { metres: DEFAULT_TARGET_M, target: { kind: "none" }, points: [] };
+  return predictedTimeTrendFor(session.user.id);
 }
 
 async function storePaceSettings(
