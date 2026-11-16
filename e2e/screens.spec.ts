@@ -58,9 +58,24 @@ test("fitness screen with a time out", async ({ page }) => {
     ),
   );
   await page.goto("/fitness");
-  await expect(page.locator(".recharts-reference-area")).toHaveCount(1);
+  // One band on the fitness chart, one on the predicted race time trend.
+  await expect(page.locator(".recharts-reference-area")).toHaveCount(2);
   await settle(page);
   await expect(page).toHaveScreenshot("fitness-time-out.png", {
+    fullPage: true,
+    mask: [syncButton(page)],
+  });
+});
+
+test("fitness screen with no road runs", async ({ page }) => {
+  // Without a route a run is a treadmill run, which the predicted race time leaves out.
+  await withDatabase((client) =>
+    client.query("update activities set summary_polyline = null where sport_type = 'Run'"),
+  );
+  await page.goto("/fitness");
+  await expect(page.getByText("Run on the road twice to see your predicted time")).toBeVisible();
+  await settle(page);
+  await expect(page).toHaveScreenshot("fitness-no-road-runs.png", {
     fullPage: true,
     mask: [syncButton(page)],
   });
@@ -131,5 +146,11 @@ test.describe("signed out", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
     await expect(page).toHaveScreenshot("signed-out.png", { fullPage: true });
+  });
+
+  test("fitness screen", async ({ page }) => {
+    await page.goto("/fitness");
+    await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
+    await expect(page.getByText("Predicted race time")).toHaveCount(0);
   });
 });

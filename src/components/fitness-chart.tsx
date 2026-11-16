@@ -47,7 +47,14 @@ import {
   seasonEvents,
   type Goal,
 } from "@/services/season.types.ts";
-import { timeOutDay, timeOutKind, timeOutSpan, type TimeOut } from "@/services/time-outs.ts";
+import {
+  timeOutDay,
+  timeOutKind,
+  timeOutSpan,
+  timeOutsBetween,
+  type TimeOut,
+} from "@/services/time-outs.ts";
+import { TIME_OUT_FILL, TimeOutPattern } from "@/components/time-out-hatch.tsx";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,26 +98,6 @@ function timeOutLabel(timeOut: TimeOut) {
       ? `since ${timeOutDay(timeOut.start)}`
       : timeOutSpan(timeOut.start, timeOut.end);
   return `${timeOutKind(timeOut)} · ${days}`;
-}
-
-/** The time out's hatch, as the band's SVG fill: the stripe of `hatch-time-out` (styles.css). */
-const TIME_OUT_PATTERN = "time-out-hatch";
-
-function TimeOutPattern() {
-  return (
-    <defs>
-      <pattern
-        id={TIME_OUT_PATTERN}
-        width="6"
-        height="6"
-        patternUnits="userSpaceOnUse"
-        patternTransform="rotate(45)"
-      >
-        <rect width="6" height="6" fill="var(--color-foreground)" fillOpacity="0.04" />
-        <rect width="1.5" height="6" fill="var(--color-foreground)" fillOpacity="0.22" />
-      </pattern>
-    </defs>
-  );
 }
 
 /** The athlete's time outs in the period, or ahead of it, each opening the sheet to edit it. */
@@ -336,12 +323,10 @@ export function FitnessChart({
     const last = series.at(-1);
     if (!first || !last) return [];
     const byDate = new Map(series.map((point) => [point.date, point.t]));
-    return timeOuts.flatMap((timeOut) => {
-      const from = timeOut.start > first.date ? timeOut.start : first.date;
-      const to = timeOut.end != null && timeOut.end < last.date ? timeOut.end : last.date;
+    return timeOutsBetween(timeOuts, first.date, last.date).flatMap(({ timeOut, from, to }) => {
       const x1 = byDate.get(from);
       const x2 = byDate.get(to);
-      return x1 == null || x2 == null || from > to ? [] : [{ timeOut, x1, x2 }];
+      return x1 == null || x2 == null ? [] : [{ timeOut, x1, x2 }];
     });
   }, [timeOuts, series]);
   const listedTimeOuts = useMemo(() => {
@@ -551,7 +536,7 @@ export function FitnessChart({
                         yAxisId={showPmc ? "pmc" : "load"}
                         x1={band.x1}
                         x2={band.x2}
-                        fill={`url(#${TIME_OUT_PATTERN})`}
+                        fill={TIME_OUT_FILL}
                         fillOpacity={1}
                         stroke="none"
                         // Over the bars and lines (recharts layers them 300 and 400), so a tap on

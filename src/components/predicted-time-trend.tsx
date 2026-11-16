@@ -2,11 +2,12 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceArea, XAxis, YAxis } from "recharts";
 
 import { runDistanceLabel } from "@/components/best-labels.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
+import { TIME_OUT_FILL, TimeOutPattern } from "@/components/time-out-hatch.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -14,12 +15,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
 import { predictedTimeTrendQueryOptions } from "@/lib/queries.ts";
 import { formatDuration } from "@/services/activity-detail.types.ts";
 import { addDayKey, dayKey } from "@/services/day-key.ts";
+import { timeOutsBetween, type TimeOut } from "@/services/time-outs.ts";
 import { periodStartMs, type FitnessPeriod } from "@/services/training-load.ts";
 import {
   trendChange,
@@ -34,6 +36,8 @@ const CHART_CONFIG = {
 
 /** Weekly points over 7 days or a month would be one or two dots, so those show 12 weeks. */
 const SHORTEST_WEEKS = 12;
+
+const DAY_MS = 86_400_000;
 
 const DATE_TICK = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 const DATE_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
@@ -97,7 +101,7 @@ function periodStartKey(period: FitnessPeriod, timeZone: string) {
 }
 
 /** Card on the Fitness page: the Automatic estimate's predicted race time, week by week. */
-export function PredictedTimeTrendCard() {
+export function PredictedTimeTrendCard({ timeOuts }: { timeOuts: TimeOut[] }) {
   const { data, isPending, isError } = useQuery(predictedTimeTrendQueryOptions);
   if (isPending) return <Skeleton className="h-72 w-full rounded-lg" />;
   if (isError) {
@@ -109,10 +113,10 @@ export function PredictedTimeTrendCard() {
       </Empty>
     );
   }
-  return <TrendCard trend={data} />;
+  return <TrendCard trend={data} timeOuts={timeOuts} />;
 }
 
-function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
+function TrendCard({ trend, timeOuts }: { trend: PredictedTimeTrend; timeOuts: TimeOut[] }) {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const isDesktop = useDesktopMedia();
   const period = useTrainingPeriod() ?? "7d";
@@ -122,6 +126,16 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
       .filter((point) => point.date >= start)
       .map((point) => ({ ...point, t: Date.parse(`${point.date}T12:00:00Z`) }));
   }, [trend.points, period, timeZone]);
+  const timeOutBands = useMemo(() => {
+    const first = points[0];
+    const last = points.at(-1);
+    if (!first || !last) return [];
+    return timeOutsBetween(timeOuts, first.date, last.date).map(({ timeOut, from, to }) => ({
+      timeOut,
+      x1: Math.max(Date.parse(`${from}T00:00:00Z`), first.t),
+      x2: Math.min(Date.parse(`${to}T00:00:00Z`) + DAY_MS, last.t),
+    }));
+  }, [timeOuts, points]);
   const tick = period === "1y" || period === "all" ? DATE_YEAR : DATE_TICK;
   const today = points.at(-1)?.date;
   const summary = headline(trend.metres, points);
@@ -140,64 +154,89 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
         <CardDescription>{subtitle(trend.metres, trend.target)}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {summary ? <p className="font-medium tabular-nums">{summary}</p> : null}
-        {trend.pacesFrom === "automatic" ? null : (
-          <p className="text-muted-foreground text-xs">
-            Your training paces come from {PACES_FROM_NOTE[trend.pacesFrom]}. This chart shows the
-            Automatic estimate, so its latest time can differ from the one on Season.
-          </p>
-        )}
-        {isDesktop === null ? (
-          <Skeleton className="h-44 w-full rounded-lg sm:h-56" />
+        {!summary ? (
+          <Empty className="min-h-32 border">
+            <EmptyHeader>
+              <EmptyTitle>Run on the road twice to see your predicted time</EmptyTitle>
+              <EmptyDescription>
+                Two road runs in 16 weeks give the first estimate, then the line fills in week by
+                week.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
-          <ChartContainer config={CHART_CONFIG} className="aspect-auto h-44 w-full sm:h-56">
-            <LineChart data={points} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-              <CartesianGrid vertical={false} />
-              <XAxis
-                dataKey="t"
-                type="number"
-                scale="time"
-                domain={["dataMin", "dataMax"]}
-                tickLine={false}
-                axisLine={false}
-                minTickGap={isDesktop ? 48 : 24}
-                tickFormatter={(value) => tick.format(new Date(Number(value)))}
-              />
-              <YAxis
-                dataKey="seconds"
-                reversed
-                ticks={yTicks}
-                domain={yTicks ? [yTicks[0]!, yTicks.at(-1)!] : ["auto", "auto"]}
-                tickLine={false}
-                axisLine={false}
-                width={isDesktop ? 56 : 44}
-                tickFormatter={(value) => formatTick(Number(value))}
-              />
-              <ChartTooltip
-                cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
-                content={
-                  <ChartTooltipContent
-                    labelFormatter={(_value, payload) => {
-                      const week = payload?.[0]?.payload as TrendWeek | undefined;
-                      if (!week) return "";
-                      return week.date === today
-                        ? "Today"
-                        : `Week to ${DATE_FULL.format(new Date(`${week.date}T00:00:00Z`))}`;
-                    }}
-                    formatter={(_value, _name, item) => <TooltipRows week={item.payload} />}
+          <>
+            <p className="font-medium tabular-nums">{summary}</p>
+            {trend.pacesFrom === "automatic" ? null : (
+              <p className="text-muted-foreground text-xs">
+                Your training paces come from {PACES_FROM_NOTE[trend.pacesFrom]}. This chart shows
+                the Automatic estimate, so its latest time can differ from the one on Season.
+              </p>
+            )}
+            {isDesktop === null ? (
+              <Skeleton className="h-44 w-full rounded-lg sm:h-56" />
+            ) : (
+              <ChartContainer config={CHART_CONFIG} className="aspect-auto h-44 w-full sm:h-56">
+                <LineChart data={points} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
+                  <TimeOutPattern />
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="t"
+                    type="number"
+                    scale="time"
+                    domain={["dataMin", "dataMax"]}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={isDesktop ? 48 : 24}
+                    tickFormatter={(value) => tick.format(new Date(Number(value)))}
                   />
-                }
-              />
-              <Line
-                dataKey="seconds"
-                type="monotone"
-                stroke="var(--color-seconds)"
-                strokeWidth={2}
-                dot={{ r: 2, fill: "var(--color-seconds)" }}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ChartContainer>
+                  <YAxis
+                    dataKey="seconds"
+                    reversed
+                    ticks={yTicks}
+                    domain={yTicks ? [yTicks[0]!, yTicks.at(-1)!] : ["auto", "auto"]}
+                    tickLine={false}
+                    axisLine={false}
+                    width={isDesktop ? 56 : 44}
+                    tickFormatter={(value) => formatTick(Number(value))}
+                  />
+                  {timeOutBands.map((band) => (
+                    <ReferenceArea
+                      key={band.timeOut.id}
+                      x1={band.x1}
+                      x2={band.x2}
+                      fill={TIME_OUT_FILL}
+                      fillOpacity={1}
+                      stroke="none"
+                    />
+                  ))}
+                  <ChartTooltip
+                    cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(_value, payload) => {
+                          const week = payload?.[0]?.payload as TrendWeek | undefined;
+                          if (!week) return "";
+                          return week.date === today
+                            ? "Today"
+                            : `Week to ${DATE_FULL.format(new Date(`${week.date}T00:00:00Z`))}`;
+                        }}
+                        formatter={(_value, _name, item) => <TooltipRows week={item.payload} />}
+                      />
+                    }
+                  />
+                  <Line
+                    dataKey="seconds"
+                    type="monotone"
+                    stroke="var(--color-seconds)"
+                    strokeWidth={2}
+                    dot={{ r: 2, fill: "var(--color-seconds)" }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ChartContainer>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
