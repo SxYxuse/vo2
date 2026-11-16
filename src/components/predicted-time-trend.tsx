@@ -6,8 +6,14 @@ import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 
 import { runDistanceLabel } from "@/components/best-labels.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { Empty, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
@@ -15,7 +21,12 @@ import { predictedTimeTrendQueryOptions } from "@/lib/queries.ts";
 import { formatDuration } from "@/services/activity-detail.types.ts";
 import { addDayKey, dayKey } from "@/services/day-key.ts";
 import { periodStartMs, type FitnessPeriod } from "@/services/training-load.ts";
-import type { PredictedTimeTrend, TrendTarget } from "@/services/training-paces.types.ts";
+import {
+  trendChange,
+  type PredictedTimeTrend,
+  type TrendTarget,
+  type TrendWeek,
+} from "@/services/training-paces.types.ts";
 
 const CHART_CONFIG = {
   seconds: { label: "Predicted race time", color: "var(--color-ds-purple-700)" },
@@ -26,6 +37,27 @@ const SHORTEST_WEEKS = 12;
 
 const DATE_TICK = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 const DATE_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
+const DATE_FULL = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });
+
+const TREND_INFO =
+  "Each week's point is the Automatic estimate as it stood that week, from your road runs' best efforts in the 16 weeks before it. Older best efforts count about 1 % less each week, so without hard runs the line slowly fades. That is the estimate waiting for a new best effort, not lost fitness.";
+
+const PACES_FROM_NOTE = {
+  effort: "a best effort you picked",
+  race: "your race result",
+} as const;
+
+/** "10 km 44:12 → 43:01 · VDOT 46.1 → 47.4 over 12 weeks", or one week's time and VDOT. */
+function headline(metres: number, points: TrendWeek[]) {
+  const change = trendChange(points);
+  if (!change) return null;
+  const { first, last, weeks } = change;
+  const distance = runDistanceLabel(metres);
+  if (!first) {
+    return `${distance} ${formatDuration(last.seconds)} · VDOT ${last.vdot.toFixed(1)}`;
+  }
+  return `${distance} ${formatDuration(first.seconds)} → ${formatDuration(last.seconds)} · VDOT ${first.vdot.toFixed(1)} → ${last.vdot.toFixed(1)} over ${weeks} week${weeks === 1 ? "" : "s"}`;
+}
 
 function subtitle(metres: number, target: TrendTarget) {
   const distance = runDistanceLabel(metres);
@@ -91,6 +123,8 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
       .map((point) => ({ ...point, t: Date.parse(`${point.date}T12:00:00Z`) }));
   }, [trend.points, period, timeZone]);
   const tick = period === "1y" || period === "all" ? DATE_YEAR : DATE_TICK;
+  const today = points.at(-1)?.date;
+  const summary = headline(trend.metres, points);
   const yTicks = useMemo(
     () => minuteTicks(points.flatMap((point) => (point.seconds == null ? [] : [point.seconds]))),
     [points],
@@ -99,10 +133,20 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Predicted race time</CardTitle>
+        <div className="flex items-center gap-1">
+          <CardTitle>Predicted race time</CardTitle>
+          <InfoTooltip label="About predicted race time">{TREND_INFO}</InfoTooltip>
+        </div>
         <CardDescription>{subtitle(trend.metres, trend.target)}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-3">
+        {summary ? <p className="font-medium tabular-nums">{summary}</p> : null}
+        {trend.pacesFrom === "automatic" ? null : (
+          <p className="text-muted-foreground text-xs">
+            Your training paces come from {PACES_FROM_NOTE[trend.pacesFrom]}. This chart shows the
+            Automatic estimate, so its latest time can differ from the one on Season.
+          </p>
+        )}
         {isDesktop === null ? (
           <Skeleton className="h-44 w-full rounded-lg sm:h-56" />
         ) : (
@@ -129,6 +173,21 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
                 width={isDesktop ? 56 : 44}
                 tickFormatter={(value) => formatTick(Number(value))}
               />
+              <ChartTooltip
+                cursor={{ stroke: "var(--color-border)", strokeDasharray: "3 3" }}
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={(_value, payload) => {
+                      const week = payload?.[0]?.payload as TrendWeek | undefined;
+                      if (!week) return "";
+                      return week.date === today
+                        ? "Today"
+                        : `Week to ${DATE_FULL.format(new Date(`${week.date}T00:00:00Z`))}`;
+                    }}
+                    formatter={(_value, _name, item) => <TooltipRows week={item.payload} />}
+                  />
+                }
+              />
               <Line
                 dataKey="seconds"
                 type="monotone"
@@ -142,5 +201,23 @@ function TrendCard({ trend }: { trend: PredictedTimeTrend }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function TooltipRows({ week }: { week: TrendWeek }) {
+  if (week.seconds == null || week.vdot == null) {
+    return <span className="text-muted-foreground">No estimate this week</span>;
+  }
+  return (
+    <div className="grid w-full gap-1">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-muted-foreground">Predicted race time</span>
+        <span className="font-medium tabular-nums">{formatDuration(week.seconds)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-muted-foreground">VDOT</span>
+        <span className="font-medium tabular-nums">{week.vdot.toFixed(1)}</span>
+      </div>
+    </div>
   );
 }
