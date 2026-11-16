@@ -3,38 +3,27 @@ import { createServerFn } from "@tanstack/react-start";
 import type { DistanceBest, PowerBest } from "./best-efforts.ts";
 import type { EfficiencyPoint } from "./heart-insights.ts";
 
-/** Fitness settles over about six weeks, so "now" and "before" are six-week blocks. */
 export const PROGRESS_WINDOW_DAYS = 42;
 export const BEST_YEAR_DAYS = 365;
-/** Progress keeps four rows per sport; the bests page shows the rest. */
 export const PROGRESS_POWER_DURATIONS = [60, 300, 1200, 3600] as const;
 export const PROGRESS_RUN_DISTANCES = [1000, 5000, 10000, 21097.5] as const;
 const MIN_WINDOW_SESSIONS = 3;
-/** Efficiency moves a little week to week; smaller changes read as steady. */
 const STEADY_PCT = 2;
 const DAY_MS = 86_400_000;
 
-/**
- * Rides with a power meter and flat runs are the only sessions whose output VO2 can compare
- * from one month to the next. Ride speed depends on wind and terrain, and swims, walks, and
- * other sports have no comparable output, so they are not shown here.
- */
 export type ProgressSport = "cycling" | "running";
 
 export type EfficiencyWindow = { output: number; count: number };
 
 export type EfficiencyComparison = {
-  /** A heart rate both blocks rode or ran near, so neither output is extrapolated far. */
   referenceBpm: number;
   now: EfficiencyWindow | null;
   before: EfficiencyWindow | null;
   changePct: number | null;
 };
 
-/** One duration (rides, seconds) or distance (runs, metres) and its best in each block. */
 export type BestRow = {
   key: number;
-  /** Watts for rides, seconds for runs. */
   now: number | null;
   before: number | null;
   year: number | null;
@@ -70,10 +59,6 @@ function windowOf(start: string, now: Date) {
   return null;
 }
 
-/**
- * Output at one heart rate in the last six weeks against the six weeks before, from the
- * median output per heartbeat of aerobic sessions in each block.
- */
 export function compareEfficiency(
   points: EfficiencyPoint[],
   now = new Date(),
@@ -166,7 +151,6 @@ export function compareRunBests(
   );
 }
 
-/** Positive when the last six weeks beat the six before: more watts, or less time. */
 export function bestChangePct(row: BestRow, sport: ProgressSport) {
   if (row.now == null || row.before == null) return null;
   const change = sport === "cycling" ? row.now / row.before - 1 : row.before / row.now - 1;

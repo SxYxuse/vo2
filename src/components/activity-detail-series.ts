@@ -29,7 +29,6 @@ export type StreamAxisPlacement = {
 const FITTED_DOMAIN = ["auto", "auto"] as const;
 const FROM_ZERO_DOMAIN = [0, "auto"] as const;
 const PACE_SLOW_PERCENTILE = 0.95;
-/** Rolling window of moving speed before a pace-sport Stream is drawn. */
 export const PACE_CHART_WINDOW_S = 60;
 
 export function chartPointForStream(

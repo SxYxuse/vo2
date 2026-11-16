@@ -26,7 +26,6 @@ Visuals: when a chart or a small diagram explains better than words (splits, hea
 
 Write markdown: short paragraphs and lists. No headings for short answers, no tables wider than four columns.`;
 
-/** Added for athletes who follow the coach plan: the chat may change it, through the athlete (ADR 0038). */
 export const COACH_PLAN_CHANGE_PROMPT = `The athlete follows the coach plan: each week's runs, rides, and swims for the next four weeks, with no day. The athlete picks when to do each one and marks it done. Read it with get_coach_plan. Runs are sized by distance and target paces; rides are sized by time and target cycling zones; swims are sized in metres and target swim zones from CSS.
 
 Plan changes: when the athlete says something that should change the plan (they're away or ill, short on time, can only train indoors, a session felt too hard or too easy), change it in two steps:

@@ -70,7 +70,6 @@ export const CALENDAR_PERIODS = [
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
-/** The phone calendar's layouts, kept side by side while athletes find the one that suits them. */
 export const PHONE_CALENDAR_VIEWS = [
   { id: "days", label: "Day list", hint: "Every day of the week in a list, rest days included." },
   {
@@ -88,7 +87,6 @@ export const PHONE_CALENDAR_VIEWS = [
 export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary"]);
 export type PhoneCalendarView = z.infer<typeof phoneCalendarViewSchema>;
 
-/** How VO2 plans the athlete's training (ADR 0037, ADR 0050). */
 export const PLANNING_STYLES = [
   {
     id: "coachPlan",
@@ -105,7 +103,6 @@ export const PLANNING_STYLES = [
 export const planningStyleSchema = z.enum(["off", "coachPlan"]);
 export type PlanningStyle = z.infer<typeof planningStyleSchema>;
 
-/** The week planner is gone (ADR 0050): a style saved as it reads as the coach plan. */
 const storedPlanningStyleSchema = z.preprocess(
   (value) => (value === "weekPlanner" ? "coachPlan" : value),
   planningStyleSchema,
@@ -115,25 +112,19 @@ const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
   calendarPeriod: calendarPeriodSchema.default("month"),
-  /** A layout tried and since dropped (feed, month) reads as the day list. */
   phoneCalendarView: phoneCalendarViewSchema.default("days").catch("days"),
-  /** When the athlete turned on top 10 effort celebrations; null while off (ADR 0027). */
   topEffortsSince: z.iso.datetime().nullable().default(null),
-  /** The model each coach feature runs on; the key itself is sealed in coach_keys (ADR 0036). */
   coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
-  /** Null until chosen in onboarding, which is unfinished until then. */
   planningStyle: storedPlanningStyleSchema.nullable().default(null),
 });
 
 export const SHOW_ONE_SPORT_MESSAGE = "Show at least one sport.";
 
-/** True when sport types have been copied and the athlete hid all of them. */
 export function hidesEverySportType(sportTypes: Record<string, { visible: boolean }>) {
   const settings = Object.values(sportTypes);
   return settings.length > 0 && settings.every((setting) => !setting.visible);
 }
 
-/** Sport type settings for a save: once any type is copied, at least one must stay shown. */
 export const shownSportTypesSchema = athleteSettingsSchema.shape.sportTypes.refine(
   (sportTypes) => !hidesEverySportType(sportTypes),
   { error: SHOW_ONE_SPORT_MESSAGE },
@@ -143,15 +134,10 @@ type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type AthleteSettings = z.infer<typeof athleteSettingsSchema>;
 export type SportTypeSettings = AthleteSettings["sportTypes"];
 
-/**
- * Hidden sport types stay out of the calendar, map, and heart-rate views only (ADR 0018); other
- * sport types are never shown (ADR 0029).
- */
 export function isSportTypeShown(sportTypes: SportTypeSettings, sportType: string) {
   return !isOtherSportType(sportType) && sportTypes[sportType]?.visible !== false;
 }
 
-/** Falls back to the sport type's default for a type the settings don't know yet. */
 export function sportTypeColor(sportTypes: SportTypeSettings, sportType: string) {
   return sportTypes[sportType]?.color ?? defaultColorForSport(sportType);
 }
@@ -179,7 +165,6 @@ export function heartRateCollectorLabel(sportType: string) {
   return "Heart rate";
 }
 
-/** Sensors are still worn when a sport type is hidden, so hidden types count (ADR 0018). */
 export function familyCollectors(
   sportTypes: SportTypeSettings,
   family: SportGroupId,
@@ -197,10 +182,6 @@ export function familyCollectors(
   };
 }
 
-/**
- * Turning top 10 effort celebrations on starts the clock, so nothing found before counts; a save
- * that leaves the switch alone keeps it (ADR 0027).
- */
 export function nextTopEffortsSince(
   stored: string | null,
   celebrate: boolean | undefined,
@@ -238,14 +219,12 @@ function defaultColorForSport(sportType: string) {
   return coerceToGeist700(DEFAULT_SPORT_COLORS[sportType] ?? "var(--color-ds-gray-700)");
 }
 
-/** Only sport-group types are listed: other sport types are never shown (ADR 0029). */
 function detectedSportTypes(sportTypes: string[]) {
   return Array.from(new Set(sportTypes.filter((sportType) => !isOtherSportType(sportType)))).sort(
     (a, b) => formatSportType(a).localeCompare(formatSportType(b)),
   );
 }
 
-/** Older rows lack sensors, and colours predate the Geist 700 palette. */
 function normalizeSportTypeSetting(sportType: string, setting: Record<string, unknown>) {
   return {
     ...setting,
@@ -255,7 +234,6 @@ function normalizeSportTypeSetting(sportType: string, setting: Record<string, un
   };
 }
 
-/** Validates a stored or submitted value and normalises every sport type in it. */
 export function parseAthleteSettings(value: unknown): AthleteSettings | null {
   if (!value || typeof value !== "object") return null;
   const raw = value as Record<string, unknown>;
@@ -275,7 +253,6 @@ export function parseAthleteSettings(value: unknown): AthleteSettings | null {
   };
 }
 
-/** Keeps the sport-group types in the local copy, adding defaults for new ones. */
 export function mergeAthleteSettings(
   stored: AthleteSettings | null,
   sportTypeNames: string[],
@@ -303,13 +280,11 @@ export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 200;
 const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
 
-/** Stored profile: athletes who onboarded before a field was required may lack it. */
 export const profileSettingsSchema = z.object({
   birthDate: birthDateSchema.nullable(),
   weightKg: weightKgSchema.nullable(),
 });
 
-/** Every save carries a birthday and a weight, so neither can be cleared once set. */
 export const profileSaveSchema = z.object({
   birthDate: birthDateSchema,
   weightKg: weightKgSchema,
@@ -323,7 +298,6 @@ export const DEFAULT_PROFILE_SETTINGS: ProfileSettings = {
   weightKg: null,
 };
 
-/** Age and weight are both required before the app opens. */
 export function isProfileComplete(profile: ProfileSettings) {
   return profile.birthDate != null && profile.weightKg != null;
 }

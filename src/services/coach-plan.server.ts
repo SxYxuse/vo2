@@ -29,6 +29,7 @@ import {
   racePaceText,
   rulesFor,
   sessionLine,
+  STALE_WRITING_MS,
   swimZoneText,
   weeksText,
   writeSessions,
@@ -72,29 +73,13 @@ import { timeOutOpen, timeOutsForCoach } from "./time-outs.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
-/** The current week and the three after it are written (ADR 0037). */
 const WEEKS_AHEAD = 4;
-/** Weeks of base fitness Plan shows ahead without a main goal. */
 const BASE_WEEKS_SHOWN = 12;
-/** Weeks gone by stay with the plan, frozen, this long. */
 const KEEP_PAST_WEEKS = 12;
-/** History read for the budget's floor: six months and the week before. */
 const HISTORY_DAYS = 27 * 7;
-/** Writing marked as running for longer than this stopped with the server. */
-const STALE_WRITING_MS = 10 * 60_000;
-/**
- * Paces drift a little every day as old runs fade (ADR 0039); a plan is written again when the
- * VDOT has moved this far since, about 2 % in pace, rather than on every small step.
- */
 const PACE_CHANGE_VDOT = 1;
-/**
- * An easy pace from zone 2 heart rate moves on its own, without the VDOT (ADR 0042): the plan is
- * written again once its middle moved this far, about what one VDOT point does to easy pace.
- */
 const EASY_CHANGE_SEC_PER_KM = 10;
-/** FTP drifts with every metered ride; the plan is written again once it moved this share. */
 const FTP_CHANGE_SHARE = 0.05;
-/** CSS moves with every fast swim; the plan is written again once it moved this far per 100 m. */
 const CSS_CHANGE_SEC = 3;
 
 type Row = typeof coachPlans.$inferSelect;
@@ -113,7 +98,6 @@ async function readRow(userId: string): Promise<Row | null> {
   return row ?? null;
 }
 
-/** Everything the plan is checked and written from, read fresh. */
 export async function gather(userId: string, now = new Date()) {
   const [row, style, goals, coach, paces, css, timeOuts, [metrics], rows] = await Promise.all([
     readRow(userId),
@@ -161,11 +145,9 @@ export async function gather(userId: string, now = new Date()) {
     km: (item.distance ?? 0) / 1000,
     minutes: Math.round(item.movingTime / 60),
   }));
-  // Hidden sport types count: hiding changes views, not training (ADR 0018).
   const runs = all.filter((item) => planSportOf(item.sportType) === "run");
   const rides = all.filter((item) => planSportOf(item.sportType) === "ride");
   const swims = all.filter((item) => planSportOf(item.sportType) === "swim");
-  // A cycling LTHR the athlete set wins over the estimate (ADR 0021).
   const rideLthr =
     parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ??
     metrics?.cyclingLthr ??
@@ -209,10 +191,6 @@ function easyOf(inputs: Inputs): PlanBasis["easy"] {
 export const rangesOf = (inputs: Inputs) =>
   inputs.paces.source === "none" ? null : inputs.paces.paces;
 
-/**
- * Each upcoming run goal the paces can predict, with its predicted race pace in seconds per km: a
- * race-pace step may target it exactly (ADR 0055).
- */
 export function racePacesOf(inputs: Inputs) {
   const vdot = vdotOf(inputs);
   if (vdot == null) return [];
@@ -225,7 +203,6 @@ export function racePacesOf(inputs: Inputs) {
   });
 }
 
-/** The paces a plan's steps are checked against: easy run and swim for sizing, ranges, race paces. */
 export const paceContext = (inputs: Inputs) => {
   const paces = rangesOf(inputs);
   return {
@@ -248,7 +225,6 @@ export const paceContext = (inputs: Inputs) => {
   };
 };
 
-/** What planned steps aim at: paces for runs, FTP and cycling LTHR for rides, CSS for swims. */
 export const anchorsOf = (inputs: Inputs): PlanAnchors => ({
   paces: rangesOf(inputs),
   ftp: inputs.ftp,
@@ -260,7 +236,6 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   const missing: CoachPlanMissing[] = [];
   if (inputs.coach.kind === "missing") missing.push("key");
   if (!inputs.availability) missing.push("availability");
-  // An A goal whose sport has no sessions a week has nothing building toward it.
   const goalSport = inputs.aGoal ? planSportOf(inputs.aGoal.sportType) : null;
   if (inputs.availability && goalSport && sessionsPerWeek(inputs.availability, goalSport) === 0) {
     missing.push("goalSport");
@@ -268,16 +243,11 @@ function missingOf(inputs: Inputs): CoachPlanMissing[] {
   return missing;
 }
 
-/** The goals still ahead, in date order. */
 const upcomingOf = (inputs: Inputs) =>
   inputs.goals
     .filter((goal) => goal.date >= inputs.today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 
-/**
- * The season week by week, from this one through the last goal ahead. Without a main goal ahead
- * it runs at least BASE_WEEKS_SHOWN weeks: base fitness has no end to run to.
- */
 function roadOf(inputs: Inputs) {
   const last = upcomingOf(inputs).at(-1)?.date;
   const baseEnd = addDayKey(inputs.currentWeek, 7 * BASE_WEEKS_SHOWN - 1);
@@ -285,7 +255,6 @@ function roadOf(inputs: Inputs) {
   return end ? seasonWeeks(inputs.goals, inputs.currentWeek, end) : [];
 }
 
-/** Goals the plan is written around: upcoming runs, rides, and swims, and every upcoming A goal. */
 function planGoals(goals: Goal[], today: string): PlanGoal[] {
   return goals
     .filter(
@@ -299,17 +268,11 @@ function planGoals(goals: Goal[], today: string): PlanGoal[] {
     });
 }
 
-/**
- * The goals as they stand today, so a goal passing (the day after a race) changes nothing: only
- * one added, edited, or removed before its day rewrites the plan. Plans written before goals were
- * kept as a list stored them as text, hence `unknown`.
- */
 function upcomingGoalsKey(goals: unknown, today: string) {
   if (!Array.isArray(goals)) return null;
   return JSON.stringify((goals as PlanGoal[]).filter((goal) => goal[1] >= today));
 }
 
-/** VDOT in whole points, so the drift of a day isn't a new writing (PACE_CHANGE_VDOT). */
 const vdotPoint = (vdot: number | null) => (vdot == null ? null : Math.floor(vdot));
 
 function basisOf(inputs: Inputs): PlanBasis {
@@ -325,21 +288,18 @@ function basisOf(inputs: Inputs): PlanBasis {
   };
 }
 
-/** The time outs as the plan was written for them: any write to one rewrites the weeks ahead. */
 const timeOutsKey = (timeOuts: Inputs["timeOuts"]) =>
   JSON.stringify(timeOuts.map(({ kind, start, end }) => [kind, start, end]));
 
 const openTimeOut = (inputs: Pick<Inputs, "timeOuts" | "today">) =>
   inputs.timeOuts.some((timeOut) => timeOutOpen(timeOut, inputs.today));
 
-/** Whether CSS moved enough to rewrite. Plans written before swims have none to compare. */
 function cssChanged(written: PlanBasis["css"], now: PlanBasis["css"]) {
   if (written === undefined || (written ?? null) === (now ?? null)) return false;
   if (written == null || now == null) return true;
   return Math.abs(now - written) >= CSS_CHANGE_SEC;
 }
 
-/** Whether FTP moved enough to rewrite. Plans written before FTP was kept aren't rewritten. */
 function ftpChanged(written: PlanBasis["ftp"], now: PlanBasis["ftp"]) {
   if (written === undefined || (written ?? null) === (now ?? null)) return false;
   if (written == null || now == null) return true;
@@ -347,33 +307,20 @@ function ftpChanged(written: PlanBasis["ftp"], now: PlanBasis["ftp"]) {
 }
 
 type Due = {
-  /** The first week written: weeks before it are kept, and in it only done sessions are. */
   fromWeek: string;
   reason: string;
-  /** What set the writing off, so a failed one is tried again only when that changes. */
   trigger: unknown;
 };
 
-/** The easy pace in steps of EASY_CHANGE_SEC_PER_KM, so a failed writing waits as the VDOT's does. */
 const easyStep = (easy: PlanBasis["easy"]) =>
   easy ? Math.round(easy.secPerKm / EASY_CHANGE_SEC_PER_KM) : null;
 
-/**
- * Whether the easy pace alone moved enough to rewrite. An easy pace read from the VDOT moves with
- * it, so the VDOT point covers it; only one from heart rate, before or now, is checked here.
- */
 function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
   if (written === undefined || written == null || now == null) return false;
   if (written.from !== "heartRate" && now.from !== "heartRate") return false;
   return Math.abs(written.secPerKm - now.secPerKm) >= EASY_CHANGE_SEC_PER_KM;
 }
 
-/**
- * Whether the weeks ahead need writing, and from which week: the first plan; the athlete asked
- * (switching back to the coach plan); availability, goals, or paces changed; or a new week is
- * due. A missed run is skipped, never a reason to write. Sessions marked done are kept. Nothing is
- * due while a time out is open.
- */
 export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = inputs.currentWeek;
   const { plan, row, today } = inputs;
@@ -390,15 +337,12 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
     const asked = mondayOf(row.requestedFrom);
     return { fromWeek: asked > first ? asked : first, reason: "asked", trigger: row.requestedFrom };
   }
-  // Read through the schema, so a plan written when availability had minutes isn't rewritten.
   if (availabilityKey(JSON.parse(plan.basis.availability)) !== basis.availability) {
     return { fromWeek: first, reason: "availability", trigger: basis.availability };
   }
-  // A plan written before the brief has none, the same as an empty one.
   if ((plan.basis.brief ?? "") !== basis.brief) {
     return { fromWeek: first, reason: "brief", trigger: basis.brief };
   }
-  // A plan written before time outs has none.
   if ((plan.basis.timeOuts ?? "[]") !== basis.timeOuts) {
     return { fromWeek: first, reason: "time outs", trigger: basis.timeOuts };
   }
@@ -412,19 +356,15 @@ export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   if (easyChanged(plan.basis.easy, basis.easy)) {
     return { fromWeek: first, reason: "easy pace", trigger: easyStep(basis.easy) };
   }
-  // FTP only shapes rides, so a plan without them isn't rewritten for it.
   if (inputs.availability?.ridesPerWeek && ftpChanged(plan.basis.ftp, basis.ftp)) {
     return { fromWeek: first, reason: "ftp", trigger: basis.ftp };
   }
-  // CSS only shapes swims.
   if (inputs.availability?.swimsPerWeek && cssChanged(plan.basis.css, basis.css)) {
     return { fromWeek: first, reason: "css", trigger: basis.css };
   }
   const lastWeek = plan.weeks.at(-1)?.weekStart ?? "";
   if (lastWeek < addDayKey(inputs.currentWeek, 7 * (WEEKS_AHEAD - 1))) {
     const next = addDayKey(lastWeek, 7);
-    // Keyed on the week being added: a plan fallen behind would otherwise try again each day
-    // after a failure.
     return { fromWeek: lastWeek && next > first ? next : first, reason: "new week", trigger: next };
   }
   return null;
@@ -469,7 +409,6 @@ function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
 const daysOf = (inputs: Inputs, sport: PlanSport): SportDay[] =>
   sport === "run" ? inputs.runs : sport === "ride" ? inputs.rides : inputs.swims;
 
-/** An activity's amount in its sport's budget unit: km, minutes, or metres. */
 const dayAmount = (day: SportDay, sport: PlanSport) =>
   sport === "run" ? day.km : sport === "ride" ? day.minutes : day.km * 1000;
 
@@ -479,11 +418,6 @@ const SPORT_DOING: Record<PlanSport, string> = {
   swim: "swimming",
 };
 
-/**
- * The season's volume through the road, for Plan and the progression setting (ADR 0058): each
- * planned sport's start, progression, and peak, so the app projects the same budgets the coach is
- * held to. Null without availability: nothing builds.
- */
 function volumeOf(inputs: Inputs): SeasonVolume | null {
   const { aGoal, availability, progression } = inputs;
   const road = roadOf(inputs);
@@ -515,10 +449,6 @@ function volumeOf(inputs: Inputs): SeasonVolume | null {
   };
 }
 
-/**
- * The athlete's own peaks above the ones VO2 recommends, in words for the coach: it brings them
- * up only when they matter (ADR 0058).
- */
 export function ownPeakNotes(inputs: Inputs): string[] {
   const { availability, progression } = inputs;
   if (!availability) return [];
@@ -535,24 +465,12 @@ export function ownPeakNotes(inputs: Inputs): string[] {
   });
 }
 
-/**
- * From the trigger, not the day or the exact VDOT: a failed writing waits for "Try again" until
- * what set it off changes (ADR 0040).
- */
 function attemptKeyOf(due: Due) {
   return createHash("sha1")
     .update(JSON.stringify([due.reason, due.trigger]))
     .digest("hex");
 }
 
-/**
- * A failed writing, held until "Try again". The rewrite the athlete asked for is cleared, so the
- * next real change gets its own key; the trigger then due is held as tried, since the writing asked
- * for already covered it and would otherwise start again on the next load. When the athlete's data
- * couldn't even be read (a database error), the next trigger is unknown: the rewrite asked for is
- * kept, so the key the writing claimed still holds it, rather than a lower trigger starting one
- * more writing on its own.
- */
 function failedValues(inputs: Inputs | null, error: string): Partial<Row> {
   if (!inputs) return { status: "failed", error };
   const values: Partial<Row> = { status: "failed", error, requestedFrom: null };
@@ -564,11 +482,6 @@ function failedValues(inputs: Inputs | null, error: string): Partial<Row> {
   return next ? { ...values, attemptKey: attemptKeyOf(next) } : values;
 }
 
-/**
- * Starts writing when the plan is due and can be written, unless the same writing was already
- * tried: a failed one waits for the athlete's "Try again" rather than spending their credit on
- * every load. Returns the row as it is now.
- */
 async function startIfDue(userId: string, inputs: Inputs, force = false): Promise<Row | null> {
   const { row } = inputs;
   if (!row || inputs.style !== "coachPlan") return row;
@@ -580,9 +493,6 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
     (force ? { fromWeek: inputs.currentWeek, reason: "again", trigger: null } : null);
   if (!due) return row;
   const attemptKey = attemptKeyOf(due);
-  // Only a failed writing waits for "Try again" (shown with its reason). One that succeeded and is
-  // due again for the same trigger, such as switching back twice in a day, writes again, so a
-  // rewrite asked for is always either written or shown as failed.
   if (!force && row.status === "failed" && row.attemptKey === attemptKey) return row;
   const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [claimed] = await db
@@ -597,17 +507,10 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
     .returning();
   if (!claimed) return row;
   logger.info("coach_plan.writing", { fromWeek: due.fromWeek, reason: due.reason });
-  // Not awaited: the writing outlives the request, so closing the app doesn't stop it.
   void writePlan(userId, due.fromWeek, claimed.statusAt);
   return claimed;
 }
 
-/**
- * While a time out is open the plan holds only what was before this week and the sessions marked
- * done in it: the open ones and the weeks ahead go (ADR 0066). A writing under way is dropped too,
- * since its result would bring them back. The basis takes the time outs, so ending, editing, or
- * deleting this one makes the rewrite due from the week it's in.
- */
 async function pause(userId: string, inputs: Inputs, row: Row): Promise<Row> {
   const { plan, currentWeek } = inputs;
   const timeOuts = timeOutsKey(inputs.timeOuts);
@@ -640,10 +543,6 @@ async function pause(userId: string, inputs: Inputs, row: Row): Promise<Row> {
   return saved ?? row;
 }
 
-/**
- * Saves a writing's result, only while it still holds the claim: a writing that outlived its
- * claim (STALE_WRITING_MS) and was started again must not overwrite the newer one.
- */
 async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
   await db
     .update(coachPlans)
@@ -657,7 +556,6 @@ async function finish(userId: string, claimedAt: Date, values: Partial<Row>) {
     );
 }
 
-/** A goal as its race session: a run or a swim by its distance, a ride by its rough time. */
 function raceSession(goal: Goal): PlannedSession {
   const sport = planSportOf(goal.sportType) ?? "run";
   return plannedSession(
@@ -692,7 +590,6 @@ function raceSession(goal: Goal): PlannedSession {
   );
 }
 
-/** A race session as the next writing finds it again: its week and the goal's name. */
 const raceKey = (session: PlannedSession) => `${session.weekStart} ${session.title}`;
 
 const tenth = (value: number) => Math.round(value * 10) / 10;
@@ -720,18 +617,12 @@ function recentTraining(inputs: Inputs) {
     longestSwimLast30DaysM: Math.round(
       Math.max(0, ...recent(inputs.swims).map((swim) => swim.km * 1000)),
     ),
-    // Walks and the rest count toward load: the coach sees them, but plans only runs, rides, and
-    // swims.
     otherSportsHoursLast4Weeks: Object.fromEntries(
       Object.entries(otherHours).map(([group, hours]) => [group, tenth(hours)]),
     ),
   };
 }
 
-/**
- * The time outs in the weeks written or in the four before them, when a return still shapes the
- * weeks ahead (ADR 0066); none, and no field, for an athlete who never marked one.
- */
 function timeOutsText(inputs: Inputs, fromWeek: string, lastDay: string) {
   const since = addDayKey(fromWeek, -28);
   const relevant = inputs.timeOuts.filter(
@@ -740,10 +631,6 @@ function timeOutsText(inputs: Inputs, fromWeek: string, lastDay: string) {
   return relevant.length ? { timeOuts: timeOutsForCoach(relevant, inputs.today) } : {};
 }
 
-/**
- * Writes the weeks from `fromWeek`, keeps the weeks before it and the sessions marked done in it,
- * and stores the plan if it passes.
- */
 async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
   let gathered: Inputs | null = null;
   try {
@@ -768,13 +655,9 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
     });
     const weeks = budgets.filter((week) => week.weekStart >= fromWeek);
     const old = (inputs.plan?.weeks ?? []).flatMap((week) => week.sessions);
-    // In the weeks written, the athlete's sessions marked done stay; the open ones are written
-    // again.
     const kept = old.filter(
       (session) => session.weekStart >= fromWeek && session.done && session.kind !== "race",
     );
-    // Weeks planned before the ones written, such as the weeks kept when only a new week is added:
-    // they set the longest-session limit of the weeks after them, and count toward no week written.
     const neighbours = old.filter(
       (session) => session.weekStart >= inputs.currentWeek && session.weekStart < fromWeek,
     );
@@ -838,7 +721,6 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       await finish(userId, claimedAt, failedValues(inputs, result.error));
       return;
     }
-    // A race is added again each writing; one the athlete marked done stays done.
     const doneRaces = new Set(
       old.filter((session) => session.kind === "race" && session.done).map(raceKey),
     );
@@ -896,7 +778,6 @@ const SIGNED_OUT: CoachPlanState = {
   volume: null,
 };
 
-/** The stored plan, starting a writing when one is due (only under the coach plan). */
 export async function loadCoachPlanImpl(): Promise<CoachPlanState> {
   const session = await getOptionalSession();
   if (!session) return SIGNED_OUT;
@@ -904,7 +785,6 @@ export async function loadCoachPlanImpl(): Promise<CoachPlanState> {
   return stateOf(inputs, await startIfDue(session.user.id, inputs));
 }
 
-/** Saves availability; a change rewrites the weeks ahead from today (dueWrite). */
 export async function saveAvailabilityImpl(
   availability: Availability,
   timeZone: string,
@@ -925,11 +805,6 @@ export async function saveAvailabilityImpl(
   return stateOf(inputs, await startIfDue(userId, inputs));
 }
 
-/**
- * Saves the progression (ADR 0058). The written weeks from next Monday are written again only
- * when one of them no longer fits its new budget; otherwise later weeks take the new budgets as
- * they're written. This week stays: its sessions may have started.
- */
 export async function saveProgressionImpl(progression: Progression): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const userId = session.user.id;
@@ -965,11 +840,6 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
   return stateOf(inputs, await startIfDue(userId, inputs));
 }
 
-/**
- * Saves the coach brief, from Settings → Training or a brief change the athlete applied in the
- * chat. A changed brief rewrites the weeks ahead (dueWrite). With `expected`, it saves only onto
- * that brief, and answers false when the brief changed since.
- */
 export async function saveBrief(userId: string, brief: string, expected?: string) {
   const [saved] = await db
     .update(coachPlans)
@@ -993,25 +863,16 @@ export async function saveBriefImpl(brief: string): Promise<CoachPlanState> {
   return stateOf(inputs, await startIfDue(userId, inputs));
 }
 
-/**
- * Starts the rewrite a brief change applied in the chat or a time out is due, as a load of Plan
- * would.
- */
 export async function startCoachPlanIfDue(userId: string) {
   await startIfDue(userId, await gather(userId));
 }
 
-/** The athlete's "Try again" after a failed writing, or "Write my plan" with nothing due. */
 export async function writeCoachPlanAgainImpl(): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const inputs = await gather(session.user.id);
   return stateOf(inputs, await startIfDue(session.user.id, inputs, true));
 }
 
-/**
- * Switching back to the coach plan writes it again from today: the weeks kept while away were
- * written for an athlete who wasn't following them.
- */
 export async function requestCoachPlanRewrite(userId: string) {
   const row = await readRow(userId);
   if (!row) return;
@@ -1021,11 +882,6 @@ export async function requestCoachPlanRewrite(userId: string) {
     .where(eq(coachPlans.userId, userId));
 }
 
-/**
- * The athlete marks a session done, or open again (ADR 0048). Only from its week on: a week ahead
- * may still be written again. Not while a writing runs, since the writing would store the plan it
- * read and drop the mark.
- */
 export async function markSessionImpl(sessionId: string, done: boolean): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const userId = session.user.id;

@@ -23,7 +23,6 @@ function messageText(message: ModelMessage) {
   return content.flatMap((part) => (part.type === "text" ? [part.content] : [])).join(" ");
 }
 
-/** The first question, with activity links read as their names and cut to one line. */
 export function chatTitle(messages: readonly ModelMessage[]) {
   const first = messages.find((message) => message.role === "user");
   const text = (first ? messageText(first) : "")
@@ -36,7 +35,6 @@ export function chatTitle(messages: readonly ModelMessage[]) {
   return text.length > TITLE_LENGTH ? `${text.slice(0, TITLE_LENGTH - 1).trimEnd()}…` : text;
 }
 
-/** Only the owner reads or writes a chat; the thread id comes from the client. */
 function messageStore(userId: string): MessageStore {
   const owned = (threadId: string) =>
     and(eq(coachChats.id, threadId), eq(coachChats.userId, userId));
@@ -57,7 +55,6 @@ function messageStore(userId: string): MessageStore {
         .onConflictDoUpdate({
           target: coachChats.id,
           set: { messages, updatedAt: now },
-          // Another athlete's id is never overwritten.
           setWhere: eq(coachChats.userId, userId),
         });
     },
@@ -79,7 +76,6 @@ function runStore(userId: string): RunStore {
 
   return {
     get,
-    // Idempotent: a resumed or double-sent run keeps the record it already has.
     async createOrResume(input) {
       const existing = await get(input.runId);
       if (existing) return existing;
@@ -97,7 +93,6 @@ function runStore(userId: string): RunStore {
         .onConflictDoNothing({ target: coachChatRuns.runId });
       return (await get(input.runId)) ?? record;
     },
-    // An unknown run is left alone; a field patched to undefined is cleared.
     async update(runId, patch) {
       const existing = await get(runId);
       if (!existing) return;
@@ -125,7 +120,6 @@ function runStore(userId: string): RunStore {
 }
 
 function interruptStore(userId: string): InterruptStore {
-  // Every listing is in the order the coach asked.
   const list = async (where: SQL | undefined) => {
     const rows = await db
       .select({ record: coachChatInterrupts.record })
@@ -162,7 +156,6 @@ function interruptStore(userId: string): InterruptStore {
   const pending = eq(coachChatInterrupts.status, "pending");
 
   return {
-    // Insert if absent: asking again never turns an answered change back to pending.
     async create(input) {
       const record: InterruptRecord = { ...input, status: "pending" };
       await db
@@ -188,7 +181,6 @@ function interruptStore(userId: string): InterruptStore {
   };
 }
 
-/** The athlete's coach chats as TanStack AI persistence, scoped to them. */
 export function coachChatPersistence(userId: string): ChatWithInterruptsPersistence {
   return defineAIPersistence({
     stores: {
@@ -199,7 +191,6 @@ export function coachChatPersistence(userId: string): ChatWithInterruptsPersiste
   });
 }
 
-/** True when the id is another athlete's chat: a new id, or the athlete's own, is fine. */
 export async function chatOwnedByOther(userId: string, threadId: string) {
   const [row] = await db
     .select({ userId: coachChats.userId })

@@ -10,11 +10,6 @@ import { logger } from "@/lib/logger.server.ts";
 import { getRequiredSession } from "@/lib/session.server.ts";
 import { COACH_PROVIDER_IDS, type CoachProvider } from "./coach-models.ts";
 
-/**
- * The encryption key lives in the server's environment, never next to the ciphertext in the
- * database. Rotating BETTER_AUTH_SECRET makes stored keys unreadable: athletes add theirs again.
- * Each provider gets its own derived key; OpenRouter's is the one used before ADR 0059.
- */
 const sealingKeys = new Map(
   COACH_PROVIDER_IDS.map((provider) => [
     provider,
@@ -46,7 +41,6 @@ function isProvider(id: string): id is CoachProvider {
   return (COACH_PROVIDER_IDS as readonly string[]).includes(id);
 }
 
-/** One key per athlete and provider; tenants have no row here. */
 function rowOf(scope: CredentialScope, id: string) {
   return scope.userId && isProvider(id) ? { userId: scope.userId, provider: id } : null;
 }
@@ -55,10 +49,6 @@ function whereRow(row: { userId: string; provider: CoachProvider }) {
   return and(eq(coachKeys.userId, row.userId), eq(coachKeys.provider, row.provider));
 }
 
-/**
- * TanStack AI's server-side key store, on the coach_keys table (ADR 0036, ADR 0059). Scope
- * always comes from the session, never from a request body.
- */
 const coachCredentials = defineCredentialStore({
   async get({ scope, id }) {
     const row = rowOf(scope, id);
@@ -72,7 +62,6 @@ const coachCredentials = defineCredentialStore({
     try {
       return { type: "api_key", value: open(row.provider, stored.sealed) };
     } catch {
-      // Sealed under an earlier BETTER_AUTH_SECRET: treat it as missing so the athlete re-adds it.
       logger.warn("coach_key.unreadable", { provider: row.provider });
       return null;
     }
@@ -103,13 +92,11 @@ const coachCredentials = defineCredentialStore({
   },
 });
 
-/** The athlete's key for a provider, or null when they have not added one. */
 export async function coachKeyFor(userId: string, provider: CoachProvider) {
   const credential = await coachCredentials.get({ scope: { userId }, id: provider });
   return credential?.type === "api_key" ? credential.value : null;
 }
 
-/** When each provider's key was saved, never the key itself, not even masked. */
 export async function coachKeysSavedAt(
   userId: string,
 ): Promise<Partial<Record<CoachProvider, string>>> {

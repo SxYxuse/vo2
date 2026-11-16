@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-/** A day key ("2026-10-30") picked from a calendar, optionally between two days. */
 export function DatePicker({
   id,
   value,
@@ -26,7 +25,6 @@ export function DatePicker({
   fromDate?: string;
   toDate?: string;
   placeholder?: string;
-  /** How the picked day reads on the button. */
   display?: (key: string) => string;
   className?: string;
   invalid: boolean;

@@ -4,7 +4,6 @@ import { e2eDatabaseUrl } from "./env.ts";
 import { rideFitFile } from "./power-file.ts";
 import { test, expect, settle, syncButton, type Page } from "./test.ts";
 
-/** The FIT file of mock Strava's threshold ride, so the import matches a synced ride. */
 async function thresholdRideFile() {
   const client = new pg.Client({ connectionString: e2eDatabaseUrl() });
   await client.connect();
@@ -37,7 +36,6 @@ function importFile(page: Page, name: string, buffer: Buffer) {
 test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, opens the ride, and deletes it", async ({
   page,
 }) => {
-  // The mock coach answers at a model's pace.
   test.setTimeout(90_000);
   const fit = await thresholdRideFile();
   await openPowerFromSidebar(page);
@@ -46,7 +44,6 @@ test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, 
   await importFile(page, "threshold.fit", fit);
   await page.waitForURL(/\/power\/[^/]+$/);
   const analysisUrl = page.url();
-  // Named after the synced ride it matched by start time.
   await expect(page.getByRole("heading", { name: "Threshold ride", level: 1 })).toBeVisible();
   await expect(page.getByText("L 52 / R 48").first()).toBeVisible();
 
@@ -58,15 +55,12 @@ test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, 
   await page.getByRole("button", { name: /^Seated and standing/ }).click();
   await expect(page.getByText("2 times out of the saddle, 1:10 in all.")).toBeVisible();
   await settle(page);
-  // Opening the sections scrolled the page; the sidebar of a full-page shot sits at the scroll.
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(page).toHaveScreenshot("power-file.png", {
     fullPage: true,
     mask: [syncButton(page)],
   });
 
-  // A section asks the coach about itself: the question waits in the message box with the file
-  // brought in, and the answer links back to the analysis.
   const question = "What do my pedaling dynamics say, and what should I change?";
   await page.getByRole("link", { name: question }).click();
   await expect(page.getByRole("textbox", { name: "Message the coach" })).toHaveValue(question);
@@ -79,13 +73,11 @@ test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, 
   await expect(page).toHaveURL(analysisUrl);
   await expect(page.getByRole("link", { name: "Ask the coach about this ride" })).toBeVisible();
 
-  // Both ways between the analysis and the synced ride.
   await page.getByRole("link", { name: "Open ride" }).click();
   await expect(page.getByRole("heading", { name: "Threshold ride", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Power analysis" }).click();
   await expect(page).toHaveURL(analysisUrl);
 
-  // The same file again opens the first import instead of adding a copy.
   await page.getByRole("link", { name: "Power", exact: true }).first().click();
   await expect(page.getByRole("link", { name: /Threshold ride/ })).toHaveCount(1);
   await importFile(page, "threshold-again.fit", fit);
@@ -96,7 +88,6 @@ test("an athlete imports a ride's FIT file, reads its pedaling, asks the coach, 
   await page.waitForURL("/power");
   await expect(page.getByText("No power files yet")).toBeVisible();
 
-  // Anything but a FIT file is turned away, and nothing is saved.
   await importFile(page, "notes.txt", Buffer.from("not a ride"));
   await expect(page.getByText("Could not import notes.txt")).toBeVisible();
   await expect(page.getByText(/This is not a FIT file/)).toBeVisible();

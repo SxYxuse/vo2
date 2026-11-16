@@ -40,9 +40,7 @@ if (readdirSync("docs/adr").some((name) => name.startsWith(`${to}-`))) {
 const renamed = ours[0].replace(`docs/adr/${from}-`, `docs/adr/${to}-`);
 renameSync(ours[0], renamed);
 
-/** Text files only: a screenshot whose bytes hold the number must not be rewritten. */
 const TEXT = /\.(tsx?|css|md|json)$/;
-/** Line numbers (1-based) each changed file holds that origin/main's copy does not; null = all. */
 const added = new Map<string, Set<number> | null>();
 for (const path of git("ls-files", "-z", "--others", "--exclude-standard").split("\0"))
   if (TEXT.test(path)) added.set(path, null);

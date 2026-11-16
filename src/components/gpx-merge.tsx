@@ -86,7 +86,6 @@ import { cn } from "@/lib/utils";
 
 type MapViewComponent = typeof import("./gpx-merge-map-view.tsx").GpxMergeMapView;
 
-// The outline is the fallback, so a chunk that can't download offline still shows the route.
 const GpxMergeMapView = lazy(() =>
   import("./gpx-merge-map-view.tsx")
     .then((mod) => ({ default: mod.GpxMergeMapView }))
@@ -97,7 +96,6 @@ const GpxMergeMapView = lazy(() =>
     })),
 );
 
-// Red is left out: it marks the straight jumps between legs that don't meet.
 const TRACK_COLORS = [
   "var(--color-ds-blue-700)",
   "var(--color-ds-amber-700)",
@@ -112,7 +110,6 @@ const TOLERANCE_MIN_M = 5;
 const TOLERANCE_MAX_M = 200;
 const SLIDER_STEP_M = 10;
 const PLAN_SAVE_DELAY_MS = 300;
-// A position this close to a meeting point or a file end is shown as that place.
 const SAME_PLACE_M = 1;
 // iOS greys out .gpx in the Files picker unless generic XML and binary types are allowed too.
 const GPX_ACCEPT = ".gpx,application/gpx+xml,application/xml,text/xml,application/octet-stream";
@@ -136,15 +133,12 @@ function fileSlug(name: string) {
   );
 }
 
-/** The meeting point the leg starts from is no place to switch again. */
 const switchMargin = (toleranceM: number) => toleranceM * 2;
 
-/** Saves tracks when files change and the plan shortly after edits, flushing when the app is hidden. */
 function useDraftSaving(ready: boolean, tracks: GpxMergeTrack[], plan: GpxMergePlan) {
   const savedTracks = useRef<GpxMergeTrack[] | null>(null);
   useEffect(() => {
     if (!ready) return;
-    // The first render after loading holds exactly what was loaded.
     if (savedTracks.current === null) {
       savedTracks.current = tracks;
       return;
@@ -174,7 +168,6 @@ function useDraftSaving(ready: boolean, tracks: GpxMergeTrack[], plan: GpxMergeP
       document.removeEventListener("visibilitychange", onHide);
     };
   }, [ready, plan]);
-  // Leaving the page within the delay still keeps the last edit.
   useEffect(
     () => () => {
       if (pending.current) void saveGpxMergePlan(pending.current);
@@ -208,7 +201,6 @@ export function GpxMerge() {
 
   useDraftSaving(ready, tracks, plan);
 
-  // Dragging the meeting distance re-searches every pair of files; let the slider stay smooth.
   const toleranceM = useDeferredValue(plan.toleranceM);
   const junctions = useMemo(() => findAllJunctions(tracks, toleranceM), [toleranceM, tracks]);
   const route = useMemo(() => buildMergedRoute(tracks, plan.legs), [plan.legs, tracks]);
@@ -246,7 +238,6 @@ export function GpxMerge() {
     if (!parsed.length) return;
     const next = [...tracksRef.current, ...parsed];
     setTracks(next);
-    // Until the athlete has a route of their own, offer one through every file.
     setPlan((current) =>
       current.legs.length < 2
         ? {
@@ -282,7 +273,6 @@ export function GpxMerge() {
       hidden
       onChange={(event) => {
         const files = [...(event.currentTarget.files ?? [])];
-        // Clearing lets the same file be picked again after removing it.
         event.currentTarget.value = "";
         void addFiles(files);
       }}
@@ -337,7 +327,6 @@ export function GpxMerge() {
       onDrop={onDrop}
     >
       {filePicker}
-      {/* On phones the map stays in view while the route below is edited. */}
       <div
         className={cn(
           "bg-muted/40 sticky top-0 z-10 h-[38svh] min-h-56 overflow-hidden rounded-xl border lg:order-2 lg:h-[calc(100svh-9rem)]",
@@ -401,7 +390,6 @@ function MapSurface(props: Omit<ComponentProps<MapViewComponent>, "onFail">) {
   );
 }
 
-/** The files and the merged route on a plain background: no tiles, so it draws offline. */
 function GpxMergeOutline({ tracks, route }: { tracks: GpxMergeTrack[]; route: MergedRoute }) {
   const shape = useMemo(() => {
     const all = tracks.flatMap((track) => track.points);
@@ -485,7 +473,6 @@ function FilesCard({
   onToleranceChange: (value: number) => void;
 }) {
   const [adjusting, setAdjusting] = useState(false);
-  // Files that never meet need the setting, so it stays open with the reason.
   const apart = junctionCount === 0;
 
   return (
@@ -586,7 +573,6 @@ const KIND_NOUN = {
   split: "Where they split",
 } as const;
 
-/** Shows the place matching `m`, or `fallback` when it matches none (fine-tuned by hand). */
 function PlaceSelect({
   label,
   places,
@@ -710,7 +696,6 @@ function RouteCard({
   );
 }
 
-/** One file in the route: where it is joined, how far it is followed, and its fine-tuning. */
 function RouteStep({
   index,
   leg,
@@ -745,7 +730,6 @@ function RouteStep({
 
   let where: ReactNode;
   if (!previous || !previousTrack) {
-    // The first file can start at its own start or at any meeting point along it.
     const places: Place[] = [
       { value: "start", label: "Start of file", m: 0 },
       ...junctionStops(junctions, track.id).map((stop) => ({
@@ -761,7 +745,6 @@ function RouteStep({
           places={places}
           m={leg.fromM}
           onPick={({ m }) => {
-            // A start past the finish rides on to the file's end instead of turning back.
             const pastFinish = (leg.toM - m) * direction <= 0;
             onPatch(pastFinish ? { fromM: m, toM: direction > 0 ? length : 0 } : { fromM: m });
           }}
@@ -773,7 +756,6 @@ function RouteStep({
       (stop) => stop.other.trackId === track.id,
     );
     const ahead = stopsAhead(stops, previous, switchMargin(toleranceM));
-    // The meeting point it switches at now, even when it is no longer ahead.
     const here = leg.linked
       ? stops.find((stop) => Math.abs(stop.m - previous.toM) < SAME_PLACE_M)
       : undefined;
@@ -986,7 +968,6 @@ function StepRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** A km position on a file: a slider for the thumb and a field for exact values. */
 function PositionField({
   label,
   valueM,
@@ -1011,7 +992,6 @@ function PositionField({
         step={SLIDER_STEP_M}
         onValueChange={(value) => {
           const m = Array.isArray(value) ? value[0]! : (value as number);
-          // Steps rarely land on the file's exact length; the ends must reach it.
           onChange(m >= lengthM - SLIDER_STEP_M ? lengthM : m <= SLIDER_STEP_M ? 0 : m);
         }}
         className="min-w-0 flex-1 py-3"
@@ -1092,7 +1072,6 @@ function DownloadCard({
     const file = new File([toGpx(name, route.points)], `${fileSlug(name)}.gpx`, {
       type: "application/gpx+xml",
     });
-    // Phones hand the file to the share sheet, so it can go straight to a bike computer app.
     if (window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: name });

@@ -50,7 +50,6 @@ import type {
 } from "./coach-plan-change.ts";
 import { PHASES } from "./season-phase.ts";
 
-/** A proposal the athlete hasn't applied within this long is gone; the coach proposes again. */
 const PROPOSAL_TTL_MS = 60 * 60_000;
 
 const STALE =
@@ -59,19 +58,13 @@ const STALE =
 const WRITING =
   "The coach plan is being written again right now, so nothing was changed. Ask again once it's written.";
 
-/**
- * A checked change: the ids of the sessions it replaces or drops, the sessions after it (a
- * replacement keeps its id), and the change as the athlete sees it.
- */
 type StoredChange = { ids: string[]; sessions: PlannedSession[]; changes: ChangedSession[] };
 
-/** The plan as read from the database, hashed: a proposal applies only onto the same plan. */
 const planKeyOf = (plan: unknown) =>
   createHash("sha1")
     .update(JSON.stringify(plan ?? null))
     .digest("hex");
 
-/** Why the plan can't be changed now, in words the coach passes on, or null when it can. */
 function blocker(inputs: Inputs): string | null {
   if (inputs.style !== "coachPlan") {
     return "The athlete doesn't follow the coach plan, so there is no plan to change.";
@@ -79,26 +72,19 @@ function blocker(inputs: Inputs): string | null {
   if (!inputs.plan || !inputs.availability) {
     return "The coach plan isn't written yet. The athlete sets it up and writes it from Plan.";
   }
-  // A rewrite would replace the sessions the change was checked against.
   if (statusOf(inputs.row, inputs.now).status === "writing") return WRITING;
   return null;
 }
 
-/** A written week's budgets, as the rules read them; weeks written before rides or swims have none. */
 const budgetOf = ({ sessions: _sessions, ...week }: PlanWeek): WeekBudget => ({
   ...week,
   budgetMinutes: week.budgetMinutes ?? 0,
   budgetSwimM: week.budgetSwimM ?? 0,
 });
 
-/** The written weeks from this one on: what a change may touch. */
 const weeksAhead = (inputs: Inputs, plan: CoachPlan) =>
   plan.weeks.filter((week) => week.weekStart >= inputs.currentWeek);
 
-/**
- * The rule context for checking the plan ahead: the weeks from this one with their budgets, the
- * sessions marked done kept, and no floor, since a change may leave a week shorter (ADR 0038).
- */
 function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
   const weeks = weeksAhead(inputs, plan);
   const sessions = weeks.flatMap((week) => week.sessions);
@@ -122,7 +108,6 @@ function changeContext(inputs: Inputs, plan: CoachPlan): RuleContext {
   };
 }
 
-/** The open runs ahead: what the checker reads as written. */
 const openRuns = (plan: CoachPlan, ctx: RuleContext) =>
   plan.weeks
     .flatMap((week) => week.sessions)
@@ -133,17 +118,9 @@ const openRuns = (plan: CoachPlan, ctx: RuleContext) =>
         ctx.weeks.some((week) => week.weekStart === session.weekStart),
     );
 
-/** The week a break names: every break names its week first. */
 const breakWeek = (item: RuleBreak) => /\d{4}-\d{2}-\d{2}/.exec(item.message)?.[0] ?? "";
 const breakKey = (item: RuleBreak) => `${item.rule}|${breakWeek(item)}`;
 
-/**
- * The breaks the change brings: every rule is checked over the whole plan ahead, before and after,
- * so a change that breaks a rule in a week it doesn't touch (a shorter long run lowering the next
- * week's longest-run limit) is caught, while a break the plan already had elsewhere doesn't block
- * an unrelated change. A break in a changed week always counts: the change could have made it
- * worse.
- */
 function newBreaks(
   before: PlannedSession[],
   after: PlannedSession[],
@@ -182,11 +159,9 @@ const sideOf = (session: PlannedSession | undefined): ChangeSide =>
       }
     : null;
 
-/** The coach plan as the chat coach reads it: the weeks ahead, the rules, and what can change. */
 export async function coachPlanForCoach(userId: string) {
   const inputs = await gather(userId);
   const blocked = blocker(inputs);
-  // The brief can change even while the plan can't, so the coach always reads it.
   if (blocked) return { canChange: false, message: blocked, brief: inputs.brief };
   const plan = inputs.plan!;
   const ctx = changeContext(inputs, plan);
@@ -222,7 +197,6 @@ export async function coachPlanForCoach(userId: string) {
         minutes: session.minutes,
         blocks: session.blocks.map((block) => ({
           repeat: block.repeat,
-          // Steps stored before drills (ADR 0063) have none; the session format needs null.
           steps: block.steps.map(({ range: _range, swimPace: _swimPace, ...step }) => ({
             ...step,
             drill: step.drill ?? null,
@@ -239,11 +213,6 @@ export async function coachPlanForCoach(userId: string) {
   };
 }
 
-/**
- * Checks the changed sessions against every rule and the athlete's availability. A change that
- * passes is stored for apply_plan_change; one that doesn't goes back to the coach with the rules
- * it breaks.
- */
 export async function proposePlanChange(
   userId: string,
   input: PlanChangeInput,
@@ -271,7 +240,6 @@ export async function proposePlanChange(
     } else if (before?.done || before?.kind === "race") {
       broken.push(`sessions: "${before.title}" is ${before.done ? "done" : "a race"}.`);
     } else if (before || change.session) {
-      // A session changed stays in its week and its sport.
       const weekStart = before?.weekStart ?? change.session!.weekStart;
       const sport = before?.sport ?? change.session!.sport;
       const after = change.session
@@ -316,7 +284,6 @@ export async function proposePlanChange(
   return { ok: true, proposalId, summary: input.summary, sessions: changes };
 }
 
-/** The plan with a change applied: replaced sessions in their place, added ones at the end. */
 function applied(plan: CoachPlan, change: StoredChange): CoachPlan {
   const removed = new Set(change.ids);
   const byId = new Map(change.sessions.map((session) => [session.id, session]));
@@ -338,11 +305,6 @@ function applied(plan: CoachPlan, change: StoredChange): CoachPlan {
   };
 }
 
-/**
- * Saves a checked change the athlete applied, only onto the plan it was checked against: if the
- * plan changed since (a rewrite, another change applied, a session marked done, a week gone by),
- * nothing is saved.
- */
 export async function applyPlanChange(
   userId: string,
   proposalId: string,
@@ -364,7 +326,6 @@ export async function applyPlanChange(
   }
 
   const refused = await db.transaction(async (tx) => {
-    // Locked, so a rewrite can't claim the plan between this check and the save.
     const [row] = await tx
       .select()
       .from(coachPlans)
@@ -376,7 +337,6 @@ export async function applyPlanChange(
       .update(coachPlans)
       .set({ plan: applied(readCoachPlan(row.plan)!, change), updatedAt: new Date() })
       .where(eq(coachPlans.userId, userId));
-    // Every other proposal was checked against the plan as it was.
     await tx.delete(coachPlanProposals).where(eq(coachPlanProposals.userId, userId));
     return null;
   });
@@ -387,10 +347,6 @@ export async function applyPlanChange(
   return refused == null ? { applied: true } : { applied: false, reason: refused };
 }
 
-/**
- * Saves a brief change the athlete applied (ADR 0065), only onto the brief it was offered against,
- * then starts the rewrite the new brief is due.
- */
 export async function applyBriefChange(
   userId: string,
   input: BriefChangeInput,

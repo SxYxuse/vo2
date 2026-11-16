@@ -20,7 +20,6 @@ const DOT_TONE: Record<SyncTone, string> = {
   idle: "bg-muted-foreground/40",
 };
 
-/** Re-renders once a minute so "Synced 3 minutes ago" stays true while the app sits open. */
 function useMinuteClock() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

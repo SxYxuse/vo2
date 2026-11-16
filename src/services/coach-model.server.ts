@@ -9,7 +9,6 @@ import { coachModelsFor } from "./athlete-settings.server.ts";
 import { coachKeyFor } from "./coach-key.server.ts";
 import type { CoachFeature, CoachModelChoice, CoachProvider } from "./coach-models.ts";
 
-/** The ids the adapters' types list; each sends any id as given. */
 type ListedOpenRouterModel = Parameters<typeof createOpenRouterText>[0];
 type ListedOpenAIModel = Parameters<typeof createOpenaiChat>[0];
 
@@ -35,20 +34,12 @@ export type CoachModel =
       provider: CoachProvider;
       model: string;
       adapter: ReturnType<typeof textAdapter>;
-      /** Undefined: send no level, so the provider's default applies. */
       reasoning: ReasoningLevel | undefined;
-      /** For scrubbing it out of anything logged. */
       key: string;
     }
   | { kind: "mock"; provider: CoachProvider; model: "mock" }
   | { kind: "missing"; provider: CoachProvider };
 
-/**
- * The model a coach feature runs on for this athlete. Only the athlete's own key for the model's
- * provider, saved with their account, runs one: VO2 keeps no key of its own (ADR 0036, ADR 0059).
- * Under mock Strava the mock coach answers when that key is missing, so development, CI, and the
- * e2e suite need none.
- */
 export async function coachModelFor(userId: string, feature: CoachFeature): Promise<CoachModel> {
   const choice = (await coachModelsFor(userId))[feature];
   const key = await coachKeyFor(userId, choice.provider);
@@ -67,12 +58,10 @@ export async function coachModelFor(userId: string, feature: CoachFeature): Prom
   };
 }
 
-/** The 401 the client reads as "add your key for this provider". */
 export function coachKeyMissing(provider: CoachProvider) {
   return byokMissing(provider);
 }
 
-/** Whether coach features answer without a key: only the mock coach does. */
 export function isCoachMocked() {
   return env.STRAVA_MOCK;
 }

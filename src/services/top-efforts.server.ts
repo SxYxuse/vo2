@@ -17,10 +17,6 @@ import {
 
 const DAY_MS = 86_400_000;
 
-/**
- * After a sync, checks each recent activity whose stream arrived since celebrations were turned
- * on, once, and stores the top 10 efforts it holds now (ADR 0027).
- */
 export async function findTopEffortCelebrations(userId: string, now = new Date()) {
   const { topEffortsSince } = await getAthleteSettings(userId);
   if (!topEffortsSince) return;
@@ -54,7 +50,6 @@ export async function findTopEffortCelebrations(userId: string, now = new Date()
     .values(
       [...ids].map((activityId) => {
         const placements = byActivity.get(activityId) ?? [];
-        // Nothing to celebrate: stored seen, so it is never checked again.
         return {
           activityId,
           userId,
@@ -71,7 +66,6 @@ export async function findTopEffortCelebrations(userId: string, now = new Date()
 export async function loadTopEffortCelebrationsImpl(): Promise<TopEffortCelebrations> {
   const session = await getOptionalSession();
   if (!session) return { activityIds: [], placements: [], activities: {} };
-  // The activity is read fresh, so a renamed activity shows its new name on the card's back.
   const rows = await db
     .select({
       activityId: topEffortCelebrations.activityId,

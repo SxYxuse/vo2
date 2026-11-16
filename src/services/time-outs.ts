@@ -5,11 +5,9 @@ import { z } from "zod";
 import { addDayKey } from "./day-key.ts";
 import { daysBetween } from "./season.types.ts";
 
-/** Days the athlete can't train because they are sick or injured (ADR 0066). */
 export type TimeOut = {
   id: string;
   kind: "sick" | "injured";
-  /** Day keys in the athlete's time zone; no end while the time out lasts. */
   start: string;
   end: string | null;
 };
@@ -21,20 +19,16 @@ export const TIME_OUT_KINDS = [
   { id: "injured", label: "Injured" },
 ] as const satisfies { id: TimeOut["kind"]; label: string }[];
 
-/** How far back and ahead a time out may start: four weeks either side (ADR 0066). */
 const WINDOW_DAYS = 28;
 
-/** The first and last day a time out may start, from today and this training week's Monday. */
 export function timeOutStartWindow(today: string, weekStart: string) {
   return { first: addDayKey(weekStart, -WINDOW_DAYS), last: addDayKey(today, WINDOW_DAYS) };
 }
 
-/** Whether a time out covers a day; an open one covers every day from its start. */
 export function timeOutCovers(timeOut: Pick<TimeOut, "start" | "end">, day: string) {
   return day >= timeOut.start && (timeOut.end == null || day <= timeOut.end);
 }
 
-/** The time outs that overlap the days from `first` to `last`, each clipped to them. */
 export function timeOutsBetween(timeOuts: TimeOut[], first: string, last: string) {
   return timeOuts.flatMap((timeOut) => {
     const from = timeOut.start > first ? timeOut.start : first;
@@ -43,11 +37,6 @@ export function timeOutsBetween(timeOuts: TimeOut[], first: string, last: string
   });
 }
 
-/**
- * The time outs as the coach reads them, in the plan writer's prompt and the chat's context: kind,
- * days, how many days off, and how long ago the athlete came back (ADR 0066). An open one, or one
- * still ahead, has no return yet.
- */
 export function timeOutsForCoach(
   timeOuts: Pick<TimeOut, "kind" | "start" | "end">[],
   today: string,
@@ -65,18 +54,12 @@ export function timeOutsForCoach(
   });
 }
 
-/**
- * Whether the athlete is on this time out with no end yet: while one is, the coach plan writes
- * nothing (ADR 0066). One ahead isn't open yet.
- */
 export function timeOutOpen(timeOut: Pick<TimeOut, "start" | "end">, today: string) {
   return timeOut.end == null && timeOut.start <= today;
 }
 
-/** "Mon 15 Jun": one day of a time out, as the athlete reads it. */
 export const timeOutDay = (key: string) => format(parseISO(key), "EEE d MMM");
 
-/** "12–14 Jun", "30 Jun–2 Jul", or "15 Jun" for one day: a time out's days. */
 export function timeOutSpan(start: string, end: string) {
   if (start === end) return format(parseISO(start), "d MMM");
   const from = parseISO(start);
@@ -85,14 +68,9 @@ export function timeOutSpan(start: string, end: string) {
   return `${format(from, sameMonth ? "d" : "d MMM")}–${format(to, "d MMM")}`;
 }
 
-/** "Sick" or "Injured": athletes see the kind; "time out" is the glossary's word for both. */
 export const timeOutKind = (timeOut: Pick<TimeOut, "kind">) =>
   TIME_OUT_KINDS.find((kind) => kind.id === timeOut.kind)?.label ?? "";
 
-/**
- * Which time out a calendar day falls in, or null. An open one marks its days up to today, or only
- * its first day while it is still ahead: what follows isn't known yet.
- */
 export function timeOutOnDay(timeOuts: TimeOut[], day: string, today: string) {
   return (
     timeOuts.find((timeOut) =>
@@ -111,10 +89,6 @@ function overlaps(a: Pick<TimeOut, "start" | "end">, b: Pick<TimeOut, "start" | 
   return (b.end == null || a.start <= b.end) && (a.end == null || b.start <= a.end);
 }
 
-/**
- * Why a time out can't be saved among the athlete's others, or null. The start window is only
- * held when the start is new, so an older time out can still be edited or ended.
- */
 export function timeOutProblem(
   candidate: Pick<TimeOut, "start" | "end">,
   others: Pick<TimeOut, "start" | "end">[],
@@ -151,7 +125,6 @@ const timeOutInputSchema = z.object({
   kind: z.enum(["sick", "injured"]),
   start: dayKeySchema,
   end: dayKeySchema.nullable(),
-  /** The device's, where the athlete reads today and this training week. */
   timeZone: timeZoneSchema,
 });
 export type TimeOutInput = z.infer<typeof timeOutInputSchema>;
@@ -177,7 +150,6 @@ export const updateTimeOut = createServerFn({ method: "POST" })
     await updateTimeOutImpl(data);
   });
 
-/** "I'm back": the time out ends yesterday, or goes when it started today or later. */
 export const endTimeOut = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string(), timeZone: timeZoneSchema }))
   .handler(async ({ data }): Promise<void> => {

@@ -88,7 +88,6 @@ function zoneTops(family: ZonedFamily, resolved: ResolvedHeartRate) {
   return zones.slice(0, 4).map((zone) => zone.maxBpm);
 }
 
-/** Fills one sport's custom zone tops from Strava once; nothing stays linked. */
 function CopyStravaZones({ onCopy }: { onCopy: (tops: number[]) => void }) {
   const copy = useMutation({ mutationFn: () => loadStravaZoneTops(), onSuccess: onCopy });
   return (
@@ -112,7 +111,6 @@ function CopyStravaZones({ onCopy }: { onCopy: (tops: number[]) => void }) {
 
 type Estimate = { bpm: number | null; source?: string };
 
-/** Says whether a field uses VO2's estimate or the athlete's value, and offers the way back. */
 function EstimateStatus({
   value,
   estimate,
@@ -157,9 +155,7 @@ function BpmField({
   name: BpmPath;
   label: string;
   placeholder?: string;
-  /** Omitted for fields with no estimate to fall back on, such as custom zone tops. */
   estimate?: Estimate;
-  /** Badge text naming the zones this field sets, when the zone method reads it. */
   setsZones?: string;
   description?: string;
   issue?: string;
@@ -226,11 +222,9 @@ export function HeartRateFields({
   control: Control<SettingsFormInput>;
   setValue: UseFormSetValue<SettingsFormInput>;
   estimates: HeartRateEstimates;
-  /** Typed fields save on blur, so going back to an estimate or copying zones saves right away. */
   onSave: () => void;
 }) {
   const heartRate = useWatch({ control, name: "heartRate" }) as HeartRateFormInput["heartRate"];
-  // A half-typed value reads as blank, so the rest of the card keeps up while typing.
   const settings = heartRateFormPreview({ heartRate });
   const issues = heartRateSettingsIssues(settings, estimates);
   const issueAt = (path: string) => issues.find((issue) => issue.path === path)?.message;
@@ -263,7 +257,6 @@ export function HeartRateFields({
       {ZONED_FAMILIES.map((family) => {
         const base = `heartRate.sports.${family}` as const;
         const resolved = resolve(family);
-        // What a blank LTHR would resolve to, given the max heart rate in use.
         const lthrEstimate = resolve(family, {
           ...settings,
           sports: { ...settings.sports, [family]: { ...settings.sports[family], lthr: null } },
@@ -313,7 +306,6 @@ export function HeartRateFields({
                         const method = next as ZoneMethod;
                         const stored = heartRate.sports[family].customZones;
                         if (method === "custom" && stored.every((top) => top === "")) {
-                          // Start from the zones in use so the athlete only adjusts them.
                           const tops = zoneTops(family, resolved);
                           if (tops.every((top) => top != null)) {
                             setValue(`${base}.customZones`, tops.map(String), {

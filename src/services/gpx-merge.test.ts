@@ -22,7 +22,6 @@ const ORIGIN = { lat: 50, lng: 4 };
 const M_PER_DEG_LAT = 111_195;
 const M_PER_DEG_LNG = M_PER_DEG_LAT * Math.cos((ORIGIN.lat * Math.PI) / 180);
 
-/** A point `x` metres east and `y` metres north of the origin. */
 function at(x: number, y: number, ele: number | null = null): GpxPoint {
   return { lng: ORIGIN.lng + x / M_PER_DEG_LNG, lat: ORIGIN.lat + y / M_PER_DEG_LAT, ele };
 }
@@ -107,7 +106,6 @@ describe("findJunctions", () => {
 
   it("gives a shared stretch a join and a split", () => {
     const a = track("a", at(0, 0), at(3000, 0));
-    // Arrives from the south, follows A 8 m off to the side, and leaves north.
     const b = track("b", at(1000, -1000), at(1000, 8), at(2000, 8), at(2000, 1000));
     const junctions = findJunctions(a, b, 20);
     expect(junctions.map((junction) => junction.kind)).toEqual(["join", "split"]);
@@ -145,7 +143,6 @@ describe("buildMergedRoute", () => {
   });
 
   it("keeps a linked leg on the pass it switched at", () => {
-    // Out along y = 0 and back along y = 6: both passes go by x = 1000.
     const outAndBack = track("c", at(0, 0), at(2000, 0), at(2000, 6), at(0, 6));
     const legs = [
       { id: "1", trackId: "b", fromM: 0, toM: 1000, linked: false },
@@ -222,7 +219,6 @@ describe("switchAtJunction", () => {
 });
 
 describe("leg editing", () => {
-  // a runs east and crosses b at 1 km and c at 2 km; b and c never meet.
   const a = track("a", at(0, 0), at(3000, 0));
   const b = track("b", at(1000, -1000), at(1000, 1000));
   const c = track("c", at(2000, -1000), at(2000, 1000));
@@ -236,7 +232,6 @@ describe("leg editing", () => {
     expect(forward.map((stop) => stop.other.trackId)).toEqual(["b", "c"]);
     const backward = stopsAhead(stops, { fromM: 3000, toM: 0 }, 40);
     expect(backward.map((stop) => stop.other.trackId)).toEqual(["c", "b"]);
-    // The one a leg starts from is skipped.
     expect(stopsAhead(stops, { fromM: 1000, toM: 3000 }, 40)).toHaveLength(1);
   });
 

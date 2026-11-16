@@ -7,11 +7,6 @@ const THEMES = {
   dark: { value: "dark", label: "Dark", icon: MoonIcon },
 } as const;
 
-/**
- * Light/dark toggle that starts from the device preference.
- * Until the athlete taps it, the theme follows the device; a tap pins the opposite of what is showing.
- * `mounted` stays false until hydration, since the stored theme is unknown on the server.
- */
 export function useThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

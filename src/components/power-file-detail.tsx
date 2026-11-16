@@ -84,10 +84,8 @@ const INFO = {
   ftp: "The FTP behind zones, intensity, and the quadrants. VO2's own FTP when it has one, else the one set on your head unit.",
 } as const;
 
-/** The power file on the page, for the coach links at the end of each section. */
 const PowerFileIdContext = createContext("");
 
-/** Opens the coach chat with this power file brought in and the question ready to send. */
 function AskCoach({ question }: { question: string }) {
   const fileId = use(PowerFileIdContext);
   return (
@@ -111,7 +109,6 @@ function fixed(value: number | null | undefined, digits = 0, unit = "") {
   return `${value.toFixed(digits)}${gap}${unit}`;
 }
 
-/** "sweet spot" → "Sweet spot": zone labels are lower case for use mid-sentence. */
 function sentence(label: string) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }

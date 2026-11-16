@@ -29,7 +29,6 @@ export const VISUAL_THEME_VARIABLES = [
   "--ds-gray-700",
 ] as const;
 
-/** The message a visual posts to its parent with its content height. */
 export const VISUAL_HEIGHT_MESSAGE = "vo2-visual-height";
 
 // No source is listed, so the page can fetch or load nothing from anywhere. Only its own

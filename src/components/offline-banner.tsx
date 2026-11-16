@@ -3,10 +3,6 @@ import { WifiOffIcon } from "lucide-react";
 
 import { useOnline } from "@/hooks/use-online.ts";
 
-/**
- * Says the app is offline and how old what it shows is, so a saved week is never read as live
- * (ADR 0031). `updatedAt` is when the app last heard from the server.
- */
 export function OfflineBanner({ updatedAt }: { updatedAt: number }) {
   const online = useOnline();
   if (online) return null;

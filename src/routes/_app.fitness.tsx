@@ -35,7 +35,6 @@ import {
 
 export const Route = createFileRoute("/_app/fitness")({
   loader: ({ context }) => {
-    // Progress reads streams and may build best efforts, so it streams in below the graph.
     void context.queryClient.query(loaderQuery(progressQueryOptions)).catch(noop);
     void context.queryClient.query(loaderQuery(predictedTimeTrendQueryOptions)).catch(noop);
     return Promise.all([

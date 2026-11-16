@@ -33,7 +33,6 @@ export type MentionableActivity = ActivityMention & {
 };
 
 const MAX_SUGGESTIONS = 8;
-/** 44px on phones, like the sidebar footer, so the buttons are easy to tap. */
 const TOUCH_BUTTON = "max-sm:size-[2.75rem] max-sm:[&_svg]:size-4";
 const MAX_QUERY = 40;
 
@@ -45,7 +44,6 @@ function dayLabel(start: string) {
   return format(new Date(start), "EEE d MMM yyyy");
 }
 
-/** The `@query` being typed right before the caret, unless it was already closed. */
 function mentionQuery(text: string, caret: number, closedAt: number | null) {
   const before = text.slice(0, caret);
   const at = before.lastIndexOf("@");
@@ -99,10 +97,6 @@ function MentionChip({
   );
 }
 
-/**
- * The coach chat's message box. Typing @ lists the athlete's activities; a pick becomes a chip
- * and, on send, a link the coach can read.
- */
 export function CoachComposer({
   activities,
   initialMentions = [],
@@ -115,7 +109,6 @@ export function CoachComposer({
 }: {
   activities: readonly MentionableActivity[];
   initialMentions?: readonly MentionableActivity[];
-  /** A question to start from, such as one asked from a section of a power file. */
   initialText?: string;
   disabled: boolean;
   placeholder: string;
@@ -203,7 +196,6 @@ export function CoachComposer({
       setClosedAt(mention.at);
       return;
     }
-    // Enter sends on a keyboard; phones keep Enter for a new line and send with the button.
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       if (window.matchMedia("(pointer: coarse)").matches) return;
       event.preventDefault();
@@ -218,7 +210,6 @@ export function CoachComposer({
           shouldFilter={false}
           value={selected?.id ?? ""}
           onValueChange={setHighlighted}
-          // Floats over the transcript, so the message box never moves while picking.
           className="bg-popover absolute inset-x-0 bottom-full z-10 mb-2 h-auto max-h-64 rounded-lg border shadow-md"
           aria-label="Activities to mention"
         >

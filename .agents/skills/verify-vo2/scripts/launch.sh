@@ -25,7 +25,6 @@ else
   echo "launch: reusing this checkout's dev server, PID $pid."
 fi
 
-# Ready means mock Strava answers through the app, not just that the port is open.
 for _ in $(seq 1 90); do
   if curl -sf -o /dev/null "$VO2_BASE/api/mock-strava/api/v3/push_subscriptions"; then break; fi
   sleep 1
@@ -37,5 +36,4 @@ curl -sf -o /dev/null "$VO2_BASE/api/mock-strava/api/v3/push_subscriptions" || {
 }
 echo "launch: server PID $(port_pid) ready."
 
-# A fresh mock athlete every launch: replaces the last one in this checkout's database only.
 vp run dev:seed "$@"

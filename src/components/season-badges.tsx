@@ -9,7 +9,6 @@ export function Dot({ fill }: { fill: string }) {
   );
 }
 
-/** The phase as an outline badge with its colour. */
 export function PhaseBadge({ kind, lighter = false }: { kind: PhaseKind; lighter?: boolean }) {
   return (
     <Badge variant="outline">
@@ -20,7 +19,6 @@ export function PhaseBadge({ kind, lighter = false }: { kind: PhaseKind; lighter
   );
 }
 
-/** A goal's weight as an outline badge: "Main", or a supporting race's effort, with its colour. */
 export function PriorityBadge({
   priority,
   effort,

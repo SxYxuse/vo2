@@ -4,11 +4,8 @@ import { z } from "zod";
 import { COACH_PROVIDER_IDS, type CoachFeature, type CoachProvider } from "./coach-models.ts";
 
 export type CoachStatus = {
-  /** The mock coach answers without a key (mock Strava only). */
   mocked: boolean;
-  /** When the athlete saved each provider's key; a provider without one is absent. */
   keys: Partial<Record<CoachProvider, string>>;
-  /** Whether the key each feature's model needs is saved. */
   ready: Record<CoachFeature, boolean>;
 };
 

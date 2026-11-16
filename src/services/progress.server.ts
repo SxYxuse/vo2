@@ -23,7 +23,6 @@ import {
 } from "./progress.ts";
 import { isPowerCyclingSport } from "./training-load.ts";
 
-/** Power-meter rides and road runs; every other sport is left out (see `ProgressSport`). */
 function progressSport(row: { sportType: string; deviceWatts: boolean }): ProgressSport | null {
   if (isPowerCyclingSport(row.sportType) && row.deviceWatts) return "cycling";
   if (row.sportType === "Run") return "running";

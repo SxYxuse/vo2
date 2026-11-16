@@ -67,10 +67,6 @@ const TRAINING_NAV_ITEMS = [
   { title: "Coach", to: "/coach", icon: SparklesIcon },
 ] as const;
 
-/**
- * Phones get 44px footer buttons so they are easy to tap clear of the rounded screen corner.
- * Sized in rem because this theme's --spacing is 0.24rem, so size-11 would be only 42px.
- */
 const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 
 const COLLAPSIBLE_NAV_GROUPS = [
@@ -117,11 +113,6 @@ function writeClosedGroups(ids: string[]) {
   }
 }
 
-/**
- * A nav group the athlete can fold away, remembered on this device. The group holding the
- * current page always shows, so a link never lands on a page hidden in the sidebar; in the
- * desktop icon rail the labels are gone, so every group shows its icons.
- */
 function CollapsibleNavGroup({
   group,
   pathname,
@@ -169,7 +160,6 @@ function CollapsibleNavGroup({
 
 function isActiveNavItem(item: NavItem, pathname: string) {
   if (item.to === "/") return pathname === "/" || pathname.startsWith("/activities/");
-  // A power file's analysis belongs to Power.
   return pathname === item.to || (item.to === "/power" && pathname.startsWith("/power/"));
 }
 
@@ -207,7 +197,6 @@ function SettingsNavMenu({
   pathname: string;
   onLinkClick: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
-  // Read from the cache the settings form fills, so the shell doesn't load the settings service.
   const { data } = useQuery<SettingsSnapshot>({ queryKey: ["settings-snapshot"], enabled: false });
   const sections = SETTINGS_SECTIONS.filter((item) =>
     showsSettingsSection(item.id, data?.settings.sportTypes),
@@ -243,7 +232,6 @@ function SettingsNavMenu({
   ));
 }
 
-/** Remembers the last page outside settings so Back can return to it. */
 function useLastHrefOutsideSettings() {
   const location = useRouterState({ select: (state) => state.location });
   const lastHref = useRef<string | null>(null);
@@ -297,11 +285,8 @@ export function AppSidebar() {
   const { pathname, navigate, onLinkClick } = useSidebarNavigate();
   const { isMobile } = useSidebar();
   const lastHref = useLastHrefOutsideSettings();
-  // A phone's More opens the app menu everywhere; inside settings, the "‹ Settings" link and the
-  // settings list move between sections.
   const inSettings = isSettingsPath(pathname) && !isMobile;
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
-  // With planning off, Plan leaves the sidebar: its page says so, reached from Settings.
   const trainingItems =
     shell.planningStyle === "off"
       ? TRAINING_NAV_ITEMS.filter((item) => item.to !== "/week")
@@ -326,7 +311,6 @@ export function AppSidebar() {
       <SidebarContent>
         {inSettings ? (
           <>
-            {/* The way out of settings sits first, where the eye starts. */}
             <SidebarGroup>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -366,8 +350,6 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
-      {/* On phones the buttons sit low, beside the home indicator, and the wide side padding
-          keeps them inside the rounded screen corner instead of lifting them above it. */}
       <SidebarFooter
         className={cn(
           "flex-row items-center group-data-[collapsible=icon]:flex-col",
@@ -381,7 +363,6 @@ export function AppSidebar() {
             tooltip="Settings"
             aria-label="Settings"
             className={isMobile ? MOBILE_FOOTER_BUTTON : "w-auto"}
-            // Phones open the settings list; desktop lists the sections in the sidebar itself.
             render={
               isMobile ? (
                 <Link to="/settings" preload="intent" onClick={onLinkClick} />

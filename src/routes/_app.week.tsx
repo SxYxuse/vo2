@@ -36,7 +36,6 @@ import {
 import { RouteError } from "@/components/route-states.tsx";
 
 type WeekSearch = {
-  /** The coach plan's week shown, by its Monday, when not the first one. */
   week?: string;
 };
 
@@ -70,7 +69,6 @@ function WeekTargetPage() {
   return <CoachPlanPage week={week} />;
 }
 
-/** The coach plan, with the time out the athlete is on or has ahead (ADR 0066). */
 function CoachPlanPage({ week }: { week?: string }) {
   const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
   const [editing, setEditing] = useState<TimeOutEditing>(null);
@@ -80,7 +78,6 @@ function CoachPlanPage({ week }: { week?: string }) {
     <>
       <WeekTargetHeading
         actions={
-          // The banner is the way in while one lasts or is ahead.
           timeOut ? undefined : (
             <Button
               type="button"
@@ -101,7 +98,6 @@ function CoachPlanPage({ week }: { week?: string }) {
   );
 }
 
-/** The way back from off: the coach plan's setup is still saved, one choice away. */
 function PlanningOff() {
   return (
     <>

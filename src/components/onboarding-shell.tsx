@@ -3,8 +3,6 @@ import { cn } from "cn";
 
 import { Vo2Wordmark } from "@/components/vo2-mark.tsx";
 
-// Its own module: the onboarding route's pending component stays in the main bundle, and the
-// forms in onboarding.tsx should not ride along with it.
 export function OnboardingShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -14,25 +12,17 @@ export function OnboardingShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="flex flex-1 justify-center px-4 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-10">
-        {/* Top-aligned on phones so the first field sits in view. The document scrolls, not main,
-            so the step footer can pin to the screen. */}
         <div className="w-full max-w-lg sm:my-auto">{children}</div>
       </main>
     </div>
   );
 }
 
-/**
- * Footer that stays at the bottom of the screen on long steps, so the next action is always
- * under the thumb. Pair it with `SETUP_CARD` on the card around it.
- */
 export const SETUP_FOOTER =
   "sticky bottom-0 z-10 flex-wrap justify-end gap-2 rounded-b-lg border-t bg-card pb-(--card-spacing) max-sm:pb-[max(var(--card-spacing),env(safe-area-inset-bottom))]";
 
-/** Sticky needs the card to let its footer escape: no clipping, no bottom padding of its own. */
 export const SETUP_CARD = "overflow-visible pb-0";
 
-/** The setup with planning off; the coach plan adds its plan steps (onboarding.tsx). */
 export const SETUP_STEP_TITLES = [
   "Copy from Strava",
   "About you",
@@ -42,10 +32,6 @@ export const SETUP_STEP_TITLES = [
   "You're set",
 ] as const;
 
-/**
- * One progress bar for the whole setup. The plan step has its own sub-steps; they fill its
- * segment in parts so the athlete never sees a second, unrelated stepper.
- */
 export function SetupProgress({
   step,
   substep,
@@ -54,10 +40,8 @@ export function SetupProgress({
   titles = SETUP_STEP_TITLES,
 }: {
   step: number;
-  /** The segments' names, when a planning style orders them differently. */
   titles?: readonly string[];
   substep?: { index: number; count: number; title?: string };
-  /** Going back to an earlier step; later steps stay closed. */
   onSelect?: (step: number) => void;
   locked?: boolean;
 }) {

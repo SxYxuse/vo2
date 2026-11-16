@@ -1,8 +1,6 @@
 import { onboardNewAthlete, waitForHydration } from "./onboard.ts";
 import { test, expect, type Page } from "./test.ts";
 
-// The ways out, run once every other spec is done with the athlete.
-
 test.describe.configure({ mode: "serial" });
 
 async function expectFreshStart(page: Page) {
@@ -27,7 +25,6 @@ test("an athlete who revokes VO2 on Strava is signed out and starts over", async
   await page.getByRole("button", { name: "Connect Strava" }).click();
   await page.waitForURL("/onboarding");
 
-  // What Strava does when the athlete revokes VO2 there: kill the tokens and push the event.
   await page.request.post("/api/mock-strava/dev/deauthorize");
   await page.reload();
   await expect(page.getByRole("heading", { name: "Sign in with Strava" })).toBeVisible();
@@ -35,7 +32,6 @@ test("an athlete who revokes VO2 on Strava is signed out and starts over", async
   await expectFreshStart(page);
 });
 
-// The athlete starts over above, so one more onboarding needs no second mock athlete.
 test("an athlete who onboards with planning off lands on the calendar with no week", async ({
   page,
 }) => {
@@ -54,7 +50,6 @@ test("an athlete who onboards with planning off lands on the calendar with no we
 test("an athlete who onboards with the coach plan sees their four weeks written", async ({
   page,
 }) => {
-  // This page still holds the session deleted above: sign in again as the athlete just onboarded.
   await page.goto("/");
   await waitForHydration(page);
   await page.getByRole("button", { name: "Connect Strava" }).click();

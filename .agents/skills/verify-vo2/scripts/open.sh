@@ -20,11 +20,9 @@ mkdir -p "$run"
 ln -sfn "$run" "$VO2_EVIDENCE/current"
 cd "$run"
 
-# One browser per checkout: a session left from an earlier run is closed first.
 playwright-cli -s="$VO2_SESSION" close >/dev/null 2>&1 || true
 playwright-cli -s="$VO2_SESSION" open "${flags[@]}" >/dev/null
 [ "$size" = desktop ] && playwright-cli -s="$VO2_SESSION" resize 1280 900 >/dev/null
-# The mock's sign-in URL signs the browser in as the seeded athlete and lands on the calendar.
 playwright-cli -s="$VO2_SESSION" goto "$VO2_BASE/api/mock-strava/dev/sign-in" >/dev/null
 [ "$path" = / ] || playwright-cli -s="$VO2_SESSION" goto "$VO2_BASE$path" >/dev/null
 "$VO2_SCRIPTS/settle.sh" >/dev/null

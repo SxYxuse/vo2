@@ -55,7 +55,6 @@ interface EventCalendarResourceViewProps extends useRender.ComponentProps<"div">
   interval?: number;
 }
 
-/** Leaf resources become booking columns for the anchor day. */
 function EventCalendarResourceView({
   className,
   render,
@@ -87,7 +86,6 @@ function EventCalendarResourceView({
     [settings.resources],
   );
 
-  // Initial scroll + api.scrollToTime (same contract as the time grid)
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!contained) return;
@@ -98,7 +96,6 @@ function EventCalendarResourceView({
     const slotPx = slotRow?.getBoundingClientRect().height || 64;
     const pxPerMinute = slotPx / interval;
     const scrollTo = (minutes: number) => {
-      // keep the hour label above the target line visible (it hangs -top-2)
       viewport?.scrollTo({
         top: Math.max(0, (minutes - startHour * 60) * pxPerMinute - 12),
       });
@@ -140,8 +137,6 @@ function EventCalendarResourceView({
     startHour,
     interval,
     viewConfig.scrollToHour,
-    // scrollbars custom<->native swaps the scroller DOM: re-bind the
-    // viewport, the scroll wiring, and the measured --ec-scrollbar-w
     viewConfig.scrollbars,
   ]);
 
@@ -153,9 +148,6 @@ function EventCalendarResourceView({
     return result;
   }, [startHour, endHour, interval]);
 
-  // All-day segments for renderAllDaySection - the same index bucket the
-  // cells read; inert (stable empty array, so the subscription never
-  // re-renders) while the override is unset.
   const allDaySegments = useEventCalendarSelector<unknown, EventCalendarSegment[]>(
     () =>
       viewConfig.renderAllDaySection
@@ -172,8 +164,6 @@ function EventCalendarResourceView({
 
   const track = (
     <div className="relative flex">
-      {/* shared gutter component, so renderTimeGutterSlot and
-          classNames.timeGutter customizations apply here too */}
       <EventCalendarTimeGutter
         days={[day]}
         slots={slots}
@@ -210,7 +200,6 @@ function EventCalendarResourceView({
     style: { "--ec-hour-height": "4rem" } as CSSProperties,
     children: (
       <>
-        {/* Resource header row */}
         <div
           className={cn(
             "flex border-b pe-(--ec-scrollbar-w,0px)",
@@ -234,7 +223,6 @@ function EventCalendarResourceView({
             ))}
           </div>
         </div>
-        {/* All-day row per resource */}
         {showAllDay && (
           <div
             data-slot="event-calendar-all-day-section"
@@ -250,10 +238,6 @@ function EventCalendarResourceView({
               <>
                 <div
                   className={cn(
-                    // pt-1.5 matches the all-day cell's top inset; the inner box is
-                    // one bar-row tall and centers the label so it sits on the SAME
-                    // baseline as the first all-day chip and stays top-aligned when
-                    // the chips wrap onto more lanes (mirrors the time-grid label)
                     "text-muted-foreground w-(--ec-gutter-width,4.5rem) shrink-0 border-e ps-2 pe-2.5 pt-1.5",
                     viewConfig.classNames?.allDayLabel,
                   )}
@@ -343,9 +327,6 @@ function EventCalendarResourceAllDayCell({
     if (!covered) return null;
     return drag.valid ? "valid" : "invalid";
   });
-  // Slot-draft highlight, mirroring the time-grid all-day cell. The dnd
-  // layer's all-day create branch does not plumb resourceId into the draft,
-  // so every resource cell covering the day highlights together.
   const inDraft = useEventCalendarSelector<unknown, boolean>((state) => {
     const draft = state.slotDraft;
     if (!draft || !draft.allDay) return false;
@@ -354,16 +335,10 @@ function EventCalendarResourceAllDayCell({
   return (
     <div
       data-slot="event-calendar-all-day-cell"
-      // data-ec-day makes this a DnD day target: without it collectSurface()
-      // finds no cells and dragging an all-day chip silently converts it to
-      // a timed event via the column branch
       data-ec-day={dayStart.getTime()}
       data-drop-target={isDropTarget ?? undefined}
       data-off={isOff || undefined}
       className={cn(
-        // reserve one bar row so the all-day row keeps the same height with or
-        // without events, matching the time-grid all-day row (which reserves
-        // the same via its bars-grid minHeight)
         "relative flex min-h-[calc(var(--ec-month-bar-h,1.625rem)+0.625rem)] min-w-0 flex-col gap-0.5 border-e px-1 py-1.5 last:border-e-0",
         isOff && offClassName,
         viewConfig.dayClassName?.(day),
@@ -398,8 +373,6 @@ function EventCalendarResourceAllDayCell({
         <EventCalendarEvent
           key={segment.occurrence.key}
           segment={segment}
-          // one bar-row tall, matching the time-grid all-day bars so the row
-          // height stays identical across views (and equals the reserved min)
           className="h-[calc(var(--ec-month-bar-h,1.625rem)-0.125rem)]"
         />
       ))}
@@ -457,10 +430,6 @@ function EventCalendarResourceColumn({
   const boundsEndMin = Math.min(endHour * 60, totalMinutes);
   const boundsMinutes = Math.max(60, boundsEndMin - boundsStartMin);
 
-  // Filter this resource's timed segments and repack per column.
-  // Clones keep the shared index cache untouched. Segments the day bounds clip
-  // away are dropped here too, otherwise they hold a column nobody can see and
-  // leave a phantom empty half beside the first in-bounds chip.
   const packed = useMemo(() => {
     const mine = segments.timed
       .filter((segment) => {
@@ -490,9 +459,6 @@ function EventCalendarResourceColumn({
     (state) => {
       const drag = state.drag;
       if (!drag || drag.proposedDayGranular) return null;
-      // Moves carry a proposedResourceId (they can cross columns); resizes stay
-      // in place and leave it undefined, so fall back to the event's own
-      // resource - otherwise the resize ghost is filtered out of every column.
       const targetResourceId = drag.proposedResourceId ?? drag.occurrence.event.resourceId;
       if (targetResourceId !== resource.id) return null;
       const from = Math.max(
@@ -525,9 +491,6 @@ function EventCalendarResourceColumn({
     },
   );
 
-  // Instants behind `draftWindow` below, for the range readout. Same
-  // resource filter, so a draft on a neighbouring resource never labels this
-  // column.
   const draftRange = useEventCalendarSelector<unknown, { start: Date; end: Date } | null>(
     (state) => {
       const draft = state.slotDraft;
@@ -576,8 +539,6 @@ function EventCalendarResourceColumn({
       className={cn(
         "relative min-w-0 border-e last:border-e-0",
         isOff && offClassName,
-        // the resource view is a single day, so today gets no column tint (the
-        // header marks it); only a consumer todayClassName can tint it
         isToday && viewConfig.todayClassName,
         viewConfig.dayClassName?.(day),
         viewConfig.classNames?.dayColumn,
@@ -621,14 +582,9 @@ function EventCalendarResourceColumn({
         const column = segment.column ?? 0;
         const span = segment.columnSpan ?? 1;
         const zIndex = segment.occurrence.event.zIndex ?? 10 + column;
-        // Strict side-by-side columns - no cascade overlap (fade-truncate +
-        // hover reveal carry the legibility); the ring separates neighbors.
         return (
           <div
             key={segment.occurrence.key}
-            // min-h keeps 15-min chips readable (Google-style: the block may
-            // slightly outgrow its true window); hover raises a squeezed
-            // cascade chip above its overlapping neighbors
             className="absolute z-(--ec-z) min-h-(--ec-event-min-h,1.5rem) px-0.5 hover:z-40"
             style={
               {
@@ -643,8 +599,6 @@ function EventCalendarResourceColumn({
               segment={segment}
               className={cn(
                 columnCount > 1 && "ring-background ring-1",
-                // short chips: single centered row, exact-fit line height so
-                // the title never slices mid-glyph
                 endMin - startMin < viewConfig.compactEventMinutes
                   ? "h-full gap-1 py-0 leading-4"
                   : "h-full flex-col items-start justify-start gap-0 py-1",
@@ -654,9 +608,6 @@ function EventCalendarResourceColumn({
           </div>
         );
       })}
-      {/* Standardized ghost (EVENT_CALENDAR_GHOST): faint drop placeholder
-          for moves (the cursor-attached carry clone owns the visual), dashed
-          clone for resizes, destructive marking when invalid. */}
       {dragGhost && (
         <div
           data-slot="event-calendar-drag-ghost"

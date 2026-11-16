@@ -103,7 +103,6 @@ function MissingHeartrateMark() {
   );
 }
 
-/** Goals share the calendar with activities; their event ids carry this prefix. */
 const GOAL_ID_PREFIX = "goal:";
 
 type CalendarItem = CalendarActivity | CalendarGoal;
@@ -121,7 +120,6 @@ function GoalMark() {
   return <FlagIcon aria-hidden className="size-3 shrink-0 text-(--ec-event-color)" />;
 }
 
-/** The event calendar renders its days and chips itself, so the time outs reach them through context. */
 const TimeOutOnContext = createContext<TimeOutOn>(() => null);
 
 function CalendarEventChip({
@@ -133,7 +131,6 @@ function CalendarEventChip({
   const { timeZone } = useEventCalendarSettings();
   const timeOutOn = useContext(TimeOutOnContext);
   const activity = occurrence.event.data;
-  // On a time out's day the chip's tint sits on the page colour, not on the hatch behind it.
   const backing = timeOutOn(getDayKey(occurrence.start, timeZone)) ? (
     <span aria-hidden className="bg-background absolute inset-0 -z-10" />
   ) : null;
@@ -266,7 +263,6 @@ function VisibleActivitiesPrefetch({ activities }: { activities: CalendarActivit
   return null;
 }
 
-/** Vertical day list of one training week: ReUI agenda rows plus rest days, for phone widths. */
 function ActivityDayListView() {
   const todayRef = useRef<HTMLDivElement | null>(null);
   const instance = useEventCalendar();
@@ -333,7 +329,6 @@ function ActivityDayListView() {
                     Today
                   </span>
                 ) : null}
-                {/* A day with nothing done says so in its header, so the week fits on screen. */}
                 {!timeOut && items.length === 0 ? (
                   <span className="text-muted-foreground font-normal">Rest</span>
                 ) : null}
@@ -391,11 +386,9 @@ function DiaryNav({
   atPresent: boolean;
   onStep: (direction: 1 | -1) => void;
   onToday: () => void;
-  /** Opens the jump picker; absent before the first activity is synced. */
   onJump?: () => void;
 }) {
   return (
-    // Phones lead with the range and keep Today and the arrows together at the right edge.
     <div className="flex min-w-0 items-center gap-1 px-2 py-2 sm:flex-wrap">
       <Button variant="ghost" size="sm" onClick={onToday}>
         Today
@@ -466,13 +459,11 @@ export function ActivityCalendar({
   const navigate = useNavigate();
   const router = useRouter();
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
-  // Phones always page one training week; desktop follows the athlete's calendar period.
   const phoneView = initialSettings.phoneCalendarView;
   const byMonth = isDesktop && initialSettings.calendarPeriod !== "weeks";
   const weeks = isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS;
   const currentMonth = useMemo(() => monthKey(new Date(), timeZone), [timeZone]);
   const currentWeek = useMemo(() => weekStartKey(new Date(), timeZone), [timeZone]);
-  // A link from the other view keeps its place in time.
   const cursorMonth = resolveDiaryCursorMonth(
     diary.month ?? (diary.week ? monthOfWeek(diary.week) : undefined),
     currentMonth,
@@ -490,7 +481,6 @@ export function ActivityCalendar({
     [byMonth, cursorMonth, weekRange.start, timeZone],
   );
   const cursor: DiarySearch = byMonth ? { month: cursorMonth } : { week: cursorWeek };
-  // The present stays out of the URL so a bare "/" keeps following today.
   const show = (next: DiarySearch) =>
     navigate({
       to: "/",
@@ -512,7 +502,6 @@ export function ActivityCalendar({
     show({ week: stepDiaryWeek(cursorWeek, direction, currentWeek, weeks) });
   const weekSwipe = useWeekSwipe({ onStep: stepWeek, canStepForward: cursorWeek < currentWeek });
 
-  // The month view still lays bars across its padded weeks, even with outside days hidden.
   const events = useMemo<CalendarEvent<CalendarItem>[]>(() => {
     const goalEvents = goals
       .filter((goal) => !byMonth || goal.date.startsWith(cursorMonth))
@@ -550,7 +539,6 @@ export function ActivityCalendar({
           data: activity,
         };
       });
-    // Goals first, so a race day leads with the goal and then what was done.
     return [...goalEvents, ...activityEvents];
   }, [activities, goals, sportTypes, timeZone, byMonth, cursorMonth]);
 
@@ -559,8 +547,6 @@ export function ActivityCalendar({
   const timeOutOn: TimeOutOn = (key) => timeOutOnDay(timeOuts, key, todayKey);
   const phoneBody = !isDesktop && phoneView !== "days";
 
-  // Phones show the week at its natural height and the page scrolls: a capped card scrolled the
-  // week inside itself on short iPhones, hiding Monday under the sticky day header.
   return (
     <Card className={cn("flex flex-none flex-col py-0 md:h-[720px]", !phoneBody && "min-h-80")}>
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
@@ -584,7 +570,6 @@ export function ActivityCalendar({
             renderEvent={renderCalendarEvent}
             renderEventTooltip={renderCalendarEventTooltip}
             renderAgendaEvent={renderAgendaEvent}
-            // A time out's hatch sits under the day's activities, inside the cell.
             dayClassName={(day) => (timeOutOn(getDayKey(day, timeZone)) ? "isolate" : undefined)}
             renderMonthCell={({ day, defaultContent }) => {
               const timeOut = timeOutOn(getDayKey(day, timeZone));

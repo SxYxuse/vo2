@@ -39,15 +39,10 @@ export function historyCompleteFromRun(status: string | null, streamsPending: nu
   return false;
 }
 
-/**
- * The first copy returns as soon as the newest page is stored, so onboarding can move on;
- * older history and streams follow on the next calls (ADR 0012).
- */
 export function stopsAfterNewestPage(input: { firstCopy: boolean; newestUpserted: number }) {
   return input.firstCopy && input.newestUpserted > 0;
 }
 
-/** Each check costs at least one Strava read; this gap keeps quota for history and streams. */
 export const NEW_ACTIVITY_CHECK_GAP_MS = 15 * 60_000;
 
 export type AutoResumePlan =
@@ -56,12 +51,6 @@ export type AutoResumePlan =
   | { kind: "wait"; until: number }
   | { kind: "idle" };
 
-/**
- * While the app is open, an incomplete local copy resumes on its own and an active pause is
- * waited out. The first copy and failed copies still wait for the athlete (ADR 0012). A
- * complete copy checks for new activities at most every 15 minutes since the last sync of any
- * kind (ADR 0020).
- */
 export function autoResumePlan(
   status: Pick<SyncStatus, "status" | "pausedUntil" | "lastAttemptAt">,
   now = Date.now(),
@@ -86,7 +75,6 @@ export type SyncResult = {
   done: boolean;
   pausedUntil: string | null;
   lastError: string | null;
-  /** Another request (a second device or tab) holds this athlete's sync; nothing was copied. */
   alreadyRunning: boolean;
   rateLimit: {
     shortRemaining: number;
@@ -95,10 +83,6 @@ export type SyncResult = {
   };
 };
 
-/**
- * While a stored pause is still in force, sync answers from it instead of asking Strava: a read
- * spent only to hear the limit again comes out of the quota the pause is waiting on (ADR 0002).
- */
 export function storedPauseResult(
   run: {
     status: string;
@@ -180,17 +164,14 @@ export function isTransientSyncError(error: unknown) {
   return error.message === "Invariant failed" || error.message.startsWith("Invariant failed:");
 }
 
-/** Dot color for the header sync button: fine, needs a look, broken, or nothing yet. */
 export type SyncTone = "ok" | "attention" | "error" | "idle";
 
-/** What the header says about the local copy: a short label, a dot tone, and a fuller name. */
 export function summarizeSyncStatus(
   status: SyncStatus | null,
   now: number,
 ): { label: string; tone: SyncTone; description: string } {
   if (!status) return { label: "Sync", tone: "idle", description: "Sync from Strava" };
   const last = status.lastAttemptAt ? new Date(status.lastAttemptAt) : null;
-  // Under a minute, or a server clock slightly ahead of the device, both read as just now.
   const ago = last
     ? now - last.getTime() < 60_000
       ? "just now"

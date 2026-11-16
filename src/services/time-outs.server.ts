@@ -22,7 +22,6 @@ const columns = {
   end: timeOuts.endDay,
 };
 
-/** The athlete's time outs, oldest first. */
 export function timeOutsFor(userId: string, tx: Tx | typeof db = db): Promise<TimeOut[]> {
   return tx
     .select(columns)
@@ -42,10 +41,6 @@ function startWindow(timeZone: string) {
   return timeOutStartWindow(dayKey(now, timeZone), weekStartKey(now, timeZone));
 }
 
-/**
- * Checks the athlete's other time outs and writes in one transaction, with their rows locked, so
- * an edit and a save at once can't both pass the overlap check.
- */
 async function writeChecked(
   userId: string,
   check: (others: TimeOut[], current: TimeOut | undefined) => string | null,
@@ -67,11 +62,6 @@ async function writeChecked(
   });
 }
 
-/**
- * Every write to a time out makes the coach plan's writing due, or pauses it while one is open,
- * as a load of Plan would; nothing happens under another planning style (ADR 0066). Imported
- * here, since the coach plan reads time outs from this module.
- */
 async function replan(userId: string) {
   const { startCoachPlanIfDue } = await import("./coach-plan.server.ts");
   await startCoachPlanIfDue(userId);
@@ -124,7 +114,6 @@ export async function endTimeOutImpl(id: string, timeZone: string) {
   const where = and(eq(timeOuts.id, id), eq(timeOuts.userId, userId));
   const [current] = await db.select(columns).from(timeOuts).where(where);
   if (!current || (current.end != null && current.end < today)) return;
-  // A time out from today on held no day yet, so being back means it never happened.
   if (current.start >= today) {
     await db.delete(timeOuts).where(where);
   } else {

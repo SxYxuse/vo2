@@ -44,10 +44,6 @@ export function isSettingsPath(pathname: string) {
   return pathname === "/settings" || pathname.startsWith("/settings/");
 }
 
-/**
- * Paces are running paces: only an athlete who shows a running sport type sees the section, so
- * one who never ran, or hid every running type, doesn't. Until settings load, every section shows.
- */
 export function showsSettingsSection(
   section: SettingsSection,
   sportTypes: Record<string, { visible: boolean }> | undefined,

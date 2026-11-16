@@ -46,7 +46,6 @@ function BestsPage() {
           data={data}
           copyIncomplete={copyIncomplete}
           search={search}
-          // Opening a board pushes history, so a back gesture closes the sheet.
           onSearchChange={(next, options) =>
             void navigate({ search: next, replace: options?.replace ?? false, resetScroll: false })
           }

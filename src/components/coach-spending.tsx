@@ -10,7 +10,6 @@ import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const count = new Intl.NumberFormat("en-US");
 
-/** A cent rounds most single answers to $0.00, which would read as free. */
 function costText(usd: number) {
   return usd > 0 && usd < 0.01 ? "< $0.01" : dollars.format(usd);
 }
@@ -40,7 +39,6 @@ function Month({ label, month }: { label: string; month: CoachSpendingMonth }) {
   );
 }
 
-/** Settings → Coach: what the coach cost on the athlete's own keys, this month and last. */
 export function CoachSpendingSection() {
   const { data, isError } = useQuery(coachSpendingQueryOptions);
   return (

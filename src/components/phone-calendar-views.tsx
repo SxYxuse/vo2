@@ -22,20 +22,8 @@ import { addDayKey, dayKey } from "@/services/day-key.ts";
 import type { DiarySearch } from "@/services/diary-window.ts";
 import { timeOutKind, type TimeOut } from "@/services/time-outs.ts";
 
-/*
- * The phone calendar's other layouts, chosen in Settings → Calendar while the athlete finds the
- * one that suits them. Each reads day keys ("2026-11-10") in the athlete's time zone, like the
- * jump picker, so none of them needs the event calendar's own layout engine.
- */
-
-/** The time out a day key falls in, or null (ADR 0066). */
 export type TimeOutOn = (key: string) => TimeOut | null;
 
-/**
- * A day of a time out: the hatch behind the day, so its activities still lead, and the kind for
- * screen readers. The parent is `relative isolate`, so the hatch sits over its background but
- * under what it holds.
- */
 export function TimeOutMark({ timeOut, className }: { timeOut: TimeOut; className?: string }) {
   return (
     <span
@@ -53,7 +41,6 @@ export function TimeOutMark({ timeOut, className }: { timeOut: TimeOut; classNam
 type Day = { activities: CalendarActivity[]; goals: CalendarGoal[] };
 type ByDay = Map<string, Day>;
 
-/** Activities and goals by day key, activities in start order. */
 export function useItemsByDay(
   activities: CalendarActivity[],
   goals: CalendarGoal[],
@@ -82,7 +69,6 @@ const WEEKDAY = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "
 const weekdayOf = (key: string) => WEEKDAY.format(keyDate(key));
 const dayOf = (key: string) => Number(key.slice(8));
 
-/** "1 h 35", "45 min". */
 function formatHours(seconds: number) {
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} min`;
@@ -192,7 +178,6 @@ function DayStamp({ dayKey: key }: { dayKey: string }) {
   );
 }
 
-/** The days' goals and activities, newest day first, each row stamped with its day. */
 function DayRows({
   days,
   byDay,
@@ -222,7 +207,6 @@ function DayRows({
   return rows.length ? <div className="divide-y border-t">{rows}</div> : null;
 }
 
-/** An empty week says so once, with last week for comparison, instead of seven rest days. */
 function EmptyWeek({ thisWeek, previous }: { thisWeek: boolean; previous: Totals }) {
   return (
     <div className="flex flex-col items-center gap-1 border-t px-4 py-8 text-center">
@@ -263,7 +247,6 @@ type WeekViewProps = RowProps & {
   timeOutOn: TimeOutOn;
 };
 
-/** Week strip: the week's days in a row with a dot per sport, then only what was done. */
 export function WeekStripView({
   week,
   byDay,
@@ -276,7 +259,6 @@ export function WeekStripView({
   const days = weekDays(week);
   const totals = totalsOf(byDay, days);
   return (
-    // pan-y, as in the day list: a sideways swipe changes the week instead of going back.
     <div className="flex touch-pan-y flex-col">
       <ol aria-label="Days of the week" className="grid grid-cols-7 gap-0.5 px-2 pb-2">
         {days.map((key) => {
@@ -340,7 +322,6 @@ export function WeekStripView({
   );
 }
 
-/** Week summary: the week's totals and a bar per day, coloured by sport, then the activities. */
 export function WeekSummaryView({
   week,
   byDay,
@@ -357,7 +338,6 @@ export function WeekSummaryView({
   );
   const longest = Math.max(...dayTime, 1);
   return (
-    // pan-y, as in the day list: a sideways swipe changes the week instead of going back.
     <div className="flex touch-pan-y flex-col">
       <dl className="grid grid-cols-3 gap-2 px-4 pb-1">
         {[

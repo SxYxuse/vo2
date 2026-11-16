@@ -10,23 +10,13 @@ import {
   type RideSummary,
 } from "./ride-analysis.ts";
 
-/*
- * A power file is a ride's FIT file imported from the athlete's head unit (ADR 0056). It carries
- * what Strava's streams drop: each pedal's share of power, where on the pedal the force goes, the
- * arc of each stroke, seated and standing, and the gears. The analysis is stored without FTP or
- * weight, so zones and quadrants follow the athlete's current FTP when the page is read.
- */
-
-/** Bump when the stored shape or the math changes; the stored file is analysed again on view. */
 export const POWER_FILE_ANALYSIS_VERSION = 1;
 
-/** Longest gap one sample may stand for. Records stop while the timer is paused. */
 const MAX_SAMPLE_SEC = 10;
 const POWER_BIN_W = 10;
 const CADENCE_BIN_RPM = 5;
 const FORCE_CADENCE_BIN_RPM = 2;
 const FORCE_TORQUE_BIN_NM = 2;
-/** Below this cadence torque is a standing start or a sensor glitch, not pedaling. */
 const MIN_TORQUE_CADENCE = 20;
 const MAX_TORQUE_NM = 250;
 const SERIES_POINTS = 600;
@@ -36,7 +26,6 @@ const CURVE_DURATIONS = [
   1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800, 2700, 3600,
   5400, 7200, 10800, 14400, 18000,
 ];
-/** A share of FTP at or below which each ride zone ends (Zones in `cycling.md`). */
 const ZONE_CEILINGS: Record<RideZone, number> = {
   recovery: 0.55,
   endurance: 0.75,
@@ -50,40 +39,30 @@ const ZONE_CEILINGS: Record<RideZone, number> = {
 
 export type FitAngles = [start: number, end: number];
 
-/** One record of the file, read into plain numbers by `power-file-fit.server.ts`. */
 export type FitSample = {
-  /** Seconds since the ride started. */
   t: number;
   watts: number | null;
   heartrate: number | null;
   cadence: number | null;
-  /** m/s */
   speed: number | null;
   distance: number | null;
   altitude: number | null;
-  /** The right pedal's share of power, %; the left pedal has the rest. */
   rightPct: number | null;
-  /** Platform center offset, mm: positive is toward the outside of the pedal. */
   pcoLeft: number | null;
   pcoRight: number | null;
-  /** Crank angles where the pedal makes positive power, degrees from top dead center. */
   phaseLeft: FitAngles | null;
   phaseRight: FitAngles | null;
-  /** Crank angles where the pedal makes its peak power. */
   peakLeft: FitAngles | null;
   peakRight: FitAngles | null;
   teLeft: number | null;
   teRight: number | null;
   psLeft: number | null;
   psRight: number | null;
-  /** Null when the file has no rider positions. */
   standing: boolean | null;
-  /** Chainring and cog teeth, from electronic shifting. */
   gear: [front: number, rear: number] | null;
 };
 
 export type PowerFileLap = {
-  /** Seconds since the ride started. */
   startSec: number;
   movingSec: number;
   distanceM: number | null;
@@ -111,7 +90,6 @@ export type PowerMeterInfo = {
 
 export type FitRide = {
   start: Date;
-  /** Strava's name for the kind of ride, so VO2's ride rules apply. */
   sportType: string;
   elapsedSec: number;
   timerSec: number | null;
@@ -130,7 +108,6 @@ export type FitRide = {
   samples: FitSample[];
 };
 
-/** Weight, Σ w·sin and Σ w·cos of start and end, and Σ w·arc: angles average around the circle. */
 type AngleSums = [
   weight: number,
   startSin: number,
@@ -142,15 +119,11 @@ type AngleSums = [
 type MeanSums = [count: number, sum: number];
 type SideSums = { pco: MeanSums; phase: AngleSums; peak: AngleSums; te: MeanSums; ps: MeanSums };
 
-/** Sums that merge by adding, so power bins can be pooled into any FTP's zones later. */
 export type PedalSums = {
   sec: number;
-  /** Σ watts·s */
   work: number;
   pedalSec: number;
-  /** Σ rpm·s while pedaling */
   cadence: number;
-  /** Σ watts·s where balance is known, and Σ watts·s·right %. */
   balance: MeanSums;
   left: SideSums;
   right: SideSums;
@@ -158,7 +131,6 @@ export type PedalSums = {
 
 export type PowerFileSeries = {
   bucketSec: number;
-  /** Moving seconds at the start of each bucket. */
   t: number[];
   watts: (number | null)[];
   heartrate: (number | null)[];
@@ -210,18 +182,14 @@ export type PowerFileAnalysis = {
     avg: number | null;
     max: number | null;
     coastingSec: number;
-    /** [rpm bin start, seconds] while pedaling. */
     histogram: [number, number][];
   } | null;
   torque: { avg: number; max: number } | null;
-  /** [rpm bin start, Nm bin start, seconds] while pedaling, for quadrant analysis. */
   forceCells: [number, number, number][];
-  /** [watts bin start, sums]: zones and pedaling by zone are pooled from these. */
   powerBins: [number, PedalSums][];
   seated: PedalSums | null;
   standing: PedalSums | null;
   standCount: number | null;
-  /** [mm, left seconds, right seconds] */
   pcoHistogram: [number, number, number][];
   laps: PowerFileLap[];
   gears: {
@@ -237,7 +205,6 @@ export type PowerFileAnalysis = {
   quality: {
     samples: number;
     missingPowerSec: number;
-    /** Share of pedaling time with balance, and with pedal stroke data. Null on a one-sided meter. */
     balancePct: number | null;
     dynamicsPct: number | null;
   };
@@ -274,7 +241,6 @@ export function emptyPedalSums(): PedalSums {
 
 const RAD = Math.PI / 180;
 
-/** Degrees from start to end going forward around the crank. */
 function arcLength(start: number, end: number) {
   return (((end - start) % 360) + 360) % 360;
 }
@@ -299,7 +265,6 @@ function addAngles(target: AngleSums, angles: FitAngles | null, weight: number) 
 
 function addSample(sums: PedalSums, sample: FitSample, dt: number) {
   const watts = sample.watts ?? 0;
-  // Balance and the stroke angles are weighed by power: a soft pedal stroke says little.
   const weight = watts * dt;
   sums.sec += dt;
   sums.work += weight;
@@ -351,7 +316,6 @@ export function mergePedalSums(target: PedalSums, source: PedalSums) {
   addSide(target.right, source.right);
 }
 
-/** Rounds the stored sums: the analysis is kept as JSON and read on every view. */
 function compactSums(sums: PedalSums): PedalSums {
   const compact = <T extends number[]>(values: T) => values.map((value) => round(value, 1)) as T;
   const side = (value: SideSums): SideSums => ({
@@ -372,7 +336,6 @@ function compactSums(sums: PedalSums): PedalSums {
   };
 }
 
-/** How long each sample stands for: a long gap is a pause, so the sample counts once. */
 function sampleSeconds(samples: FitSample[], index: number) {
   const next = samples[index + 1];
   if (!next) return 1;
@@ -471,7 +434,6 @@ function gearUses(samples: FitSample[], ride: FitRide): PowerFileAnalysis["gears
   const list = [...uses.values()];
   const chainrings = [...new Set(list.map((use) => use.front))].sort((a, b) => a - b);
   const cogs = [...new Set(list.map((use) => use.rear))].sort((a, b) => a - b);
-  // Cross-chaining: the big ring on the two biggest cogs, or the small ring on the two smallest.
   let crossChainSec: number | null = null;
   if (chainrings.length >= 2 && cogs.length >= 4) {
     const small = chainrings[0];
@@ -505,7 +467,6 @@ function gearUses(samples: FitSample[], ride: FitRide): PowerFileAnalysis["gears
   };
 }
 
-/** Everything about the ride that does not depend on the athlete's FTP or weight. */
 export function buildPowerFileAnalysis(ride: FitRide): PowerFileAnalysis {
   const samples = ride.samples;
   const bins = new Map<number, PedalSums>();
@@ -710,9 +671,6 @@ export function isPowerFileAnalysis(value: unknown): value is PowerFileAnalysis 
   return analysis.version === POWER_FILE_ANALYSIS_VERSION && Array.isArray(analysis.powerBins);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Read time: the athlete's FTP and weight turn the sums into zones, quadrants, and W/kg.
-
 export type StrokeAngles = { start: number; end: number; arc: number };
 
 export type SidePedaling = {
@@ -741,10 +699,8 @@ export type PowerZoneRow = Pedaling & {
 };
 
 export type Quadrants = {
-  /** The ride's pedaling cadence, and the torque that makes FTP at that cadence. */
   cadence: number;
   torque: number;
-  /** % of pedaling time: I high force and fast, II high force and slow, III low and slow, IV low force and fast. */
   pct: [number, number, number, number];
 };
 

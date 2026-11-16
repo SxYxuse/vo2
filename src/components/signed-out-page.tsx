@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
 
 export function SignedOutPage() {
-  // Sign-out clears the coach chat, but an athlete deleted from Strava's side lands here
-  // without signing out.
   useEffect(() => {
     void removeCoachChats();
   }, []);

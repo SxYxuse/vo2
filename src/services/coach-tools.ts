@@ -140,8 +140,6 @@ export const showVisualDef = toolDefinition({
   }),
 });
 
-// The coach plan's tools (ADR 0038), given to the chat only when the athlete follows the coach plan.
-
 export const getCoachPlanDef = toolDefinition({
   name: "get_coach_plan",
   description:

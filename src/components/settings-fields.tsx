@@ -110,8 +110,6 @@ export function BirthDateField<T extends ProfileFormValues>({
                   onSelect={(next) => {
                     if (!next) return;
                     field.onChange(formatBirthDate(next));
-                    // Picking the day finishes the field; on a phone the open calendar would
-                    // otherwise cover the step's Continue button.
                     setPickerOpen(false);
                   }}
                 />
@@ -173,8 +171,6 @@ export function WeightField<T extends ProfileFormValues>({
   );
 }
 
-/** Settings → Training: the week's shape, saved as the athlete edits it (ADR 0026). */
-/** The coach plan or off (ADR 0050). */
 export function PlanningStyleChoice({
   idPrefix,
   value,
@@ -186,7 +182,6 @@ export function PlanningStyleChoice({
   value: PlanningStyle;
   onChange: (next: PlanningStyle) => void;
   disabled?: boolean;
-  /** False where the page heading already names the choice, as in onboarding. */
   titled?: boolean;
 }) {
   return (

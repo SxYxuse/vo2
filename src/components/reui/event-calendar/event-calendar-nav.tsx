@@ -28,8 +28,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CalendarIcon } from "lucide-react";
 
-/** Configured nav button variant/size (viewConfig.navButtonVariant/Size)
- *  plus the shared classNames.navButton hook, merged on every nav button. */
 function useNavButtonProps(): {
   variant: "ghost" | "outline" | "secondary" | "default";
   size: "sm" | "default";
@@ -45,7 +43,6 @@ function useNavButtonProps(): {
   };
 }
 
-/** Resolved nav tooltip policy (viewConfig.navTooltips + classNames.navTooltip). */
 function useNavTooltipConfig(): {
   disabled: boolean;
   side: "top" | "bottom" | "left" | "right";
@@ -58,9 +55,6 @@ function useNavTooltipConfig(): {
   const config = viewConfig.navTooltips === false ? undefined : viewConfig.navTooltips;
   return {
     disabled: viewConfig.navTooltips === false,
-    // the nav sits at the top of the calendar, so tooltips open upward by
-    // default (away from the grid); collision flipping still drops them below
-    // when there is no room above
     side: config?.side ?? "top",
     delay: config?.delay ?? 600,
     closeDelay: config?.closeDelay ?? 0,
@@ -85,8 +79,6 @@ type NavButtonProps = Omit<useRender.ComponentProps<"button">, "children"> & {
   tooltip?: ReactNode | null;
 };
 
-/** Hover/focus-visible tooltip wrapper; renders the bare button when disabled
- *  (per-button content=null or viewConfig.navTooltips=false). */
 function NavTooltip({
   content,
   children,
@@ -231,8 +223,6 @@ function EventCalendarViewSwitcher({
   const nav = useNavButtonProps();
   const tooltips = useNavTooltipConfig();
   const labels = settings.i18n.labels;
-  // Controlled open: selecting a view swaps the whole content subtree in the
-  // same click, so closing must not depend on the menu's internal handler.
   const [open, setOpen] = useState(false);
   // Hover-only tooltip: when the menu closes, Base UI focuses the trigger
   // again and a focus-opened tooltip would flash - ignore focus opens.
@@ -254,15 +244,9 @@ function EventCalendarViewSwitcher({
         if (next) setTipOpen(false);
       }}
     >
-      {/* Tooltip on an overlay-opener: hover-only (focus opens ignored) and
-          force-closed while the menu is up, so it never lingers or flashes
-          when focus returns on close. Inherits the nav TooltipProvider's
-          delay/closeDelay/timeout. */}
       <Tooltip
         open={tipOpen && !open}
         onOpenChange={(next: boolean, details: { reason?: string }) => {
-          // opens are hover-only; the trigger-focus open that follows a
-          // menu close is ignored, closes always land
           if (next && details?.reason !== "trigger-hover") return;
           setTipOpen(next);
         }}
@@ -320,7 +304,6 @@ function EventCalendarViewSwitcher({
                   onClick={() => selectView("days", { dayCount: count })}
                 >
                   {settings.i18n.viewNames.days(count)}
-                  {/* hint derived from the preset itself, not i18n's default */}
                   {viewConfig.enableShortcuts && (
                     <EventCalendarViewShortcut>{count}</EventCalendarViewShortcut>
                   )}
@@ -373,7 +356,6 @@ interface EventCalendarDatePickerProps extends Omit<
   tooltip?: ReactNode | null;
 }
 
-/** Views whose period reads better as a highlighted range. */
 const RANGE_VIEWS: CalendarView[] = ["week", "days", "agenda"];
 
 /**
@@ -510,7 +492,6 @@ function EventCalendarNav({
       className,
     ),
     children: children ?? (
-      // Shared provider: first tooltip waits, moving between buttons is instant
       <TooltipProvider
         delay={tooltips.delay}
         closeDelay={tooltips.closeDelay}
@@ -522,8 +503,6 @@ function EventCalendarNav({
           <EventCalendarNavPrev />
           <EventCalendarNavNext />
         </div>
-        {/* ms-3 sets the title apart from the tight control cluster so the
-            period reads as its own group, not another button */}
         <EventCalendarTitle className="ms-3" />
         <div className="grow" />
       </TooltipProvider>

@@ -10,7 +10,6 @@ import {
   type ActivityAnalysisSnapshot,
 } from "./activity-analysis.types.ts";
 
-/** One activity's overview and samples, read by the coach chat's activity tools. */
 export async function loadActivityAnalysisSnapshot(activityId: string, userId: string) {
   const [activityRows, metricsRows] = await Promise.all([
     db

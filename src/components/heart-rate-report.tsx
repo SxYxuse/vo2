@@ -56,7 +56,6 @@ function pct(share: number) {
 
 type ChartRow = HeartRateReportBucket & Record<HeartRateZoneId, number>;
 
-/** Time in zone per day, week, or month of the selected period, with averages and intensity split. */
 export function HeartRateReportCard({
   sport,
   period,

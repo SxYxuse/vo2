@@ -14,14 +14,9 @@ type CoachSearch = {
 const MAX_ASK = 500;
 
 export const Route = createFileRoute("/_app/coach")({
-  // `thread` is the chat open; without one, a new chat starts.
-  // `activity` starts the message with that activity mentioned (Ask the coach on its page).
-  // Strava ids are numeric, so the router parses them as numbers.
-  // `power` brings in a power file, and `ask` starts the message with a question (Ask the coach on
-  // a power file and its sections).
-  // `change` comes from "Ask the coach to change my plan" on the coach plan.
   validateSearch: (search: Record<string, unknown>): CoachSearch => ({
     ...(typeof search.thread === "string" && search.thread ? { thread: search.thread } : {}),
+    // Strava ids are numeric, so the router parses them as numbers.
     ...(typeof search.activity === "string" || typeof search.activity === "number"
       ? { activity: String(search.activity) }
       : {}),
@@ -45,14 +40,11 @@ function CoachSkeleton() {
 function CoachPage() {
   const { thread, activity, power, ask, change } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  // The chat's id is in the address from the start, so a reload or a return keeps it.
   if (!thread) {
     return (
       <Navigate to="/coach" search={(prev) => ({ ...prev, thread: crypto.randomUUID() })} replace />
     );
   }
-  // The chat renders on the client only: it loads from the server, or from the copy saved for
-  // offline, through TanStack AI.
   return (
     <ClientOnly fallback={<CoachSkeleton />}>
       <CoachChat
@@ -62,7 +54,6 @@ function CoachPage() {
         initialPowerFileId={power}
         initialQuestion={ask}
         planChange={change}
-        // Once sent, the mention is in the chat; a reload must not offer it again.
         onInitialSent={() =>
           void navigate({
             search: ({ activity: _activity, power: _power, ask: _ask, ...rest }) => rest,

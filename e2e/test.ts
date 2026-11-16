@@ -4,11 +4,6 @@ import pg from "pg";
 import { E2E_NOW, E2E_URL, e2eDatabaseUrl } from "./env.ts";
 import { waitForHydration } from "./onboard.ts";
 
-/**
- * Every page starts at the server's clock (e2e/fixed-clock.ts), so "today" matches the data, and
- * never leaves the app: map tiles and the like would make runs depend on the network. Every spec
- * that runs after the setup starts from the athlete the setup left (resetAthlete).
- */
 export const test = base.extend<{ freshAthlete: void }>({
   freshAthlete: [
     // Playwright reads a fixture's dependencies from this pattern, and this one needs none.
@@ -31,23 +26,12 @@ export const test = base.extend<{ freshAthlete: void }>({
 
 export { expect, type Locator, type Page };
 
-/** Where the setup keeps a copy of the athlete it onboarded. */
 const SNAPSHOT_SCHEMA = "e2e_athlete";
 
-/**
- * The account, so the saved sign-in stays valid, and the synced streams, which no spec changes
- * and which would be slow to copy before every test. Every other table is the athlete's state:
- * settings, paces, goals, the plan, the models, keys, chats, power files.
- */
 const NOT_RESET = ["user", "session", "account", "verification", "activity_streams"];
 
-/**
- * Activities are restored in place: deleting them would delete their streams. A heart-rate
- * change rescores every activity's load, and nothing scores them again once it is undone.
- */
 const UPDATED_IN_PLACE = "activities";
 
-/** A client on the e2e database, closed once `use` is done. */
 export async function withDatabase<T>(use: (client: pg.Client) => Promise<T>) {
   const client = new pg.Client({ connectionString: e2eDatabaseUrl() });
   await client.connect();
@@ -58,7 +42,6 @@ export async function withDatabase<T>(use: (client: pg.Client) => Promise<T>) {
   }
 }
 
-/** Run by the setup once it has onboarded the athlete: what every later spec starts from. */
 export async function snapshotAthlete() {
   await withDatabase(async (client) => {
     const { rows } = await client.query<{ tablename: string }>(
@@ -75,12 +58,6 @@ export async function snapshotAthlete() {
   });
 }
 
-/**
- * Puts the athlete back as the setup left them, before every test, so a journey that fails
- * partway, or the phone run before the desktop run, leaves nothing behind. A plan still being
- * written for the last test can't land afterwards: it saves only while it holds its claim. A coach
- * reply still streaming could, so chat journeys wait for the reply.
- */
 export async function resetAthlete() {
   await withDatabase(async (client) => {
     const { rows } = await client.query<{ tablename: string }>(
@@ -109,7 +86,6 @@ export async function resetAthlete() {
   });
 }
 
-/** Waits until the page has its data and answers taps: hydrated, nothing in flight, no skeleton. */
 export async function settle(page: Page) {
   await waitForHydration(page);
   await page.waitForLoadState("networkidle");
@@ -117,19 +93,12 @@ export async function settle(page: Page) {
   await expect(page.getByRole("status", { name: "Loading" })).toHaveCount(0);
 }
 
-/** "Synced just now" turns into "Synced 1 min ago" while the suite runs. */
 export function syncButton(page: Page) {
   return page.getByRole("button", { name: /Sync from Strava/ });
 }
 
-/** The offline copy's saved views (offline-copy.ts), by the first part of their query key. */
 type OfflineViews = Record<string, Record<string, unknown> | undefined>;
 
-/**
- * A reload restores the views saved on the device, written at most once a second, so a reload
- * right after a save can bring back the state from before it. Waits until the saved views pass
- * `predicate`; no fixed wait is ever long enough for sure.
- */
 export async function waitForOfflineCopy(page: Page, predicate: (views: OfflineViews) => boolean) {
   await expect
     .poll(async () =>
@@ -161,7 +130,6 @@ export async function waitForOfflineCopy(page: Page, predicate: (views: OfflineV
     .toBe(true);
 }
 
-/** Opens `path` as the server has it now: drops the offline copy first, then loads. */
 export async function openFresh(page: Page, path: string) {
   await page.goto(path);
   await page.evaluate(() => indexedDB.deleteDatabase("keyval-store"));

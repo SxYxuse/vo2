@@ -4,10 +4,8 @@ import { weekBudgets, type SportDay } from "./coach-plan-budget.ts";
 import { addDayKey } from "./day-key.ts";
 import type { Goal } from "./season.types.ts";
 
-/** A Monday. */
 const FIRST_WEEK = "2027-01-04";
 
-/** Three 10 km runs every week for the twelve weeks before `FIRST_WEEK`: 30 km a week. */
 const runs: SportDay[] = Array.from({ length: 12 }, (_, week) =>
   [0, 2, 4].map((day) => ({
     date: addDayKey(FIRST_WEEK, -7 * (week + 1) + day),

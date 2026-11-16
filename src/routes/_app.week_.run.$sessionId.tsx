@@ -7,7 +7,6 @@ import { coachPlanQueryOptions, loaderQuery, planningStyleOf } from "@/lib/queri
 
 export const Route = createFileRoute("/_app/week_/run/$sessionId")({
   loader: async ({ context }) => {
-    // A coach-plan run, ride, or swim; with planning off there is no plan to show.
     if ((await planningStyleOf(context)) !== "coachPlan") {
       throw redirect({ to: "/week", replace: true });
     }

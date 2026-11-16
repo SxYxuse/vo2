@@ -22,10 +22,6 @@ type TapTooltipProps = Omit<
   "open" | "defaultOpen" | "onOpenChange"
 >;
 
-/**
- * Tooltip that also works on touch screens, which have no hover: a tap on the trigger
- * toggles it and a tap outside closes it. Mouse and keyboard behave like the plain tooltip.
- */
 export function TapTooltip(props: TapTooltipProps) {
   const [open, setOpen] = useState(false);
   const lastTapAt = useRef(0);
@@ -81,14 +77,12 @@ export function TapTooltipTrigger({
 
 export { TooltipContent as TapTooltipContent };
 
-/** Small "i" button that explains the thing next to it; opens on hover, focus, or tap. */
 export function InfoTooltip({
   label,
   children,
   className,
   iconClassName,
 }: {
-  /** Accessible name, such as "About TSS". */
   label: string;
   children: React.ReactNode;
   className?: string;
@@ -103,7 +97,6 @@ export function InfoTooltip({
             variant="ghost"
             size="icon-xs"
             aria-label={label}
-            // the icon stays small; the hit area grows to a 44px thumb-sized target
             className="relative after:absolute after:-inset-[0.8rem]"
           />
         }

@@ -1,17 +1,9 @@
 import { createHash } from "node:crypto";
 
-// Pure helpers for worktree-setup.ts and worktree-prune.ts, kept apart so they test without Docker.
-
 export const SHARED_DATABASE = "vo2";
 export const DATABASE_PREFIX = "vo2_wt_";
 export const PORT_RANGE = { first: 3100, last: 3999 } as const;
-/**
- * The main checkout's dev-server port (`.env.example`). Not 3000, which other servers and most
- * Node projects on the same machine want. Outside PORT_RANGE, as are its e2e ports at +1000 and
- * +2000 (e2e/env.ts), so they never meet a worktree's.
- */
 export const DEFAULT_DEV_PORT = 3090;
-/** Not 5432, which other projects' Postgres on the same machine also wants. */
 export const DEFAULT_PG_PORT = 55432;
 /** Before #208 every checkout's DATABASE_URL named this port. */
 const LEGACY_PG_PORT = "5432";
@@ -24,7 +16,6 @@ export function pathHash(worktreePath: string) {
   return createHash("sha256").update(worktreePath).digest("hex").slice(0, HASH_LENGTH);
 }
 
-/** `fix/app-slowness` at some path becomes `vo2_wt_fix_app_slowness_a1b2c3`. */
 export function worktreeDatabaseName(branch: string, worktreePath: string) {
   const room = MAX_IDENTIFIER - DATABASE_PREFIX.length - 1 - HASH_LENGTH;
   const slug = branch
@@ -36,7 +27,6 @@ export function worktreeDatabaseName(branch: string, worktreePath: string) {
   return `${DATABASE_PREFIX}${slug || "head"}_${pathHash(worktreePath)}`;
 }
 
-/** Only identifiers that pass this are ever interpolated into SQL. */
 export function assertSafeIdentifier(name: string) {
   if (!/^[a-z0-9_]+$/.test(name) || name.length > MAX_IDENTIFIER) {
     throw new Error(`Refusing unsafe database name ${JSON.stringify(name)}`);
@@ -59,7 +49,6 @@ export function databaseUrl(database: string, port: number) {
   return `postgresql://vo2:vo2@localhost:${port}/${database}`;
 }
 
-/** Moves a local DATABASE_URL still on 5432 to `port`; any other URL is left alone. */
 export function migrateLegacyPgPort(envText: string, port: number) {
   const value = readEnvValue(envText, "DATABASE_URL");
   if (!value) return envText;
@@ -83,7 +72,6 @@ export function databaseFromUrl(url: string | undefined) {
   }
 }
 
-/** Before the vo2 rename the server's user and database were `vo`; that role no longer exists. */
 export function usesRenamedVoDatabase(envText: string) {
   const url = readEnvValue(envText, "DATABASE_URL");
   if (!url) return false;
@@ -103,7 +91,6 @@ export function readEnvValue(text: string, key: string) {
   return undefined;
 }
 
-/** Rewrites `key=value` lines in place, appending missing keys, and keeps everything else. */
 export function setEnvValues(text: string, values: Record<string, string>) {
   const pending = new Map(Object.entries(values));
   const lines = text.split("\n").map((line) => {
@@ -118,11 +105,7 @@ export function setEnvValues(text: string, values: Record<string, string>) {
   return `${lines.join("\n")}\n`;
 }
 
-export type EnvPlan =
-  /** No `.env` yet, or it already uses this worktree's database: write the three keys. */
-  | { kind: "write" }
-  /** `.env` uses another database, such as the shared `vo2`: leave it unless `--isolate`. */
-  | { kind: "keep"; database: string | undefined };
+export type EnvPlan = { kind: "write" } | { kind: "keep"; database: string | undefined };
 
 export function planEnv(existing: string | undefined, database: string, isolate: boolean): EnvPlan {
   if (existing === undefined || isolate) return { kind: "write" };
@@ -134,7 +117,6 @@ export function inPortRange(port: number) {
   return Number.isInteger(port) && port >= PORT_RANGE.first && port <= PORT_RANGE.last;
 }
 
-/** Keeps a port this worktree already owns, so a second run does not move the dev server. */
 export async function pickPort(
   current: number | undefined,
   taken: ReadonlySet<number>,

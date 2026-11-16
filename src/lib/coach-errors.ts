@@ -1,6 +1,5 @@
 import { ByokMissingError } from "@tanstack/ai/byok";
 
-/** The reason a coach request failed, in the athlete's words, without switching model or key. */
 export function coachErrorMessage(error: Error) {
   const text = error.message.toLowerCase();
   if (

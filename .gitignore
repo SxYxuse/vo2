@@ -12,19 +12,15 @@ dist-ssr
 __unconfig*
 todos.json
 
-# dotenv environment variable files
 .env.*
 !.env.example
 
-# Quality reports (CI uploads them for the PR comment)
 .lighthouseci
 lighthouse-report
 jscpd-report
 
-# Playwright: signed-in state, run reports, and failure artifacts (baselines live in e2e/screenshots)
 e2e/.auth
 playwright-report
 test-results
 
-# vp run dev:seed: the mock athlete's signed-in browser state
 .dev-seed

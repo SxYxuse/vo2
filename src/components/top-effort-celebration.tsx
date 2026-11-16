@@ -38,14 +38,10 @@ const CARD_DATE = new Intl.DateTimeFormat("en-US", {
   month: "short",
   day: "numeric",
 });
-/** Past this many cards, dots give way to a "3 / 12" counter. */
 const MAX_DOTS = 5;
-/** A drag this far, in pixels, turns the card. */
 const SWIPE_PX = 60;
-/** The opening deal, from the first card's delay to the last card landing. */
 const DEAL_MS = 1200;
 
-/** Gold, silver, and bronze for the first three places all time; plain cards for the rest. */
 const MEDAL: Record<number, CSSProperties> = {
   1: {
     background:
@@ -68,13 +64,11 @@ function cardTitle(placement: TopEffortPlacement) {
   return `${label} · ${SPORT_NOUN[placement.sport]}`;
 }
 
-/** "All time · #1 in 2026", or "In 2026" for a place within the year only. A PB tops its year too. */
 function rankText({ allTimeRank, yearRank, year }: TopEffortPlacement) {
   if (!allTimeRank) return `In ${year}`;
   return allTimeRank !== 1 && yearRank ? `All time · #${yearRank} in ${year}` : "All time";
 }
 
-/** "PB", "#4": the place the card leads with, all time when it has one. */
 function rankBadge({ allTimeRank, yearRank }: TopEffortPlacement) {
   return allTimeRank === 1 ? "PB" : `#${allTimeRank ?? yearRank}`;
 }
@@ -90,18 +84,11 @@ function otherModalOpen() {
   );
 }
 
-/**
- * Congratulates the athlete on top 10 efforts found by a sync, once, as a deck of cards
- * (ADR 0027). It waits for any other dialog to close first.
- */
 export function TopEffortCelebration() {
   const queryClient = useQueryClient();
   const { data } = useQuery(topEffortCelebrationsQueryOptions);
-  // What is on screen stays put while a later sync refetches the query underneath.
   const [shown, setShown] = useState<TopEffortCelebrations | null>(null);
   const [index, setIndex] = useState(0);
-  // Opening an activity steps the deck aside; it comes back, on the same card, once the
-  // athlete leaves that activity, so the other cards aren't lost.
   const [away, setAway] = useState<{ path: string; arrived: boolean } | null>(null);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
@@ -185,7 +172,6 @@ function CelebrationContent({
   const isDesktop = useIsDesktop();
   const [flipped, setFlipped] = useState(false);
   const count = placements.length;
-  // Past the last card the deck starts over, and back from the first goes to the last.
   const go = (step: number) => {
     setFlipped(false);
     onIndex((index + step + count) % count);
@@ -267,12 +253,10 @@ function CelebrationContent({
   );
 }
 
-/** A year-only place opens that year on the bests page, so the board shows the ranking. */
 function periodOf(placement: TopEffortPlacement) {
   return placement.allTimeRank ? ("all" as const) : (`${placement.year}` as `${number}`);
 }
 
-/** Where a card sits relative to the front one: turned away, in front, or fanned behind. */
 function stackStyle(offset: number, dragX: number): CSSProperties {
   if (offset === -1) return { transform: "translateX(-130%) rotate(-14deg)", opacity: 0 };
   if (offset === 0) {
@@ -285,10 +269,6 @@ function stackStyle(offset: number, dragX: number): CSSProperties {
   return { transform: "scale(0.9)", opacity: 0 };
 }
 
-/**
- * A card's place in the deck going round: 0 in front, 1 and 2 fanned behind, -1 the card just
- * turned away. With three cards or fewer every other card is behind, so none is turned away.
- */
 function deckOffset(at: number, index: number, count: number) {
   const behind = (at - index + count) % count;
   return count > 3 && behind === count - 1 ? -1 : behind;
@@ -314,7 +294,6 @@ function Deck({
   const [dragX, setDragX] = useState(0);
   const start = useRef<number | null>(null);
   const dragged = useRef(false);
-  // Only the opening deal animates; a card coming into view on a swipe just slides into place.
   const [dealing, setDealing] = useState(true);
   useEffect(() => {
     const done = setTimeout(() => setDealing(false), DEAL_MS);
@@ -330,7 +309,6 @@ function Deck({
     const dx = event.clientX - start.current;
     if (!dragged.current && Math.abs(dx) > 6) {
       dragged.current = true;
-      // Keeps a mouse drag going after the pointer leaves the card.
       event.currentTarget.setPointerCapture(event.pointerId);
     }
     setDragX(dx);
@@ -353,7 +331,6 @@ function Deck({
     >
       {placements.map((placement, at) => {
         const offset = deckOffset(at, index, placements.length);
-        // Cards far from the front are neither seen nor animated.
         if (offset > 3) return null;
         const front = offset === 0;
         const turned = front && flipped;
@@ -366,7 +343,6 @@ function Deck({
             inert={!front}
             className="absolute inset-0 transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none"
             style={{
-              // The card turned away stays on top, so it leaves over the deck, not under it.
               zIndex: offset === -1 ? placements.length + 1 : placements.length - offset,
               ...stackStyle(offset, front ? dragX : 0),
             }}
@@ -458,7 +434,6 @@ function EffortCard({ placement, shine }: { placement: TopEffortPlacement; shine
   );
 }
 
-/** The activity's own numbers, the whole of it rather than the effort. */
 function activityStats(sportType: string, summary: CelebratedActivity) {
   const { distance, movingTime } = summary;
   const kmh = distance && movingTime ? (distance / movingTime) * 3.6 : null;
@@ -490,7 +465,6 @@ function EffortCardBack({
   const { activity } = placement;
   return (
     <div className={cardFace(medal)} style={medal}>
-      {/* Tapping anywhere but the button turns the card back. */}
       <button type="button" aria-label="Turn back" onClick={onFlip} className="absolute inset-0" />
       <div className="pointer-events-none relative">
         <p className="text-[0.65rem] font-semibold tracking-widest uppercase opacity-70">

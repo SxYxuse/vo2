@@ -9,9 +9,6 @@ const appEnv = env.APP_ENV;
 const lokiHost = env.LOKI_HOST;
 const isDev = appEnv === "development";
 
-/**
- * Add context to the log message
- */
 const addContext = winston.format((info) => {
   const c = tryGetLogContext();
 
@@ -31,9 +28,6 @@ const addContext = winston.format((info) => {
   };
 });
 
-/**
- * Remove labels from the log message for console output
- */
 const removeLabels = winston.format((info) => {
   delete info.labels;
   return info;

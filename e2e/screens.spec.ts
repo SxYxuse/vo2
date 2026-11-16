@@ -1,10 +1,5 @@
 import { test, expect, settle, syncButton, withDatabase } from "./test.ts";
 
-// One screenshot per screen, at phone and desktop size, and in WebKit at iPhone size. A diff fails
-// the run and the HTML report shows expected, actual, and the difference side by side. After an
-// intended change, update the baselines with `vp run e2e:update` and review the new images in the
-// pull request.
-
 const SCREENS = [
   { name: "calendar", path: "/", heading: "Activity calendar" },
   { name: "fitness", path: "/fitness", heading: null },
@@ -39,10 +34,7 @@ test("activity screen", async ({ page }) => {
   await settle(page);
   await page.locator("[data-event-id]").filter({ hasText: "Lunch run" }).first().click();
   await page.waitForURL(/\/activities\//);
-  // The charts load in their own chunk, and their skeleton can show after the page settled.
   await expect(page.getByRole("button", { name: "Pace", exact: true })).toBeVisible();
-  // The basemap is blocked here, so the card falls back to the outline: on the map's error, or
-  // after its 10 s first-load timeout. Screenshot only once it has.
   await expect(page.locator(".maplibregl-canvas")).toHaveCount(0, { timeout: 15_000 });
   await settle(page);
   await expect(page).toHaveScreenshot("activity.png", {
@@ -58,7 +50,6 @@ test("fitness screen with a time out", async ({ page }) => {
     ),
   );
   await page.goto("/fitness");
-  // One band on the fitness chart, one on the predicted race time trend.
   await expect(page.locator(".recharts-reference-area")).toHaveCount(2);
   await settle(page);
   await expect(page).toHaveScreenshot("fitness-time-out.png", {
@@ -68,7 +59,6 @@ test("fitness screen with a time out", async ({ page }) => {
 });
 
 test("fitness screen with no road runs", async ({ page }) => {
-  // Without a route a run is a treadmill run, which the predicted race time leaves out.
   await withDatabase((client) =>
     client.query("update activities set summary_polyline = null where sport_type = 'Run'"),
   );
@@ -82,7 +72,6 @@ test("fitness screen with no road runs", async ({ page }) => {
 });
 
 test("plan screen on a time out", async ({ page }) => {
-  // On the coach plan and sick since Monday, with no end yet: the plan is paused (ADR 0066).
   await withDatabase(async (client) => {
     await client.query(
       `update calendar_settings set value = jsonb_set(value, '{planningStyle}', '"coachPlan"')`,
@@ -101,7 +90,6 @@ test("plan screen on a time out", async ({ page }) => {
 });
 
 test("plan screen with a time out ahead", async ({ page }) => {
-  // Injured from next Monday: the banner is quieter, with only "Edit" (ADR 0066).
   await withDatabase(async (client) => {
     await client.query(
       `update calendar_settings set value = jsonb_set(value, '{planningStyle}', '"coachPlan"')`,
@@ -120,8 +108,6 @@ test("plan screen with a time out ahead", async ({ page }) => {
 });
 
 test("calendar screen with time outs", async ({ page }) => {
-  // Today is Wednesday 17 June: sick at the start of the month, and injured since Monday with no
-  // end, which marks Monday to today.
   await withDatabase((client) =>
     client.query(
       `insert into time_outs (id, user_id, kind, start_day, end_day)

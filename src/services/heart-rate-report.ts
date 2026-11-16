@@ -5,16 +5,13 @@ import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 export type ReportBucketSize = "day" | "week" | "month";
 
 export type HeartRateReportBucket = {
-  /** `YYYY-MM-DD` for days and weeks (week start), `YYYY-MM` for months. */
   key: string;
-  /** Same order as `HR_ZONES`. */
   zoneSeconds: number[];
   seconds: number;
   sessions: number;
   avgBpm: number | null;
 };
 
-/** Share of time in three intensity bands, from the five sport zones. */
 export type IntensitySplit = { low: number; moderate: number; high: number };
 
 export type HeartRateReport = {
@@ -22,7 +19,6 @@ export type HeartRateReport = {
   buckets: HeartRateReportBucket[];
   sessions: number;
   seconds: number;
-  /** Total time spread over the length of the period, so empty weeks count. */
   weeklySeconds: number;
   avgBpm: number | null;
   intensity: IntensitySplit | null;
@@ -30,7 +26,6 @@ export type HeartRateReport = {
 
 const DAY_MS = 86_400_000;
 
-/** Enough bars to read on a phone: days for a week, weeks up to six months, then months. */
 export function reportBucketSize(period: FitnessPeriod): ReportBucketSize {
   if (period === "7d") return "day";
   return period === "1y" || period === "all" ? "month" : "week";
@@ -49,10 +44,6 @@ function nextKey(key: string, size: ReportBucketSize) {
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
-/**
- * Zone 1–2 is easy, zone 3 is the middle, zones 4–5 are hard: the usual three-zone reading
- * behind 80/20 training, applied to each sport's own zones.
- */
 export function intensitySplit(zoneSeconds: number[]): IntensitySplit | null {
   const [z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0] = zoneSeconds;
   const total = z1 + z2 + z3 + z4 + z5;
@@ -60,7 +51,6 @@ export function intensitySplit(zoneSeconds: number[]): IntensitySplit | null {
   return { low: (z1 + z2) / total, moderate: z3 / total, high: (z4 + z5) / total };
 }
 
-/** Time in zone, sessions, and average heart rate per day, week, or month of the period. */
 export function buildHeartRateReport(
   sessions: HeartRateSession[],
   options: { size: ReportBucketSize; timeZone: string; startMs: number | null; now?: Date },

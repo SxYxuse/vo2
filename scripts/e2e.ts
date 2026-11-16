@@ -38,7 +38,6 @@ if (args[0] === "--update") {
   }
 }
 
-/** The pids listening on a port, or none when lsof is missing or the port is free. */
 function listeners(port: number) {
   const result = spawnSync("lsof", ["-t", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" });
   return result.status === 0 ? result.stdout.split("\n").filter(Boolean).map(Number) : [];
@@ -54,7 +53,6 @@ function cwdOf(pid: number) {
     ?.slice(1);
 }
 
-/** A process that exits between lsof and the kill is already what we wanted. */
 function signal(pid: number, name: NodeJS.Signals) {
   try {
     process.kill(pid, name);
@@ -96,5 +94,4 @@ if (locked) {
   const playwright = join(root, "node_modules/.bin/playwright");
   process.exit(await run(playwright, ["test", ...args], { interruptOnly: true }));
 }
-// Runs itself again inside the lock, so it never cleans up after a suite that is still running.
 process.exit(await runHeavy(["bun", import.meta.filename, "--locked", ...args]));

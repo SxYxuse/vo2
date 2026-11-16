@@ -20,7 +20,6 @@ import {
 } from "./heart-rate.ts";
 const STREAM_BATCH = 40;
 
-/** The `athlete_metrics` columns every view resolves heart-rate zones from. */
 export const HEART_RATE_METRICS = {
   heartRate: athleteMetrics.heartRate,
   restHr: athleteMetrics.restHr,
@@ -129,7 +128,6 @@ export async function loadHeartRateImpl(): Promise<HeartRateData> {
     sport.efficiency.sort((a, b) => a.start.localeCompare(b.start));
   }
 
-  // Zone bounds come from the anchors above, so streams are classified after collapsing.
   const startById = new Map(rows.map((row) => [row.id, row.startDate.toISOString()]));
   const sportById = new Map(rows.map((row) => [row.id, row.sportType]));
   const chunks: string[][] = [];

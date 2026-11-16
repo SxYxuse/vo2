@@ -1,9 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-// The release workflow bumps the version and nothing else. This guards the
-// commit it is about to push: any other change in package.json means the
-// bump picked up work that was never reviewed on its own.
-
 export function isVersionOnlyBump(
   before: Record<string, unknown>,
   after: Record<string, unknown>,

@@ -9,17 +9,11 @@ import { afterSignOut } from "@/lib/query-events.ts";
 import { removeSavedPages } from "@/lib/service-worker.ts";
 import { removeOfflineCopy } from "@/integrations/tanstack-query/offline-copy.ts";
 
-/**
- * Ends the session, drops every cached athlete query, the copy saved on the device for
- * offline, the coach chat, and any GPX merge in progress, and returns to sign-in.
- * Pass ignoreBlocker once the athlete is gone, so unsaved settings edits cannot hold them on a dead page.
- */
 export function useSignOut() {
   const router = useRouter();
   const queryClient = useQueryClient();
   return useCallback(
     async ({ ignoreBlocker = false }: { ignoreBlocker?: boolean } = {}) => {
-      // Offline or an already-deleted session must not strand the athlete here.
       await authClient.signOut().catch(() => undefined);
       afterSignOut(queryClient);
       await Promise.all([

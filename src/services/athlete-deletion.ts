@@ -5,11 +5,6 @@ export type AthleteDeletionPorts = {
   removeAthlete: (userId: string) => Promise<void>;
 };
 
-/**
- * Athlete deletion: revoke VO2 on Strava first, because the token lives on the
- * rows being removed. Revocation is best effort; a Strava failure never keeps
- * the athlete's data around.
- */
 export async function deleteAthlete(userId: string, ports: AthleteDeletionPorts) {
   let stravaRevoked = true;
   try {

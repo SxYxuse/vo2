@@ -1,34 +1,24 @@
 import type { LngLat } from "./activity-map.types.ts";
 
-/*
- * Merging GPX routes runs entirely on the device: files are parsed here, never uploaded, so the
- * page works offline and keeps nothing about the athlete on the server.
- */
-
 export type GpxPoint = { lng: number; lat: number; ele: number | null };
 
 export type GpxTrack = {
   id: string;
   name: string;
   points: GpxPoint[];
-  /** Metres from the first point to each point, so a km position resolves by binary search. */
   distances: number[];
 };
 
-/** One stretch of the merged route: a track ridden from one position to another (backward when `toM < fromM`). */
 export type MergeLeg = {
   id: string;
   trackId: string;
   fromM: number;
   toM: number;
-  /** Starts at the point of this track nearest to where the previous leg ends, instead of `fromM`. */
   linked: boolean;
 };
 
-/** Where two tracks come within the meeting distance of each other. */
 export type Junction = {
   id: string;
-  /** A crossing is a brief contact; a shared stretch gives a junction where it joins and one where it splits. */
   kind: "cross" | "join" | "split";
   at: LngLat;
   a: { trackId: string; m: number };
@@ -122,7 +112,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Index of the last point at or before `m`. */
 function indexAt(distances: number[], m: number) {
   let low = 0;
   let high = distances.length - 1;
@@ -150,7 +139,6 @@ export function pointAt(track: GpxTrack, m: number): GpxPoint {
   };
 }
 
-/** The track between two positions, ends interpolated, reversed when `toM < fromM`. */
 export function sliceTrack(track: GpxTrack, fromM: number, toM: number): GpxPoint[] {
   const length = trackLength(track);
   const low = clamp(Math.min(fromM, toM), 0, length);
@@ -164,7 +152,6 @@ export function sliceTrack(track: GpxTrack, fromM: number, toM: number): GpxPoin
   return toM < fromM ? slice.reverse() : slice;
 }
 
-/** Flat metres around an origin: plenty accurate over the few hundred metres a junction spans. */
 function projector(origin: GpxPoint) {
   const lngM = LAT_M * Math.cos(origin.lat * RAD);
   return (point: GpxPoint) =>
@@ -184,13 +171,8 @@ function segmentProjection(
   return { t, distance: Math.hypot(px - (ax + t * dx), py - (ay + t * dy)) };
 }
 
-/** How much farther a pass may be and still win by lying nearer the hint (out-and-back roads). */
 const PASS_SLACK_M = 30;
 
-/**
- * The position on the track closest to a point, and how far away it is. With `nearM`, a track
- * passing the point more than once (an out-and-back) keeps to the pass nearest that position.
- */
 export function nearestOnTrack(track: GpxTrack, target: GpxPoint, nearM?: number) {
   const project = projector(target);
   const projected = track.points.map(project);
@@ -218,15 +200,8 @@ export function nearestOnTrack(track: GpxTrack, target: GpxPoint, nearM?: number
 
 type Contact = { aM: number; bM: number; gapM: number; at: GpxPoint };
 
-/**
- * Walks track A in steps no longer than the meeting distance and looks up B's nearby segments
- * in a grid, so it stays linear in the tracks' length and still catches a crossing between two
- * sparse points.
- */
 function contactsBetween(a: GpxTrack, b: GpxTrack, toleranceM: number) {
   const project = projector(a.points[0]!);
-  // Cells twice the meeting distance, with B's segments rasterised every half cell, put any
-  // segment within reach of a sample in the sample's cell or one of its 8 neighbours.
   const cell = toleranceM * 2;
   const grid = new Map<string, number[]>();
   const keyOf = (x: number, y: number) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
@@ -247,7 +222,6 @@ function contactsBetween(a: GpxTrack, b: GpxTrack, toleranceM: number) {
   }
 
   const length = trackLength(a);
-  // Very long tracks with a tight distance would sample too finely; 200k samples is plenty.
   const step = Math.max(toleranceM, length / 200_000);
   const samples = Math.max(1, Math.ceil(length / step));
   const contacts: Array<Contact | null> = [];
@@ -285,7 +259,6 @@ export function findJunctions(a: GpxTrack, b: GpxTrack, toleranceM: number): Jun
   let run: Contact[] = [];
   for (const contact of contacts) {
     const previous = run.at(-1);
-    // A jump along B means A now runs beside a different pass of B (a loop or out-and-back).
     if (!contact || (previous && Math.abs(contact.bM - previous.bM) > step * 4)) {
       if (run.length) runs.push(run);
       run = contact ? [contact] : [];
@@ -332,7 +305,6 @@ export function findAllJunctions(tracks: GpxTrack[], toleranceM: number) {
   return junctions;
 }
 
-/** A junction seen from one of its tracks: where it sits on that track and where it leads. */
 export type JunctionStop = {
   junction: Junction;
   m: number;
@@ -356,7 +328,6 @@ export function junctionStops(junctions: Junction[], trackId: string): JunctionS
 export type RouteLeg = MergeLeg & {
   points: GpxPoint[];
   distanceM: number;
-  /** Straight-line jump from the previous leg's end to this leg's start. */
   gapM: number;
 };
 
@@ -368,7 +339,6 @@ export type MergedRoute = {
   lossM: number;
 };
 
-/** Device altitude wobbles by a few metres; ignore climbs smaller than this. */
 const ELEVATION_NOISE_M = 3;
 
 function elevationChange(points: GpxPoint[]) {
@@ -390,7 +360,6 @@ function elevationChange(points: GpxPoint[]) {
   return { gainM, lossM };
 }
 
-/** Joins the legs in order, resolving linked starts, into one route. */
 export function buildMergedRoute(tracks: GpxTrack[], legs: MergeLeg[]): MergedRoute {
   const byId = new Map(tracks.map((track) => [track.id, track]));
   const routeLegs: RouteLeg[] = [];
@@ -408,7 +377,6 @@ export function buildMergedRoute(tracks: GpxTrack[], legs: MergeLeg[]): MergedRo
     const slice = sliceTrack(track, fromM, toM);
     const gapM = previous ? distanceM(previous, slice[0]!) : 0;
     routeLegs.push({ ...leg, fromM, toM, points: slice, distanceM: Math.abs(toM - fromM), gapM });
-    // A leg that starts where the last one ended would repeat that point.
     points.push(...(previous && gapM < 0.5 ? slice.slice(1) : slice));
   }
   const distances = cumulativeDistances(points);
@@ -420,10 +388,6 @@ export function buildMergedRoute(tracks: GpxTrack[], legs: MergeLeg[]): MergedRo
   };
 }
 
-/**
- * A first plan to edit: start on the first track and switch to each next one at their first
- * junction ahead, or jump straight to it when the two never meet.
- */
 export function suggestLegs(
   tracks: GpxTrack[],
   junctions: Junction[],
@@ -451,15 +415,10 @@ export function suggestLegs(
   return legs;
 }
 
-/** 1 when a leg is ridden toward the end of its track, -1 when ridden back toward its start. */
 export function legDirection(leg: { fromM: number; toM: number }) {
   return leg.toM < leg.fromM ? -1 : 1;
 }
 
-/**
- * Meeting points on a leg's track past where the leg starts, in riding order. `marginM` skips the
- * meeting point the leg starts from, which is no place to switch again.
- */
 export function stopsAhead(
   stops: JunctionStop[],
   leg: { fromM: number; toM: number },
@@ -470,7 +429,6 @@ export function stopsAhead(
   return direction < 0 ? ahead.reverse() : ahead;
 }
 
-/** The legs to store for a built route: linked starts keep where they resolved to. */
 export function planLegs(route: MergedRoute): MergeLeg[] {
   return route.legs.map(({ id, trackId, fromM, toM, linked }) => ({
     id,
@@ -485,10 +443,6 @@ function trackById(tracks: GpxTrack[], id: string) {
   return tracks.find((track) => track.id === id);
 }
 
-/**
- * Switches from leg `index - 1` to leg `index` at a meeting point on the earlier leg's track: the
- * earlier leg ends there, and leg `index` carries on along the other track from the same spot.
- */
 export function switchLegAt(
   legs: MergeLeg[],
   index: number,
@@ -506,10 +460,6 @@ export function switchLegAt(
   });
 }
 
-/**
- * Puts leg `index` on another track, switching to it at the first meeting point ahead on the leg
- * before, or jumping straight to its start when the two never meet.
- */
 export function changeLegTrack(
   route: MergedRoute,
   index: number,
@@ -531,10 +481,6 @@ export function changeLegTrack(
   return stop ? switchLegAt(legs, index, stop, tracks) : legs;
 }
 
-/**
- * Adds a leg after the last one, switching at the first meeting point ahead with any other track,
- * or jumping to the next track's start when none is ahead.
- */
 export function addLeg(
   route: MergedRoute,
   tracks: GpxTrack[],
@@ -559,10 +505,6 @@ export function addLeg(
   return switchLegAt(added, added.length - 1, stop, tracks);
 }
 
-/**
- * Removes leg `index`. The leg after it starts where the leg before ends; when the last leg goes,
- * the one before rides on to the end of its track.
- */
 export function removeLeg(route: MergedRoute, index: number, tracks: GpxTrack[]): MergeLeg[] {
   const legs = planLegs(route);
   legs.splice(index, 1);
@@ -577,7 +519,6 @@ export function removeLeg(route: MergedRoute, index: number, tracks: GpxTrack[])
   return legs;
 }
 
-/** The first leg that rides past a junction, or -1. */
 export function legPassing(route: MergedRoute, junction: Junction) {
   return route.legs.findIndex((leg) => {
     const side = [junction.a, junction.b].find((end) => end.trackId === leg.trackId);
@@ -589,10 +530,6 @@ export function legPassing(route: MergedRoute, junction: Junction) {
   });
 }
 
-/**
- * Changes track at a junction: the first leg passing it now ends there, and the route carries on
- * along the other track from the same spot (toward its finish). Null when no leg passes it.
- */
 export function switchAtJunction(
   route: MergedRoute,
   tracks: GpxTrack[],
@@ -606,7 +543,6 @@ export function switchAtJunction(
     junction.a.trackId === leg.trackId ? [junction.a, junction.b] : [junction.b, junction.a];
   const stop: JunctionStop = { junction, m: here.m, other: there };
   const legs = planLegs(route);
-  // A next leg already on the other track is kept (with its finish); anything else gets a new leg.
   if (legs[index + 1]?.trackId !== there.trackId) {
     const other = trackById(tracks, there.trackId);
     if (!other) return null;

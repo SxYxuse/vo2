@@ -1,4 +1,3 @@
-/** Resolves a CSS colour token (such as a `var(...)`) to an rgb string MapLibre paint accepts. */
 export function resolveThemeColor(token: string) {
   const probe = document.createElement("span");
   probe.style.color = token;

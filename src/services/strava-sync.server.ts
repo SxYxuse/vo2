@@ -96,14 +96,11 @@ async function activityCopyCounts(userId: string) {
 export async function syncStravaImpl(): Promise<SyncResult> {
   const session = await getRequiredSession();
   const userId = session.user.id;
-  // The stored pause is read inside the lock: a sync that just finished on another device may
-  // have set it.
   const result = await withAthleteSyncLock(userId, async () => {
     const synced = await syncAthlete({
       store: postgresSyncStore(userId),
       openStrava: async () => new StravaApi(await getStravaAccessToken(userId)),
     });
-    // A failed check must not fail the sync; the next sync checks again.
     await findTopEffortCelebrations(userId).catch((error: unknown) =>
       logger.warn("top_efforts.find_failed", errorFields(error)),
     );
@@ -211,10 +208,6 @@ async function withAthleteSyncLock<T>(userId: string, run: () => Promise<T>): Pr
   }
 }
 
-/**
- * Every sync re-reads the newest few activities, so clearing their load unconditionally would
- * recompute the whole history on each call. A cleared load is what triggers the recompute.
- */
 const LOAD_INPUTS_CHANGED = sql.raw(`(
   activities.sport_type, activities.start_date, activities.moving_time,
   activities.average_heartrate, activities.max_heartrate, activities.average_watts,
@@ -272,7 +265,6 @@ async function insertActivityRows(userId: string, pageItems: SummaryActivity[]) 
         updatedAt: sql`excluded.updated_at`,
       },
     });
-  // after the upsert, so a detail view in between can only rebuild from the fresh fields
   const stale = staleDerivedCacheIds(stored, rows);
   if (stale.length > 0) {
     await db
@@ -379,7 +371,6 @@ async function storeStreams(activityId: string, streams: StreamSet) {
         moving: streams.moving?.data ?? null,
         gradeSmooth: streams.grade_smooth?.data ?? null,
         chartPreview,
-        // rebuilt from the fresh streams on the next detail view
         ...CLEARED_DERIVED_CACHES,
         raw: streams,
         syncedAt: now,
@@ -391,8 +382,6 @@ async function storeStreams(activityId: string, streams: StreamSet) {
       streamsSyncedAt: now,
       hasHeartrate,
       updatedAt: now,
-      // A power ride without weighted watts is scored from its watts stream, which arrives after
-      // history: rescore it.
       ...(streams.watts?.data?.length ? { trainingLoad: null, loadSource: null } : {}),
     })
     .where(eq(activities.id, activityId));

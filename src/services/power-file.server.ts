@@ -24,9 +24,7 @@ import type {
 } from "./power-file.ts";
 import { isCyclingSport } from "./training-load.ts";
 
-/** Strava and the head unit may start a ride a little apart. */
 const MATCH_WINDOW_MS = 5 * 60_000;
-/** A ride's FIT file is a few megabytes; Garmin's zip is smaller. */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 type PowerFileSummary = Omit<PowerFileListItem, "id" | "fileName" | "start" | "activity">;
@@ -62,7 +60,6 @@ function window(column: typeof activities.startDate | typeof powerFiles.startDat
   );
 }
 
-/** Each start's synced ride, found by start time; Strava never sees the imported file. */
 async function matchActivities(userId: string, starts: Date[]) {
   const matches = new Map<number, MatchedActivity>();
   if (!starts.length) return matches;
@@ -88,7 +85,6 @@ async function matchActivities(userId: string, starts: Date[]) {
   return matches;
 }
 
-/** The imported file of a synced ride, for the link from its activity page. */
 export async function powerFileIdFor(userId: string, sportType: string, start: Date) {
   if (!isCyclingSport(sportType)) return null;
   const rows = await db
@@ -122,7 +118,6 @@ export async function loadPowerFiles(userId: string): Promise<PowerFileListItem[
   }));
 }
 
-/** The stored analysis, or a new one read from the stored file when VO2's analysis changed. */
 async function currentAnalysis(id: string, stored: unknown) {
   if (isPowerFileAnalysis(stored)) return stored;
   const [row] = await db
@@ -144,7 +139,6 @@ export async function listPowerFilesImpl() {
   return loadPowerFiles(session.user.id);
 }
 
-/** One of the athlete's power files, read with their current FTP and weight. */
 export async function loadPowerFile(userId: string, id: string): Promise<PowerFileDetail | null> {
   const [row] = await db
     .select({
@@ -225,7 +219,6 @@ export async function importPowerFileImpl(form: FormData): Promise<PowerFileImpo
     })
     .onConflictDoNothing({ target: [powerFiles.userId, powerFiles.fileHash] })
     .returning({ id: powerFiles.id });
-  // The same file sent twice at once: the other request saved it first.
   if (!inserted.length) return { status: "duplicate", id: (await existingId(userId, fileHash))! };
   logger.info("power_file.imported", {
     powerFileId: id,

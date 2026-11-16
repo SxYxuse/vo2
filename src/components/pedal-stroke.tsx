@@ -4,7 +4,6 @@ const SIZE = 132;
 const CENTER = SIZE / 2;
 const RADIUS = 46;
 
-/** A crank angle, clockwise from top dead center, as a point on the circle. */
 function point(angle: number, radius = RADIUS) {
   const rad = (angle * Math.PI) / 180;
   return [CENTER + radius * Math.sin(rad), CENTER - radius * Math.cos(rad)] as const;
@@ -17,10 +16,6 @@ function arcPath({ start, arc }: StrokeAngles, radius = RADIUS) {
   return `M ${x1} ${y1} A ${radius} ${radius} 0 ${sweep > 180 ? 1 : 0} 1 ${x2} ${y2}`;
 }
 
-/**
- * One pedal's stroke: the power phase as a wide arc and the peak power phase as a heavy arc on
- * it, with top dead center at 12 o'clock.
- */
 export function PedalStroke({
   label,
   side,

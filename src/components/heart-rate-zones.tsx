@@ -159,7 +159,6 @@ export function HeartRateZones({
           info={selected.maxAnchor ? maxHrAnchorInfo(selected.maxAnchor) : MAX_HR_INFO}
           color="var(--color-ds-red-700)"
         />
-        {/* All sports together have no one threshold: the tile shows once a sport is picked. */}
         {selected.lthr ? (
           <StatCard
             hintClassName="line-clamp-2"

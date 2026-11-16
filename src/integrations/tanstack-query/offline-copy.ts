@@ -6,15 +6,6 @@ import {
 } from "@tanstack/query-persist-client-core";
 import { del, get, set } from "idb-keyval";
 
-/*
- * The athlete's last loaded views, saved on the device so the installed app can show them with
- * no signal (ADR 0031). Offline is read-only: nothing is queued to send later.
- */
-
-/**
- * Views worth reading with no signal. Activity details and power file analyses (streams), the
- * map (needs tiles), and top-effort celebrations (marked seen on the server) stay out.
- */
 export const OFFLINE_QUERY_KEYS = [
   "app-shell",
   "home",
@@ -34,14 +25,11 @@ export const OFFLINE_QUERY_KEYS = [
   "coach-spending",
 ] as const;
 
-/** A week plan older than this is no use to read offline. */
 export const OFFLINE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
-/** The cache writes on every query event; one write a second is plenty. */
 const SAVE_DELAY_MS = 1000;
 const STORAGE_KEY = "vo2-offline-copy";
 
-/** Data saved by another build may not have the shape this build's code reads. */
 const BUILD_ID: string = import.meta.env.VITE_BUILD_ID ?? "dev";
 
 export type OfflineStorage = {
@@ -93,7 +81,6 @@ const persister = throttledPersister(indexedDbStorage);
  * even when IndexedDB is unavailable (a private window), so loaders can wait on it safely.
  */
 export function keepOfflineCopy(queryClient: QueryClient) {
-  // A saved query dropped from memory would drop from the saved copy at the next write.
   for (const key of OFFLINE_QUERY_KEYS) {
     queryClient.setQueryDefaults([key], { gcTime: OFFLINE_MAX_AGE_MS });
   }
@@ -110,7 +97,6 @@ export function keepOfflineCopy(queryClient: QueryClient) {
   return restored.catch(noop);
 }
 
-/** Signing out or deleting the athlete must not leave their data on the device. */
 export async function removeOfflineCopy() {
   await Promise.resolve(persister.removeClient()).catch(noop);
 }

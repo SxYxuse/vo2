@@ -12,14 +12,6 @@ import {
   type PaceType,
 } from "./training-paces.types.ts";
 
-/*
- * The coach plan (ADR 0037, ADR 0050): the athlete's availability, the structured session format
- * the coach writes in, and the written plan as stored. Shared by the server and the app. Sessions
- * belong to a week and have no day or order (ADR 0048): the athlete picks when to do them. The
- * plan holds runs, rides, and swims (ADR 0061); walks and other sports count toward load but
- * aren't planned.
- */
-
 export const PLAN_SPORTS = [
   { id: "run", group: "running", label: "Run", plural: "runs" },
   { id: "ride", group: "cycling", label: "Ride", plural: "rides" },
@@ -29,7 +21,6 @@ export const PLAN_SPORTS = [
 export type PlanSport = (typeof PLAN_SPORTS)[number]["id"];
 const PLAN_SPORT_IDS = PLAN_SPORTS.map((sport) => sport.id) as [PlanSport, ...PlanSport[]];
 
-/** The plan sport of a Strava sport type, or null when the coach plan doesn't plan it. */
 export function planSportOf(sportType: string): PlanSport | null {
   const group: SportGroupId | undefined = sportGroupFor(sportType)?.id;
   return PLAN_SPORTS.find((sport) => sport.group === group)?.id ?? null;
@@ -37,10 +28,6 @@ export function planSportOf(sportType: string): PlanSport | null {
 
 export const MAX_SESSIONS_PER_SPORT = 6;
 
-/**
- * How much the athlete can train: runs, rides, and swims a week (ADR 0048, ADR 0050, ADR 0061).
- * Availability saved before rides or swims has none of them; older keys such as days are dropped.
- */
 export const availabilitySchema = z
   .object({
     runsPerWeek: z.number().int().min(0).max(MAX_SESSIONS_PER_SPORT),
@@ -64,7 +51,6 @@ export function parseAvailability(value: unknown): Availability | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** An availability as plan bases compare it, so one saved with days reads as without. */
 export function availabilityKey(value: unknown) {
   return JSON.stringify(parseAvailability(value));
 }
@@ -79,19 +65,12 @@ export function sessionsPerWeek(availability: Availability, sport: PlanSport) {
   return availability[PER_WEEK_KEY[sport]];
 }
 
-/**
- * How fast each sport's weekly budget grows, and the athlete's own peak, when they set one (ADR
- * 0058). Growth is the base phase's weekly %, from Hold (0) to Steep (10); a sport left unset
- * grows at Standard when the A goal is in it and holds otherwise. Peak is in the sport's unit (km
- * of running, minutes of riding, metres of swimming); null is the peak VO2 recommends.
- */
 const sportProgressionSchema = (peakLimit: number) =>
   z.object({
     growth: z.number().min(0).max(10).multipleOf(0.5),
     peak: z.number().int().positive().max(peakLimit).nullable(),
   });
 
-/** Peaks up to 200 km of running, 25 h of riding, and 60 km of swimming (PEAK_LIMIT). */
 export const progressionSchema = z.object({
   run: sportProgressionSchema(200).optional(),
   ride: sportProgressionSchema(25 * 60).optional(),
@@ -105,7 +84,6 @@ export function parseProgression(value: unknown): Progression {
   return parsed.success ? parsed.data : {};
 }
 
-/** The named marks on the progression slider, in % a week. */
 export const PROGRESSION_MARKS = [
   { growth: 0, label: "Hold" },
   { growth: 3, label: "Gentle" },
@@ -114,24 +92,20 @@ export const PROGRESSION_MARKS = [
   { growth: 10, label: "Steep" },
 ] as const;
 
-/** "2,400 m": swims are written and budgeted in metres. */
 export const metresText = (metres: number) => `${Math.round(metres).toLocaleString("en")} m`;
 
-/** "42 km" of running, "4.5 h" of riding (budgets in minutes), "8,000 m" of swimming. */
 export function amountText(sport: PlanSport, amount: number) {
   if (sport === "run") return `${Math.round(amount)} km`;
   if (sport === "swim") return metresText(amount);
   return `${Math.round((amount / 60) * 10) / 10} h`;
 }
 
-/** A session's amount in its sport's budget unit: km of running, minutes of riding, metres of swimming. */
 export function sessionAmount(session: Pick<PlannedSession, "sport" | "distanceKm" | "minutes">) {
   if (session.sport === "run") return session.distanceKm;
   if (session.sport === "swim") return Math.round(session.distanceKm * 1000);
   return session.minutes;
 }
 
-/** A week's budget for a sport. Weeks written before rides or swims have none of theirs. */
 export function budgetOf(
   week: Pick<PlanWeek, "budgetKm" | "budgetMinutes" | "budgetSwimM">,
   sport: PlanSport,
@@ -141,18 +115,13 @@ export function budgetOf(
   return week.budgetMinutes ?? 0;
 }
 
-/** "Standard", or "+6 %" between the marks. */
 export function progressionLabel(growth: number) {
   return PROGRESSION_MARKS.find((mark) => mark.growth === growth)?.label ?? `+${growth} %`;
 }
 
-/** The sports the athlete's availability plans. */
 export const plannedSports = (availability: Availability) =>
   PLAN_SPORT_IDS.filter((sport) => sessionsPerWeek(availability, sport) > 0);
 
-// ----- The session format the coach writes in -----
-
-/** Each kind with its name per sport; null where the kind isn't written for that sport. */
 export const SESSION_KINDS = [
   { id: "easy", run: "Easy run", ride: "Endurance ride", swim: "Endurance swim" },
   { id: "recovery", run: "Recovery run", ride: "Recovery ride", swim: "Recovery swim" },
@@ -173,7 +142,6 @@ export const SESSION_KINDS = [
 export type SessionKind = (typeof SESSION_KINDS)[number]["id"];
 const SESSION_KIND_IDS = SESSION_KINDS.map((kind) => kind.id) as [SessionKind, ...SessionKind[]];
 
-/** Sessions with threshold, interval, sprint, or race-pace work: quality sessions (rule 4). */
 const QUALITY_KINDS = new Set<SessionKind>([
   "tempo",
   "intervals",
@@ -192,10 +160,6 @@ export const isLongKind = (kind: SessionKind) => LONG_KINDS.has(kind);
 export const kindFitsSport = (kind: SessionKind, sport: PlanSport) =>
   SESSION_KINDS.find((item) => item.id === kind)?.[sport] != null;
 
-/**
- * The five efforts of `coaching/running.md`, plus walking for recoveries, with the run pace, ride
- * zone, and swim zone each sits at.
- */
 export const EFFORTS = [
   { id: "easy", label: "easy", pace: "easy", zone: "endurance", swimZone: "endurance" },
   { id: "steady", label: "steady", pace: "marathon", zone: "tempo", swimZone: "tempo" },
@@ -221,11 +185,6 @@ export type Effort = (typeof EFFORTS)[number]["id"];
 const EFFORT_IDS = EFFORTS.map((effort) => effort.id) as [Effort, ...Effort[]];
 const PACE_IDS = PACE_TYPES.map((pace) => pace.id) as [PaceType, ...PaceType[]];
 
-/**
- * Cycling zones a ride step targets (`coaching/cycling.md`): Coggan's levels as a share of FTP, with
- * sweet spot between tempo and threshold, and as a share of cycling LTHR where heart rate still
- * reads the effort. Above threshold heart rate lags too much to steer by.
- */
 export const RIDE_ZONES = [
   { id: "recovery", label: "recovery", level: 1, ftp: [0.4, 0.55], lthr: [0.6, 0.68] },
   { id: "endurance", label: "endurance", level: 2, ftp: [0.56, 0.75], lthr: [0.69, 0.83] },
@@ -241,12 +200,6 @@ export type RideZone = (typeof RIDE_ZONES)[number]["id"];
 const RIDE_ZONE_IDS = RIDE_ZONES.map((zone) => zone.id) as [RideZone, ...RideZone[]];
 export const rideZone = (id: RideZone) => RIDE_ZONES.find((zone) => zone.id === id)!;
 
-/**
- * Swim zones a swim step targets (`coaching/swimming.md`, ADR 0061): offsets from the athlete's
- * CSS, the critical swim speed, in seconds per 100 m, fast then slow (a positive offset is slower
- * than CSS). They share the ride zones' ids, so a step keeps one `zone` field. Sprint is all-out:
- * no pace to hold.
- */
 export const SWIM_ZONES = [
   { id: "recovery", label: "recovery", level: 1, css: [11, 20] },
   { id: "endurance", label: "endurance", level: 2, css: [6, 10] },
@@ -264,11 +217,6 @@ export const SWIM_ZONES = [
 export const swimZoneOf = (id: RideZone | null) =>
   SWIM_ZONES.find((zone) => zone.id === id) ?? null;
 
-/**
- * Drills a step may name, by sport (ADR 0063): what the athlete does in the step, beside its
- * distance and effort. Swims only for now; another sport's drills join the same list with their
- * own sport, and the rule checker keeps each drill to its sport.
- */
 export const DRILLS = [
   {
     id: "catchUp",
@@ -339,7 +287,6 @@ const DRILL_IDS = DRILLS.map((drill) => drill.id) as [Drill, ...Drill[]];
 export const drillOf = (id: Drill | null | undefined) =>
   DRILLS.find((drill) => drill.id === id) ?? null;
 
-/** The drills a session's steps name, each once, in the order they come. */
 export function sessionDrills(session: Pick<PlannedSession, "blocks">) {
   const ids = new Set(session.blocks.flatMap((block) => block.steps.map((step) => step.drill)));
   return [...ids].map(drillOf).filter((drill) => drill != null);
@@ -348,15 +295,6 @@ export function sessionDrills(session: Pick<PlannedSession, "blocks">) {
 export const STEP_PARTS = ["warmup", "work", "recovery", "cooldown"] as const;
 export type StepPart = (typeof STEP_PARTS)[number];
 
-/**
- * One step: a distance or a time, and a target. A run targets a pace type or an effort; a ride
- * targets a zone or an effort, by time only. A run step at a pace harder than easy also names one
- * pace in seconds per km, inside its pace type's range or at a goal's race pace (ADR 0055). A swim
- * step is a distance at a swim zone or an effort, or rest at the wall: a recovery step by time
- * (ADR 0061), and may name a swim drill to do in it, at an easy effort (ADR 0063). Kept flat,
- * without refinements, so every structured-output model reads it the same way; the rule checker
- * reports a step that mixes them (coach-plan-rules.ts).
- */
 const stepSchema = z.object({
   part: z.enum(STEP_PARTS),
   distanceM: z.number().min(0).max(50_000).nullable(),
@@ -372,14 +310,12 @@ const stepSchema = z.object({
   drill: z.enum(DRILL_IDS).nullable(),
 });
 
-/** Steps run `repeat` times in a row: 6 × (300 m R, 300 m jog) is one block repeated 6 times. */
 const blockSchema = z.object({
   repeat: z.number().int().min(1).max(40),
   steps: z.array(stepSchema).min(1).max(6),
 });
 
 export const writtenSessionSchema = z.object({
-  /** The Monday of the session's week: a session has no day (ADR 0048). */
   weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   sport: z.enum(PLAN_SPORT_IDS),
   kind: z.enum(SESSION_KIND_IDS),
@@ -388,11 +324,8 @@ export const writtenSessionSchema = z.object({
   blocks: z.array(blockSchema).min(1).max(10),
 });
 
-/** What the coach answers with. */
 export const writtenPlanSchema = z.object({
-  // Four weeks of six runs, six rides, and six swims.
   sessions: z.array(writtenSessionSchema).max(4 * MAX_SESSIONS_PER_SPORT * PLAN_SPORTS.length),
-  // No max: a long sentence is cut where it's stored rather than failing the whole writing.
   briefNotFit: z
     .string()
     .nullable()
@@ -401,7 +334,6 @@ export const writtenPlanSchema = z.object({
     ),
 });
 
-/** The longest coach brief the athlete can write: a few lines, read by every writing. */
 export const MAX_BRIEF_LENGTH = 500;
 
 export const briefSchema = z
@@ -413,74 +345,44 @@ export type Step = z.infer<typeof stepSchema>;
 export type WrittenSession = z.infer<typeof writtenSessionSchema>;
 export type WrittenPlan = z.infer<typeof writtenPlanSchema>;
 
-/** Watts or bpm, low to high. */
 export type Band = [number, number];
 
-/**
- * A step as stored, with what it targets in the athlete's numbers when it was written: a run's
- * pace range, a ride zone's watts from FTP and, below VO2 max, its heart rate from LTHR, or a swim
- * zone's pace per 100 m from CSS.
- */
 export type PlannedStep = Step & {
   range: PaceRange | null;
   watts?: Band | null;
   bpm?: Band | null;
-  /** Seconds per 100 m, fast then slow. */
   swimPace?: Band | null;
 };
 
-/**
- * A session as stored, with its size worked out by VO2, not the model: a run's or a swim's
- * distance and time, a ride's time (its distance is 0: rides are planned by time).
- */
 export type PlannedSession = Omit<WrittenSession, "blocks"> & {
   id: string;
   blocks: { repeat: number; steps: PlannedStep[] }[];
   distanceKm: number;
   minutes: number;
-  /** Marked done by the athlete (ADR 0048). Plans stored before it have none: open. */
   done?: boolean;
 };
 
 export type PlanWeek = {
   weekStart: string;
-  /** VO2's weekly running budget (rule 1). */
   budgetKm: number;
-  /** VO2's weekly riding budget, in minutes (rule 1). Plans written before rides have none. */
   budgetMinutes?: number;
-  /** VO2's weekly swimming budget, in metres (rule 1). Plans written before swims have none. */
   budgetSwimM?: number;
   phase: PhaseKind;
   lighter: boolean;
-  /** A taper week before a main goal or an all-out race, or the race week itself. */
   taper: boolean;
   sessions: PlannedSession[];
 };
 
-/**
- * A goal as the plan was written around it: id, date, distance, priority, sport type, and a
- * supporting race's effort. A main goal has no sixth item, so plans written before efforts are
- * not rewritten for one.
- */
 export type PlanGoal = [string, string, number | null, string, string, string?];
 
-/** What a written plan was written from; a change in any of it rewrites the weeks ahead. */
 export type PlanBasis = {
   availability: string;
   goals: PlanGoal[];
   vdot: number | null;
-  /**
-   * The easy pace's middle and where it came from (ADR 0042). Plans written before it was kept
-   * have none, and are not rewritten for it.
-   */
   easy?: { from: EasyFrom; secPerKm: number } | null;
-  /** FTP in watts (ADR 0050). Plans written before rides have none, and aren't rewritten for it. */
   ftp?: number | null;
-  /** CSS in seconds per 100 m (ADR 0061). Plans written before swims have none. */
   css?: number | null;
-  /** The coach brief. Plans written before it have none, the same as an empty brief. */
   brief?: string;
-  /** The time outs, as a key (ADR 0066). Plans written before them have none, the same as none. */
   timeOuts?: string;
 };
 
@@ -489,11 +391,9 @@ export type CoachPlan = {
   basis: PlanBasis;
   writtenAt: string;
   model: string;
-  /** What the coach couldn't fit of the brief, in its words, or none when it all fit. */
   briefNotFit?: string | null;
 };
 
-/** A stored plan with every session's sport: sessions written before rides are runs. */
 export function readCoachPlan(value: unknown): CoachPlan | null {
   if (!value) return null;
   const plan = value as CoachPlan;
@@ -508,7 +408,6 @@ export function readCoachPlan(value: unknown): CoachPlan | null {
 
 export type CoachPlanStatus = "idle" | "writing" | "failed";
 
-/** What the coach plan still needs before it can be written. */
 export type CoachPlanMissing = "key" | "availability" | "goalSport";
 
 export type GoalSummary = Pick<Goal, "id" | "name" | "date" | "distanceM" | "sportType">;
@@ -517,29 +416,18 @@ export type CoachPlanState = {
   signedIn: boolean;
   today: string;
   availability: Availability | null;
-  /** The coach brief, or "" for none. */
   brief: string;
-  /** The upcoming A run, ride, or swim with a distance the plan builds toward; none builds base. */
   aGoal: GoalSummary | null;
   missing: CoachPlanMissing[];
   plan: CoachPlan | null;
   status: CoachPlanStatus;
-  /** Why the last writing failed, in words for the athlete. */
   error: string | null;
-  /** The season week by week, from this one through the last goal ahead or the base weeks shown. */
   road: SeasonWeek[];
-  /** The goals ahead, every sport, in date order. */
   goals: Goal[];
-  /** The VDOT of the athlete's training paces, for the predicted race time. */
   vdot: number | null;
-  /** The season's volume, for Plan's charts and the progression setting; null without an A goal. */
   volume: SeasonVolume | null;
 };
 
-/**
- * What the app needs to draw each planned sport's season and recompute it live as the athlete
- * moves the progression (ADR 0058): the season's weeks and each sport's starting point.
- */
 export type SeasonVolume = {
   shape: WeekShape[];
   sports: SportVolume[];
@@ -548,24 +436,14 @@ export type SeasonVolume = {
 export type SportVolume = {
   sport: PlanSport;
   seed: SportSeed;
-  /** What the athlete set; null growth is the default by week (Standard for the A goal's sport). */
   growth: number | null;
-  /** The growth the slider shows when the athlete set none: the A goal's sport grows. */
   defaultGrowth: number;
-  /** The athlete's own peak, or null for the recommended one. */
   peak: number | null;
   recommended: number;
-  /** The goal that sets the ceiling, with what it usually asks, or null without one. */
   goal: { name: string; floor: number } | null;
-  /** What's done of the sport this week, for the current week's bar. */
   doneThisWeek: number;
 };
 
-/**
- * The A goal the coach plan builds toward: the next A run, ride, or swim with a distance. Of a
- * multisport event's legs, the longest by time leads (a triathlon's ride), so its taper is the
- * event's.
- */
 export function coachPlanGoal(goals: Goal[], today: string): Goal | null {
   return (
     goals
@@ -582,9 +460,6 @@ export function coachPlanGoal(goals: Goal[], today: string): Goal | null {
   );
 }
 
-// ----- Distance, time, and text of a session -----
-
-/** Seconds per km used when the athlete has no training paces, by effort. */
 const NO_PACE_SEC_PER_KM: Record<Effort, number> = {
   easy: 390,
   steady: 345,
@@ -602,16 +477,10 @@ const PACE_EFFORT: Record<PaceType, Effort> = {
   repetition: "fastRelaxed",
 };
 
-/** A ride step written by distance, which the rules refuse, is still sized at this speed. */
 const RIDE_KMH = 25;
 
 const middle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPerKm) / 2;
 
-/**
- * The seconds per km a run step is counted at: its own pace, else the middle of its pace range, or
- * of the pace an effort sits at, so time steps count toward distance and distance steps toward
- * time. Steps stored before ADR 0055 have no pace of their own.
- */
 export function stepSecPerKm(step: Step, paces: Record<PaceType, PaceRange> | null) {
   if (step.secPerKm != null) return step.secPerKm;
   const effort = step.effort ?? (step.pace ? PACE_EFFORT[step.pace] : "easy");
@@ -620,36 +489,22 @@ export function stepSecPerKm(step: Step, paces: Record<PaceType, PaceRange> | nu
   return paces ? middle(paces[pace]) : NO_PACE_SEC_PER_KM[effort];
 }
 
-/**
- * CSS assumed when the athlete has none, in seconds per 100 m: a recreational swimmer's, used only
- * to estimate a swim's time.
- */
 const NO_CSS_SEC_PER_100M = 125;
-/** A sprint has no pace to hold; it is counted this much faster than CSS. */
 const SPRINT_CSS_OFFSET = -8;
 
-/** The zone a swim step swims at: its own, or the one its effort sits at. */
 export function stepSwimZone(step: Pick<Step, "zone" | "effort">) {
   const effort = EFFORTS.find((item) => item.id === step.effort)?.swimZone ?? null;
   return swimZoneOf(step.zone) ?? swimZoneOf(effort) ?? swimZoneOf("endurance")!;
 }
 
-/** The seconds per 100 m a swim step is counted at: the middle of its zone around CSS. */
 export function swimSecPer100m(step: Pick<Step, "zone" | "effort">, css: number | null) {
   const zone = stepSwimZone(step);
   const offset = zone.css ? (zone.css[0] + zone.css[1]) / 2 : SPRINT_CSS_OFFSET;
   return (css ?? NO_CSS_SEC_PER_100M) + offset;
 }
 
-/**
- * A swim step with no distance is rest at the wall: it takes time, swims no metres (ADR 0061).
- */
 const isRest = (step: Pick<Step, "distanceM">) => step.distanceM == null;
 
-/**
- * A session's distance (km) and time (minutes), from its steps; a ride's distance is 0. A swim's
- * distance is kept to the metre: pool sets come in lengths, not tenths of a km.
- */
 export function sessionSize(
   sport: PlanSport,
   blocks: { repeat: number; steps: Step[] }[],
@@ -684,18 +539,13 @@ export function sessionSize(
   return { distanceKm, minutes: Math.round(seconds / 60) };
 }
 
-/** What a planned step is aimed at, in the athlete's own numbers. */
 export type PlanAnchors = {
   paces: Record<PaceType, PaceRange> | null;
-  /** FTP in watts, for ride zones. */
   ftp: number | null;
-  /** Cycling LTHR, for ride zones without power. */
   rideLthr: number | null;
-  /** CSS in seconds per 100 m, for swim zones (ADR 0061). */
   css: number | null;
 };
 
-/** The zone a ride step targets: its own, or the one its effort sits at. */
 export function stepZone(step: Pick<Step, "zone" | "effort">): RideZone {
   return step.zone ?? EFFORTS.find((item) => item.id === step.effort)?.zone ?? "endurance";
 }
@@ -718,18 +568,12 @@ function rideTargets(step: Step, anchors: PlanAnchors) {
   };
 }
 
-/** A swim zone's pace per 100 m from CSS, fast then slow; none for a sprint or rest. */
 function swimTarget(step: Step, css: number | null): Band | null {
-  // A drill is swum by feel: its pace says nothing about the drill done well.
   if (css == null || isRest(step) || step.drill != null) return null;
   const zone = stepSwimZone(step);
   return zone.css ? [Math.round(css + zone.css[0]), Math.round(css + zone.css[1])] : null;
 }
 
-/**
- * A written session as stored: sized, each step given its targets, and open. Its id is new unless
- * it replaces a session, which keeps that one's id so a link to it still opens it.
- */
 export function plannedSession(
   session: WrittenSession,
   anchors: PlanAnchors,
@@ -755,7 +599,6 @@ export function plannedSession(
   };
 }
 
-/** "800 m", "2.5 km", "90 s", "20 min", "1 h 30"; a swim's distance always in metres, "1,500 m". */
 export function stepAmountText(step: Step, sport?: PlanSport) {
   if (step.distanceM != null && sport === "swim") return metresText(step.distanceM);
   if (step.distanceM != null) {
@@ -768,7 +611,6 @@ export function stepAmountText(step: Step, sport?: PlanSport) {
   return minutesText(Math.round(seconds / 60));
 }
 
-/** "45 min", "1 h", "2 h 15". */
 export function minutesText(minutes: number) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
@@ -776,7 +618,6 @@ export function minutesText(minutes: number) {
   return rest ? `${hours} h ${String(rest).padStart(2, "0")}` : `${hours} h`;
 }
 
-/** A session's headline size: a run's distance, a ride's time, a swim's metres. */
 export function sessionAmountText(
   session: Pick<PlannedSession, "sport" | "distanceKm" | "minutes">,
 ) {
@@ -787,14 +628,9 @@ export function sessionAmountText(
 
 export const bandText = (band: Band, unit: string) => `${band[0]}–${band[1]} ${unit}`;
 
-/** "1:42–1:45 /100m", fast then slow. */
 export const swimPaceText = (band: Band) =>
   `${formatPaceClock(band[0])}–${formatPaceClock(band[1])} /100m`;
 
-/**
- * A swim step's target: rest, a drill at its effort (a drill is swum by feel, not at a pace), or
- * its zone and its pace per 100 m when VO2 has a CSS.
- */
 export function swimTargetText(step: PlannedStep, join = " ") {
   if (isRest(step)) return "rest";
   const zone = stepSwimZone(step);
@@ -838,7 +674,6 @@ function stepText(step: PlannedStep, sport: PlanSport) {
   return `${PART_PREFIX[step.part] ?? ""}${stepAmountText(step, sport)} ${targetText(step, sport)}`;
 }
 
-/** One line per block, the way the session files write them: "6 × 300 m R …, 300 m jog". */
 export function sessionLines(session: Pick<PlannedSession, "blocks" | "sport">) {
   return session.blocks.map((block) => {
     const steps = block.steps.map((step) => stepText(step, session.sport)).join(", ");

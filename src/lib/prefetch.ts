@@ -23,11 +23,8 @@ const APP_ROUTES = [
   "/power",
 ] as const;
 
-// On a slow connection, other pages' chunks and data would compete with the page the athlete
-// just opened, its map tiles included; warm them once it has had time to settle.
 const SETTLE_MS = 5000;
 
-/** Runs `work` when the browser is idle, a few seconds after the page opened. */
 export function afterPageSettles(work: () => void) {
   if (typeof window === "undefined") return () => undefined;
   let idle: number | undefined;
@@ -41,7 +38,6 @@ export function afterPageSettles(work: () => void) {
   };
 }
 
-/** Run each signed-in route loader (and its query). */
 export function warmApp(router: RegisteredRouter, queryClient: QueryClient) {
   for (const to of APP_ROUTES) {
     void router.preloadRoute({ to });

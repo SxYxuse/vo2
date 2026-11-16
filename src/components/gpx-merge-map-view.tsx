@@ -40,7 +40,6 @@ function km(m: number) {
   return `km ${(m / 1000).toFixed(1)}`;
 }
 
-/** Frames every file when the set of files changes, but never while legs are being edited. */
 function FitTracks({ tracks }: { tracks: GpxMergeTrack[] }) {
   const { map, isLoaded } = useMap();
   const key = tracks.map((track) => track.id).join(",");
@@ -58,7 +57,6 @@ function FitTracks({ tracks }: { tracks: GpxMergeTrack[] }) {
   return null;
 }
 
-// Static paints, so a slider tick that redraws the route doesn't reapply them.
 const SOURCE_PAINT: LineLayerSpecification["paint"] = {
   "line-color": ["get", "color"],
   "line-width": 3,
@@ -77,7 +75,6 @@ const ROUTE_PAINT: LineLayerSpecification["paint"] = {
 
 const FIRST_LOAD_TIMEOUT_MS = 10_000;
 
-/** Falls back to the plain outline when the basemap can't load (offline, weak signal). */
 function FailBeforeLoad({ onFail }: { onFail: () => void }) {
   const { map } = useMap();
 
@@ -168,7 +165,6 @@ export function GpxMergeMapView({
   }, [route]);
 
   const finish = route.points.at(-1);
-  // Which file a tap on the selected meeting point leaves, and which it joins.
   const passing = selected ? route.legs[legPassing(route, selected)] : undefined;
   const leaving =
     passing && selected
@@ -210,7 +206,6 @@ export function GpxMergeMapView({
           }}
         >
           <MarkerContent>
-            {/* A 32px hit area around a small ring, so a thumb can pick it. */}
             <span className="flex size-8 items-center justify-center">
               <span
                 aria-label="Meeting point"
@@ -297,7 +292,6 @@ export function GpxMergeMapView({
   );
 }
 
-/** What the markers mean, since the map is where meeting points are picked. */
 function MapLegend({ jumps }: { jumps: boolean }) {
   return (
     <div className="bg-background/90 pointer-events-none absolute top-2 left-2 z-10 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-2 py-1 text-[0.6875rem] shadow-sm">

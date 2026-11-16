@@ -22,7 +22,6 @@ export const loadPredictedTimeTrend = createServerFn({ method: "GET" }).handler(
   },
 );
 
-/** Sets the athlete's race result, or clears it with null. */
 export const saveRaceResult = createServerFn({ method: "POST" })
   .validator(z.object({ raceResult: raceResultSchema.nullable() }))
   .handler(async ({ data }): Promise<TrainingPaces> => {
@@ -30,7 +29,6 @@ export const saveRaceResult = createServerFn({ method: "POST" })
     return saveRaceResultImpl(data.raceResult);
   });
 
-/** Saves one Paces choice: Automatic, a picked best effort, or where the easy pace comes from. */
 export const savePaceChoice = createServerFn({ method: "POST" })
   .validator(z.object({ choice: paceChoiceSchema }))
   .handler(async ({ data }): Promise<TrainingPaces> => {

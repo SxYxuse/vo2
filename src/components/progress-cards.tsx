@@ -49,7 +49,6 @@ const RUN_LABEL: Record<number, string> = {
 const DATE_SHORT = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
 
 function formatOutput(output: number, sport: ProgressSport) {
-  // Run output is metres per minute.
   return sport === "cycling" ? `${Math.round(output)} W` : `${formatPaceClock(60000 / output)} /km`;
 }
 
@@ -152,7 +151,6 @@ function BestEfforts({ rows, sport }: { rows: BestRow[]; sport: ProgressSport })
                     sport,
                     best: boardId(sport, sport === "cycling" ? "power" : "time", row.key),
                   }}
-                  // Padding the row's height into the link makes a 44px target without moving it.
                   className="text-muted-foreground -my-[0.8rem] py-[0.8rem] underline-offset-4 hover:text-foreground hover:underline"
                 >
                   {labels[row.key]}
@@ -200,7 +198,6 @@ function SportProgressCard({ progress }: { progress: SportProgress }) {
   );
 }
 
-/** Whether training is paying off: capacity and cost, next to the load graph above. */
 export function ProgressCards() {
   const { data, isPending, isError } = useQuery(progressQueryOptions);
 

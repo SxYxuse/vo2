@@ -17,9 +17,6 @@ import {
   worktreeDatabaseName,
 } from "./worktree-env.ts";
 
-// Run by T3's worktree hook (t3.json) and by `vp run db:setup`. Gives a feature worktree its own
-// database on the shared vo2-postgres server and its own dev-server port. Safe to run twice.
-
 export const CONTAINER = "vo2-postgres";
 const isolate = process.argv.includes("--isolate");
 
@@ -27,8 +24,6 @@ function git(...args: string[]) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
-// Agents compare against origin/main and read release tags, so a stale clone misleads them.
-// Best effort: offline, with no origin, or on a clobbered tag, setup carries on.
 function fetchOrigin() {
   try {
     execFileSync("git", ["fetch", "--tags", "--quiet", "origin"], {
@@ -47,7 +42,6 @@ function readOptional(path: string) {
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
 }
 
-/** Listed paths, resolved like `--show-toplevel` so path hashes match across scripts. */
 export function worktreePaths() {
   return git("worktree", "list", "--porcelain")
     .split("\n")
@@ -87,7 +81,6 @@ export function inspect(format: string) {
   }
 }
 
-/** Host ports vo2-postgres publishes, empty when it is missing or published none. */
 export function publishedPorts() {
   const ports = inspect(`{{range (index .NetworkSettings.Ports "5432/tcp")}}{{.HostPort}} {{end}}`);
   return new Set((ports ?? "").split(/\s+/).filter(Boolean).map(Number));
@@ -123,7 +116,6 @@ function createDatabase(name: string) {
   console.log(`Created database ${database}`);
 }
 
-/** True when anything listens on `port` on the IPv4 or IPv6 loopback. */
 export function isListening(port: number) {
   const probe = (host: string) =>
     new Promise<boolean>((done) => {
@@ -157,7 +149,6 @@ async function main() {
   const isMain = gitDir === git("rev-parse", "--path-format=absolute", "--git-common-dir");
   const original = readOptional(envPath);
   const pg = pgPort(original);
-  // Rewritten on every path, so an existing checkout follows the server to its new port.
   const existing = original === undefined ? undefined : migrateLegacyPgPort(original, pg);
   if (existing !== original) {
     writeFileSync(envPath, existing ?? "");
@@ -165,7 +156,6 @@ async function main() {
   }
   fetchOrigin();
 
-  // --isolate rewrites DATABASE_URL, so only a worktree can repair the old URL that way.
   if (existing && usesRenamedVoDatabase(existing) && (isMain || !isolate)) {
     console.error(
       `.env still connects as the pre-rename \`vo\` user or database, which vo2-postgres rejects.\n` +

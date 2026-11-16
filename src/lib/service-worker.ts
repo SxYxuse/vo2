@@ -8,7 +8,6 @@ export function registerServiceWorker() {
   navigator.serviceWorker.register("/sw.js").catch(() => undefined);
 }
 
-/** The saved pages carry the athlete's rendered data; build files are not personal and stay. */
 export async function removeSavedPages() {
   if (typeof caches === "undefined") return;
   try {

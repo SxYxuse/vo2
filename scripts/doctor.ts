@@ -21,12 +21,8 @@ import {
   publishedPorts,
 } from "./worktree-setup.ts";
 
-// `vp run doctor`: checks what setup and sign-in need and prints the fix for each failure. It
-// only reads, and needs nothing from node_modules, so it runs before `bun install` too.
-
 type Check = {
   name: string;
-  /** Reported but not counted as a failure. */
   warnOnly?: boolean;
   run: () => Promise<string | undefined> | string | undefined;
 };
@@ -90,8 +86,6 @@ const checks: Check[] = [
           ? undefined
           : `The main checkout uses database ${database}, not ${SHARED_DATABASE}. Fix: set DATABASE_URL to ${SHARED_DATABASE}.`;
       }
-      // A worktree's database ends in its path hash (worktreeDatabaseName), so .env copied from
-      // another checkout fails here.
       const own = database?.startsWith(DATABASE_PREFIX) && database.endsWith(`_${pathHash(root)}`);
       return own
         ? undefined
@@ -160,18 +154,14 @@ const checks: Check[] = [
   },
   {
     name: "dev-server PORT is free",
-    // Sign-in problems are checked with this checkout's own dev server running on PORT.
     warnOnly: true,
     run: async () => {
       const port = Number(readEnvValue(envText ?? "", "PORT"));
       if (!Number.isInteger(port) || port <= 0)
         return "PORT is not set in .env. Fix: `vp run db:setup`.";
       if (!(await isListening(port))) return undefined;
-      // Setup never moves the main checkout's PORT, nor a worktree's that shares its database
-      // (planEnv keeps that .env), so each gets the fix that applies to it.
       let move = "remove PORT from .env and run `vp run db:setup` to pick a free one";
       if (isMain && port !== DEFAULT_DEV_PORT) {
-        // Set up before the default moved off 3000, which other servers on this machine hold.
         move = `set PORT=${DEFAULT_DEV_PORT} and BETTER_AUTH_URL=http://localhost:${DEFAULT_DEV_PORT} in .env`;
       } else if (isMain) {
         move = `set PORT and BETTER_AUTH_URL in .env to another free port from 3001 to ${PORT_RANGE.first - 1}`;

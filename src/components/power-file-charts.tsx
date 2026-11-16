@@ -23,7 +23,6 @@ import type { PowerFileView, Quadrants } from "@/services/power-file.ts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** Left and right pedal, everywhere a side is drawn. */
 export const SIDE_COLOR = {
   left: "var(--color-ds-teal-700)",
   right: "var(--color-ds-pink-700)",
@@ -90,7 +89,6 @@ const TIME_VIEWS: {
   },
 ];
 
-/** One measure against moving time, over the elevation profile. */
 export function RideOverTimeChart({ series }: { series: Series }) {
   const views = TIME_VIEWS.filter((view) =>
     view.lines.some((line) =>
@@ -271,7 +269,6 @@ export function PowerCurveChart({
   );
 }
 
-/** A chart tooltip that renders the hovered row, or nothing. */
 function tipFor<T>(render: (row: T) => ReactNode) {
   return function Tip({
     active,
@@ -287,7 +284,6 @@ function tipFor<T>(render: (row: T) => ReactNode) {
 
 type HistogramRow = { x: number } & Record<string, number>;
 
-/** Time spent in each bin, one bar per series in `config`. */
 function TimeHistogram({
   rows: given,
   step,
@@ -297,7 +293,6 @@ function TimeHistogram({
   zeroLine = false,
 }: {
   rows: HistogramRow[];
-  /** Bin width: empty bins between the first and last are drawn as zero, so the axis is even. */
   step: number;
   config: Record<string, { label: string; color: string }>;
   title: (x: number) => string;
@@ -345,7 +340,6 @@ const PCO_CONFIG = {
   right: { label: "Right", color: SIDE_COLOR.right },
 } satisfies ChartConfig;
 
-/** Pedaling time at each platform center offset, left and right side by side. */
 export function PcoHistogram({ histogram }: { histogram: PowerFileView["pcoHistogram"] }) {
   return (
     <TimeHistogram
@@ -379,10 +373,6 @@ const QUADRANT_CONFIG = {
   sec: { label: "Time", color: SERIES_META.watts.color },
 } satisfies ChartConfig;
 
-/**
- * Quadrant analysis on cadence and torque: the same split as pedal force against pedal speed,
- * without needing the crank length. The curve is every pairing that makes FTP.
- */
 export function QuadrantChart({
   cells,
   quadrants,
@@ -447,7 +437,6 @@ export function QuadrantChart({
         <ChartTooltip
           cursor={false}
           content={tipFor<{ rpm: number; nm: number; sec?: number }>((point) =>
-            // The FTP curve's points carry no time and get no tooltip.
             point.sec == null ? null : (
               <TipBox
                 title={`${point.rpm} rpm · ${point.nm} Nm`}

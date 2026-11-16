@@ -67,16 +67,10 @@ const DEFAULT_INTERACTIONS: EventCalendarInteractions = {
 
 const EMPTY_SELECTION: EventCalendarSelection = { eventKeys: [], slot: null };
 
-// resolveSettings runs on every render, so a freshly allocated default would
-// bust the view memos keyed on it (the month grid rebuilds its 42 zoned day
-// starts whenever weekendDays changes identity). Shared, never mutated.
 const DEFAULT_WEEKEND_DAYS: number[] = [0, 6];
 const EMPTY_RESOURCES: EventCalendarResource[] = [];
 const DEFAULT_EVENT_PRIORITY = (event: CalendarEvent<never>) => event.priority ?? 0;
 
-// Priority-aware default order, cached on the resolver identity: eventOrder is
-// part of the index cache key, so a fresh closure per render would rebuild the
-// whole index on every render.
 const priorityOrderCache = new WeakMap<object, unknown>();
 type EventOrder<TData> = (
   a: EventCalendarOccurrence<TData>,
@@ -87,8 +81,6 @@ function priorityEventOrder<TData>(
 ): EventOrder<TData> {
   const cached = priorityOrderCache.get(getEventPriority);
   if (cached) return cached as EventOrder<TData>;
-  // higher priority packs and orders first; ties fall through to the
-  // start/duration/key default
   const order: EventOrder<TData> = (a, b) =>
     getEventPriority(b.event) - getEventPriority(a.event) || defaultEventOrder(a, b);
   priorityOrderCache.set(getEventPriority, order);
@@ -250,7 +242,6 @@ interface EventCalendarApi<TData = unknown> {
   scrollToTime(time: Date | number): void;
 }
 
-/** Cross-file plumbing for sibling view/interaction modules; not public API. */
 interface EventCalendarInternals<TData = unknown> {
   getIndex(): EventCalendarIndex<TData>;
   setDrag(drag: EventCalendarDragState<TData> | null): void;
@@ -278,7 +269,6 @@ function resolveSettings<TData>(
   options: UseEventCalendarStateOptions<TData>,
 ): EventCalendarSettings<TData> {
   const {
-    // strip state pairs; the rest flows into settings
     events: _e,
     defaultEvents: _de,
     view: _v,
@@ -302,10 +292,7 @@ function resolveSettings<TData>(
     ...rest,
     timeZone: options.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     locale: options.locale,
-    // locale-first default: a de/fr locale gets Monday weeks without also
-    // having to set weekStartsOn; an explicit weekStartsOn always wins
     weekStartsOn: options.weekStartsOn ?? options.locale?.options?.weekStartsOn ?? 0,
-    // the resource view only makes sense with resources configured
     views: options.views ?? (options.resources?.length ? ALL_VIEWS : BASE_VIEWS),
     dayStartHour: options.dayStartHour ?? 0,
     dayEndHour: options.dayEndHour ?? 24,
@@ -396,15 +383,9 @@ function createEventCalendarStore<TData>(
     occurrences: EventCalendarOccurrence<TData>[];
   } | null = null;
   let scrollHandler: ((time: Date | number) => void) | null = null;
-  // The rendered calendar root element, registered by the <EventCalendar> host.
-  // The drag engine falls back to it to find day cells when a gesture starts
-  // from a portaled surface (e.g. a chip inside the "+N more" popover), whose
-  // DOM ancestors do not include the calendar.
   let rootEl: HTMLElement | null = null;
   let lastEmittedRangeKey: string | null = null;
 
-  // Controlled interactions merge, cached on input identity: rebuilding the
-  // merged object per snapshot would break Object.is for selector hooks.
   let interactionsCache: {
     input: Partial<EventCalendarInteractions>;
     merged: EventCalendarInteractions;
@@ -491,7 +472,6 @@ function createEventCalendarStore<TData>(
   ) => {
     const controlled = options[key] !== undefined;
     if (!controlled) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (internal as any)[key] = value;
       invalidate();
     }
@@ -508,10 +488,6 @@ function createEventCalendarStore<TData>(
     if (!controlled) notify();
   };
 
-  // An occurrence key encodes the start instant (id::startISO), so committing a
-  // move re-keys the occurrence and a selection holding the old key would point
-  // at nothing. Remapped in the same commit and emitted BEFORE the events write
-  // so a controlled consumer applies the two in a consistent order.
   const remapSelectionKey = (id: EventCalendarEventId, oldKey: string, nextStart: Date) => {
     const newKey = `${id}::${nextStart.toISOString()}`;
     if (newKey === oldKey) return;
@@ -523,10 +499,6 @@ function createEventCalendarStore<TData>(
     });
   };
 
-  // extraPatch: non-timing fields committed in the SAME write. Two sequential
-  // setField("events") calls break controlled mode - the second one re-reads
-  // the still-stale controlled array and its onEventsChange payload silently
-  // reverts the timing change the first one emitted.
   const applyProposedUpdate = (
     update: EventCalendarProposedUpdate<TData>,
     extraPatch?: Partial<CalendarEvent<TData>>,
@@ -542,9 +514,6 @@ function createEventCalendarStore<TData>(
           }
         : { start: update.start, end: update.end, allDay: update.allDay };
     if (update.resourceId !== undefined) adjusted.resourceId = update.resourceId;
-    // the STORED event holds the pre-commit start, which is what the live
-    // occurrence key was built from (update.event already carries the proposal
-    // when the call comes from api.updateEvent)
     const stored = getState().events.find((event) => event.id === update.event.id);
     const oldKey =
       update.occurrence?.key ?? (stored ? `${stored.id}::${stored.start.toISOString()}` : null);
@@ -648,8 +617,6 @@ function createEventCalendarStore<TData>(
       const timingChanged =
         patch.start !== undefined || patch.end !== undefined || patch.allDay !== undefined;
       if (timingChanged && settings.onEventUpdate) {
-        // single write: the non-timing rest rides along as extraPatch so
-        // controlled mode sees one consistent onEventsChange payload
         const rest = { ...patch };
         delete rest.start;
         delete rest.end;
@@ -894,15 +861,11 @@ function useEventCalendarState<TData = unknown>(
   });
   useEffect(() => {
     store.emitRangeIfChanged();
-    // mount-only: onRangeChange fires once for the initial range
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return store.instance;
 }
 
-const EventCalendarContext =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createContext<EventCalendarInstance<any> | null>(null);
+const EventCalendarContext = createContext<EventCalendarInstance<any> | null>(null);
 
 /** The stable calendar instance; throws outside <EventCalendar>. */
 function useEventCalendar<TData = unknown>(): EventCalendarInstance<TData> {
@@ -966,13 +929,6 @@ function useEventCalendarView(): {
   };
 }
 
-/**
- * isToday is a wall-clock read, so no store write ever invalidates it and a
- * calendar left open overnight keeps highlighting yesterday. One timer per
- * display zone, armed for the next zoned midnight and re-armed on fire, wakes
- * every day-scoped hook exactly when the answer changes; an interval would
- * tick thousands of times a day to catch one transition.
- */
 const midnightTicker = (() => {
   const zones = new Map<
     string,
@@ -1111,10 +1067,6 @@ function useEventCalendarOccurrences<TData = unknown>(
     () => instance.api.getOccurrences(range),
     {
       calendar: instance,
-      // element identity, not keys: keys encode id+start only, so an end-only
-      // resize or a title/color/data edit would never invalidate a key-based
-      // memo. The index rebuilds occurrence objects precisely when events
-      // change, so identity is the correct (and cheapest) change signal.
       isEqual: (a, b) => a === b || (a.length === b.length && a.every((occ, i) => occ === b[i])),
     },
   );
@@ -1140,11 +1092,6 @@ function useEventCalendarDay<TData = unknown>(
       (EMPTY_BUCKET as EventCalendarDayBucket<TData>),
     {
       calendar: instance,
-      // Element identity, not a content key: an occurrence key encodes
-      // id+start only, so a title/color/data edit produced an identical key
-      // and this cell kept serving its STALE segments. Buckets come straight
-      // out of the memoized index, which rebuilds precisely when events
-      // change, so identity is both correct and the cheapest signal.
       isEqual: (a, b) =>
         a === b ||
         (a.allDay.length === b.allDay.length &&
@@ -1213,9 +1160,6 @@ function useEventCalendarWeek<TData = unknown>(
     },
     {
       calendar: instance,
-      // Same reasoning as the day bucket above: `bars` is the array held by
-      // the memoized index, so element identity catches content edits that a
-      // key built from id+start could never see.
       isEqual: (a, b) =>
         (a.rowStart?.getTime() ?? 0) === (b.rowStart?.getTime() ?? 0) &&
         (a.bars === b.bars ||
@@ -1296,7 +1240,6 @@ interface EventCalendarClassNames {
   morePopover?: string;
   /** "+N more" popover day header row. */
   morePopoverHeader?: string;
-  // nav family (reachable without recomposing the default nav)
   navButton?: string;
   title?: string;
   navTooltip?: string;
@@ -1304,7 +1247,6 @@ interface EventCalendarClassNames {
   viewSwitcherLabel?: string;
   viewShortcut?: string;
   datePickerContent?: string;
-  // month view
   monthHeader?: string;
   monthDayHeader?: string;
   monthBody?: string;
@@ -1316,14 +1258,12 @@ interface EventCalendarClassNames {
   monthCellFooter?: string;
   monthDayNumber?: string;
   dayAddButton?: string;
-  // time grid / resource
   timeGridHeader?: string;
   timeGutterLabel?: string;
   allDayLabel?: string;
   allDayCell?: string;
   timedChip?: string;
   resourceHeader?: string;
-  // interaction surfaces (shared by every view)
   dragGhost?: string;
   dragCarry?: string;
   dragCarryInvalid?: string;
@@ -1332,7 +1272,6 @@ interface EventCalendarClassNames {
   slotDraft?: string;
   resizeHandle?: string;
   resizeGrip?: string;
-  // agenda
   noEvents?: string;
   agendaDay?: string;
   agendaDayHeader?: string;
@@ -1564,10 +1503,8 @@ const DEFAULT_VIEW_CONFIG: EventCalendarViewConfig = {
   agendaSummaryMaxDots: 6,
 };
 
-const EventCalendarViewConfigContext = createContext<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  EventCalendarViewConfig<any>
->(DEFAULT_VIEW_CONFIG);
+const EventCalendarViewConfigContext =
+  createContext<EventCalendarViewConfig<any>>(DEFAULT_VIEW_CONFIG);
 
 /** Root-level display props + render overrides, for view components. */
 function useEventCalendarViewConfig<TData = unknown>(): EventCalendarViewConfig<TData> {
@@ -1742,8 +1679,6 @@ function EventCalendar<TData = unknown>({
     if (apiRef) apiRef.current = instance.api;
   }, [apiRef, instance]);
 
-  // Register the root element so the drag engine can find day cells even when a
-  // gesture starts from a portaled surface (the "+N more" popover).
   const registerRoot = useCallback(
     (el: HTMLElement | null) => instance.internals.setRootEl(el),
     [instance],

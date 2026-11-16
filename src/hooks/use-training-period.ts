@@ -39,16 +39,10 @@ export function setTrainingPeriod(period: FitnessPeriod) {
   chosen = period;
   try {
     window.localStorage.setItem(STORAGE_KEY, period);
-  } catch {
-    // Private mode or full storage: the choice still holds for this session.
-  }
+  } catch {}
   for (const listener of listeners) listener();
 }
 
-/**
- * The one period every training view shares (fitness, heart rate). A choice made on one page
- * carries to the others and survives app restarts. `null` until the client knows the layout.
- */
 export function useTrainingPeriod(): FitnessPeriod | null {
   const isDesktop = useDesktopMedia();
   const stored = useSyncExternalStore(subscribe, getSnapshot, () => null);

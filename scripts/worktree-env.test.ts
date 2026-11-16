@@ -119,7 +119,6 @@ describe("DEFAULT_DEV_PORT", () => {
     expect(readEnvValue(example, "BETTER_AUTH_URL")).toBe(`http://localhost:${DEFAULT_DEV_PORT}`);
   });
 
-  // e2e/env.ts puts a checkout's e2e server at PORT+1000 and its browser at PORT+2000.
   it("keeps its dev, e2e and browser ports clear of every worktree's", () => {
     const offsets = [0, 1000, 2000];
     for (const ours of offsets) {

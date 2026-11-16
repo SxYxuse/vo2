@@ -32,22 +32,16 @@ type SyncToast = {
   update: (toastId: string, options: SyncToastOptions) => void;
 };
 
-/**
- * Skips the progress toast. The finish toast still shows if the athlete has left onboarding
- * by the time the copy ends, since that copy keeps running behind the app (ADR 0012).
- */
 function quietToast(onOnboarding: () => boolean): SyncToast {
   return {
     add: () => "",
     update: (_toastId, options) => {
-      // "info" is the copy already running elsewhere; a quiet resume has nothing to add to it.
       if (options.type === "loading" || options.type === "info" || onOnboarding()) return;
       toast.add(options);
     },
   };
 }
 
-/** A check for new activities shows only the header spinner; status shows pauses and errors. */
 const silentToast: SyncToast = { add: () => "", update: () => {} };
 
 function finishSyncToast(
@@ -163,7 +157,6 @@ export function useStravaSync({ quiet = false }: { quiet?: boolean } = {}) {
             timeout: 0,
             actionProps: {
               children: "Reconnect",
-              // Signing in again stores a fresh token pair on the same account.
               onClick: () =>
                 void authClient.signIn.social({
                   provider: "strava",

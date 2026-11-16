@@ -66,10 +66,6 @@ function makeComponents(lookup: ActivityLookup): MarkdownComponents {
   };
 }
 
-/**
- * Chat markdown, styled by Typeset. Links to an activity or a power file become chips that open
- * it. Raw HTML is never rendered; the coach draws HTML only through a visual.
- */
 export const CoachMarkdown = memo(function CoachMarkdown({
   markdown,
   lookup,

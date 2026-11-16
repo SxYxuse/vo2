@@ -27,8 +27,6 @@ import {
 } from "@/services/heart-rate-settings.ts";
 import { DEFAULT_SPORT_GROUP_SHARES } from "@/services/sport-groups.ts";
 
-// Age checks the max-HR anchor against spikes, and weight is used for watts per
-// kilogram on personal bests, so every athlete gives both.
 export const profileFormSchema = z.object({
   birthDate: z
     .string()
@@ -59,7 +57,6 @@ const sportsFormFields = {
 
 const sportsFormSchema = z.object(sportsFormFields);
 
-/** Blank means "use the estimate"; anything typed must be a whole bpm in range. */
 function bpmText(min: number, max: number) {
   return z
     .string()
@@ -169,7 +166,6 @@ export function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFor
   };
 }
 
-/** The settings the form describes, reading any value that isn't a valid bpm as blank. */
 export function heartRateFormPreview(values: HeartRateFormInput): HeartRateSettings {
   const { restHr, sports } = values.heartRate;
   const bpm = (value: string, min = BPM_MIN, max = BPM_MAX) => {
@@ -192,15 +188,10 @@ export function heartRateFormPreview(values: HeartRateFormInput): HeartRateSetti
   });
 }
 
-/** The settings the form describes, or null while a typed value is incomplete. */
 export function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
   return heartRateFormSchema.safeParse(values).success ? heartRateFormPreview(values) : null;
 }
 
-/**
- * Settings save as the athlete edits, so one half-typed field must not hold back the rest:
- * each part that fails validation keeps its last saved value. Null when nothing valid is known.
- */
 export function settingsSaveFromForm(
   values: SettingsFormInput,
   saved: SavedAthleteSettings & { heartRateEstimates?: HeartRateEstimates },

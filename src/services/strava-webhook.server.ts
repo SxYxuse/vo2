@@ -12,14 +12,12 @@ export function handleStravaWebhookRequest(request: Request) {
   return handleStravaWebhook(
     request,
     {
-      // Athlete deletion without the Strava revoke step: the athlete already revoked VO2 there.
       removeAthlete: async (stravaAthleteId) => {
         const userId = await userIdForStravaAthlete(stravaAthleteId);
         if (!userId) return;
         await removeAthlete(userId);
         logger.info("athlete.deleted_on_strava", { userId });
       },
-      // Streams and top-effort celebrations cascade from the activity row.
       removeActivity: async (stravaAthleteId, activityId) => {
         const userId = await userIdForStravaAthlete(stravaAthleteId);
         if (!userId) return;

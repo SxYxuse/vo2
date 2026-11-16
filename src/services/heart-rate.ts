@@ -20,7 +20,6 @@ export const HR_ZONES = [
     id: "z1",
     label: "Zone 1",
     name: "Recovery",
-    // Gray to red, cool to hot, so the zone order reads from the color alone.
     color: "var(--color-ds-gray-700)",
     info: "Easy effort. Breathing is light and you can talk in full sentences. Used for recovery and long aerobic time.",
   },
@@ -57,16 +56,13 @@ export const HR_ZONES = [
 export type HeartRateZoneId = (typeof HR_ZONES)[number]["id"];
 export type HeartRateFamily = "cycling" | "running" | "swimming" | "walking" | "other";
 
-/** How a sport's zones are cut: % of LTHR, % of max HR, heart-rate reserve, or custom bpm. */
 export type ZoneMethod = "lthr" | "max" | "reserve" | "custom";
 
-/** Everything a zone method may read. Walking and other sports always use % of max. */
 export type ZoneAnchors = {
   maxHr: number | null;
   lthr: number | null;
   restHr?: number | null;
   method?: ZoneMethod;
-  /** Tops of zones 1 to 4 in bpm, used by the custom method. */
   customZones?: number[] | null;
 };
 
@@ -90,7 +86,6 @@ const FAMILY_BY_GROUP: Record<SportGroupId, HeartRateFamily> = {
   walking: "walking",
 };
 
-/** Karvonen: zone 1 tops out at 60 % of reserve, zone 5 starts above 90 %. */
 const RESERVE_BANDS: ZoneBand[] = [
   { id: "z1", toPct: 0.6 },
   { id: "z2", toPct: 0.7 },
@@ -170,11 +165,9 @@ export type HeartRateZoneStat = {
   seconds: number;
 };
 
-/** One activity's time in each zone (same order as `HR_ZONES`), so the page can filter by period. */
 export type HeartRateSession = {
   start: string;
   zoneSeconds: number[];
-  /** Time-weighted average of the plausible samples; null without any. */
   avgBpm: number | null;
 };
 
@@ -183,9 +176,7 @@ export type HeartRateSport = {
   members: string[];
   family: HeartRateFamily | null;
   zoneModel: string;
-  /** Null on the all-sports view, where each sport keeps its own. */
   zoneMethod: ZoneMethod | null;
-  /** Zone anchor: the athlete's max, else recent max HR without spikes, or the age prediction. */
   maxHeartrate: number | null;
   maxAnchor: MaxHrAnchor | null;
   lthr: number | null;
@@ -197,14 +188,12 @@ export type HeartRateSport = {
   peakActivityName: string | null;
   peakActivityStart: string | null;
   zones: HeartRateZoneStat[];
-  /** Start of every activity with heart rate, streams or not. */
   activityStarts: string[];
   sessions: HeartRateSession[];
   efficiencyKind: EfficiencyKind | null;
   efficiency: EfficiencyPoint[];
 };
 
-/** The athlete's heart-rate settings and the stored estimates every view resolves zones from. */
 export type AthleteHeartRate = {
   settings?: HeartRateSettings;
   restHr: number | null;
@@ -229,7 +218,6 @@ export type SportBucket = {
   peakActivityStart: string | null;
 };
 
-/** The sports with an LTHR model; walking and other sports always cut % of max (ADR 0021). */
 export const ZONED_FAMILIES = ["cycling", "running", "swimming"] as const;
 export type ZonedFamily = (typeof ZONED_FAMILIES)[number];
 
@@ -239,11 +227,9 @@ export function isZonedFamily(family: HeartRateFamily | null): family is ZonedFa
 
 export type AnchorSource = "athlete" | "estimated";
 
-/** One sport's estimates, before anything the athlete set. */
 export type FamilyEstimates = {
   restHr: number | null;
   maxHr: number | null;
-  /** A stored LTHR estimate from hard efforts; without one, LTHR is a share of max. */
   lthr?: number | null;
 };
 
@@ -259,7 +245,6 @@ function anchorSource(set: number | null, value: number | null): AnchorSource | 
   return value != null ? "estimated" : null;
 }
 
-/** A set anchor wins over the estimate, and estimates build on set anchors. */
 export function resolveHeartRate(
   family: ZonedFamily,
   settings: HeartRateSettings | undefined,
@@ -270,8 +255,6 @@ export function resolveHeartRate(
   const setLthr = sport?.lthr ?? null;
   const setRest = settings?.restHr ?? null;
   const maxHr = setMax ?? estimates.maxHr;
-  // The stored estimate comes from activities and is refreshed when settings change; until
-  // then, one at or above a newly set max can't stand.
   const stored =
     estimates.lthr != null && (maxHr == null || estimates.lthr < maxHr) ? estimates.lthr : null;
   const estimatedLthr = stored ?? estimateLthrFromMax(maxHr, family);
@@ -289,7 +272,6 @@ export function resolveHeartRate(
   };
 }
 
-/** The anchor a sport's method needs but has no value for, if any. */
 export function missingAnchor(
   resolved: ResolvedHeartRate,
 ): "max" | "lthr" | "rest" | "zones" | null {
@@ -344,7 +326,6 @@ function pctBpm(anchor: number, pct: number) {
   return Math.round(anchor * pct);
 }
 
-/** The usual LTHR as a share of max HR, used when there aren't enough hard efforts. */
 export function lthrShareOfMax(family: HeartRateFamily) {
   return ZONE_MODELS[family].lthrFactor;
 }
@@ -387,7 +368,6 @@ function zoneBounds(sportType: string, anchors: ZoneAnchors, peak: number): Boun
     );
   }
   const bands = method === "max" ? POLAR_HRMAX_BANDS : model.bands;
-  // No silent fallback: a missing LTHR shows no zones rather than a different method.
   const anchor = method === "lthr" ? (anchors.lthr ?? 0) : peak;
   if (anchor <= 0) return [];
   return boundsFromTops(bands.slice(0, 4).map((band) => pctBpm(anchor, band.toPct ?? 1)));
@@ -466,12 +446,10 @@ export function noteActivityPeak(
   bucket.peakActivityStart = input.start;
 }
 
-/** The max HR the athlete set for a sport, if any. */
 export function athleteMaxHr(family: HeartRateFamily, athlete: AthleteHeartRate | undefined) {
   return isZonedFamily(family) ? (athlete?.settings?.sports[family].maxHr ?? null) : null;
 }
 
-/** One sport's zone anchors: the athlete's settings over the estimates. */
 export function sportHeartRate(
   family: HeartRateFamily,
   maxHr: number | null,
@@ -489,7 +467,6 @@ export function sportHeartRate(
     method: "max",
     maxHr,
     maxSource: anchorSource(null, maxHr),
-    // Shown for reference only; walking and other sports cut zones from max.
     lthr: estimateLthrFromMax(maxHr, family),
     lthrSource: null,
     restHr,
@@ -558,7 +535,6 @@ export function toHeartRateSport(
   };
 }
 
-/** Adds one activity's samples to a sport whose zone bounds are already set. */
 export function addSessionToSport(sport: HeartRateSport, start: string, histogram: number[]) {
   const zones = zonesFromHistogram(histogram, sport.sportType, sportZoneAnchors(sport));
   const zoneSeconds = zones.map((zone) => zone.seconds);
@@ -570,10 +546,6 @@ export function addSessionToSport(sport: HeartRateSport, start: string, histogra
   }));
 }
 
-/**
- * Time in zone and activity count for activities since `startMs` (null: all time).
- * Zone bounds and max HR stay on the anchor so switching period never moves the zones.
- */
 export function sportForPeriod(sport: HeartRateSport, startMs: number | null): HeartRateSport {
   if (startMs == null) return sport;
   const inPeriod = (start: string) => new Date(start).getTime() >= startMs;

@@ -75,8 +75,6 @@ function ActivityDetailBody({
           value={formatDuration(detail.movingTime)}
           color="var(--color-ds-purple-700)"
         />
-        {/* A stat the activity didn't record (a pool swim's climb, power without a meter) is
-            left out rather than shown as a dash. */}
         {detail.totalElevationGain ? (
           <StatCard
             label="Elevation"
@@ -143,10 +141,6 @@ function ActivityDetailBody({
 
 type ActivitySearch = DiarySearch & BestsReturn;
 
-/**
- * Returns to the bests board or calendar period the activity was opened from, or else the
- * activity's own month and week so either calendar view lands on it.
- */
 function BackLink({ diary, start }: { diary?: ActivitySearch; start?: string }) {
   if (diary?.from === "bests") {
     return (

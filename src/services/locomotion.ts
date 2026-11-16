@@ -67,7 +67,6 @@ export function defaultVisibleSeries(detail: {
   return detail.series.filter((key) => !offByDefault.has(key));
 }
 
-/** Below this speed a pace-sport Stream sample is not locomotion. */
 export const PACE_STOP_KMH = 1;
 
 export function paceSeconds(kmh: number | null, unit: PaceUnit): number | null {

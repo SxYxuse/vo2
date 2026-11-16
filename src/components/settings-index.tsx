@@ -10,7 +10,6 @@ import {
   showsSettingsSection,
 } from "@/lib/settings-sections.ts";
 
-/** Every settings section as a list, so a phone, which has no settings sidebar, can reach each. */
 export function SettingsIndex() {
   const { data } = useSuspenseQuery(settingsSnapshotQueryOptions);
   const sections = SETTINGS_SECTIONS.filter((item) =>

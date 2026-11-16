@@ -40,10 +40,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
-/**
- * Whether a coach feature can run: the athlete saved the key its model needs, or the mock coach
- * answers (mock Strava only). Undecided until the status loads, so no prompt flashes.
- */
 export function useCoachAvailable(feature: CoachFeature) {
   const { data: status } = useQuery(coachStatusQueryOptions);
   const hasKey = status?.ready[feature] === true;
@@ -51,13 +47,11 @@ export function useCoachAvailable(feature: CoachFeature) {
   return {
     hasKey,
     available,
-    /** Known to have no key: show the way in rather than the feature. */
     needsKey: status != null && !available,
     mocked: !hasKey && status?.mocked === true,
   };
 }
 
-/** Shown in place of a coach feature without a key: the way in (ADR 0036). */
 export function CoachKeyPrompt({ children }: { children: string }) {
   return (
     <Empty className="min-h-36 border-0 py-6">
@@ -81,7 +75,6 @@ export function CoachKeyPrompt({ children }: { children: string }) {
   );
 }
 
-/** Adds, replaces, or removes the athlete's key for one provider; it is never shown back. */
 export function CoachKeyField({
   idPrefix,
   provider = OPENROUTER,
@@ -89,7 +82,6 @@ export function CoachKeyField({
 }: {
   idPrefix: string;
   provider?: CoachProvider;
-  /** False under a heading that already says what the key is for, as in Settings → Coach. */
   titled?: boolean;
 }) {
   const info = COACH_PROVIDERS.find((each) => each.id === provider) ?? COACH_PROVIDERS[0];
@@ -135,9 +127,7 @@ export function CoachKeyField({
           <Spinner />
         </div>
       ) : editing ? (
-        // Settings and onboarding are forms already: Enter here saves the key, not the page.
         <div className="flex flex-col gap-2">
-          {/* The legend shows the provider; each input still needs its own name. */}
           <FieldLabel htmlFor={id} className="sr-only">
             {info.label} key
           </FieldLabel>
@@ -169,7 +159,6 @@ export function CoachKeyField({
               ) : null}
               <Button
                 type="button"
-                // Outlined until there is a key to save, so it doesn't read as a dead button.
                 variant={value.trim() ? "default" : "outline"}
                 onClick={submit}
                 className="flex-1 sm:flex-none"
@@ -216,7 +205,6 @@ export function CoachKeyField({
   );
 }
 
-/** Settings → Coach: the athlete's keys, and the model and reasoning for each coach feature. */
 export function SettingsCoachSection() {
   const { data } = useQuery(settingsSnapshotQueryOptions);
   const { data: status } = useQuery(coachStatusQueryOptions);

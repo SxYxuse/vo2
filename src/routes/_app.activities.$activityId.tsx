@@ -20,9 +20,6 @@ import { RouteError } from "@/components/route-states.tsx";
 type ActivitySearch = DiarySearch & BestsReturn & { map?: true };
 
 export const Route = createFileRoute("/_app/activities/$activityId")({
-  // Where the activity was opened from (a calendar period or a bests board), so the back link
-  // returns there. `map` is the full-screen activity map: in the URL so the back gesture of an
-  // installed app closes it.
   validateSearch: (search: Record<string, unknown>): ActivitySearch => ({
     ...parseDiarySearch(search),
     ...parseBestsReturn(search),
@@ -59,9 +56,6 @@ function ActivityPage() {
       });
       return;
     }
-    // Pop the entry the tap pushed, so back from the activity still leaves it. The mark lives in
-    // history state, so it survives the app being reloaded with the map open; a map opened
-    // straight from a link has no such entry to pop.
     if (router.state.location.state.activityMapPushed) {
       router.history.back();
       return;

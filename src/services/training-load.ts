@@ -41,10 +41,8 @@ export const FITNESS_PERIODS: { id: FitnessPeriod; label: string; shortLabel: st
 
 export type LoadInputs = {
   sportType: string;
-  /** Peaks older than the max-HR window stop setting zones; missing counts as recent. */
   startDate?: Date | string;
   movingTime: number;
-  /** Metres; lets HR estimates match activities of similar speed. */
   distance?: number | null;
   averageHeartrate: number | null;
   maxHeartrate: number | null;
@@ -52,7 +50,6 @@ export type LoadInputs = {
   weightedAverageWatts: number | null;
   deviceWatts: boolean;
   wattsStream?: number[] | null;
-  /** Attached only to recent activities that could hold a threshold effort. */
   heartrateStream?: number[] | null;
   timeStream?: number[] | null;
 };
@@ -180,7 +177,6 @@ function athleteMaxHr(family: HeartRateFamily, settings: HeartRateSettings | und
   return isZonedFamily(family) ? (settings?.sports[family].maxHr ?? null) : null;
 }
 
-/** Recent max HR per family, with sensor spikes dropped (same rules as the heart rate page). */
 function peakByFamily(activities: LoadInputs[], options: AnchorOptions) {
   const peaks: Record<HeartRateFamily, HeartPeak[]> = {
     cycling: [],
@@ -248,7 +244,6 @@ function estimateFtp(activities: LoadInputs[]) {
   return ftpEstimate && ftpEstimate > 80 ? ftpEstimate : null;
 }
 
-/** Whether an activity's heart-rate stream can feed the LTHR estimate. */
 export function couldHoldThreshold(
   activity: Pick<LoadInputs, "sportType" | "movingTime" | "startDate">,
   now = new Date(),
@@ -298,7 +293,6 @@ export function estimateLoadAnchors(
   };
 }
 
-/** Estimates with the athlete's set LTHR and resting heart rate laid over; the zone method plays no part. */
 export function withAthleteAnchors(
   anchors: LoadAnchors,
   settings: HeartRateSettings | undefined,
@@ -327,9 +321,7 @@ function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
 }
 
 const SIMILAR_HR_NEIGHBOURS = 5;
-/** Fewer matches than this and one bad sensor day would set the estimate; duration is safer. */
 const SIMILAR_HR_MIN_MATCHES = 3;
-/** Heart rate at a given effort drifts with fitness, so only sessions this close in time count. */
 export const SIMILAR_HR_WINDOW_DAYS = 60;
 
 function averageSpeed(activity: LoadInputs) {
@@ -348,17 +340,12 @@ function daysApart(activity: LoadInputs, other: LoadInputs) {
   return Math.abs(start - otherStart) / DAY_MS;
 }
 
-/**
- * Walks borrow from walks and rides from rides: a run's intensity would score a walk far too
- * hard. Mixed sports only borrow from the same sport type, since yoga says nothing about a gym session.
- */
 function canLendHeartRate(activity: LoadInputs, other: LoadInputs) {
   const family = heartRateFamily(activity.sportType);
   if (family === "other") return other.sportType === activity.sportType;
   return heartRateFamily(other.sportType) === family;
 }
 
-/** How unlike two activities of one sport group are: duration, speed, time apart, sport type. */
 function dissimilarity(activity: LoadInputs, other: LoadInputs) {
   let score = Math.abs(Math.log(activity.movingTime / other.movingTime));
   score += daysApart(activity, other) / SIMILAR_HR_WINDOW_DAYS / 2;
@@ -375,12 +362,6 @@ function median(values: number[]) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-/**
- * Heart-rate intensity (share of heart-rate reserve up to LTHR or max) borrowed from the
- * athlete's most similar sessions of the same sport group within two months either side.
- * The median keeps one bad sensor day from setting the estimate; with fewer than three
- * matches there is no estimate and duration scores the session.
- */
 export function estimateHrIntensity(
   activity: LoadInputs,
   pool: LoadInputs[],
@@ -410,14 +391,12 @@ export function estimateHrIntensity(
 export type ActivityLoad = {
   load: number;
   source: LoadSource;
-  /** Average HR implied by the borrowed intensity; only set when source is "similarHeartRate". */
   estimatedHeartrate: number | null;
 };
 
 export function activityTrainingLoad(
   activity: LoadInputs,
   anchors: LoadAnchors,
-  /** Activities to borrow heart-rate intensity from when this one has none. */
   pool: LoadInputs[] = [],
 ): ActivityLoad {
   const hours = hoursFromMoving(activity.movingTime);
@@ -526,7 +505,6 @@ export function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
   return point.ctl - point.atl;
 }
 
-/** Form aligned with fitness and fatigue on the same point (after that day's known load). */
 export function pmcWithCurrentForm(points: PmcPoint[]): PmcPoint[] {
   return points.map((point) => ({ ...point, tsb: formAfterLoad(point) }));
 }
@@ -538,7 +516,6 @@ export function ctlChange(points: PmcPoint[], days = 7) {
   return latest.ctl - prior.ctl;
 }
 
-/** First instant of a period in the athlete's timezone; null for all time. */
 export function periodStartMs(period: FitnessPeriod, timeZone: string, now = new Date()) {
   if (period === "all") return null;
   const end = zonedDayStart(now, timeZone);
@@ -598,20 +575,13 @@ export type TrainingPhase = {
   tone: "positive" | "neutral" | "warning";
 };
 
-/** A ramp below this, either way, reads as steady load. */
 const STEADY_RAMP = 2;
 const FAST_RAMP = 8;
 const DEEP_FATIGUE_TSB = -30;
 const FRESH_TSB = 10;
-/** A four-week drop of a fifth of fitness (and at least 5) is a break, not a recovery week. */
 const BREAK_SHARE = 0.2;
 const MIN_HISTORY_DAYS = 28;
 
-/**
- * Where the athlete is in the build, rest, and freshen cycle, from the last week's ramp, the
- * last four weeks' trend, and form. Fitness is meant to rise in blocks and dip in recovery,
- * so a falling line is a phase to read, not a loss to avoid.
- */
 export function trainingPhase(points: PmcPoint[]): TrainingPhase {
   const latest = points.at(-1);
   if (!latest || points.length < MIN_HISTORY_DAYS || latest.ctl < 3) {
@@ -694,7 +664,6 @@ export function roundLoad(value: number) {
 export type FitnessPageData = {
   signedIn: boolean;
   fitnessLoads: FitnessLoad[];
-  /** Season goals, marked on the chart; the next one gets a race-day projection. */
   goals: Goal[];
 };
 

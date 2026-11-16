@@ -12,7 +12,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { constants } from "node:os";
 
-// A fixed path, not os.tmpdir(): agents whose TMPDIR differs must still wait for each other.
 const LOCK = "/tmp/vo2-heavy.lock";
 const BUSY = 75;
 
@@ -44,7 +43,6 @@ export function run(command: string, args: string[], { interruptOnly = false } =
   });
 }
 
-/** Runs the command once no other heavy command on this machine is running. */
 export async function runHeavy([command, ...args]: string[]): Promise<number> {
   if (!command) throw new Error("usage: bun scripts/heavy.ts <command> [args…]");
   if (!hasFlock()) return run(command, args);

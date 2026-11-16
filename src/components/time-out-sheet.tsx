@@ -37,16 +37,10 @@ import {
   type TimeOut,
 } from "@/services/time-outs.ts";
 
-/** A time out to edit, "new" to mark one, or null when the sheet is closed. */
 export type TimeOutEditing = TimeOut | "new" | null;
 
-/** Every button of the feature fits its text and stays a thumb's height (AGENTS.md). */
 const TOUCH = "min-h-[2.75rem]";
 
-/**
- * Marks, edits, ends, or deletes a time out (ADR 0066): a bottom sheet on phones, a dialog on
- * desktop. Athletes see its kind, "Sick" or "Injured"; "time out" is the glossary's word.
- */
 export function TimeOutSheet({
   editing,
   onClose,
@@ -73,16 +67,10 @@ function deviceTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-/** The time out the athlete is on, or the next one ahead, if any. */
 export function currentTimeOut(timeOuts: TimeOut[], today: string) {
   return timeOuts.find((item) => item.end == null || item.end >= today) ?? null;
 }
 
-/**
- * Plan's banner for the time out the athlete is on, or the next one ahead (ADR 0066). While one
- * lasts it owns the page: the day count, what the return looks like, and "I'm back". One ahead is
- * quieter, with only "Edit".
- */
 export function TimeOutBanner({
   timeOut,
   today,
@@ -131,7 +119,6 @@ export function TimeOutBanner({
     );
   }
 
-  // "I'm back" ends it yesterday, so the days off are the ones before today.
   const day = daysBetween(timeOut.start, today) + 1;
   const share = Math.round(firstWeekBack(Math.max(1, day - 1)) * 100);
   return (
@@ -242,7 +229,6 @@ function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () 
             <DatePicker
               id="time-out-start"
               value={start}
-              // An older time out keeps its start; a new start is held to the window.
               fromDate={timeOut && timeOut.start < window.first ? timeOut.start : window.first}
               toDate={window.last}
               display={timeOutDay}
