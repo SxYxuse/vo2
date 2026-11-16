@@ -53,7 +53,11 @@ Regenerate these, rather than editing them by hand:
 
 ## Verifying
 
-- Prove behavior end to end, not function by function. Vitest keeps only guards: tests that hold a rule over the whole repository (every athlete table cascades on delete, ADR numbers are unique, mock Strava stays off in production), not tests of one function.
+- Prove behavior end to end first: a feature is done when a journey or screen shows it, not when its functions pass.
+- Vitest holds guards (tests that hold a rule over the whole repository: every athlete table cascades on delete, ADR numbers are unique, mock Strava stays off in production) and tests of a module's behavior through its public interface, where an end-to-end run is too slow or can't reach the case (the weekly budget, a parser, a date rule). Write them test-first, and avoid the `tdd` skill's anti-patterns:
+  - **Coupled to the implementation:** mocking internal collaborators, testing private helpers, or checking through a side channel such as the database instead of the interface. If a refactor that keeps the behavior breaks the test, it is coupled.
+  - **Tautological:** computing the expected value the way the code does, so the test can never disagree with it. Take expected values from the spec, a worked example, or a known-good literal.
+  - **All tests first:** writing every test before any code. Go one test, then just enough code to pass it, then the next.
 - Changes to coach-plan rules, budget or paces must pass the property guard (`src/services/coach-plan-rules.property.test.ts`); extend its generators when you add an input.
 - Open the app in a browser to verify only when the developer asks for it.
 - **Before every commit,** run `vp run gate` and fix what it reports; `vp check --fix` fixes formatting and simple lint issues. The gate runs `vp check` (format, lint, types), Knip (unused files and dependencies), jscpd (duplication over 1%), `bun audit` (high advisories), and the guard tests. CI runs the same steps plus the end-to-end suite on every pull request. Lighthouse (`vp run lighthouse`, on the sign-in page and the calendar, week, and activity screens) runs on main once a day and before each release (`.github/workflows/lighthouse.yml`).
