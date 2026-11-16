@@ -1075,7 +1075,8 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
     // The next field's calendar would show the same day while this one is still closing.
     await expect(page.locator("[data-day]")).toHaveCount(0);
   };
-  const band = page.locator(".recharts-reference-area");
+  // The fitness chart's bands, which a tap edits; the predicted race time trend only shades them.
+  const band = page.locator(".recharts-reference-area.cursor-pointer");
 
   // Today is Wednesday 17 June: sick from Friday to Sunday.
   await page.getByRole("button", { name: "Sick or injured" }).click();

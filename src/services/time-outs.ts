@@ -34,6 +34,15 @@ export function timeOutCovers(timeOut: Pick<TimeOut, "start" | "end">, day: stri
   return day >= timeOut.start && (timeOut.end == null || day <= timeOut.end);
 }
 
+/** The time outs that overlap the days from `first` to `last`, each clipped to them. */
+export function timeOutsBetween(timeOuts: TimeOut[], first: string, last: string) {
+  return timeOuts.flatMap((timeOut) => {
+    const from = timeOut.start > first ? timeOut.start : first;
+    const to = timeOut.end != null && timeOut.end < last ? timeOut.end : last;
+    return from > to ? [] : [{ timeOut, from, to }];
+  });
+}
+
 /**
  * The time outs as the coach reads them, in the plan writer's prompt and the chat's context: kind,
  * days, how many days off, and how long ago the athlete came back (ADR 0066). An open one, or one

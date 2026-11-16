@@ -83,7 +83,7 @@ function FitnessPage() {
             onEditTimeOut={setEditing}
           />
           <TimeOutSheet editing={editing} onClose={() => setEditing(null)} />
-          <PredictedTimeTrendCard />
+          <PredictedTimeTrendCard timeOuts={timeOuts} />
           <ProgressCards />
         </>
       ) : (
