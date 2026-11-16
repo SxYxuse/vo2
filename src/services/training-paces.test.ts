@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  activePacesFrom,
   estimateVdot,
   predictRaceSeconds,
   predictedTimeTrend,
+  trendChange,
   type RunEffort,
 } from "./training-paces.types.ts";
 
@@ -86,5 +88,60 @@ describe("predictedTimeTrend", () => {
     const nearTie = [run(at.toISOString(), 10_000, 2400.2), run(at.toISOString(), 5000, 1156.9)];
     expect(predictedTimeTrend(nearTie, [at], 10_000)[0]?.vdot).toBe(51.9);
     expect(predictedTimeTrend(nearTie, [at], 5000)[0]?.vdot).toBe(52);
+  });
+});
+
+describe("trendChange", () => {
+  const week = (date: string, vdot: number | null, seconds: number | null) => ({
+    date,
+    vdot,
+    seconds,
+  });
+
+  it("compares the first and last weeks with an estimate, skipping gaps at either end", () => {
+    const change = trendChange([
+      week("2026-01-04", null, null),
+      week("2026-01-11", 46.1, 2652),
+      week("2026-01-18", null, null),
+      week("2026-04-05", 47.4, 2581),
+      week("2026-04-08", null, null),
+    ]);
+    expect(change).toEqual({
+      first: { date: "2026-01-11", vdot: 46.1, seconds: 2652 },
+      last: { date: "2026-04-05", vdot: 47.4, seconds: 2581 },
+      weeks: 12,
+    });
+  });
+
+  it("has no first week when only one week has an estimate", () => {
+    const change = trendChange([week("2026-01-04", null, null), week("2026-01-11", 46.1, 2652)]);
+    expect(change).toEqual({ first: null, last: week("2026-01-11", 46.1, 2652), weeks: 0 });
+  });
+
+  it("is null without any estimate", () => {
+    expect(trendChange([week("2026-01-04", null, null)])).toBeNull();
+  });
+});
+
+describe("activePacesFrom", () => {
+  const now = new Date("2026-04-08T12:00:00Z");
+  const race = { metres: 10_000, seconds: 2400, date: "2026-03-01" } as const;
+  const effort = run("2026-03-02T09:00:00Z");
+
+  it("is a picked best effort when the athlete picked one", () => {
+    expect(activePacesFrom({ from: "effort", effort, easyFrom: "heartRate" }, null, now)).toBe(
+      "effort",
+    );
+  });
+
+  it("is the race result while it counts, also for athletes from before the choice", () => {
+    expect(activePacesFrom({ effort: null, easyFrom: "heartRate" }, race, now)).toBe("race");
+  });
+
+  it("goes back to Automatic once the race result is older than 16 weeks", () => {
+    const old = { ...race, date: "2025-11-01" };
+    expect(activePacesFrom({ from: "race", effort: null, easyFrom: "heartRate" }, old, now)).toBe(
+      "automatic",
+    );
   });
 });

@@ -24,6 +24,7 @@ import {
   DEFAULT_TARGET_M,
   ESTIMATE_WINDOW_DAYS,
   NO_PACES,
+  activePacesFrom,
   canPredict,
   effortChoices,
   estimateVdot,
@@ -278,10 +279,11 @@ export async function predictedTimeTrendFor(
   userId: string,
   now = new Date(),
 ): Promise<PredictedTimeTrend> {
-  const [{ efforts }, upcoming, timeZone] = await Promise.all([
+  const [{ efforts }, upcoming, timeZone, metrics] = await Promise.all([
     roadRuns(userId),
     upcomingRunningAGoals(userId, now),
     athleteTimeZone(userId),
+    readMetrics(userId),
   ]);
   const [next] = upcoming;
   const predicted = next && predictsRaceTime(next.sportType) && canPredict(next.distanceM);
@@ -300,13 +302,25 @@ export async function predictedTimeTrendFor(
       : predicted
         ? { kind: "goal", name: next.name }
         : { kind: "unpredicted", name: next.name },
+    pacesFrom: activePacesFrom(
+      parsePaceSettings(metrics?.paceSettings),
+      parseRaceResult(metrics?.raceResult),
+      now,
+    ),
     points: firstEstimate < 0 ? [] : points.slice(firstEstimate),
   };
 }
 
 export async function loadPredictedTimeTrendImpl(): Promise<PredictedTimeTrend> {
   const session = await getOptionalSession();
-  if (!session) return { metres: DEFAULT_TARGET_M, target: { kind: "none" }, points: [] };
+  if (!session) {
+    return {
+      metres: DEFAULT_TARGET_M,
+      target: { kind: "none" },
+      pacesFrom: "automatic",
+      points: [],
+    };
+  }
   return predictedTimeTrendFor(session.user.id);
 }
 

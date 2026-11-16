@@ -323,12 +323,32 @@ export type TrendTarget =
   /** A trail or virtual goal, or one outside 1,500 m to the marathon. */
   | { kind: "unpredicted"; name: string };
 
+export type TrendWeek = { date: string; vdot: number | null; seconds: number | null };
+type EstimatedWeek = { date: string; vdot: number; seconds: number };
+
 /** The predicted race time week by week, each point dated by its day key. */
 export type PredictedTimeTrend = {
   metres: number;
   target: TrendTarget;
-  points: { date: string; vdot: number | null; seconds: number | null }[];
+  /** The training paces come from a picked best effort or a race result, not this estimate. */
+  pacesFrom: "automatic" | "effort" | "race";
+  points: TrendWeek[];
 };
+
+function isEstimated(week: TrendWeek): week is EstimatedWeek {
+  return week.vdot != null && week.seconds != null;
+}
+
+/** The first and last weeks with an estimate and the weeks between them; no first with only one. */
+export function trendChange(points: TrendWeek[]) {
+  const estimated = points.filter(isEstimated);
+  const first = estimated[0];
+  const last = estimated.at(-1);
+  if (!first || !last) return null;
+  if (first === last) return { first: null, last, weeks: 0 };
+  const days = (Date.parse(last.date) - Date.parse(first.date)) / 86_400_000;
+  return { first, last, weeks: Math.round(days / 7) };
+}
 
 /** Whether a date (YYYY-MM-DD or ISO) is inside the last 16 weeks, as best efforts count. */
 function isInWindow(date: string, now: Date) {
@@ -427,6 +447,18 @@ export const NO_PACES: TrainingPaces = {
   heart: { kind: "zones-missing" },
 };
 
+/** What the paces are read from now: a race result stops counting after 16 weeks. */
+export function activePacesFrom(
+  settings: PaceSettings,
+  raceResult: RaceResult | null,
+  now: Date,
+): PacesFrom {
+  const from = settings.from ?? (raceResult ? "race" : "automatic");
+  if (from === "effort" && settings.effort) return "effort";
+  if (from === "race" && raceResult && isRaceResultCurrent(raceResult, now)) return "race";
+  return "automatic";
+}
+
 /**
  * The athlete's training paces from their choice: a picked best effort as it is, a race result
  * while current, else the estimate. The easy pace comes from zone 2 when chosen and found.
@@ -441,9 +473,9 @@ export function trainingPaces(input: {
 }): TrainingPaces {
   const { settings, raceResult, estimate, choices, heart, now } = input;
   const from = settings.from ?? (raceResult ? "race" : "automatic");
-  const effort = from === "effort" ? settings.effort : null;
-  const race =
-    from === "race" && raceResult && isRaceResultCurrent(raceResult, now) ? raceResult : null;
+  const active = activePacesFrom(settings, raceResult, now);
+  const effort = active === "effort" ? settings.effort : null;
+  const race = active === "race" ? raceResult : null;
   const picked = effort ?? race;
   const vdot = picked ? roundVdot(vdotFromRace(picked.metres, picked.seconds)) : estimate?.vdot;
   const newer = effort ? choices.find((choice) => choice.metres === effort.metres)?.recent : null;
