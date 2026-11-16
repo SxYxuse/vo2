@@ -50,7 +50,6 @@ function emptyMonth(month: string): CoachSpendingMonth {
   return { month, costUsd: 0, byFeature, unpricedCalls: 0, unpricedTokens: 0 };
 }
 
-/** This month's and last month's spending, months starting in the athlete's timezone. */
 export async function coachSpendingFor(userId: string, timeZone: string): Promise<CoachSpending> {
   const localMonth = sql<string>`to_char(${coachUsage.createdAt} at time zone ${timeZone}, 'YYYY-MM')`;
   const rows = await db

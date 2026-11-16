@@ -37,7 +37,6 @@ export function coachProviderLabel(id: CoachProvider) {
   return COACH_PROVIDERS.find((provider) => provider.id === id)?.label ?? id;
 }
 
-/** The things the coach does that need a model (ADR 0036). */
 export const COACH_FEATURES = [
   {
     id: "chat",
@@ -53,7 +52,6 @@ export const COACH_FEATURES = [
 
 export type CoachFeature = (typeof COACH_FEATURES)[number]["id"];
 
-/** Every level TanStack AI knows, least thinking first. */
 export const REASONING_LEVELS = [
   "off",
   "minimal",
@@ -185,28 +183,17 @@ export type CoachModelOption = {
   label: string;
   hint: string;
   reasoning: readonly ReasoningLevel[];
-  /** One of COACH_MODELS, checked with every coach feature. */
   recommended: boolean;
 };
 
-/** The provider default, sent as no reasoning option at all. */
 export const AUTO_REASONING = null;
 
-/**
- * Every feature starts here, plan writing too: it rewrites up to four weeks, so a strong default
- * there is the expensive one. A plan model already stored stays (ADR 0036).
- */
 export const DEFAULT_COACH_MODEL = {
   provider: "openrouter",
   model: "openai/gpt-6-luna",
   reasoning: AUTO_REASONING,
 } as const satisfies CoachModelChoice;
 
-/**
- * Stored as chosen: a model later dropped from the list keeps running and shows as no longer
- * offered until the athlete picks another, rather than switching silently (ADR 0036). Before
- * ADR 0059 a choice was a bare OpenRouter model id.
- */
 const coachModelChoiceSchema = z.preprocess(
   (value) => (typeof value === "string" ? { provider: OPENROUTER, model: value } : value),
   z
@@ -221,7 +208,6 @@ const coachModelChoiceSchema = z.preprocess(
 export type CoachModelChoice = {
   provider: CoachProvider;
   model: string;
-  /** null: send no level, so the provider's default applies. */
   reasoning: ReasoningLevel | null;
 };
 
@@ -241,7 +227,6 @@ export function findCoachModel(provider: CoachProvider, id: string) {
   return COACH_MODELS.find((model) => model.provider === provider && model.id === id);
 }
 
-/** A stored choice keeps its id, including models no longer listed. */
 export function coachModelLabel(id: string, provider: CoachProvider = OPENROUTER) {
   if (id === "mock") return "Mock coach";
   return findCoachModel(provider, id)?.label ?? catalogLabel(id);
@@ -267,7 +252,6 @@ export function keptReasoning(
   return above ?? levels.at(-1) ?? AUTO_REASONING;
 }
 
-/** The recommended models as picker options; the picker shows them until the catalog loads. */
 export const RECOMMENDED_MODELS: CoachModelOption[] = COACH_MODELS.map((model) => ({
   ...model,
   recommended: true,

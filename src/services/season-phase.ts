@@ -25,47 +25,30 @@ export const PHASES = {
   recovery: { label: "Recovery", hint: "Easy days after the race. No hard sessions." },
 } as const;
 
-/** Hint for a lighter week, whatever the phase. */
 export const LIGHTER_HINT = "A lighter week so the last three weeks of work sink in.";
 
 export type PhaseKind = keyof typeof PHASES;
 
-/** Weeks before the goal week at which each phase starts. */
 export const BASE_WEEKS = 12;
 export const PEAK_WEEKS = 3;
-/** A goal finished this recently leaves no room to rebuild before the next one. */
 export const REBUILD_WEEKS = 8;
-/** Every this many weeks before the peak, a lighter week (ADR 0024). */
 export const LIGHTER_EVERY_WEEKS = 4;
-/** Share of the usual week a lighter week keeps. */
 export const LIGHTER_LOAD_FACTOR = 0.7;
-/** Share of the usual week the race week of a steady supporting race keeps (ADR 0052). */
 export const STEADY_RACE_LOAD_FACTOR = 0.85;
-/** Days after an A goal during which the plan does not ramp, whatever comes next. */
 export const NO_RAMP_AFTER_A_DAYS = 13;
-/** The week target never asks for more than this times the recent weeks' load (rampBaseLoad). */
 export const MAX_RAMP_RATIO = 1.1;
 
 export type SeasonPhase = {
   kind: PhaseKind;
-  /** The goals the week works toward (one event: several for a same-day multisport race). */
   anchor: Goal[];
-  /** Days from the start of the week to the anchor. */
   daysToAnchor: number | null;
-  /** A lighter week inside a build: less load. */
   lighter: boolean;
-  /**
-   * How the week's load moves: a ramp in fitness per week, or a share of
-   * the week's usual load when volume drops.
-   */
   ramp: number;
   loadFactor: number | null;
 };
 
-/** The athlete's usual speed and climbing per sport group, from recent activities. */
 export type GroupPace = { kmh: number; climbPerKm: number };
 
-/** How fast fitness rises toward the main goal, in fitness per week. */
 const RAMP = { base: 5, build: 7, peak: 5 } as const;
 
 const HOLD: SeasonPhase = {
@@ -77,15 +60,9 @@ const HOLD: SeasonPhase = {
   loadFactor: null,
 };
 
-/**
- * The week's phase from the season, read at the start of the week so it holds all week. The plan
- * builds toward the next main goal (ADR 0024); a supporting race only changes the weeks around it,
- * by its effort (ADR 0052).
- */
 export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
   const events = seasonEvents(goals);
   const phase = mainPhase(events, weekStart);
-  // The main goal's taper, race week, and recovery come first.
   if (phase.kind === "taper" || phase.kind === "race" || phase.kind === "recovery") return phase;
   return events
     .map((event) => supportingWeek(event, weekStart))
@@ -96,7 +73,6 @@ export function seasonPhase(goals: Goal[], weekStart: string): SeasonPhase {
     );
 }
 
-/** The phase the next main goal sets: base, build, peak, taper, race week, then recovery. */
 function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
   const ahead = events.filter((event) => daysBetween(weekStart, event.date) >= 0);
   const lastA = events
@@ -134,7 +110,6 @@ function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
     phase = { ...HOLD, kind: "base", ramp: RAMP.base };
   }
 
-  // Right after an A goal the body is still recovering: hold, however close the next one is.
   if (
     sinceLast != null &&
     sinceLast <= NO_RAMP_AFTER_A_DAYS &&
@@ -143,8 +118,6 @@ function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
     phase = { ...phase, kind: "maintain", ramp: 0 };
   }
 
-  // Every fourth week before the peak is lighter, counted back from the goal so the
-  // last one lands just before the peak weeks.
   const lighter =
     (phase.kind === "base" || phase.kind === "build") &&
     weeksLeft > PEAK_WEEKS &&
@@ -161,13 +134,8 @@ function mainPhase(events: SeasonEvent[], weekStart: string): SeasonPhase {
   return { ...phase, anchor, daysToAnchor };
 }
 
-/** A Monday the lighter weeks of base fitness are counted from, so they stay put week to week. */
 const BASE_FITNESS_EPOCH = "2024-01-01";
 
-/**
- * With no main goal ahead the season builds base fitness: base weeks, every fourth one lighter,
- * counted on the calendar since there is no goal to count back from.
- */
 function baseFitness(weekStart: string): SeasonPhase {
   const lighter =
     Math.floor(daysBetween(BASE_FITNESS_EPOCH, weekStart) / 7) % LIGHTER_EVERY_WEEKS ===
@@ -177,12 +145,6 @@ function baseFitness(weekStart: string): SeasonPhase {
     : { ...HOLD, kind: "base", ramp: RAMP.base };
 }
 
-/**
- * How a supporting race changes the week, by its effort, or null when it doesn't (ADR 0052). Fun
- * changes nothing. Steady trims its race week and lightens the week after. All out gets the main
- * goal's taper and race week, and a recovery week after, but no build of its own. The most a
- * week is cut wins.
- */
 function supportingWeek(event: SeasonEvent, weekStart: string): Partial<SeasonPhase> | null {
   const effort = eventEffort(event);
   if (effort == null || effort === "fun") return null;
@@ -209,10 +171,6 @@ function recoveryPhase(raced: Goal[]): SeasonPhase {
   };
 }
 
-/**
- * Why a supporting race can't go on its date, or null when it can: it falls in a main goal's
- * taper, the week before it or its race week (ADR 0052). `except` are the goals being changed.
- */
 export function supportingRaceBlock(
   goals: Pick<Goal, "id" | "name" | "date" | "priority">[],
   race: Pick<Goal, "date" | "priority">,
@@ -229,10 +187,8 @@ export function supportingRaceBlock(
     : null;
 }
 
-/** Days of activities that set the athlete's usual pace for a goal. */
 const PACE_DAYS = 120;
 
-/** Usual speed and climbing per sport group, from recent activities that recorded distance. */
 export function recentPaces(
   rows: {
     sportType: string;
@@ -248,7 +204,6 @@ export function recentPaces(
   for (const row of rows) {
     const group = sportGroupFor(row.sportType)?.id;
     if (!group || !row.distance || row.movingTime <= 0 || row.startDate.getTime() < since) continue;
-    // Indoor sessions have no real distance or climbing to learn a pace from.
     if (row.sportType.startsWith("Virtual")) continue;
     const total = totals.get(group) ?? { km: 0, hours: 0, climb: 0 };
     total.km += row.distance / 1000;
@@ -264,14 +219,12 @@ export function recentPaces(
   return paces;
 }
 
-/** Minutes per 100 m of climbing beyond what the athlete's usual sessions climb. */
 const CLIMB_MINUTES_PER_100M: Record<SportGroupId, number> = {
   cycling: 6,
   running: 10,
   walking: 15,
   swimming: 0,
 };
-/** The goal's duration at the athlete's own pace, or null without a usable pace. */
 export function expectedGoalMinutes(
   goal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM">,
   pace: GroupPace | undefined,
@@ -283,7 +236,6 @@ export function expectedGoalMinutes(
   return Math.round((km / pace.kmh) * 60 + (extraClimb / 100) * CLIMB_MINUTES_PER_100M[group]);
 }
 
-/** The phase's ramp, eased off when form is already low. */
 export function rampFor(ramp: number, form: number) {
   if (form < -30) return Math.min(ramp, 0);
   if (form < -18) return Math.min(ramp, 5);
@@ -293,15 +245,9 @@ export function rampFor(ramp: number, form: number) {
 
 export type WeekLoad = {
   load: number;
-  /** Which guardrail held the phase back, if any (ADR 0024). */
   limitedBy: "ramp-cap" | "form" | null;
 };
 
-/**
- * A week's training load from fitness and fatigue at its start, as the week target sets it.
- * The phase's ramp is capped by form and by the last four weeks' average load, but never below
- * what holds fitness where it is.
- */
 export function phaseWeekLoad(
   phase: Pick<SeasonPhase, "ramp" | "loadFactor">,
   fitness: { ctl: number; atl: number },
@@ -320,10 +266,6 @@ export function phaseWeekLoad(
   return { load: wanted, limitedBy: formLimited ? "form" : null };
 }
 
-/**
- * The load the ramp cap grows from: the average of the last four weeks without the lightest, so
- * a lighter week or a missed one does not hold the next build back.
- */
 export function rampBaseLoad(weekLoads: number[]): number | null {
   const recent = weekLoads.slice(-4);
   if (!recent.length || recent.every((load) => load <= 0)) return null;
@@ -331,7 +273,6 @@ export function rampBaseLoad(weekLoads: number[]): number | null {
   return kept.reduce((sum, load) => sum + load, 0) / kept.length;
 }
 
-/** Loads of the `weeks` whole weeks before `weekStart`, oldest first; empty without any. */
 export function weekLoadsBefore(
   days: { date: string; load: number }[],
   weekStart: string,
@@ -352,10 +293,8 @@ export function mondayOf(key: string) {
   return addDayKey(key, -((weekday + 6) % 7));
 }
 
-/** One week of the season: its phase, and whether it is a lighter week. */
 export type SeasonWeek = { weekStart: string; phase: PhaseKind; lighter: boolean };
 
-/** The season week by week, from the week of `fromDay` through the week of `toDay`. */
 export function seasonWeeks(goals: Goal[], fromDay: string, toDay: string): SeasonWeek[] {
   const weeks: SeasonWeek[] = [];
   for (let week = mondayOf(fromDay); week <= toDay; week = addDayKey(week, 7)) {
@@ -365,10 +304,6 @@ export function seasonWeeks(goals: Goal[], fromDay: string, toDay: string): Seas
   return weeks;
 }
 
-/**
- * Fitness, fatigue, and form on the morning of `goalDate` if every week from tomorrow hits its
- * week target, load spread evenly over the days. A guide to the taper, not a prediction.
- */
 export function projectRaceDay(
   fitness: { ctl: number; atl: number },
   goals: Goal[],

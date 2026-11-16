@@ -1,6 +1,5 @@
 const PATTERN_ID = "time-out-hatch";
 
-/** A time out band's SVG fill, the stripe of `hatch-time-out` (styles.css). Needs `TimeOutPattern` in the chart. */
 export const TIME_OUT_FILL = `url(#${PATTERN_ID})`;
 
 export function TimeOutPattern() {

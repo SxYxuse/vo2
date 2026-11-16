@@ -5,7 +5,6 @@ type Vo2MarkProps = {
   className?: string;
 };
 
-/** App icon tile. Use only in collapsed chrome; the wordmark is the expanded brand. */
 export function Vo2Mark({ className }: Vo2MarkProps) {
   return (
     <img
@@ -18,7 +17,6 @@ export function Vo2Mark({ className }: Vo2MarkProps) {
   );
 }
 
-/** In-app wordmark: VO with a blue subscript 2. */
 export function Vo2Wordmark({ className }: Vo2MarkProps) {
   return (
     <span className={cn("inline-flex items-baseline tracking-tight", className)}>

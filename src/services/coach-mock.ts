@@ -18,7 +18,6 @@ function lastUserIndex(messages: ModelMessage[]) {
   return lastUser;
 }
 
-/** Every tool result since the athlete's last message, oldest first. */
 function resultListThisTurn(messages: ModelMessage[]) {
   const turn = messages.slice(lastUserIndex(messages) + 1);
   const names = new Map<string, string>();
@@ -39,14 +38,10 @@ function resultListThisTurn(messages: ModelMessage[]) {
   return results;
 }
 
-/** Tool results since the athlete's last message, by tool name (the latest of each). */
 function resultsThisTurn(messages: ModelMessage[]) {
   return new Map(resultListThisTurn(messages).map(({ name, value }) => [name, value]));
 }
 
-// ----- Plan changes on the coach plan (ADR 0038) -----
-
-/** A session as get_coach_plan gives it: no week of its own, and no day (ADR 0048). */
 type MockSession = Omit<WrittenSession, "weekStart"> & {
   id: string;
   status: "open" | "done";
@@ -60,7 +55,6 @@ type MockCoachPlan = {
 };
 type Asked = { weekStart: string | null; kind: "fewer" | "indoor" | "easier" | "away" };
 
-/** Each kind of change, from the words of a week note or a chat message. */
 function kindOf(text: string): Asked["kind"] | null {
   if (/can'?t (?:run|train)|only run (?:once|twice|\w+ times)/i.test(text)) return "fewer";
   if (/indoors|treadmill/i.test(text)) return "indoor";
@@ -69,10 +63,6 @@ function kindOf(text: string): Asked["kind"] | null {
   return null;
 }
 
-/**
- * What the athlete asked, for the phrasings the mock coach knows: a week note ("Note on my plan
- * for the week of 2026-06-15: …") or "I can only run twice this week" in the chat.
- */
 function askedChange(text: string): Asked | null {
   const note = /Note on my plan for the week of (\d{4}-\d{2}-\d{2}): (.*)/s.exec(text);
   if (note) return { weekStart: note[1], kind: kindOf(note[2]) ?? "easier" };
@@ -150,7 +140,6 @@ function easierSession(weekStart: string, session: MockSession): WrittenSession 
   };
 }
 
-/** The changes the mock coach tries, in order, until one passes VO2's rules. */
 function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["kind"]) {
   const written = ({
     id: _id,
@@ -181,7 +170,6 @@ function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["k
       },
     ];
   }
-  // One session fewer: the long session stays, and of the others the shorter go first.
   const isLong = (session: MockSession) => (session.kind === "long" ? 1 : 0);
   return [...open]
     .sort((a, b) => isLong(a) - isLong(b) || a.minutes - b.minutes)
@@ -191,11 +179,6 @@ function candidateChanges(weekStart: string, open: MockSession[], kind: Asked["k
     }));
 }
 
-/**
- * Away for a while: over the next three weeks, the shortest session of each week that isn't the
- * long one is dropped, and the first week's long session gets easier. A change over several
- * weeks, with drops and a replacement; then the drops alone if that breaks a rule.
- */
 function awayChanges(weeks: MockCoachPlan["weeks"]) {
   const open = weeks
     .slice(0, 3)
@@ -232,7 +215,6 @@ function appliedText(result: unknown) {
   return "No problem: your plan stays as it was.";
 }
 
-/** The mock coach's plan change: read the plan, propose until a change passes, then offer it. */
 function planChangeStep(messages: ModelMessage[]): Step | null {
   const asked = askedChange(textOf(messages[lastUserIndex(messages)]?.content ?? ""));
   if (!asked) return null;
@@ -280,12 +262,6 @@ function planChangeStep(messages: ModelMessage[]): Step | null {
   return { kind: "tools", calls: [{ name: "propose_plan_change", input: next }] };
 }
 
-// ----- Brief changes (ADR 0065) -----
-
-/**
- * The mock coach's brief change: "From now on, …" in the chat adds that sentence to the brief,
- * after reading the brief now from get_coach_plan.
- */
 function briefChangeStep(messages: ModelMessage[]): Step | null {
   const text = textOf(messages[lastUserIndex(messages)]?.content ?? "");
   const asked = /from now on,?\s*(.+)/is.exec(text)?.[1]?.trim();
@@ -322,8 +298,6 @@ function briefChangeStep(messages: ModelMessage[]): Step | null {
   };
 }
 
-// ----- Power files (ADR 0057) -----
-
 type MockPowerFile = {
   id: string;
   title: string;
@@ -336,7 +310,6 @@ type MockPowerFile = {
   };
 };
 
-/** The power file the athlete's last message links to, like [Morning Ride](/power/<id>). */
 function linkedPowerFile(messages: ModelMessage[]) {
   const question = messages[lastUserIndex(messages)];
   const match = question ? /\]\(\/power\/([^)\s]+)\)/.exec(textOf(question.content)) : null;
@@ -429,17 +402,13 @@ function finalText(activities: MockActivity[]) {
 // come four tokens per tick, so a visual's HTML takes a second or two rather than six: the e2e
 // suite asks the coach many times, and a turn stays about as long as before (about 4 s).
 
-/** Before anything streams, as a provider takes to start answering. */
 const FIRST_TOKEN_MS = 300;
 const TICK_MS = 10;
-/** About a token: real deltas are a few characters, not a sentence. */
 const TOKEN_CHARS = 4;
 const ARGS_TOKENS_PER_TICK = 4;
-/** Each mock model call reports usage like OpenRouter does, so spending shows in development. */
 const MOCK_USAGE = { promptTokens: 2400, completionTokens: 180, totalTokens: 2580, cost: 0.0021 };
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** The text in token-sized deltas, pausing a tick after every `perTick` of them. */
 async function* paced(text: string, perTick = 1) {
   const deltas = text.match(new RegExp(`[\\s\\S]{1,${TOKEN_CHARS}}`, "g")) ?? [];
   for (const [index, delta] of deltas.entries()) {
@@ -494,7 +463,6 @@ function nextStep(messages: ModelMessage[], tools: string[]): Step {
   return { kind: "text", text: finalText(activities) };
 }
 
-/** A scripted coach for running without a model key: two tools, a visual, then markdown. */
 export function mockCoachText(): AnyTextAdapter {
   const model = "mock-coach";
   return {

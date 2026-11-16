@@ -122,7 +122,6 @@ function peakStats(heart: ActivityHeart): StatCardProps[] {
   }));
 }
 
-/** Morning form (yesterday's fitness minus fatigue) on the activity's day, from the cached PMC. */
 function useFormOnDay(start: string) {
   const { data } = useQuery(fitnessQueryOptions);
   return useMemo(() => {

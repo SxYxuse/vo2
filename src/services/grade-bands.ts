@@ -1,6 +1,5 @@
 export type GradeBand = { label: string; min: number; max: number };
 
-/** Gradient bands (percent) shared by the AI effort summary and the ride terrain table. */
 export const GRADE_BANDS: readonly GradeBand[] = [
   { label: "Steep descent", min: -100, max: -6 },
   { label: "Descent", min: -6, max: -2.5 },

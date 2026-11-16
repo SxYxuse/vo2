@@ -46,7 +46,6 @@ export type SavedAthleteSettings = {
 export type SettingsSnapshot = SavedAthleteSettings & {
   signedIn: boolean;
   fitnessLoads: FitnessLoad[];
-  /** Shown as placeholders and checked against the athlete's own values. */
   heartRateEstimates: HeartRateEstimates;
 };
 
@@ -64,7 +63,6 @@ export const saveAthleteSettings = createServerFn({ method: "POST" })
     return saveAthleteSettingsImpl(data);
   });
 
-/** Collects the birthday and weight from athletes who onboarded before they were required. */
 export const saveProfile = createServerFn({ method: "POST" })
   .validator(profileSaveSchema)
   .handler(async ({ data }): Promise<void> => {
@@ -79,7 +77,6 @@ const coachModelSaveSchema = z.object({
   reasoning: z.enum(REASONING_LEVELS).nullable(),
 });
 
-/** Every model the picker offers, recommended first (ADR 0060). */
 export const loadCoachCatalog = createServerFn({ method: "GET" }).handler(
   async (): Promise<CoachModelOption[]> => {
     const { coachCatalog } = await import("./coach-catalog.server.ts");

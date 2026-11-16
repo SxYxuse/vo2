@@ -21,7 +21,6 @@ export const timeZoneSchema = z
     }
   });
 
-/** The coach plan as stored; starts writing when one is due (ADR 0037). */
 export const loadCoachPlan = createServerFn({ method: "GET" }).handler(
   async (): Promise<CoachPlanState> => {
     const { loadCoachPlanImpl } = await import("./coach-plan.server.ts");
@@ -36,7 +35,6 @@ export const saveCoachPlanAvailability = createServerFn({ method: "POST" })
     return saveAvailabilityImpl(data.availability, data.timeZone);
   });
 
-/** Saves how each sport's budget grows and the athlete's own peaks (ADR 0058). */
 export const saveCoachPlanProgression = createServerFn({ method: "POST" })
   .validator(z.object({ progression: progressionSchema }))
   .handler(async ({ data }): Promise<CoachPlanState> => {
@@ -44,7 +42,6 @@ export const saveCoachPlanProgression = createServerFn({ method: "POST" })
     return saveProgressionImpl(data.progression);
   });
 
-/** Saves the coach brief; a changed one rewrites the weeks ahead. */
 export const saveCoachPlanBrief = createServerFn({ method: "POST" })
   .validator(z.object({ brief: briefSchema }))
   .handler(async ({ data }): Promise<CoachPlanState> => {
@@ -59,7 +56,6 @@ export const writeCoachPlanAgain = createServerFn({ method: "POST" }).handler(
   },
 );
 
-/** Marks a coach-plan session done, or open again with `done: false` (ADR 0048). */
 export const markCoachPlanSession = createServerFn({ method: "POST" })
   .validator(z.object({ sessionId: z.string().min(1).max(64), done: z.boolean() }))
   .handler(async ({ data }): Promise<CoachPlanState> => {

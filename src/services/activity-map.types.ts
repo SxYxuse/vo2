@@ -65,7 +65,6 @@ export type ActivityMapTrace = {
   finish: LngLat;
 };
 
-/** The activity map's line, or null when the activity has no outline to draw (indoor sessions). */
 export function activityMapTrace(outline: string | null): ActivityMapTrace | null {
   if (!outline) return null;
   const coordinates = decodePolyline(outline);

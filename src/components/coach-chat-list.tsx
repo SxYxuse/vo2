@@ -47,7 +47,6 @@ function DeleteChatButton({ chat, current }: { chat: CoachChatSummary; current: 
     onSuccess: async () => {
       setOpen(false);
       queryClient.removeQueries({ queryKey: coachChatQueryKey(chat.id) });
-      // The open chat is gone: start a new one in its place.
       if (current) await navigate({ to: "/coach", search: {}, replace: true });
       await queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey });
     },
@@ -89,7 +88,6 @@ function DeleteChatButton({ chat, current }: { chat: CoachChatSummary; current: 
   );
 }
 
-/** Every chat the athlete had with the coach, to reopen or delete. */
 export function CoachChatList({ currentId }: { currentId: string }) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -98,12 +96,10 @@ export function CoachChatList({ currentId }: { currentId: string }) {
     <Sheet
       open={open}
       onOpenChange={(next) => {
-        // Another device may have added or deleted a chat since the list was last read.
         if (next) void queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey });
         setOpen(next);
       }}
     >
-      {/* Labelled on phones too: a clock alone doesn't say "your earlier chats". */}
       <SheetTrigger render={<Button variant="ghost" size="sm" />}>
         <HistoryIcon data-icon="inline-start" />
         Chats

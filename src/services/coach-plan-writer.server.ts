@@ -1,7 +1,6 @@
 import { chat, type ModelMessage } from "@tanstack/ai";
 import { scrubSecrets } from "@tanstack/ai/byok";
 
-// Server-only: imported from handlers alone, so the coaching knowledge stays out of the app.
 import cycling from "@/coaching/cycling.md?raw";
 import running from "@/coaching/running.md?raw";
 import season from "@/coaching/season.md?raw";
@@ -44,14 +43,9 @@ import { formatPaceClock } from "./locomotion.ts";
 import { PHASES } from "./season-phase.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
-/** A plan that breaks a rule goes back to the coach this many times before it is dropped. */
 const RETRIES = 2;
-/**
- * Each model call gives up after this, so three calls end well inside the 10 minutes a writing
- * holds its claim (STALE_WRITING_MS in coach-plan.server.ts).
- */
-const MODEL_TIMEOUT_MS = 150_000;
-/** Paced like a real model, so the app's "writing" state shows in development and e2e. */
+export const STALE_WRITING_MS = 10 * 60_000;
+const MODEL_TIMEOUT_MS = STALE_WRITING_MS / (RETRIES + 2);
 const MOCK_PAUSE_MS = 1500;
 
 const FORMAT = [
@@ -72,7 +66,6 @@ const FORMAT = [
   "VO2 works out each run's distance and time from its steps, counting time steps at their secPerKm, or the middle of their pace range, each ride's time, and each swim's metres and time, counting its steps at the middle of their swim zone and its rests. Those numbers are what the rules check.",
 ].join("\n\n");
 
-/** The knowledge the coach writes from: each planned sport's file, and the season's when both. */
 function systemPrompt(ctx: RuleContext) {
   const sports = plannedSports(ctx.availability);
   return [
@@ -87,7 +80,6 @@ function systemPrompt(ctx: RuleContext) {
 
 export type PlanPrompt = Record<string, unknown>;
 
-/** The rules in numbers for this athlete, so the coach can size sessions to pass them. */
 export function rulesFor(ctx: RuleContext) {
   const { runsPerWeek, ridesPerWeek, swimsPerWeek } = ctx.availability;
   const sports = plannedSports(ctx.availability);
@@ -128,7 +120,6 @@ export function rulesFor(ctx: RuleContext) {
   return rules;
 }
 
-/** The zones in the athlete's numbers: watts from FTP, else heart rate from cycling LTHR. */
 export function zoneText(anchors: PlanAnchors) {
   const { ftp, rideLthr } = anchors;
   if (!ftp && !rideLthr) return "No FTP or cycling LTHR yet: target zones by feel.";
@@ -150,7 +141,6 @@ export function zoneText(anchors: PlanAnchors) {
   );
 }
 
-/** The swim zones in the athlete's pace per 100 m, from CSS. */
 export function swimZoneText(anchors: PlanAnchors) {
   const { css } = anchors;
   if (!css) return "No CSS yet: target swim zones by feel.";
@@ -174,7 +164,6 @@ export function paceText(ranges: Record<PaceType, PaceRange> | null) {
   );
 }
 
-/** Each upcoming run goal's predicted race pace, which a race-pace step may target exactly. */
 export function racePaceText(races: { name: string; distanceKm: number; secPerKm: number }[]) {
   return races.map(
     (race) =>
@@ -182,11 +171,9 @@ export function racePaceText(races: { name: string; distanceKm: number; secPerKm
   );
 }
 
-/** A kept or planned session in a line: "ride long 180 min", "run easy 8 km", "swim easy 2,400 m". */
 export const sessionLine = (session: PlannedSession) =>
   `${session.sport} ${session.kind} ${session.sport === "ride" ? `${session.minutes} min` : sessionAmountText(session)}`;
 
-/** A race as the coach reads it in its week (ADR 0052). */
 const RACE_EFFORT_TEXT: Record<RaceEffort, string> = {
   perform: "main goal, raced to perform",
   fun: "supporting race for fun: it is one of the week's easy sessions, not a quality one",
@@ -200,7 +187,6 @@ const LEFT_FIELDS = {
   swim: ["swimsToWrite", "budgetSwimMLeft"],
 } as const;
 
-/** What is left to write of each sport in a week, the sessions kept taken off (rules 1 and Availability). */
 export const leftText = (week: WeekBudget, ctx: RuleContext, sports: readonly PlanSport[]) =>
   Object.fromEntries(
     sports.flatMap((sport) => {
@@ -244,16 +230,13 @@ export type WriteResult =
   | { ok: true; sessions: PlannedSession[]; briefNotFit: string | null }
   | { ok: false; error: string };
 
-/** The athlete's brief as the prompt carries it, or "" for none. */
 const briefOf = (prompt: PlanPrompt) => (typeof prompt.brief === "string" ? prompt.brief : "");
 
-/** What the coach couldn't fit of the brief; nothing without a brief, whatever the model says. */
 const notFit = (prompt: PlanPrompt, written: WrittenPlan) =>
   briefOf(prompt) ? written.briefNotFit?.trim().slice(0, 300) || null : null;
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** What the coach is first sent: the coaching knowledge, then the prompt as JSON. */
 export function planRequest(prompt: PlanPrompt, ctx: RuleContext) {
   return {
     systemPrompts: [systemPrompt(ctx)],
@@ -261,29 +244,19 @@ export function planRequest(prompt: PlanPrompt, ctx: RuleContext) {
   };
 }
 
-/** Where the dev server keeps the last request the mock coach answered, for `vp run coach:replay`. */
 const RECORDED_REQUEST = ".dev-seed/plan-writer-request.json";
 
-/**
- * Development only: the mock coach skips the prompt, so the request is kept for
- * scripts/coach-replay.ts to send to a real model. Mock Strava's athlete only, and gitignored.
- */
 async function recordRequest(prompt: PlanPrompt, ctx: RuleContext, anchors: PlanAnchors) {
   const { mkdir, writeFile } = await import("node:fs/promises");
   await mkdir(".dev-seed", { recursive: true });
   await writeFile(RECORDED_REQUEST, JSON.stringify({ prompt, ctx, anchors }, null, 2));
 }
 
-/**
- * Asks the coach for the sessions, checks them, and sends a failing plan back with the rules it
- * broke, at most twice. The mock coach writes a plan that passes, without a model.
- */
 export async function writeSessions(
   coach: Exclude<CoachModel, { kind: "missing" }>,
   prompt: PlanPrompt,
   ctx: RuleContext,
   anchors: PlanAnchors,
-  /** Whose spending the calls count toward; none for a replay outside the app. */
   userId?: string,
 ): Promise<WriteResult> {
   const plan = (written: WrittenPlan) =>
@@ -291,7 +264,6 @@ export async function writeSessions(
   if (coach.kind === "mock") {
     if (import.meta.env.DEV) await recordRequest(prompt, ctx, anchors);
     await pause(MOCK_PAUSE_MS);
-    // The mock coach doesn't read the brief, and says so, so Plan's line shows in development.
     const written: WrittenPlan = {
       sessions: mockCoachPlan(ctx, anchors.paces),
       briefNotFit: "The mock coach doesn't read your brief.",
@@ -319,7 +291,6 @@ export async function writeSessions(
         middleware: userId ? [recordCoachUsage(userId, "plan", coach.provider, coach.model)] : [],
       })) as WrittenPlan;
     } catch (error) {
-      // The athlete's key must never reach a log or the screen, even inside a provider's error.
       const message = scrubSecrets(error instanceof Error ? error.message : String(error), [
         coach.key,
       ]);

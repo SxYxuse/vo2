@@ -29,7 +29,6 @@ import { cn } from "cn";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RepeatIcon } from "lucide-react";
 
-/** Event color presets; each stays legible on light and dark surfaces. */
 const EVENT_CALENDAR_COLORS: Array<{ name: string; value: string }> = [
   { name: "Blue", value: "var(--color-blue-500)" },
   { name: "Emerald", value: "var(--color-emerald-500)" },
@@ -43,19 +42,11 @@ const EVENT_CALENDAR_COLORS: Array<{ name: string; value: string }> = [
   { name: "Indigo", value: "var(--color-indigo-500)" },
 ];
 
-/**
- * Drag-ghost surfaces, shared verbatim by every view. A move CARRIES the
- * event: the dnd engine attaches a full clone to the cursor
- * (data-slot=event-calendar-drag-carry), so this in-grid ghost is only the
- * dashed placeholder for the snapped drop slot. A resize STRETCHES instead:
- * the chip itself at the proposed extent, dashed rather than solid.
- */
 const EVENT_CALENDAR_GHOST = {
   move: "rounded-sm border border-dashed border-(--ec-event-color)/50 bg-(--ec-event-color)/8",
   resize: "rounded-sm border border-dashed border-(--ec-event-color)/70 overflow-hidden",
   invalid: "border-destructive/70 bg-destructive/10",
   invalidResize: "border-destructive/70",
-  /** Applied to the clone inside an invalid resize ghost. */
   invalidContent: "opacity-60",
 } as const;
 
@@ -70,29 +61,12 @@ const EVENT_CALENDAR_GHOST = {
 const EVENT_CALENDAR_FADE_TRUNCATE =
   "w-full truncate @max-[10rem]:text-clip @max-[10rem]:[mask-image:linear-gradient(to_right,#000_calc(100%-0.75rem),transparent)] @max-[10rem]:rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-0.75rem),transparent)]";
 
-/**
- * The drag-to-create selection, shared by every view: a dashed primary
- * outline over a faint wash with the range printed inside. `box` is the timed
- * grid's single minute-positioned rectangle; `segment` is one day-cell slice
- * of a multi-cell draft, with side borders and rounding only on the run's two
- * ends so it reads as one dashed box rather than a row of them.
- */
 const EVENT_CALENDAR_SLOT_DRAFT = {
   box: "rounded-sm border border-dashed border-primary/40 bg-primary/5",
   segment: "border-y border-dashed border-primary/40",
   segmentStart: "rounded-s-sm border-s",
   segmentEnd: "rounded-e-sm border-e",
-  /**
-   * The wash for segmented views, on the CELL not the dashed overlay: the
-   * overlay stacks above the chips, so tinting it would wash them instead.
-   */
   surface: "bg-primary/5",
-  /**
-   * The range readout. `leading-none` is load-bearing: the shortest timed
-   * draft is one snap interval tall (16px at the default 15-minute snap and
-   * 4rem hour height), and looser leading renders ~18px, clipped by the
-   * draft's own overflow-hidden.
-   */
   label: "text-primary truncate px-1 py-0.5 text-[0.6875rem] leading-none font-medium",
 } as const;
 
@@ -103,9 +77,7 @@ interface EventCalendarChipContextValue<TData = unknown> {
   isSelected: boolean;
 }
 
-const EventCalendarChipContext =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  createContext<EventCalendarChipContextValue<any> | null>(null);
+const EventCalendarChipContext = createContext<EventCalendarChipContextValue<any> | null>(null);
 
 /** The chip's subject; usable inside renderEvent content and chip children. */
 function useEventCalendarEventChip<TData = unknown>(): EventCalendarChipContextValue<TData> {
@@ -130,11 +102,6 @@ interface EventCalendarEventProps<TData = unknown> extends Omit<
   preview?: boolean;
 }
 
-/**
- * The one interactive event element in every view. The wrapper owns a11y,
- * data attributes, selection and drag/resize wiring; content comes from
- * children, else renderEvent, else the built-in default.
- */
 function EventCalendarEvent<TData = unknown>({
   segment,
   className,
@@ -159,16 +126,12 @@ function EventCalendarEvent<TData = unknown>({
     (state) => state.drag?.occurrence.key === occurrence.key,
     { calendar: instance },
   );
-  // reactive, unlike gestures.canResize: api.setInteractions({ resize })
-  // must add/remove the handles without waiting for an unrelated re-render
   const resizeOn = useEventCalendarSelector<TData, boolean>((state) => state.interactions.resize, {
     calendar: instance,
   });
   const dragOn = useEventCalendarSelector<TData, boolean>((state) => state.interactions.drag, {
     calendar: instance,
   });
-  // A preview clone must never inherit the source's selected/dragging state
-  // (the drag key matches, which would dim the clone itself).
   const isSelected = preview ? false : isSelectedRaw;
   const isDragging = preview ? false : isDraggingRaw;
 
@@ -177,21 +140,15 @@ function EventCalendarEvent<TData = unknown>({
   const interactive = view !== "agenda" && !preview;
   const timedBlock = inTimeGrid && !isBar;
   const horizontalBar = isBar && !inTimeGrid;
-  // >= compactEventMinutes renders the stacked (title over time) layout, where
-  // squeezed cascade columns fade-truncate instead of clipping into neighbors
   const stackedBlock =
     timedBlock && (segment.endMin ?? 0) - (segment.startMin ?? 0) >= viewConfig.compactEventMinutes;
 
   const defaultContent = (
     <>
-      {/* leading dot for single-row chips (month cells, all-day bars); a
-          time-grid block takes its color from the tinted surface instead, and
-          in its stacked layout a dot would sit alone on the first line */}
       {!timedBlock && (
         <span
           aria-hidden
           data-slot="event-calendar-event-dot"
-          // -me-0.5 tightens only the dot-to-title gap; the chip keeps gap-1.5
           className="-me-0.5 size-1.5 shrink-0 rounded-full bg-(--ec-event-color)"
         />
       )}
@@ -201,8 +158,6 @@ function EventCalendarEvent<TData = unknown>({
       <span className={cn("font-medium", stackedBlock ? EVENT_CALENDAR_FADE_TRUNCATE : "truncate")}>
         {event.title}
       </span>
-      {/* month cells are narrow: a compact never-shrinking start time keeps
-          the title readable; grids show the full range */}
       {!occurrence.allDay &&
         segment.isStart &&
         (view === "month" ? (
@@ -229,9 +184,6 @@ function EventCalendarEvent<TData = unknown>({
     </>
   );
 
-  // Per-day time text for a multi-day event: "From 9:00 AM", "All day",
-  // "Until 5:00 PM". Boundaries come from the occurrence vs segment.day, never
-  // the packing flags - lane merging rewrites those on shared segments.
   const agendaTimeText = (() => {
     if (view !== "agenda") return "";
     if (occurrence.allDay) return settings.i18n.labels.allDay;
@@ -262,7 +214,6 @@ function EventCalendarEvent<TData = unknown>({
     );
   })();
 
-  // Agenda default row: time column, color-dot badge, plain title
   const agendaDefaultContent = (
     <>
       <span className="text-muted-foreground w-40 shrink-0 truncate tabular-nums">
@@ -280,10 +231,6 @@ function EventCalendarEvent<TData = unknown>({
     </>
   );
 
-  // Memoized so a drag - which re-renders the lane on every pointer move -
-  // never re-invokes the consumer's renderEvent per frame: a referentially
-  // stable element lets React skip the custom subtree instead of flickering it.
-  // The render fns are deps, so an inline arrow from the consumer defeats it.
   const customContent = useMemo(() => {
     const renderProps = { occurrence, segment, view, isDragging, isSelected };
     return view === "agenda"
@@ -312,10 +259,6 @@ function EventCalendarEvent<TData = unknown>({
     ? settings.i18n.functions.formatEventLabel(event.title, timeLabel)
     : `${event.title}, ${timeLabel}`;
 
-  // Optional styled tooltip (viewConfig.eventTooltip, default off). It replaces
-  // the native title so the two never stack, and a preview never gets one. A
-  // falsy renderEventTooltip result (including the false/"" of `cond && <node>`)
-  // falls back to the label; an empty label leaves no content and skips it.
   const tooltipOpts = typeof viewConfig.eventTooltip === "object" ? viewConfig.eventTooltip : null;
   const tooltipContent =
     !preview && viewConfig.eventTooltip
@@ -333,9 +276,6 @@ function EventCalendarEvent<TData = unknown>({
   // swipe that lands on the chip from scrolling the list, so only chips that
   // can actually move claim the touch
   const movable = interactive && dragOn && !event.readOnly && event.draggable !== false;
-  // Hover grip pill (mirrors the gantt bars) marking the resize direction.
-  // Shown on compact sub-compactEventMinutes blocks too: the 1.5rem chip
-  // min-height leaves edge room without colliding with the centered title.
   const grip = (
     <span
       aria-hidden
@@ -427,8 +367,6 @@ function EventCalendarEvent<TData = unknown>({
           ? `, ${settings.i18n.labels.continues}`
           : ""
       }`,
-    // A background tint alone conveys selection, so the chip is a real toggle
-    // wherever it is interactive (agenda rows never select, previews are inert).
     "aria-pressed": interactive ? isSelected : undefined,
     "aria-hidden": preview || undefined,
     tabIndex: preview ? -1 : undefined,
@@ -437,16 +375,13 @@ function EventCalendarEvent<TData = unknown>({
     } as CSSProperties,
     onPointerDown: (e: React.PointerEvent) => {
       e.stopPropagation();
-      // suppress the trailing slot-create click when this press yields no drag
       markChipPress();
       if (interactive) gestures.beginMove(e, segment);
     },
     onClick: (e: React.MouseEvent) => {
       e.stopPropagation();
       if (wasRecentDrag()) return;
-      // consumer first: e.preventDefault() opts out of built-in selection
       settings.onEventClick?.(occurrence, e);
-      // the agenda is a read-only list: a click never selects/focuses a row
       if (e.defaultPrevented || view === "agenda") return;
       instance.api.selectEvent(occurrence.key);
     },
@@ -460,16 +395,10 @@ function EventCalendarEvent<TData = unknown>({
       "focus-visible:ring-ring/50 outline-none focus-visible:ring-2",
       preview && "pointer-events-none",
       view === "agenda"
-        ? // plain list row: color lives in the dot badge, not a tinted pill;
-          // hover AND selection surfaces are owned by the agenda row wrapper
-          "gap-3 rounded-md text-sm"
+        ? "gap-3 rounded-md text-sm"
         : cn(
-            // @container removes intrinsic sizing; only grid chips are containers
-            // py-1: room above/below inline badges (attendee pill etc.)
             "@container gap-1.5 rounded-sm px-1.5 py-1 leading-normal",
-            // soft tint + inset ring, not an accent border: legible on both themes
             "bg-(--ec-event-color)/20 hover:bg-(--ec-event-color)/30",
-            // a flat tint reads darker on a dark surface, so lift it there
             "dark:bg-(--ec-event-color)/25 dark:hover:bg-(--ec-event-color)/35",
             "inset-ring inset-ring-(--ec-event-color)/15",
             "transition-[background-color,box-shadow] duration-150",

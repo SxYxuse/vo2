@@ -76,11 +76,6 @@ import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
 
 type CoachRuntime = { userId: string; timeZone: string };
 
-/**
- * The running, cycling, swimming, and season knowledge the plan writer reads, loaded by the chat
- * only when a question needs it: about 11,000 words would tax every message. Portable skills run on the
- * athlete's OpenRouter model; hosted provider skills need Anthropic's or OpenAI's sandbox.
- */
 const COACHING_SKILLS = [
   inlineSkill({
     name: "running",
@@ -152,11 +147,6 @@ async function loadStreams(activityId: string, userId: string) {
   return row;
 }
 
-/**
- * The chat reads the coach plan, and may change it only through a checked proposal the athlete
- * applies (ADR 0038), and the coach brief only through a brief change the athlete applies
- * (ADR 0065). With planning off, the chat never gets these tools.
- */
 function coachPlanTools() {
   return [
     getCoachPlanDef.server<CoachRuntime>((_input, { context }) =>
@@ -179,7 +169,6 @@ function createCoachTools(coachPlan: boolean) {
     ...(coachPlan ? coachPlanTools() : []),
     findActivitiesDef.server<CoachRuntime>(async (input, { context }) => {
       const { userId, timeZone } = context;
-      // Pad the bounds by a day, then keep the days the athlete means in their own timezone.
       const conditions = [eq(activities.userId, userId)];
       if (input.from)
         conditions.push(gte(activities.startDate, new Date(Date.parse(input.from) - DAY_MS)));
@@ -252,7 +241,6 @@ function createCoachTools(coachPlan: boolean) {
         start: row?.startDate.toISOString() ?? null,
         trainingLoad: row?.trainingLoad == null ? null : roundLoad(row.trainingLoad),
         bestEfforts: isBestEfforts(row?.bestEfforts) ? row.bestEfforts : null,
-        // The ride's imported FIT file, read with get_power_file.
         powerFileId,
         ...presentOverviewForCoach(snapshot.overview),
       };
@@ -382,16 +370,10 @@ function createCoachTools(coachPlan: boolean) {
         })),
       };
     }),
-    // The visual is drawn from the call's input on the athlete's screen; the coach only learns
-    // that it was shown.
     showVisualDef.server<CoachRuntime>(async () => ({ shown: true })),
   ];
 }
 
-/**
- * The athlete's time outs, past and open, so "how should I come back?" gets their real situation
- * (ADR 0066). The chat reads them only: marking, ending, or changing one is the athlete's.
- */
 async function timeOutsLine(userId: string, timeZone: string) {
   const timeOuts = await timeOutsFor(userId);
   if (!timeOuts.length) return [];
@@ -440,7 +422,6 @@ export async function handleCoachChat(request: Request) {
     messages: params.messages,
     threadId: params.threadId,
     runId: params.runId,
-    // The athlete's Apply or Decline on a plan change continues the paused run.
     parentRunId: params.parentRunId,
     resume: params.resume,
     tools: createCoachTools(coachPlan),
@@ -452,8 +433,6 @@ export async function handleCoachChat(request: Request) {
       ...timeOuts,
     ],
     agentLoopStrategy: maxIterations(12),
-    // The server keeps the chat, so the athlete can reopen it later on any device.
-    // Snapshots while streaming keep what the coach had said if the athlete leaves mid-reply.
     middleware: [
       withSkills(COACHING_SKILLS),
       withPersistence(coachChatPersistence(session.user.id), { snapshotStreaming: true }),
@@ -464,13 +443,10 @@ export async function handleCoachChat(request: Request) {
   return toServerSentEventsResponse(stream);
 }
 
-/** A chat as last saved, for the app to show when it opens it (TanStack AI hydration). */
 export async function handleCoachChatHistory(request: Request) {
   const session = await getOptionalSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
   const { messages, interrupts } = coachChatPersistence(session.user.id).stores;
-  // No run store: the reply streams only to the request that asked, so a reload has no run to
-  // join. A pending plan change is still offered again.
   return reconstructChat(defineAIPersistence({ stores: { messages, interrupts } }), request, {
     authorize: async (threadId) => !(await chatOwnedByOther(session.user.id, threadId)),
   });

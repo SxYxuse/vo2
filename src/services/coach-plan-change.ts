@@ -8,13 +8,6 @@ import {
   type SessionKind,
 } from "./coach-plan.types.ts";
 
-/*
- * A plan change (ADR 0038): the coach proposes the sessions it changes, VO2 checks them against
- * every coach plan rule, and the athlete applies or declines what passed. Sessions have no day
- * (ADR 0048), so a change replaces, drops, or adds a week's session. Shared by the chat tools and
- * the approval card.
- */
-
 export const planChangeInputSchema = z.object({
   summary: z
     .string()
@@ -46,29 +39,21 @@ export const planChangeInputSchema = z.object({
 
 export type PlanChangeInput = z.infer<typeof planChangeInputSchema>;
 
-/** A session as the athlete sees it in the change, or null when there is none. */
 export type ChangeSide = {
   title: string;
   sport: PlanSport;
   kind: SessionKind;
   distanceKm: number;
   minutes: number;
-  /** One line per block, so a change of steps under the same title shows. */
   steps: string[];
 } | null;
 
-/** One session of the change, before and after, in its week. */
 export type ChangedSession = { weekStart: string; before: ChangeSide; after: ChangeSide };
 
-/** What propose_plan_change answers: a checked change to apply, or why it can't be offered. */
 export type PlanChangeProposal =
   | { ok: true; proposalId: string; summary: string; sessions: ChangedSession[] }
   | { ok: false; broken: string[] };
 
-/**
- * A brief change (ADR 0065): the whole new coach brief, offered with the brief it replaces. It is
- * saved only when the athlete taps Apply, and only if the brief is still the one shown.
- */
 export const briefChangeInputSchema = z.object({
   summary: z
     .string()
@@ -86,5 +71,4 @@ export const briefChangeInputSchema = z.object({
 
 export type BriefChangeInput = z.infer<typeof briefChangeInputSchema>;
 
-/** What apply_plan_change answers once the athlete tapped Apply. */
 export type PlanChangeApplied = { applied: true } | { applied: false; reason: string };

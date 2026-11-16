@@ -38,13 +38,6 @@ import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/*
- * Settings → Training → Progression (ADR 0058): per planned sport, how fast its weekly volume
- * grows (a slider from Hold to Steep) and its peak week (the one VO2 recommends, or the athlete's
- * own), with the season redrawn live. It saves with its own button, since a save can rewrite the
- * weeks ahead on the athlete's key.
- */
-
 type Choices = Partial<Record<PlanSport, SportChoice>>;
 
 const choicesOf = (volume: SeasonVolume): Choices =>
@@ -52,7 +45,6 @@ const choicesOf = (volume: SeasonVolume): Choices =>
     volume.sports.map((sport) => [sport.sport, { growth: sport.growth, peak: sport.peak }]),
   );
 
-/** What's saved: a sport left at its default with the recommended peak stays unset. */
 function progressionOf(volume: SeasonVolume, choices: Choices): Progression {
   return Object.fromEntries(
     volume.sports.flatMap((sport) => {
@@ -230,7 +222,6 @@ function SportProgression({
   );
 }
 
-/** What the athlete saved, as a key: the draft starts again from it when it changes. */
 export const savedProgressionKey = (volume: SeasonVolume) => JSON.stringify(choicesOf(volume));
 
 export function ProgressionSettings({ state }: { state: CoachPlanState }) {
@@ -250,7 +241,6 @@ export function ProgressionSettings({ state }: { state: CoachPlanState }) {
       ? nextWeek
       : null;
   }, [volume, state.plan, state.today, choices]);
-  // Hidden without availability: no sport is planned (ADR 0058).
   if (!volume) return null;
   const changed = JSON.stringify(choices) !== savedKey;
   const written = new Set((state.plan?.weeks ?? []).map((week) => week.weekStart));

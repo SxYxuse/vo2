@@ -64,7 +64,6 @@ export const env$ = z
         : "https://www.strava.com",
       STRAVA_CLIENT_ID: raw.STRAVA_CLIENT_ID ?? "mock",
       STRAVA_CLIENT_SECRET: raw.STRAVA_CLIENT_SECRET ?? "mock",
-      /** Unset turns the Strava webhook off; the mock always has one so its events reach the app. */
       STRAVA_WEBHOOK_SECRET: raw.STRAVA_WEBHOOK_SECRET ?? (stravaMock ? "mock" : undefined),
       LOKI_HOST: raw.LOKI_HOST,
     };

@@ -26,25 +26,11 @@ import { daysBetween, type Goal, type GoalEffort } from "./season.types.ts";
 import { formatPaceClock } from "./locomotion.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
-/*
- * The rules of ADR 0037 and ADR 0050, checked in code on every plan the coach writes. Each check
- * is a pure function of the plan and what VO2 knows, returning the rules it breaks in words the
- * coach can act on. A plan that breaks any goes back to the coach (coach-plan.server.ts). Sessions
- * have no day (ADR 0048), so every rule reads them by week, and none is about neighbouring days.
- * Runs and swims are sized by distance, rides by time; each sport is checked on its own, and the
- * week's quality sessions across all of them (ADR 0061).
- */
-
 export type RuleBreak = { rule: string; message: string };
 
-/**
- * An upcoming goal in the weeks written: VO2 adds the race itself. Its effort is "perform" for a
- * main goal, else the supporting race's (ADR 0052).
- */
 export type RaceWeek = { weekStart: string; date: string; sport: PlanSport; effort: RaceEffort };
 export type RaceEffort = "perform" | GoalEffort;
 
-/** The run, ride, and swim goals from `fromWeek` through `lastDay`, as the rules read them. */
 export function raceWeeks(goals: Goal[], fromWeek: string, lastDay: string) {
   return goals
     .filter(
@@ -68,92 +54,46 @@ export function raceWeeks(goals: Goal[], fromWeek: string, lastDay: string) {
 export type RuleContext = {
   availability: Availability;
   weeks: WeekBudget[];
-  /** The first week written; weeks before it are kept as they are. */
   fromWeek: string;
   today: string;
-  /** Sessions kept in the weeks being written: the ones the athlete marked done. */
   frozen: PlannedSession[];
-  /** The athlete's runs, rides, and swims before today, for the longest of the last 30 days. */
   runs: SportDay[];
   rides: SportDay[];
   swims: SportDay[];
-  /** The week and sport of each upcoming run, ride, or swim goal in the weeks written. */
   races: RaceWeek[];
-  /**
-   * Planned sessions of this week on outside the weeks being written, such as the weeks kept when
-   * only a new week is added. They count toward the longest-session limit of the weeks after
-   * them, but toward no week being written.
-   */
   neighbours: PlannedSession[];
-  /** Seconds per km at the middle of easy pace, to size a 2 h 30 run for the floor. */
   easySecPerKm: number;
-  /** Seconds per 100 m at the middle of the endurance swim zone, to size a 2 h swim. */
   easySecPer100m: number;
-  /** The athlete's training paces; null without running history, when runs go by effort. */
   paces: Record<PaceType, PaceRange> | null;
-  /** Each upcoming run goal's predicted race pace in seconds per km, for race-pace steps. */
   racePaces: number[];
-  /**
-   * Set when checking a plan change (ADR 0038): a week may then end under its floor, since an
-   * athlete who is ill or away trains less, and less training breaks no safety rule, and the
-   * longest session's share is read by the sessions left in the week, as long as the week's
-   * longest doesn't grow past `longestBefore`.
-   */
   allowShort?: true;
-  /** For a plan change: each week's longest session before it, by sport and week start. */
   longestBefore?: Partial<Record<PlanSport, Record<string, number>>>;
 };
 
-/** A week may come in this much over its budget, for rounding. */
 export const BUDGET_TOLERANCE = 1.05;
-/**
- * A full week must reach this share of its budget: the coaching knowledge asks for 95–100 %, and
- * the gap leaves room for rounding. The longest-session rules may hold a week lower; see
- * weekFloor.
- */
 const BUDGET_FLOOR = 0.9;
-/** What the longest-session rules allow is estimated, so only this much counts. */
 const REACH_SHARE = 0.85;
 const LONGEST_WINDOW_DAYS = 30;
-/** Planned weeks read for rule 2: the four before a session's week. */
 const LONGEST_WINDOW_WEEKS = 4;
-/** The long run is at most 2 h 30 (rule 5). */
 export const MAX_LONG_MINUTES = 150;
-/** The long ride is at most 6 h (rule 5): beyond it recovery costs more than it builds. */
 export const MAX_LONG_RIDE_MINUTES = 360;
-/** The long swim is at most 2 h (rule 5), longer than any age-group event's swim leg. */
 export const MAX_LONG_SWIM_MINUTES = 120;
-/** At most this many quality sessions a week across runs, rides, and swims (rule 4). */
 export const MAX_QUALITY_ACROSS_SPORTS = 3;
 
-/** Quality sessions a week per sport (rule 4): 1 for 2–3 sessions, 2 for 4–5, at most 3 for 6. */
 export function maxQualitySessions(perWeek: number) {
   return perWeek <= 3 ? 1 : perWeek <= 5 ? 2 : 3;
 }
 
-/**
- * The long run's largest share of the week (rule 5), by the runs the athlete's availability
- * allows that week: at most twice the average of the week's other runs, so 2 / (runs + 1), and
- * never under Daniels' 30 % (ADR 0053). That is 67 % for 2 runs, 50 % for 3, 40 % for 4, 33 % for
- * 5, and 30 % from 6. The 10 % rule on the longest run still sets how fast it grows. A week of one
- * run has no share to keep.
- */
 export function maxLongShare(runsInWeek: number) {
   if (runsInWeek <= 1) return 1;
   return Math.max(0.3, 2 / (runsInWeek + 1));
 }
 
-/**
- * The long ride's (and the long swim's) largest share of the week (rule 5): about 40 %, more with
- * fewer sessions, where even equal ones take a bigger share (`coaching/cycling.md`,
- * `coaching/swimming.md`).
- */
 export function maxLongRideShare(ridesInWeek: number) {
   if (ridesInWeek <= 1) return 1;
   return ridesInWeek === 2 ? 0.6 : ridesInWeek === 3 ? 0.5 : 0.4;
 }
 
-/** How each sport's sessions are sized and limited. */
 const SPORT_RULES = {
   run: {
     noun: "run",
@@ -161,12 +101,9 @@ const SPORT_RULES = {
     amount: (session: Pick<PlannedSession, "distanceKm" | "minutes">) => session.distanceKm,
     dayAmount: (day: SportDay) => day.km,
     text: (km: number) => `${Math.round(km * 10) / 10} km`,
-    /** Rule 2: at most 10 % longer than the longest of the last 30 days. */
     growth: 1.1,
-    /** With nothing in the last 30 days, sessions up to this long still pass rule 2. */
     minLongest: 5,
     maxLongMinutes: MAX_LONG_MINUTES,
-    /** VO2 asks for no session under this. */
     minSession: 3,
     longShare: maxLongShare,
   },
@@ -176,7 +113,6 @@ const SPORT_RULES = {
     amount: (session: Pick<PlannedSession, "distanceKm" | "minutes">) => session.minutes,
     dayAmount: (day: SportDay) => day.minutes,
     text: (minutes: number) => minutesText(Math.round(minutes)),
-    // Rides carry no impact, so they may grow more: 15 % on the longest of the last 30 days.
     growth: 1.15,
     minLongest: 90,
     maxLongMinutes: MAX_LONG_RIDE_MINUTES,
@@ -190,7 +126,6 @@ const SPORT_RULES = {
       sessionAmount({ ...session, sport: "swim" }),
     dayAmount: (day: SportDay) => day.km * 1000,
     text: metresText,
-    // Swims carry no impact either: 15 % on the longest of the last 30 days (`coaching/swimming.md`).
     growth: 1.15,
     minLongest: 2000,
     maxLongMinutes: MAX_LONG_SWIM_MINUTES,
@@ -201,7 +136,6 @@ const SPORT_RULES = {
 
 const historyOf = (ctx: Pick<RuleContext, "runs" | "rides" | "swims">, sport: PlanSport) =>
   sport === "run" ? ctx.runs : sport === "ride" ? ctx.rides : ctx.swims;
-/** The longest session's time cap in the sport's unit, at its easy pace. */
 const timeCapOf = (sport: PlanSport, ctx: Pick<RuleContext, "easySecPerKm" | "easySecPer100m">) => {
   const seconds = SPORT_RULES[sport].maxLongMinutes * 60;
   if (sport === "run") return seconds / ctx.easySecPerKm;
@@ -212,7 +146,6 @@ const inWeek =
   (week: Pick<WeekBudget, "weekStart">, sport?: PlanSport) =>
   (session: Pick<PlannedSession, "weekStart" | "sport">) =>
     session.weekStart === week.weekStart && (sport == null || session.sport === sport);
-/** How the coach finds a session in a break: its week, then its title. */
 const named = (session: PlannedSession) => `Week of ${session.weekStart}, "${session.title}"`;
 const racesOf = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   ctx.races.filter(
@@ -220,13 +153,8 @@ const racesOf = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   );
 const racesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   racesOf(week, ctx, sport).length;
-/** Races that count as a quality session (rule 4): every race but one run for fun. */
 const qualityRacesIn = (week: WeekBudget, ctx: RuleContext, sport?: PlanSport) =>
   racesOf(week, ctx, sport).filter((race) => race.effort !== "fun").length;
-/**
- * Quality races toward the cap across sports: a multisport event's legs, raced on one day, are one
- * race, or a triathlon alone would fill the week's three.
- */
 const qualityEventsIn = (week: WeekBudget, ctx: RuleContext) =>
   new Set(
     racesOf(week, ctx)
@@ -236,18 +164,11 @@ const qualityEventsIn = (week: WeekBudget, ctx: RuleContext) =>
 const sumOf = (sessions: PlannedSession[], sport: PlanSport) =>
   sessions.reduce((sum, session) => sum + SPORT_RULES[sport].amount(session), 0);
 
-/** Days of the week from today on: 7 for a week ahead, fewer for this one. */
 const daysLeft = (week: WeekBudget, today: string) =>
   Math.min(7, Math.max(0, 7 - daysBetween(week.weekStart, today)));
 
-/** A run step's own pace may sit this far outside its range or a race pace, for rounding. */
 const PACE_SLACK_SEC = 2;
 
-/**
- * Why a run step's own pace is wrong, or null: a step at a pace harder than easy names one pace
- * inside its pace type's range or at a goal's race pace, and every other step names none
- * (ADR 0055).
- */
 function paceIssue(step: Step, ctx: Pick<RuleContext, "paces" | "racePaces">) {
   const paces = ctx.paces;
   if (paces == null || step.pace == null || step.pace === "easy") {
@@ -273,7 +194,6 @@ function paceIssue(step: Step, ctx: Pick<RuleContext, "paces" | "racePaces">) {
 function stepIssue(sport: PlanSport, step: Step) {
   const amount = step.distanceM ?? step.durationS ?? 0;
   if (sport === "swim") {
-    // A distance, or rest at the wall: a recovery step by time.
     const rest = step.distanceM == null && step.part === "recovery";
     return (
       (rest ? step.durationS == null : step.durationS != null || step.distanceM == null) ||
@@ -312,10 +232,6 @@ const STEP_FORMAT: Record<PlanSport, (name: string) => string> = {
     `${name}: every swim step needs distanceM (above 0) and no durationS, except rest at the wall: a recovery step with durationS and no distanceM. Each has exactly one of zone (recovery, endurance, tempo, threshold, vo2max, or sprint) or effort (not walk), with pace and secPerKm null.`,
 };
 
-/**
- * Why a step's drill is wrong, or null: a drill is one of the session's sport's drills, on a step
- * with a distance, at an easy effort or the recovery or endurance zone (ADR 0063).
- */
 function drillIssue(sport: PlanSport, step: Step) {
   if (step.drill == null) return null;
   const drills = DRILLS.filter((drill) => drill.sport === sport).map((drill) => drill.id);
@@ -325,17 +241,12 @@ function drillIssue(sport: PlanSport, step: Step) {
       : `a ${SPORT_RULES[sport].noun} step has drill null; drills are for swims`;
   }
   if (step.distanceM == null) return "rest at the wall has drill null";
-  // Effort easy is the endurance zone, so both zones are as easy as a drill allows.
   if (step.effort !== "easy" && step.zone !== "recovery" && step.zone !== "endurance") {
     return `a ${step.drill} drill step is swum at effort easy, or zone recovery or endurance`;
   }
   return null;
 }
 
-/**
- * Steps that read as one thing, drills of the session's sport, run paces that fit, and a kind
- * written for the session's sport.
- */
 export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const session of sessions) {
@@ -363,7 +274,6 @@ export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): Rule
   return breaks;
 }
 
-/** Sessions in the weeks being written only, for a planned sport, and no race: VO2 adds races. */
 export function weekBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const written = ctx.weeks.filter((week) => week.weekStart >= ctx.fromWeek);
   const open = new Set(written.map((week) => week.weekStart));
@@ -384,34 +294,20 @@ export function weekBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBr
   return breaks;
 }
 
-/**
- * Sessions of one sport the athlete's availability allows in the week: their sessions per week,
- * or fewer when the week is under way and has fewer days left, one of each sport a day and none
- * on that sport's race day, and one fewer for each race run for fun. Sessions kept because they
- * are done count.
- */
 export function sessionsAvailable(week: WeekBudget, ctx: RuleContext, sport: PlanSport) {
   const kept = ctx.frozen.filter(inWeek(week, sport)).length;
   const open = Math.max(0, daysLeft(week, ctx.today) - racesIn(week, ctx, sport));
-  // A race run for fun is the week's easy session, so one fewer is written (ADR 0052).
   const fun = racesIn(week, ctx, sport) - qualityRacesIn(week, ctx, sport);
   return Math.max(0, Math.min(sessionsPerWeek(ctx.availability, sport) - fun, kept + open));
 }
 
-/**
- * What the coach has left to write of a sport in a week: the sessions available and the budget,
- * less the sessions done. The checker counts kept sessions toward their
- * week, so a coach given the totals writes a full week on top of them.
- */
 export function leftToWrite(week: WeekBudget, ctx: RuleContext, sport: PlanSport) {
   const kept = ctx.frozen.filter(inWeek(week, sport));
   const budget = Math.max(0, Math.round((budgetOf(week, sport) - sumOf(kept, sport)) * 10) / 10);
-  // Kept sessions that already fill the budget leave nothing to write, whatever days are left.
   const sessions = budget > 0 ? sessionsAvailable(week, ctx, sport) - kept.length : 0;
   return { sessions: Math.max(0, sessions), budget };
 }
 
-/** No more sessions of a sport in a week than the athlete's availability allows. */
 export function availabilityBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const { id: sport } of PLAN_SPORTS) {
@@ -433,11 +329,6 @@ export function availabilityBreaks(sessions: PlannedSession[], ctx: RuleContext)
   return breaks;
 }
 
-/**
- * The sessions the longest session's share is read for: the sessions available, but no more than
- * the budget holds at the shortest session VO2 asks for (3 km, 45 minutes, 1,000 m), so a small taper or
- * recovery week isn't asked for tiny sessions.
- */
 export function longShareCount(week: WeekBudget, ctx: RuleContext, sport: PlanSport) {
   return Math.max(
     1,
@@ -448,12 +339,6 @@ export function longShareCount(week: WeekBudget, ctx: RuleContext, sport: PlanSp
   );
 }
 
-/**
- * The longest a session of the sport may be in the week (rule 2): 10 % over the longest run (15 %
- * over the longest ride or swim) of the 30 days before the week, and of the planned sessions in the four
- * weeks before it. Sessions in the same week don't count: they have no order, so none comes
- * before another.
- */
 export function longestAllowed(
   weekStart: string,
   sport: PlanSport,
@@ -481,14 +366,6 @@ export function longestAllowed(
   return { longest, limit: longest * rules.growth };
 }
 
-/**
- * The least a sport's week must reach (rule 1), or null when it has no floor: a week not written
- * in full (one already under way), a race week, and a taper week can come in lower. The floor is
- * 90 % of the budget, or of what the longest-session rules allow when they hold the week lower:
- * no session past rule 2 nor the long session's time, so an athlete back from a break isn't asked
- * for more than they may do. Equal sessions always keep the long session's share, so the share
- * never holds the week lower.
- */
 export function weekFloor(week: WeekBudget, ctx: RuleContext, sport: PlanSport): number | null {
   if (ctx.allowShort || week.weekStart < ctx.fromWeek || week.weekStart < ctx.today) return null;
   if (week.taper || racesIn(week, ctx)) return null;
@@ -498,17 +375,11 @@ export function weekFloor(week: WeekBudget, ctx: RuleContext, sport: PlanSport):
   return Math.round(Math.min(budgetOf(week, sport), reach) * BUDGET_FLOOR * 10) / 10;
 }
 
-/**
- * Rules 1, 6, and 7, per sport: each week's distance of running and swimming and time of riding stays inside
- * its budget, which is lighter every fourth week and in the taper. Sessions kept because they are
- * done count, so a missed session can't be added to the others (rule 8).
- */
 export function budgetBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const sport of plannedSports(ctx.availability)) {
     const { text, plural } = SPORT_RULES[sport];
     for (const week of ctx.weeks) {
-      // Sessions kept alone may already pass the budget; then the coach's part is to add nothing.
       if (!sessions.some(inWeek(week, sport))) continue;
       const total = sumOf([...ctx.frozen, ...sessions].filter(inWeek(week, sport)), sport);
       const budget = budgetOf(week, sport);
@@ -532,7 +403,6 @@ export function budgetBreaks(sessions: PlannedSession[], ctx: RuleContext): Rule
   return breaks;
 }
 
-/** Rule 2: no session much longer than the longest of its sport in the 30 days before its week. */
 export function spikeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   const planned = [...ctx.frozen, ...ctx.neighbours, ...sessions];
@@ -549,11 +419,6 @@ export function spikeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleB
   return breaks;
 }
 
-/**
- * Rule 4 per sport and across all of them, and rule 5 per sport: the long session's share of the week
- * and its time. A race counts as a quality session unless it is run for fun, and a steady
- * supporting race keeps its sport's other sessions that week easy (ADR 0052).
- */
 export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   const sports = plannedSports(ctx.availability);
@@ -561,7 +426,6 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
     const all = [...ctx.frozen, ...sessions].filter(inWeek(week));
     const allQuality =
       all.filter((session) => isQualityKind(session.kind)).length + qualityEventsIn(week, ctx);
-    // Sessions kept alone may already pass the cap; then the coach's part is to add nothing.
     const wrote = sessions.some(inWeek(week));
     if (sports.length > 1 && wrote && allQuality > MAX_QUALITY_ACROSS_SPORTS) {
       breaks.push({
@@ -584,8 +448,6 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
           message: `Week of ${week.weekStart}: a steady ${rules.noun} race keeps the week's other ${rules.plural} easy, but it has ${written.length} quality ${written.length === 1 ? rules.noun : rules.plural}.`,
         });
       } else if (written.length && quality > maxQuality) {
-        // Races alone may pass the cap, as an A race and a supporting one in the same week can;
-        // then the coach's part is to add no quality session.
         breaks.push({
           rule: "4. quality sessions",
           message: `Week of ${week.weekStart}: ${quality} quality ${rules.plural}${races ? " (races count)" : ""}, at most ${maxQuality} with ${perWeek} ${rules.plural} a week.`,
@@ -598,11 +460,7 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
         });
       }
       const total = sumOf(mine, sport);
-      // The week's longest counts whatever it is called, so a long session can't pass as easy.
       const longest = [...mine].sort((a, b) => rules.amount(b) - rules.amount(a))[0];
-      // A plan change reads the share by the sessions left in the week, so dropping one for an
-      // absence isn't refused for leaving the others equal; a long one that dominates still breaks
-      // it, and one that grows is held to the usual share (ADR 0038).
       const loose =
         ctx.allowShort &&
         longest != null &&
@@ -633,7 +491,6 @@ export function weekShapeBreaks(sessions: PlannedSession[], ctx: RuleContext): R
   return breaks;
 }
 
-/** Every rule the plan's new sessions break; empty when it passes. */
 export function checkPlan(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   return [
     ...formatBreaks(sessions, ctx),

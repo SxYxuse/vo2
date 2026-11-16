@@ -9,7 +9,6 @@ function subscribeOnline(onChange: () => void) {
   };
 }
 
-/** False only when the browser knows it has no network; the server render assumes online. */
 export function useOnline() {
   return useSyncExternalStore(
     subscribeOnline,

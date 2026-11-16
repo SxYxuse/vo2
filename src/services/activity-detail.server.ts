@@ -93,7 +93,6 @@ export async function getActivityDetailImpl(id: string): Promise<ActivityDetail 
     logger.warn("activity_detail.not_found", { activityId: id });
     return null;
   }
-  // Other sport types are never shown, so their page is missing like any other (ADR 0029).
   if (isOtherSportType(row.sportType)) return null;
 
   const hasStreamsRow = Boolean(row.streamsSyncedAt);
@@ -179,7 +178,6 @@ type DetailRow = HeartRateMetricsRow & {
   birthDate: string | null;
 };
 
-/** Anchors come from the athlete's whole history, the same way the heart rate page builds them. */
 async function buildActivityHeart(
   userId: string,
   row: DetailRow,
@@ -269,7 +267,6 @@ async function buildActivityHeart(
   };
 }
 
-/** Builds whichever derived summaries are not cached yet, from one stream read. */
 async function loadAndStoreDerived(
   activityId: string,
   hasStreamsRow: boolean,

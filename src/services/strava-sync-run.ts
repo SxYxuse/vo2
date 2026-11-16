@@ -21,12 +21,9 @@ const ACTIVITY_PAGE_SIZE = 200;
 const ACTIVITY_PAGES_PER_CALL = 1;
 const STREAM_BATCH_SIZE = 25;
 const STREAM_RETRY_ATTEMPTS = 3;
-/** Re-pull this many already-stored activities so title/sport edits land after a late Strava change. */
 const RECENT_REFRESH_COUNT = 3;
-/** Reads kept back so the athlete's other Strava apps aren't starved mid-window. */
 const SHORT_LIMIT_RESERVE = 5;
 
-/** The Strava reads one sync needs; `StravaApi` is the production adapter. */
 export type StravaReader = {
   listAthleteActivities(params: {
     page: number;
@@ -54,20 +51,15 @@ export type RecordedSyncRun = {
   lastError: string | null;
 };
 
-/** One athlete's local copy; the Postgres adapter lives in `strava-sync.server.ts`. */
 export type SyncStore = {
   readRun(): Promise<StoredSyncRun | null>;
   recordRun(run: RecordedSyncRun): Promise<void>;
   streamsPending(): Promise<number>;
-  /** Start dates of the newest stored activities, newest first. */
   newestStartDates(limit: number): Promise<Date[]>;
   oldestStartDate(): Promise<Date | null>;
-  /** Returns how many were not stored before, so re-read activities don't count as copied. */
   upsertActivities(activities: SummaryActivity[]): Promise<number>;
-  /** Activities still waiting for streams, newest first. */
   activitiesWithoutStreams(limit: number): Promise<{ id: string; manual: boolean }[]>;
   storeStreams(activityId: string, streams: StreamSet): Promise<void>;
-  /** Marks activities whose streams were stored before the flag existed. */
   stampStoredStreams(): Promise<void>;
   athleteExists(): Promise<boolean>;
   refreshTrainingLoads(): Promise<void>;
@@ -75,12 +67,10 @@ export type SyncStore = {
 
 export type SyncDeps = {
   store: SyncStore;
-  /** Opened only when the run reaches Strava, so a stored pause costs no token refresh. */
   openStrava: () => Promise<StravaReader>;
   now?: () => number;
 };
 
-/** One sync call: copies a page of history, then streams, within the request budget (ADR 0002). */
 export async function syncAthlete({
   store,
   openStrava,
@@ -106,8 +96,6 @@ export async function syncAthlete({
 
   try {
     let newerCaughtUp = false;
-    // Once history is walked, nothing older appears: skip that read so a sync of a complete
-    // copy costs one read plus streams for new activities (#41, ADR 0020).
     let olderCaughtUp = historyCompleteFromRun(run?.status ?? null, pendingAtStart);
     const firstCopy = (await store.oldestStartDate()) == null;
     let newestOnly = false;
@@ -123,8 +111,6 @@ export async function syncAthlete({
       olderCaughtUp = older.caughtUp;
     }
     historyComplete = newerCaughtUp && olderCaughtUp;
-    // History first: older pages are 200 activities per read and settle fitness; streams cost a
-    // read each and only feed maps and charts.
     if (historyComplete && !overBudget()) {
       streamsFetched = await syncPendingStreams(strava, store, overBudget);
     }
@@ -157,7 +143,6 @@ export async function syncAthlete({
     nextWindowAt: snapshot.nextWindowAt,
   };
 
-  // Athlete deletion ran mid-sync: stop quietly, there is nothing left to write to.
   if (athleteDeleted || !(await store.athleteExists())) {
     logger.info("sync.stopped_athlete_deleted");
     return {

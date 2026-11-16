@@ -18,10 +18,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 
-/**
- * A route that failed to load: says why in plain words, and offers a retry that reruns the
- * loaders. An installed app resumed without network lands here, so offline gets its own message.
- */
 export function RouteError({
   title,
   error,
@@ -30,7 +26,6 @@ export function RouteError({
 }: {
   title: string;
   error: unknown;
-  /** Extra actions next to Try again, such as a link back. */
   children?: ReactNode;
   className?: string;
 }) {
@@ -74,7 +69,6 @@ export function RouteError({
   );
 }
 
-/** Placeholder for a StatGrid: same panel, same cell padding, so the page doesn't jump. */
 export function StatGridSkeleton({ cells, className }: { cells: number; className?: string }) {
   return (
     <div className="ring-foreground/10 overflow-hidden rounded-lg ring-1">
@@ -94,7 +88,6 @@ export function StatGridSkeleton({ cells, className }: { cells: number; classNam
   );
 }
 
-/** Placeholder for a bordered list of rows, such as the week's days or a calendar agenda. */
 export function ListSkeleton({ rows, className }: { rows: number; className?: string }) {
   return (
     <div className={cn("ring-foreground/10 divide-y overflow-hidden rounded-lg ring-1", className)}>
@@ -111,7 +104,6 @@ export function ListSkeleton({ rows, className }: { rows: number; className?: st
   );
 }
 
-/** Placeholder for a titled card holding a chart or a form. */
 export function PanelSkeleton({
   className,
   bodyClassName,
@@ -128,7 +120,6 @@ export function PanelSkeleton({
   );
 }
 
-/** Placeholder for a row of segmented controls, such as the period picker. */
 export function ToolbarSkeleton({ widths = ["w-44"] }: { widths?: string[] }) {
   return (
     <div className="flex flex-wrap gap-2">

@@ -7,15 +7,8 @@ import { syncStatusQueryOptions } from "@/lib/queries.ts";
 import { useStravaSync } from "@/hooks/use-strava-sync.ts";
 import { autoResumePlan } from "@/services/strava-sync.types.ts";
 
-/** Strava's window can open a little after `pausedUntil`; wait past it so the first read lands. */
 const PAUSE_SLACK_MS = 5_000;
 
-/**
- * Finishes an incomplete local copy while the app is open and in the foreground: on open, on
- * return from the background, and when a rate-limit pause ends (ADR 0012). It only reacts to
- * those moments, never to every status change, so a copy that keeps dropping does not loop.
- * The same moments check a complete copy for new activities (ADR 0020).
- */
 export function useSyncAutoResume() {
   const queryClient = useQueryClient();
   const sync = useStravaSync({ quiet: true });
@@ -33,7 +26,6 @@ export function useSyncAutoResume() {
       if (cancelled || syncRef.current.isPending) return;
       const plan = autoResumePlan(latest);
       if (plan.kind === "sync") syncRef.current.mutate();
-      // A check runs on every app open; a finish toast each time would be noise.
       if (plan.kind === "check") syncRef.current.mutate({ silent: true });
     };
 

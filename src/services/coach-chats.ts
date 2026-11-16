@@ -3,7 +3,6 @@ import { z } from "zod";
 
 export type CoachChatSummary = { id: string; title: string; updatedAt: string };
 
-/** The athlete's coach chats, most recently active first. */
 export const listCoachChats = createServerFn({ method: "GET" }).handler(
   async (): Promise<CoachChatSummary[]> => {
     const [{ getOptionalSession }, { listCoachChatsFor }] = await Promise.all([

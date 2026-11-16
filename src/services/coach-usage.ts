@@ -5,9 +5,7 @@ import type { CoachFeature } from "./coach-models.ts";
 import { timeZoneSchema } from "./coach-plan.ts";
 
 export type CoachSpendingMonth = {
-  /** YYYY-MM in the athlete's timezone. */
   month: string;
-  /** US dollars, over the calls whose provider reported a cost. */
   costUsd: number;
   byFeature: Record<CoachFeature, number>;
   /** Calls whose provider reported no cost (OpenAI never does), and the tokens they used. */
@@ -17,7 +15,6 @@ export type CoachSpendingMonth = {
 
 export type CoachSpending = { thisMonth: CoachSpendingMonth; lastMonth: CoachSpendingMonth };
 
-/** What the coach cost the athlete on their own keys, this month and last. */
 export const getCoachSpending = createServerFn({ method: "GET" })
   .validator(z.object({ timeZone: timeZoneSchema }))
   .handler(async ({ data }): Promise<CoachSpending | null> => {

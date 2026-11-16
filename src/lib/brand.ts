@@ -1,4 +1,3 @@
-/** User-facing product name. */
 export const APP_NAME = "VO2";
 
 export type AppChrome = {
@@ -21,10 +20,6 @@ function chromeFor(themeColor: string, dir: string): AppChrome {
 
 const PRODUCTION_CHROME = chromeFor("#171717", "");
 
-/**
- * Tab/PWA chrome per APP_ENV, so an installed non-production app cannot be mistaken for
- * production: grey for development, orange for staging, blue for PR previews.
- */
 const CHROME_BY_ENV: Record<string, AppChrome> = {
   development: chromeFor("#525252", "/development"),
   staging: chromeFor("#c2410c", "/staging"),

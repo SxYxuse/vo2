@@ -7,7 +7,6 @@ import {
   WavesIcon,
 } from "lucide-react";
 
-/** Icon and colours per sport on the Plan and session pages. */
 export const SPORT_STYLE = {
   cycling: { label: "Ride", icon: BikeIcon, bar: "bg-ds-blue-700", text: "text-ds-blue-700" },
   running: {

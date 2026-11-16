@@ -433,7 +433,6 @@ function indexedElevationClimbs(samples: ActivitySample[], sportType?: string) {
     .sort((a, b) => b.elevationDeltaM - a.elevationDeltaM);
 }
 
-/** Every sustained climb, in chronological order. */
 export function allElevationClimbs(
   samples: ActivitySample[],
   sportType?: string,
@@ -817,7 +816,6 @@ function zoneSharesFromSamples(
     });
 }
 
-/** Set, estimated from the athlete's max (recorded or set), or from this session's own peak. */
 function overviewLthrSource(
   family: HeartRateFamily,
   resolved: ResolvedHeartRate,
@@ -862,7 +860,6 @@ export function buildOverview(input: {
     .filter((value): value is number => value != null);
   const maxHeartrate = hrs.length ? Math.max(...hrs) : null;
   const heartRate = input.athlete?.heartRate;
-  // Without a max the athlete set, the session's own peak caps the zones.
   const zoneMax = athleteMaxHr(family, heartRate) ?? maxHeartrate;
   const resolved = sportHeartRate(family, zoneMax, heartRate);
   const lthr = resolved.lthr;

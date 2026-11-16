@@ -26,7 +26,6 @@ import {
   type Effort,
 } from "./personal-bests.ts";
 
-/** Every sport type any board reads; the rest of the local copy is never loaded here. */
 export const BESTS_SPORT_TYPES = [
   "Run",
   "TrailRun",
@@ -49,7 +48,6 @@ type Row = {
   totalElevationGain: number | null;
 };
 
-/** Which tab's biggest days an activity counts toward: trail runs yes, virtual rides no. */
 function daysSport(sportType: string): BestsSport | null {
   if (sportType === "Run" || sportType === "TrailRun") return "running";
   if (isOutdoorRideSport(sportType)) return "cycling";
@@ -102,7 +100,6 @@ export async function loadBestsForUser(userId: string): Promise<BestsData> {
     }
     return found;
   };
-  // Every distance and duration gets a board up front, so a missing one shows as "not yet".
   for (const metres of RUN_DISTANCES) board("running", "time", metres);
   for (const metres of RIDE_DISTANCES) board("cycling", "time", metres);
   for (const metres of SWIM_DISTANCES) board("swimming", "time", metres);

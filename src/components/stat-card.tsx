@@ -15,7 +15,6 @@ export type StatCardProps = {
   hint?: string;
   info?: string;
   color?: string;
-  /** Change or verdict shown as a badge under the value, e.g. "+1 by Sunday". */
   trend?: StatTrend;
   className?: string;
   hintClassName?: string;
@@ -23,10 +22,6 @@ export type StatCardProps = {
   sparkline?: ReactNode;
 };
 
-/**
- * One panel split into stat cells by hairlines, so a row of numbers reads as one object
- * instead of a grid of boxes. Pass the column classes; cells wrap onto new rows.
- */
 export function StatGrid({
   className,
   footer,
@@ -38,8 +33,6 @@ export function StatGrid({
 }) {
   return (
     <div className="bg-card text-card-foreground ring-foreground/10 overflow-hidden rounded-lg ring-1">
-      {/* The negative margins push the outer cell borders into the clipped edge. */}
-      {/* On the phone's two columns, an odd last cell spans both rather than leave a hole. */}
       <div
         className={cn(
           "-me-px -mb-px grid grid-cols-2 max-sm:[&>*:last-child:nth-child(odd)]:col-span-2",

@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Weekly, so advisories published since the last push still fail the audit.
   schedule:
     - cron: "0 6 * * 1"
 
@@ -99,7 +98,6 @@ jobs:
 
       - run: vp run e2e --project=${{ matrix.project }}
 
-      # Expected, actual, and diff images for every failed screenshot, plus traces.
       - name: Upload the Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -108,7 +106,6 @@ jobs:
           path: playwright-report/
           if-no-files-found: ignore
 
-  # One comment per PR, edited on every push, with the numbers behind the checks.
   report:
     if: always() && github.event_name == 'pull_request'
     needs: [ci, e2e]

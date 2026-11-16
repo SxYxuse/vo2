@@ -41,7 +41,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** The athlete's time zone travels with availability, so "today" is theirs on the server. */
 export function useSaveAvailability(onSaved?: (state: CoachPlanState) => void) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -54,7 +53,6 @@ export function useSaveAvailability(onSaved?: (state: CoachPlanState) => void) {
   });
 }
 
-/** The first problem with an availability, in words, or null when it can be saved. */
 export function availabilityIssue(value: Availability) {
   const parsed = availabilitySchema.safeParse(value);
   return parsed.success ? null : (parsed.error.issues[0]?.message ?? "Check your availability.");
@@ -66,10 +64,6 @@ const SPORT_FIELDS = [
   { sport: "swim", key: "swimsPerWeek", legend: "Swims a week", noun: "swims" },
 ] as const;
 
-/**
- * Availability (ADR 0048, ADR 0050, ADR 0061): how many runs, rides, and swims a week. The coach writes each week's
- * sessions, and the athlete picks the days to do them. 0 plans none of that sport.
- */
 export function AvailabilityFields({
   value,
   onChange,
@@ -118,7 +112,6 @@ export function AvailabilityFields({
   );
 }
 
-/** Availability with the A goal's sport planned: a first ride goal asks for rides, not runs. */
 export function availabilityForGoal(value: Availability, goalSportType: string | undefined) {
   const sport = goalSportType ? planSportOf(goalSportType) : null;
   const field = SPORT_FIELDS.find((item) => item.sport === sport);
@@ -153,7 +146,6 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
   },
 };
 
-/** What the coach plan still needs, each with the way to fix it. */
 export function CoachPlanMissingAlert({ missing }: { missing: CoachPlanMissing[] }) {
   if (!missing.length) return null;
   return (
@@ -209,11 +201,6 @@ function formatKm(metres: number) {
   return `${Math.round(metres / 100) / 10} km`;
 }
 
-/**
- * The A goal the coach plan builds toward, or a short form to add one: a run or a ride, its date
- * and distance. As an A race, it is saved to perform (ADR 0049). Climbing and more goals are
- * added in Season.
- */
 export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefined }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -354,10 +341,6 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
   );
 }
 
-/**
- * The coach brief (ADR 0065): standing context every writing reads. It saves with its own button,
- * since a changed brief rewrites the weeks ahead on the athlete's key. An empty brief clears it.
- */
 function CoachBriefField({ state }: { state: CoachPlanState }) {
   const online = useOnline();
   const queryClient = useQueryClient();
@@ -418,7 +401,6 @@ function CoachBriefField({ state }: { state: CoachPlanState }) {
   );
 }
 
-/** Where the plan stands: being written, failed with why, or written. */
 export function coachPlanStatusText(state: CoachPlanState) {
   if (state.status === "writing") return "Writing your plan…";
   if (state.status === "failed") return `Failed: ${state.error ?? "try again"}`;
@@ -426,11 +408,6 @@ export function coachPlanStatusText(state: CoachPlanState) {
   return "Not written yet";
 }
 
-/**
- * Settings → Training under the coach plan: what's missing, availability, progression, and where
- * the plan stands. Availability saves with its own button: each save can rewrite the weeks ahead on the
- * athlete's key, so it shouldn't save one tap at a time.
- */
 export function CoachPlanSettings() {
   const online = useOnline();
   const { data: state } = useQuery(coachPlanQueryOptions);

@@ -96,14 +96,12 @@ const STARTERS: Starter[] = [
   { text: "What are my best 5 km times this year?", icon: TrophyIcon },
 ];
 
-/** Offered when the athlete came from "Ask the coach" on a power file. */
 const POWER_FILE_STARTERS: Starter[] = [
   { text: "What does my pedaling say, and what should I change?", icon: ZapIcon },
   { text: "Is my left/right balance something to work on?", icon: ScaleIcon },
   { text: "Where on the pedal do I push, and should I move my cleats?", icon: TargetIcon },
 ];
 
-/** Offered when the athlete came from "Ask the coach to change my plan". */
 const PLAN_STARTERS: Starter[] = [
   { text: "I can only run twice this week", icon: CalendarMinusIcon },
   { text: "This week feels too hard", icon: GaugeIcon },
@@ -180,7 +178,6 @@ type Block =
   | { kind: "change"; call: ToolCall }
   | { kind: "brief"; call: ToolCall };
 
-/** Text, thinking, visuals, and runs of tool calls, in the order the coach produced them. */
 function blocksOf(parts: readonly Part[]): Block[] {
   const blocks: Block[] = [];
   for (const part of parts) {
@@ -221,11 +218,9 @@ function ToolTrace({
   failed: Set<string>;
   live: boolean;
 }) {
-  // A stopped or failed run leaves calls without output; only the reply streaming now runs.
   const finished = (call: ToolCall) =>
     !live || call.state === "complete" || call.output !== undefined;
   const running = !calls.every(finished);
-  // Open while the coach works, folded once it's done, unless the athlete toggled it.
   const [toggled, setToggled] = useState<boolean | null>(null);
   return (
     <Trace aria-live="polite">
@@ -376,7 +371,6 @@ function CoachAvatar() {
   );
 }
 
-/** Shown between sending and the coach's first word, so a slow model never looks stuck. */
 function CoachThinking() {
   return (
     <Trace aria-live="polite">
@@ -424,7 +418,6 @@ function useMentionableActivities() {
       color: sportTypeColor(sportTypes, activity.sportType),
     }));
     const byId = new Map(all.map((activity) => [activity.id, activity]));
-    // Only what the athlete sees elsewhere can be picked; the coach still reads everything.
     const shown = all
       .filter((activity) => isSportTypeShown(sportTypes, activity.sportType))
       .sort((a, b) => b.start.localeCompare(a.start));
@@ -432,10 +425,6 @@ function useMentionableActivities() {
   }, [data]);
 }
 
-/**
- * Loads the chat from the server (TanStack AI hydration). Offline, it shows the copy saved the
- * last time this chat was open, so the installed app still reads it with no signal (ADR 0031).
- */
 function coachConnection(queryClient: QueryClient): ConnectionAdapter {
   const server = fetchServerSentEvents("/api/coach");
   return {
@@ -452,11 +441,6 @@ function coachConnection(queryClient: QueryClient): ConnectionAdapter {
   };
 }
 
-/**
- * One coach chat. The server keeps it, so the athlete can reopen it later from Chats on any
- * device; the one open last also reads offline.
- */
-/** A power file brought in from its page, as a chip like an activity's. */
 function usePowerFileMention(fileId: string | undefined): MentionableActivity | undefined {
   const { data } = useQuery({ ...powerFilesQueryOptions, enabled: Boolean(fileId) });
   return useMemo(() => {
@@ -477,13 +461,9 @@ export function CoachChat({
 }: {
   threadId: string;
   initialActivityId?: string;
-  /** Opened from "Ask the coach" on a power file: the file is brought in. */
   initialPowerFileId?: string;
-  /** A question to start from, asked from a section of a power file. */
   initialQuestion?: string;
-  /** The activity, power file, or question brought in went out with the first message. */
   onInitialSent: () => void;
-  /** Opened from "Ask the coach to change my plan": offer plan changes to start with. */
   planChange?: boolean;
 }) {
   const online = useOnline();
@@ -504,13 +484,10 @@ export function CoachChat({
   } = useChat({
     connection,
     threadId,
-    // Server-authoritative: the transcript is loaded from and saved on the server.
     persistence: true,
-    // A new chat appears in Chats, and an older one moves to the top.
     onFinish: () =>
       void queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey }),
     forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-    // The approval the coach asks for on a plan or brief change binds to these definitions.
     tools: [applyPlanChangeDef, changeCoachBriefDef],
   });
 
@@ -521,7 +498,6 @@ export function CoachChat({
     return [activity, powerFile].filter((item) => item != null);
   }, [byId, initialActivityId, powerFile]);
 
-  // Keep only the chat open now for offline reading, so the saved copy stays small.
   useEffect(() => {
     if (isLoading || isHydrating || !messages.length) return;
     queryClient.removeQueries({
@@ -538,18 +514,14 @@ export function CoachChat({
     if (initialActivityId || initialPowerFileId || initialQuestion) onInitialSent();
   };
   const empty = !messages.length && !isHydrating;
-  // The chat stays readable without a key; only asking needs one (ADR 0036).
   const { needsKey } = coach;
   const canAsk = online && !needsKey;
   const planChanges = usePlanChanges(messages, interrupts, canAsk && !isLoading && !resuming);
-  // A run paused on the athlete's Apply or Decline takes no new message until it's answered,
-  // even when the paused run was restored hours later.
   const awaitingAnswer = interrupts.length > 0;
   const canSend = canAsk && !awaitingAnswer;
   const starters = planChange ? PLAN_STARTERS : powerFile ? POWER_FILE_STARTERS : STARTERS;
   const { data: chats } = useQuery(coachChatsQueryOptions);
   const title = chats?.find((chat) => chat.id === threadId)?.title;
-  // Between sending and the reply's first part, the transcript ends on the question.
   const waiting = isLoading && messages.at(-1)?.role === "user";
 
   return (
@@ -580,7 +552,6 @@ export function CoachChat({
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         {empty && error ? (
-          // Loading the chat failed: offline and never opened here, or the server didn't answer.
           <Empty className="flex-1">
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -598,8 +569,6 @@ export function CoachChat({
             training.
           </CoachKeyPrompt>
         ) : empty ? (
-          // Centred: the composer below already sits at the thumb, and a bottom-aligned hero left a
-          // blank half screen under the title.
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6 overflow-y-auto pb-4">
             <div className="flex flex-col items-center gap-3 text-center text-balance">
               <span
@@ -615,8 +584,6 @@ export function CoachChat({
                   : "Ask about any activity, your form, or your plan. Type @ to point at an activity."}
               </p>
             </div>
-            {/* A starter would send without the activity "Ask about this activity" brought in, and
-                competes with a question asked from a power file's section. */}
             {(initialMentions.length > 0 && !powerFile) || initialQuestion ? null : (
               <div className="grid gap-2 sm:grid-cols-3">
                 {starters.map((starter) => (
@@ -644,8 +611,6 @@ export function CoachChat({
                       <MessageScrollerItem
                         key={message.id}
                         messageId={message.id}
-                        // Only the latest question anchors: the scroller snaps to any anchor it
-                        // hasn't scrolled to itself, so older ones pulled the view back up mid-reply.
                         scrollAnchor={message.id === lastQuestionId}
                         // Skipped offscreen rendering would size visuals at 0 and make the list
                         // jump as estimated heights turn real while scrolling back.
@@ -697,7 +662,6 @@ export function CoachChat({
 
       <div className="mx-auto w-full max-w-3xl shrink-0">
         <CoachComposer
-          // The activities may still be loading on first paint; start again once it's known.
           key={`${initialActivityId}-${initialPowerFileId}-${initialMentions.length}`}
           activities={shown}
           initialMentions={initialMentions}

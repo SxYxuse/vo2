@@ -1,11 +1,8 @@
 import { useRef, type SyntheticEvent, type TouchEvent } from "react";
 
-/** How far a finger travels before the release changes the week. */
 const SWIPE_DISTANCE = 60;
-/** Movement before the gesture commits to sideways (week) or vertical (scroll). */
 const AXIS_LOCK_DISTANCE = 10;
 const SLIDE_MS = 180;
-/** Past the current week the list only stretches, so the athlete sees there is nothing newer. */
 const EDGE_RESISTANCE = 0.25;
 
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
@@ -21,10 +18,8 @@ export function useWeekSwipe({
   canStepForward,
   canStepBack = true,
 }: {
-  /** Changes the week; resolves once the new week is shown. */
   onStep: (direction: 1 | -1) => Promise<unknown>;
   canStepForward: boolean;
-  /** False on the first week there is, which then only stretches like the newest. */
   canStepBack?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -39,9 +34,7 @@ export function useWeekSwipe({
     element.style.transform = x ? `translateX(${x}px)` : "";
   };
 
-  /** Slides the shown week off toward the older or newer side and the new one in from the other. */
   const slide = async (direction: 1 | -1) => {
-    // A second tap on an arrow mid-slide would step from the week still shown.
     if (sliding.current) return;
     const width = ref.current?.offsetWidth ?? 0;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -52,7 +45,6 @@ export function useWeekSwipe({
         await onStep(direction);
         return;
       }
-      // Older weeks sit to the left, so going back moves the list right.
       const away = direction === -1 ? width : -width;
       moveTo(away, SLIDE_MS);
       await wait(SLIDE_MS);
@@ -107,7 +99,6 @@ export function useWeekSwipe({
       gesture.current = null;
       moveTo(0, SLIDE_MS);
     },
-    // A swipe can end on the activity it started on; that is not a tap.
     onClickCapture: (event: SyntheticEvent) => {
       if (!swiped.current) return;
       swiped.current = false;

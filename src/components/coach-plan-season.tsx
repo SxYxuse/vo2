@@ -38,15 +38,6 @@ import {
   writtenAmount,
 } from "@/components/season-volume.tsx";
 
-/*
- * The coach plan against the season, beside the week on Plan: each planned sport's weekly volume
- * through the last goal (ADR 0058: bars sized by the budget, coloured by phase, the written weeks
- * outlined, goals marked by priority), and the four written weeks with what each holds.
- */
-
-/**
- * "17 km running · 5 h 20 riding · 6,400 m swimming", leaving out a sport the week doesn't hold.
- */
 export function weekTotals(week: PlanWeek) {
   const runs = week.sessions.filter((session) => session.sport === "run");
   const rides = week.sessions.filter((session) => session.sport === "ride");
@@ -63,7 +54,6 @@ export function weekTotals(week: PlanWeek) {
     .join(" · ");
 }
 
-/** "Base now, build from 3 Aug, peak from 7 Sep, taper from 21 Sep." */
 export function phaseText(road: SeasonWeek[]) {
   const parts: string[] = [];
   road.forEach((week, index) => {
@@ -78,7 +68,6 @@ export function phaseText(road: SeasonWeek[]) {
   return parts.length ? `${parts.join(", ")}.` : "";
 }
 
-/** The four written weeks: what each holds, and a tap shows it. */
 function WrittenWeeks({
   weeks,
   state,
@@ -134,10 +123,6 @@ function WrittenWeeks({
   );
 }
 
-/**
- * A written week's tag: its phase, or the kind of the time out it falls fully inside, and how far
- * the ramp back has come after one (ADR 0066).
- */
 function WeekTag({
   week,
   state,
@@ -169,16 +154,11 @@ function WeekTag({
   );
 }
 
-/** " (36 % above recommended)" for an own peak above the one VO2 recommends (ADR 0058). */
 function aboveText(sport: SportVolume) {
   if (sport.peak == null || sport.peak <= sport.recommended) return "";
   return ` (${Math.round((sport.peak / sport.recommended - 1) * 100)} % above recommended)`;
 }
 
-/**
- * Each planned sport's season as a chart, a tap showing that week's numbers, and the athlete's
- * progression with the way to change it (ADR 0058).
- */
 function SeasonVolumeCharts({
   volume,
   state,
@@ -311,7 +291,6 @@ function SeasonVolumeCharts({
   );
 }
 
-/** The plan against the season: each sport's volume and the written weeks. */
 export function PlanSeason({
   state,
   weeks,

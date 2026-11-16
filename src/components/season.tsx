@@ -109,7 +109,6 @@ import {
 
 const formatGoalDate = (key: string) => format(parseISO(key), "EEE d MMM yyyy");
 
-/** Metres of climbing per km from which a goal reads as hilly, as the plan treats it. */
 const HILLY_M_PER_KM = 15;
 
 function goalFacts(goal: Goal) {
@@ -121,7 +120,6 @@ function goalFacts(goal: Goal) {
     .join(" · ");
 }
 
-/** The predicted race time for a road-run goal, or why there is none. */
 function goalPrediction(goal: Goal, vdot: SeasonData["vdot"]) {
   if (vdot === undefined || !predictsRaceTime(goal.sportType) || goal.distanceM == null) {
     return null;
@@ -139,7 +137,6 @@ function isHilly(goal: Goal) {
   );
 }
 
-/** Which dialog is open: a new goal (optionally on a date) or an existing one. */
 type Editing = { goal: Goal | null } | null;
 
 export function SeasonView({
@@ -147,7 +144,6 @@ export function SeasonView({
   header,
 }: {
   data: SeasonData;
-  /** The page header, given the season's actions for its title row. */
   header: (actions: ReactNode) => ReactNode;
 }) {
   const [editing, setEditing] = useState<Editing>(null);
@@ -172,7 +168,6 @@ export function SeasonView({
     <>
       {header(
         <>
-          {/* Copying needs a goal: a season with none offers only Paste, in its empty state. */}
           {allGoals.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -192,7 +187,6 @@ export function SeasonView({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-          {/* An empty season asks for its first goal once, in the middle of the page. */}
           {data.upcoming.length > 0 ? (
             <Button onClick={() => open(null)}>
               <PlusIcon data-icon="inline-start" />
@@ -340,7 +334,6 @@ function PasteSeasonBody({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** One race or event: priority, countdown, and legs. */
 function EventCard({
   event,
   data,
@@ -350,7 +343,6 @@ function EventCard({
   data: SeasonData;
   onEdit: (goal: Goal) => void;
 }) {
-  // Each leg opens on its own, so only a single-leg event can make the whole card its button.
   const whole = event.goals.length === 1;
 
   return (
@@ -453,7 +445,6 @@ function PastGoals({ goals, today }: { goals: PastGoal[]; today: string }) {
   );
 }
 
-/** One sport of an event; a triathlon has three. */
 type LegForm = { sportType: string; distanceKm: string; elevationGainM: string };
 
 type GoalForm = LegForm & {
@@ -461,8 +452,7 @@ type GoalForm = LegForm & {
   date: string;
   priority: Goal["priority"];
   effort: Goal["effort"];
-  /** Further sports on the same day, for a new multisport event. */
-  legs: LegForm[];
+  legs: (LegForm & { key: string })[];
 };
 
 function formFor(goal: Goal | null, defaultSportType: string): GoalForm {
@@ -499,7 +489,6 @@ function toInput(form: GoalForm, leg: LegForm = form, name = form.name) {
   });
 }
 
-/** "Ironman WA · Swim": the event's name with the leg's sport. */
 function legName(form: GoalForm, leg: LegForm) {
   return `${form.name.trim()}${LEG_SEPARATOR}${formatSportType(leg.sportType)}`;
 }
@@ -549,7 +538,6 @@ function GoalFormBody({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
-  // A goal keeps its sport even after the athlete hides it in Settings.
   const sportOptions =
     goal && !sportTypes.includes(goal.sportType) ? [goal.sportType, ...sportTypes] : sportTypes;
   const [form, setForm] = useState(() => formFor(goal, sportOptions[0] ?? "Run"));
@@ -563,7 +551,6 @@ function GoalFormBody({
         parsed.error.issues.map((issue) => [String(issue.path[0]), issue.message]),
       );
   const errorFor = (key: keyof GoalInput) => (submitted ? issues[key] : undefined);
-  // The same rule the server holds: no supporting race in a main goal's taper (ADR 0052).
   const block = form.date
     ? supportingRaceBlock(
         goals,
@@ -662,7 +649,6 @@ function GoalFormBody({
                   <DatePicker
                     id="goal-date"
                     value={form.date}
-                    // A new goal is ahead; an existing one may be moved to any date.
                     fromDate={goal ? undefined : today}
                     invalid={errorFor("date") != null}
                     onChange={(date) => set({ date })}
@@ -711,9 +697,7 @@ function GoalFormBody({
               {!goal ? (
                 <div className="flex flex-col gap-3">
                   {form.legs.map((leg, index) => (
-                    // Legs are positional: the order is the race order.
-                    // oxlint-disable-next-line react/no-array-index-key
-                    <div key={index} className="flex flex-col gap-2 rounded-lg border p-3">
+                    <div key={leg.key} className="flex flex-col gap-2 rounded-lg border p-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium">Then</span>
                         <Button
@@ -789,7 +773,12 @@ function GoalFormBody({
                         set({
                           legs: [
                             ...form.legs,
-                            { sportType: form.sportType, distanceKm: "", elevationGainM: "" },
+                            {
+                              key: crypto.randomUUID(),
+                              sportType: form.sportType,
+                              distanceKm: "",
+                              elevationGainM: "",
+                            },
                           ],
                         })
                       }

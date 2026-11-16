@@ -59,12 +59,9 @@ if (years != null && !(years * 52 >= 1 && years <= 10))
 
 const BASE = new URL(process.env.BETTER_AUTH_URL ?? "http://localhost:3090").origin;
 const STATE_PATH = resolve(".dev-seed/athlete.json");
-/** The athlete mock Strava always signs in (mock-server.ts). */
 const MOCK_ATHLETE_ID = "1";
-/** CELEBRATE_WITHIN_DAYS in src/services/top-efforts.ts: older activities are never celebrated. */
 const CELEBRATE_WITHIN_DAYS = 7;
 
-/** Also proves the running server is this checkout's, with mock Strava on. */
 async function setMockHistory(weeks: number) {
   const response = await fetch(`${BASE}/api/mock-strava/dev/history?weeks=${weeks}`, {
     method: "POST",
@@ -86,7 +83,6 @@ async function withDatabase<T>(use: (client: pg.Client) => Promise<T>) {
 
 const MOCK_USER = `(select user_id from account where provider_id = 'strava' and account_id = $1)`;
 
-/** Clears the last week's streams and turns celebrations on, as an athlete would see them. */
 async function freshenStreams(client: pg.Client) {
   await client.query(
     `update calendar_settings set value = jsonb_set(value, '{topEffortsSince}', to_jsonb($2::text))
@@ -106,7 +102,6 @@ async function freshenStreams(client: pg.Client) {
 }
 
 await setMockHistory(years == null ? 8 : Math.round(years * 52));
-// A new athlete every run: deleting the user cascades to everything they own.
 await withDatabase((client) =>
   client.query(`delete from "user" where id in ${MOCK_USER}`, [MOCK_ATHLETE_ID]),
 );

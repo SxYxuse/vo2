@@ -19,7 +19,6 @@ import {
   type DiaryTotals,
 } from "@/services/diary-window.ts";
 
-/** "45 min", "2h", "1h 30". */
 function formatHours(hours: number) {
   const totalMinutes = Math.round(Math.max(0, hours) * 60);
   const h = Math.floor(totalMinutes / 60);
@@ -39,13 +38,11 @@ type DiaryJumpPickerProps = {
   cursorMonth: string;
   currentMonth: string;
   currentWeek: string;
-  /** Phones pick a training week after the month; desktop shows the month itself. */
   pickWeek: boolean;
   onPickMonth: (month: string) => void;
   onPickWeek: (week: string) => void;
 };
 
-/** Year → month (→ training week) picker behind the calendar's date label (ADR 0022). */
 export function DiaryJumpPicker({
   open,
   onOpenChange,
@@ -60,7 +57,6 @@ export function DiaryJumpPicker({
 }: DiaryJumpPickerProps) {
   const oldestYear = Number(oldestMonth.slice(0, 4));
   const currentYear = Number(currentMonth.slice(0, 4));
-  // The parent remounts the picker on every open, so it starts on the cursor's year.
   const [year, setYear] = useState(() =>
     Math.min(currentYear, Math.max(oldestYear, Number(cursorMonth.slice(0, 4)))),
   );

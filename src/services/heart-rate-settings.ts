@@ -38,7 +38,6 @@ export function zoneMethodHint(method: ZoneMethod, family: ZonedFamily) {
   return "Your own zone tops, in bpm.";
 }
 
-/** The anchors a zone method reads. Training load reads resting HR and LTHR whatever the method. */
 export const ZONE_METHOD_ANCHORS: Record<ZoneMethod, ("rest" | "lthr" | "max")[]> = {
   lthr: ["lthr"],
   max: ["max"],
@@ -51,7 +50,6 @@ export const REST_HR_MAX = 100;
 
 const bpm = z.number().int().min(BPM_MIN).max(BPM_MAX);
 
-/** Tops of zones 1 to 4, as saved. Rising order is checked separately so the form can explain it. */
 export const customZoneTopsSchema = z.array(bpm).length(4);
 
 export function customZoneTopsRise(tops: number[]) {
@@ -62,7 +60,6 @@ const sportHeartRateSchema = z.object({
   method: z.enum(["lthr", "max", "reserve", "custom"]).default("lthr"),
   lthr: bpm.nullable().default(null),
   maxHr: bpm.nullable().default(null),
-  /** Tops of zones 1 to 4. Kept when switching away from custom so switching back restores them. */
   customZones: customZoneTopsSchema.nullable().default(null),
 });
 
@@ -87,12 +84,10 @@ export function parseHeartRateSettings(value: unknown): HeartRateSettings {
   return parsed.success ? parsed.data : DEFAULT_HEART_RATE_SETTINGS;
 }
 
-/** The `athlete_metrics` columns zones are resolved from. */
 export type HeartRateMetricsRow = {
   heartRate: unknown;
   restHr: number | null;
   cyclingLthr: number | null;
-  /** Cycling LTHR from before LTHR was split per sport. */
   lthr: number | null;
   runLthr: number | null;
   swimLthr: number | null;
@@ -112,17 +107,14 @@ export function athleteHeartRateFrom(
   };
 }
 
-/** What VO2 estimates on its own, before anything the athlete set. */
 export type HeartRateEstimates = {
   restHr: number | null;
   maxHr: Record<ZonedFamily, number | null>;
-  /** Stored LTHR estimates from hard efforts; missing ones are a share of max. */
   lthr?: Partial<Record<ZonedFamily, number | null>>;
 };
 
 export type HeartRateSettingsIssue = { path: string; message: string };
 
-/** Combinations the zone and load formulas can't use; set values and estimates alike. */
 export function heartRateSettingsIssues(
   settings: HeartRateSettings,
   estimates: HeartRateEstimates,

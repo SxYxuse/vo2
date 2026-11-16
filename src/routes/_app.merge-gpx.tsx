@@ -10,7 +10,6 @@ if (typeof window !== "undefined") {
 }
 
 export const Route = createFileRoute("/_app/merge-gpx")({
-  // Files are read and kept on the device, so there is nothing to render on the server.
   ssr: false,
   component: MergeGpxPage,
 });

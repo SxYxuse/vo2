@@ -30,15 +30,8 @@ import {
 } from "./coach-plan-rules.ts";
 import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
-/*
- * The mock coach's plan: written without a model under mock Strava, so local development and the
- * e2e suite see a plan with no OpenRouter key. Deterministic, and sized to pass every rule.
- */
-
-/** Rounds down to half a km, so rounding never takes a run over a limit. */
 const halfKm = (km: number) => Math.floor(km * 2) / 2;
 const tenth = (km: number) => Math.round(km * 10) / 10;
-/** Room left under each limit, so the sizes VO2 works out from the steps stay inside it. */
 const MARGIN = 0.95;
 
 function runStep(
@@ -54,7 +47,6 @@ function runStep(
     distanceM: Math.round(km * 1000),
     durationS: null,
     pace: paces ? pace : null,
-    // A harder pace names one pace inside its range, as the coach must (ADR 0055).
     secPerKm:
       range && pace !== "easy" ? Math.round((range.fastSecPerKm + range.slowSecPerKm) / 2) : null,
     zone: null,
@@ -76,7 +68,6 @@ function rideStep(part: Step["part"], minutes: number, zone: Step["zone"]): Step
   };
 }
 
-/** A swim step: metres at a zone, or rest at the wall when `restS` is given. */
 function swimStep(part: Step["part"], metres: number, zone: Step["zone"], restS?: number): Step {
   return {
     part,
@@ -90,12 +81,10 @@ function swimStep(part: Step["part"], metres: number, zone: Step["zone"], restS?
   };
 }
 
-/** A swim drill: metres of it, easy (ADR 0063). */
 function drillStep(metres: number, drill: Step["drill"]): Step {
   return { ...swimStep("work", metres, null), effort: "easy", drill };
 }
 
-/** Per sport: the step it grows by, its smallest session, its share, and how quality sizes. */
 const MOCK = {
   run: { step: 0.1, start: 2, round: tenth, share: maxLongShare, minQuality: 5 },
   ride: {
@@ -119,14 +108,12 @@ export function mockCoachPlan(
   paces: Record<PaceType, PaceRange> | null,
 ): WrittenSession[] {
   const easySecPerKm = stepSecPerKm(runStep("work", 1, "easy", paces), paces);
-  /** The longest session's time cap, in the sport's unit, a little under it. */
   const timeCapOf = (sport: PlanSport) => {
     if (sport === "run") return ((MAX_LONG_MINUTES * 60) / easySecPerKm) * MARGIN;
     if (sport === "swim") return ((MAX_LONG_SWIM_MINUTES * 60) / ctx.easySecPer100m) * 100 * MARGIN;
     return MAX_LONG_RIDE_MINUTES;
   };
   const sessions: WrittenSession[] = [];
-  // Earlier weeks' sessions raise the longest-session limit of the weeks after them (rule 2).
   const planned: Pick<PlannedSession, "weekStart" | "distanceKm" | "minutes" | "kind" | "sport">[] =
     [...ctx.frozen, ...ctx.neighbours];
 
@@ -142,15 +129,11 @@ export function mockCoachPlan(
       );
       const frozenAmount = frozen.reduce((sum, session) => sum + sessionAmount(session), 0);
       const budget = budgetOf(week, sport) * 0.97 - frozenAmount;
-      // As many sessions as the longest-session share is read for, so equal ones always pass it,
-      // and never more than fit (a race run for fun can leave none).
       const wanted =
         Math.min(longShareCount(week, ctx, sport), sessionsAvailable(week, ctx, sport)) -
         frozen.length;
       if (wanted <= 0) continue;
 
-      // Grow every session a step a round, all together so none outgrows the longest-session
-      // share, until the budget or the longest-session rules (time cap, rule 2) stop it.
       const share = mock.share(longShareCount(week, ctx, sport));
       const cap = Math.min(
         timeCapOf(sport),
@@ -165,11 +148,8 @@ export function mockCoachPlan(
         if (size + mock.step > share * total(size + mock.step) + 0.01) break;
         size = mock.round(size + mock.step);
       }
-      // A lighter or taper week too small for the shortest session gets none of the sport.
       const over = total(size) > budgetOf(week, sport) * BUDGET_TOLERANCE;
       if (size < mock.start || over) continue;
-      // Equal sessions grow a step each at a time, coarser than the band a week must reach with
-      // many sessions or a small budget: the long session then takes what is left to the floor.
       const floor = weekFloor(week, ctx, sport);
       let longSize = size;
       const weekTotal = () => total(size) - size + longSize;
@@ -183,8 +163,6 @@ export function mockCoachPlan(
         longSize = mock.round(longSize + mock.step);
       }
 
-      // One quality session when the sport and the week allow it, no steady race of the sport
-      // keeps the week easy, and the sessions are long enough.
       const sportRaces = races.filter((race) => race.sport === sport);
       const sportQuality =
         sportRaces.filter((race) => race.effort !== "fun").length +
@@ -194,12 +172,10 @@ export function mockCoachPlan(
         sportQuality < maxQualitySessions(sessionsPerWeek(ctx.availability, sport)) &&
         quality < MAX_QUALITY_ACROSS_SPORTS &&
         week.phase !== "recovery" &&
-        // A swim's second session is technique, its third the quality one (`coaching/swimming.md`).
         wanted > (sport === "swim" ? 2 : 1) &&
         size >= mock.minQuality;
       if (canQuality) quality += 1;
 
-      // A long session kept because it's done is the week's one (rule 5): none is written again.
       const shift = frozen.some((session) => isLongKind(session.kind)) ? 1 : 0;
       for (let index = 0; index < wanted; index += 1) {
         const amount = index === 0 ? longSize : size;
@@ -287,7 +263,6 @@ function mockRide(
     };
   }
   if (index === 1 && quality) {
-    // 15 min warm-up, 2 × (12 min sweet spot, 5 min easy), and the rest easy.
     return {
       ...base,
       kind: "sweetSpot",
@@ -329,7 +304,6 @@ function mockSwim(
     };
   }
   if (index === 2 && quality) {
-    // 400 m warm-up, 100 m repeats at CSS with 15 s rest, and the rest easy.
     const repeats = Math.floor((size - 600) / 100);
     return {
       ...base,
@@ -346,7 +320,6 @@ function mockSwim(
       ],
     };
   }
-  // Every other swim is technique: drills as steps, then swimming that uses them (size ≥ 1000 m).
   return {
     ...base,
     kind: "technique",

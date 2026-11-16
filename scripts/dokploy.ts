@@ -27,8 +27,6 @@ import { parseArgs } from "node:util";
 const CONFIG_DIR = join(homedir(), ".config/dokploy");
 const TOKEN_FILE = join(CONFIG_DIR, "token");
 
-// Dokploy API keys expire (the developer keeps them short-lived), so a 401 is the normal way an
-// agent learns the key ran out. These steps get a new one without the key passing through chat.
 const RENEWAL = `To renew the Dokploy API key:
   1. Ask the developer for a new key with the request_secret tool (delivery "file"). Point them
      at <Dokploy URL>/dashboard/settings/profile, section "API/CLI Keys", with the URL from
@@ -87,7 +85,6 @@ export async function dokploy<T>(endpoint: string, body?: object): Promise<T> {
     method: body ? "POST" : "GET",
     headers: { "x-api-key": token, "content-type": "application/json" },
     body: body && JSON.stringify(body),
-    // A hung request would otherwise outlast `wait --timeout`.
     signal: AbortSignal.timeout(30_000),
   }).catch((error: Error) =>
     stop(`Cannot reach the Dokploy URL (DOKPLOY_URL or ~/.config/dokploy/url): ${error.message}`),
@@ -99,7 +96,6 @@ export async function dokploy<T>(endpoint: string, body?: object): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** The Web app of the VO2 project's `production` or `staging` environment. */
 async function webAppId(environment: "production" | "staging") {
   type Project = {
     name: string;
@@ -114,7 +110,6 @@ async function webAppId(environment: "production" | "staging") {
   return app.applicationId;
 }
 
-/** Previews only exist on the staging app (see docs/agents/production.md). */
 export async function listPreviews() {
   const staging = await webAppId("staging");
   return dokploy<Preview[]>(`previewDeployment.all?applicationId=${staging}`);

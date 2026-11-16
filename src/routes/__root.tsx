@@ -23,7 +23,6 @@ interface MyRouterContext {
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   loader: () => loadAppEnv(),
-  // The environment never changes while the app runs; reloading it on navigation fails offline.
   staleTime: Number.POSITIVE_INFINITY,
   head: ({ loaderData }) => {
     const chrome = appChrome(loaderData?.appEnv ?? "development");
@@ -58,15 +57,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
 });
 
-/**
- * The devtools button sits over the composer's Send on phones, in every screenshot and recording,
- * so it shows only when asked for (.env.example).
- */
 const SHOW_DEVTOOLS = import.meta.env.DEV && import.meta.env.VITE_DEVTOOLS === "1";
 
 function RootDocument({ children }: { children: ReactNode }) {
   useEffect(registerServiceWorker, []);
-  // Clicks before hydration do nothing, so scripts and e2e wait for this instead of guessing.
   useEffect(() => {
     document.body.dataset.hydrated = "";
   }, []);

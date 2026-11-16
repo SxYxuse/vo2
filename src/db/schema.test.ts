@@ -4,7 +4,6 @@ import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 
 import * as schema from "./schema.ts";
 
-/** Tables that are not per athlete: the athlete itself, and Better Auth's sign-in challenges. */
 const NOT_PER_ATHLETE = new Set(["user", "verification"]);
 
 const tables = (Object.values(schema) as unknown[]).filter((value): value is PgTable =>
@@ -18,7 +17,6 @@ function foreignKeys(table: PgTable) {
   });
 }
 
-/** True when deleting a `user` row reaches `table` through cascading foreign keys. */
 function cascadesFromUser(name: string, seen = new Set<string>()): boolean {
   if (name === "user") return true;
   if (seen.has(name)) return false;

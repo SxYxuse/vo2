@@ -85,7 +85,6 @@ export function OnboardingSyncStepPanel({
   onSync: () => void;
 }) {
   const activities = status?.activityCount ?? 0;
-  // The ring tracks the gate, not streams: it fills once the newest page is in (ADR 0012).
   const fraction = step.phase === "complete" || activities > 0 ? 1 : 0;
   const syncing = step.phase === "syncing";
   const badge =

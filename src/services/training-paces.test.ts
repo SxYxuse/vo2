@@ -10,7 +10,6 @@ import {
 } from "./training-paces.types.ts";
 
 let ids = 0;
-/** A run holding one best effort; a 40-minute 10 km is VDOT 51.9 (Daniels). */
 function run(start: string, metres = 10_000, seconds = 2400): RunEffort {
   ids += 1;
   return { activityId: `run-${ids}`, name: `Run ${ids}`, start, metres, seconds };

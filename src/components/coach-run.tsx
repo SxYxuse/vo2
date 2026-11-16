@@ -27,26 +27,16 @@ import { PACE_TYPES, type PaceRange } from "@/services/training-paces.types.ts";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-/*
- * Pieces of a coach-plan session shared by the Plan view and the session page: its shape (width is
- * a run's or a swim's distance or a ride's time, height and colour depth are effort), its steps
- * with repeats, and marking it done. Runs are amber, rides blue, and swims teal, as in the coach's
- * visuals.
- */
-
 type Level = 1 | 2 | 3 | 4 | 5;
 
-/** The icon and colour of a session's sport. */
 export const SPORT_ICON: Record<PlanSport, { icon: typeof BikeIcon; className: string }> = {
   run: { icon: FootprintsIcon, className: "text-ds-amber-700" },
   ride: { icon: BikeIcon, className: "text-ds-blue-700" },
   swim: { icon: WavesIcon, className: "text-ds-teal-700" },
 };
 
-/** A swim step with no distance is rest at the wall. */
 const isSwimRest = (step: PlannedStep) => step.distanceM == null;
 
-/** Effort 1 (walk, jog, recovery spin) to 5 (interval pace, VO2 max and up), from the target. */
 function effortLevel(step: PlannedStep, sport: PlanSport): Level {
   if (step.effort === "walk") return 1;
   if (sport === "ride") return rideZone(stepZone(step)).level as Level;
@@ -81,16 +71,11 @@ const LEVEL_BG: Record<PlanSport, Record<Level, string>> = {
   },
 };
 
-/** Drill steps are striped, so a technique swim reads as drills and swimming, not one block. */
 const DRILL_STRIPES =
   "bg-[repeating-linear-gradient(135deg,transparent_0_3px,rgb(255_255_255/0.45)_3px_6px)]";
 
 const rangeMiddle = (range: PaceRange) => (range.slowSecPerKm + range.fastSecPerKm) / 2;
 
-/**
- * A step's width: a run's metres, a timed step at the middle of its pace; a ride's seconds; a
- * swim's metres, its rest at about a metre a second so a short rest stays a sliver.
- */
 function stepWidth(step: PlannedStep, sport: PlanSport) {
   if (sport === "ride") return step.durationS ?? 0;
   if (sport === "swim") return step.distanceM ?? step.durationS ?? 0;
@@ -100,7 +85,6 @@ function stepWidth(step: PlannedStep, sport: PlanSport) {
   return ((step.durationS ?? 0) / secPerKm) * 1000;
 }
 
-/** The session drawn as its shape. */
 export function RunShape({
   run,
   height = 48,
@@ -138,7 +122,6 @@ export const rangeText = (range: PaceRange) =>
 
 const PART_LABEL = { warmup: "Warm-up", cooldown: "Cool-down" } as const;
 
-/** A ride step's target: its zone, and its watts or, without power, its heart rate. */
 function rideTargetText(step: PlannedStep) {
   if (step.effort === "walk") return "off the bike";
   const zone = rideZone(stepZone(step));
@@ -147,10 +130,6 @@ function rideTargetText(step: PlannedStep) {
   return zone.label;
 }
 
-/**
- * "800 m at 4:15–4:20/km", "400 m jog", "Warm-up: 2 km easy", "12 min sweet spot at 230–245 W",
- * "100 m threshold at 1:44–1:47 /100m", "50 m catch-up drill, easy", "15 s rest".
- */
 export function stepText(step: PlannedStep, sport: PlanSport) {
   const part =
     step.part in PART_LABEL ? `${PART_LABEL[step.part as keyof typeof PART_LABEL]}: ` : "";
@@ -168,10 +147,6 @@ export function stepText(step: PlannedStep, sport: PlanSport) {
   return `${part}${amount} ${label}`;
 }
 
-/**
- * What the session is about, from its hardest stretch: a run's pace range, a ride's watts or heart
- * rate, a swim's pace per 100 m; null when it has none, such as a run without training paces.
- */
 export function headlineTarget(run: Pick<PlannedSession, "blocks" | "sport">): string | null {
   const steps = run.blocks
     .flatMap((block) => block.steps)
@@ -190,7 +165,6 @@ export function headlineTarget(run: Pick<PlannedSession, "blocks" | "sport">): s
   return top?.range ? rangeText(top.range) : null;
 }
 
-/** The steps, a repeated block as one line: "6 × 800 m at 4:15–4:20/km, 400 m jog". */
 export function RunSteps({ run }: { run: Pick<PlannedSession, "blocks" | "sport"> }) {
   const level = (steps: PlannedStep[]) =>
     Math.max(...steps.map((step) => effortLevel(step, run.sport))) as Level;
@@ -224,15 +198,9 @@ export function RunSteps({ run }: { run: Pick<PlannedSession, "blocks" | "sport"
   );
 }
 
-/** "This week", or "Week of 22 Jun". */
 export const weekLabel = (weekStart: string, today: string) =>
   weekStart === mondayOf(today) ? "This week" : `Week of ${format(parseISO(weekStart), "d MMM")}`;
 
-/**
- * Marks a session done, or open again (ADR 0048). Shown from the session's week on; a week ahead
- * may still be written again. Off while offline, and while the plan is being written, since the
- * writing would store the plan it read and drop the mark.
- */
 export function DoneToggle({
   run,
   state,

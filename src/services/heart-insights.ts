@@ -10,31 +10,22 @@ import {
 } from "./heart-rate.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
-/** Max HR falls with age, so only recent peaks set the anchor. */
 export const MAX_HR_WINDOW_MONTHS = 18;
-/** A peak this far above the age prediction is treated as a sensor spike. */
 const ABOVE_AGE_LIMIT_BPM = 25;
-/** A peak this far above every other peak, on an easy session, is treated as a sensor spike. */
 const ISOLATED_GAP_BPM = 8;
 const EASY_AVG_SHARE = 0.7;
 const MAX_EXCLUDED = 3;
-/** Observed vs age-predicted max within this many bpm reads as "matches". */
 const AGE_MATCH_BPM = 10;
 
 export type HeartPeak = {
   bpm: number;
   start: string;
   name?: string | null;
-  /** Average HR of the same activity; tells a race peak from a spike on an easy day. */
   avgBpm?: number | null;
 };
 
 export type MaxHrAnchor = {
   bpm: number | null;
-  /**
-   * `recent`: a peak inside the window. `older`: no recent peak, oldest data used. `age`: no peaks.
-   * `athlete`: set in settings, trusted as given.
-   */
   source: "recent" | "older" | "age" | "athlete" | null;
   predictedBpm: number | null;
   ageCheck: "matches" | "above" | "below" | null;
@@ -48,7 +39,6 @@ export function predictedMaxHr(age: number | null | undefined) {
   return Math.round(208 - 0.7 * age);
 }
 
-/** Only bike and run peaks are expected to reach a true max; swims and walks sit well below it. */
 function checksAgainstAge(family: HeartRateFamily) {
   return family === "cycling" || family === "running";
 }
@@ -58,7 +48,6 @@ export function estimateMaxHrAnchor(
   options: { family: HeartRateFamily; age?: number | null; now?: Date; athleteBpm?: number | null },
 ): MaxHrAnchor {
   const predictedBpm = predictedMaxHr(options.age);
-  // A max the athlete set skips the spike filter and the age check (ADR 0021).
   if (options.athleteBpm != null) {
     return {
       bpm: options.athleteBpm,
@@ -151,9 +140,6 @@ export function maxHrAnchorInfo(anchor: MaxHrAnchor) {
   return parts.join(" ");
 }
 
-/* ---------- Per-activity stream summary (cached next to the chart preview) ---------- */
-
-/** Bump when the stored shape or the math changes, so cached rows are rebuilt on next view. */
 export const HEART_ANALYSIS_VERSION = 2;
 
 const MAX_INTERVAL_SEC = 30;
@@ -163,7 +149,6 @@ const MIN_DECOUPLING_SEC = 35 * 60;
 const MAX_STEADY_VI = 1.15;
 const MAX_STEADY_SPEED_CV = 0.15;
 const MAX_STEADY_POWER_CV = 0.25;
-/** Running speed is only comparable to HR on fairly flat routes. */
 export const MAX_FLAT_GAIN_M_PER_KM = 15;
 
 export type HeartStreams = {
@@ -179,7 +164,6 @@ export type DecouplingResult =
   | {
       status: "ok";
       output: "power" | "speed";
-      /** Positive: HR rose against output in the second half. */
       pct: number;
       analysedSec: number;
       firstHalf: { avgHeartrate: number; avgOutput: number };
@@ -187,13 +171,10 @@ export type DecouplingResult =
     }
   | { status: "skipped"; reason: "no-heartrate" | "no-output" | "short" | "unsteady" | "hilly" };
 
-/** FTP- and zone-independent heart summary of one activity. */
 export type HeartAnalysis = {
   version: typeof HEART_ANALYSIS_VERSION;
-  /** Sparse `[bpm, seconds]` pairs of time spent at each heart rate. */
   histogram: [number, number][];
   decoupling: DecouplingResult;
-  /** Best sustained average HR per `PEAK_HR_DURATIONS` window; missing when the session is shorter. */
   peaks: SustainedHeartrate[];
   avgTempC: number | null;
 };
@@ -246,7 +227,6 @@ export function denseHistogram(pairs: [number, number][]) {
 
 type DecouplingContext = {
   family: HeartRateFamily;
-  /** Bike power is comparable to HR; run speed only on flat, outdoor runs. */
   sportType: string;
   distance: number | null;
   totalElevationGain: number | null;
@@ -262,7 +242,6 @@ function weightedMean(values: number[], weights: number[]) {
   return total > 0 ? sum / total : 0;
 }
 
-/** Coefficient of variation of 60 s means: for run speed, and for power when NP is unavailable. */
 function outputVariation(values: number[], weights: number[]) {
   const bins: number[] = [];
   let binSum = 0;
@@ -288,10 +267,6 @@ export function isFlatEnough(distance: number | null, gain: number | null) {
   return (gain ?? 0) / (distance / 1000) <= MAX_FLAT_GAIN_M_PER_KM;
 }
 
-/**
- * Aerobic decoupling (Friel's Pa:HR / Pw:HR): output per heartbeat in the first half of the
- * session after warm-up vs the second half. Only steady sessions say anything about endurance.
- */
 export function computeDecoupling(
   streams: HeartStreams,
   context: DecouplingContext,
@@ -333,7 +308,6 @@ export function computeDecoupling(
   if (usePower) {
     const avg = weightedMean(outputs, weights);
     const np = normalizedPowerFromWatts(outputs, times);
-    // Sparse streams (10 s samples) give no 30 s NP windows; fall back to minute-to-minute spread.
     const steady = np
       ? np / avg <= MAX_STEADY_VI
       : (outputVariation(outputs, weights) ?? Infinity) <= MAX_STEADY_POWER_CV;
@@ -385,16 +359,10 @@ function meanTemp(temp: number[] | null) {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
-/** Windows a sustained heart rate is reported for: a hard minute, a VO2 effort, a threshold test. */
 export const PEAK_HR_DURATIONS = [60, 300, 1200] as const;
 
 export type SustainedHeartrate = { seconds: number; bpm: number };
 
-/**
- * Highest time-weighted average heart rate over each window, so a single spike does not read
- * as an effort. Implausible samples and recording gaps (capped like the histogram) count as
- * missing time rather than as low heart rate.
- */
 export function peakSustainedHeartrates(
   heartrate: number[] | null,
   time: number[] | null,
@@ -475,8 +443,6 @@ export function decouplingInfo(result: DecouplingResult) {
   return reasons[result.reason];
 }
 
-/* ---------- Efficiency factor and "usual" heart rate ---------- */
-
 const MIN_EF_SECONDS = 20 * 60;
 const MIN_EF_HEARTRATE = 90;
 export const EF_NORM_DAYS = 42;
@@ -484,9 +450,7 @@ export const USUAL_HR_DAYS = 90;
 const MIN_NORM_POINTS = 3;
 const MIN_MODEL_POINTS = 6;
 const MIN_MODEL_R = 0.3;
-/** How far past the outputs seen the line may still be read. */
 const RANGE_MARGIN = 0.05;
-/** Aerobic sessions stay below the top of zone 3 in both the Coggan and Friel models. */
 const AEROBIC_LTHR_SHARE = 0.94;
 
 const POWER_EF_SPORTS = new Set([
@@ -513,7 +477,6 @@ export type EfficiencyInput = {
 
 export type EfficiencyPoint = {
   start: string;
-  /** Output per heartbeat: W/bpm for rides, m/min per bpm for runs. */
   ef: number;
   output: number;
   avgHeartrate: number;
@@ -526,7 +489,6 @@ export function efficiencyKindFor(sportType: string): EfficiencyKind | null {
   return null;
 }
 
-/** Normalized power (or speed on flat runs) per heartbeat, from activity summaries. */
 export function efficiencyFactor(input: EfficiencyInput) {
   const kind = efficiencyKindFor(input.sportType);
   const hr = input.averageHeartrate;
@@ -579,7 +541,6 @@ function priorPoints(points: EfficiencyPoint[], beforeIso: string, days: number)
   });
 }
 
-/** Median aerobic EF in the weeks before an activity. */
 export function efficiencyNorm(points: EfficiencyPoint[], beforeIso: string) {
   const prior = priorPoints(points, beforeIso, EF_NORM_DAYS);
   if (prior.length < MIN_NORM_POINTS) return null;
@@ -587,11 +548,6 @@ export function efficiencyNorm(points: EfficiencyPoint[], beforeIso: string) {
   return value == null ? null : { value: Math.round(value * 1000) / 1000, count: prior.length };
 }
 
-/**
- * Average HR this athlete usually needs for a given output: a least-squares line through
- * recent aerobic sessions. Null when there are too few sessions, the relation is weak,
- * or the output is more than 5 % outside the range seen.
- */
 export function usualHeartrate(points: EfficiencyPoint[], beforeIso: string, output: number) {
   const prior = priorPoints(points, beforeIso, USUAL_HR_DAYS);
   if (prior.length < MIN_MODEL_POINTS) return null;
@@ -621,14 +577,11 @@ export function usualHeartrate(points: EfficiencyPoint[], beforeIso: string, out
   return { bpm: Math.round(meanY + slope * (output - meanX)), count: n };
 }
 
-/* ---------- Activity heart card ---------- */
-
 export type ActivityHeart = {
   family: HeartRateFamily;
   zoneModel: string;
   maxHeartrate: number | null;
   lthr: number | null;
-  /** Null when the activity has no heart-rate stream. */
   zones: HeartRateZoneStat[] | null;
   zoneSeconds: number;
   decoupling: DecouplingResult | null;
@@ -659,7 +612,6 @@ export type HeartContext = {
   detail: string;
 };
 
-/** Explains a heart rate that differs from usual with form and heat, so it is not just a number. */
 export function explainHeartGap(input: {
   gapBpm: number;
   tsb: number | null;
@@ -709,8 +661,6 @@ export function explainHeartGap(input: {
     detail: `Heart rate was within ${GAP_BPM} bpm of your usual for this output${formText ? `; ${formText}` : ""}.`,
   };
 }
-
-/* ---------- Efficiency trend vs fitness ---------- */
 
 export type EfficiencyWeek = { week: string; ef: number; count: number; ctl: number | null };
 

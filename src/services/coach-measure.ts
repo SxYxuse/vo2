@@ -13,7 +13,6 @@ export type MeasureRequest =
   | { kind: "range"; unit: "metres" | "seconds"; start: number; end: number }
   | { kind: "splits" | "fastest"; unit: "metres" | "seconds"; length: number };
 
-/** One stretch of an activity. Seconds are moving time; pauses are left out. */
 export type Measure = {
   startM: number;
   endM: number;
@@ -38,7 +37,6 @@ function distanceSport(sportType: string): DistanceSport {
   return "run";
 }
 
-/** The fractional sample index where a rising series first reaches `value`. */
 function positionOf(series: number[], value: number) {
   if (value <= series[0]) return 0;
   const last = series.length - 1;
@@ -106,7 +104,6 @@ function measureBetween(
   };
 }
 
-/** The window of `length` (metres or seconds) with the least time or the most distance. */
 function fastestWindow(axis: number[], other: number[], length: number, byDistance: boolean) {
   let best: { from: number; to: number; score: number } | null = null;
   for (let to = 1; to < axis.length; to += 1) {
@@ -120,10 +117,6 @@ function fastestWindow(axis: number[], other: number[], length: number, byDistan
   return best;
 }
 
-/**
- * Exact numbers over an activity's streams, so the coach never does arithmetic on raw samples:
- * a range from the start, even splits, or the fastest stretch of a distance or duration.
- */
 export function measureActivity(
   streams: MeasureStreams,
   sportType: string,
@@ -143,7 +136,6 @@ export function measureActivity(
     const to = positionOf(axis, axis[0] + request.end);
     if (to <= from) return { measures: [], note: "The range is empty or past the end." };
     const measures = [measureBetween(withDistance, clock, from, to)];
-    // Without this, "time at 10 km" on a shorter run would quietly read as the whole run.
     if (request.end > total) {
       return {
         measures,
@@ -187,7 +179,6 @@ export const STREAM_CHANNELS = [
 ] as const;
 export type StreamChannel = (typeof STREAM_CHANNELS)[number];
 
-/** The most points per channel the coach gets: it types each one into a visual (ADR 0035). */
 export const MAX_STREAM_POINTS = 150;
 
 type ChannelStreams = { time: number[] | null; distance: number[] | null } & Partial<
@@ -200,11 +191,6 @@ function round(value: number | null, digits: number) {
   return Math.round(value * scale) / scale;
 }
 
-/**
- * At most `points` samples per channel against distance and elapsed time. The first and last
- * samples are kept; each point between is the mean of its stretch, so a spike can't stand in
- * for a whole stretch.
- */
 export function downsampleStreams(
   streams: ChannelStreams,
   channels: readonly StreamChannel[],

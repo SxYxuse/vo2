@@ -15,12 +15,6 @@ import type {
 } from "@/components/reui/event-calendar/event-calendar-types";
 import { addDays, addMinutes, differenceInCalendarDays } from "date-fns";
 
-/**
- * Activation policy (dnd-kit parity where proven):
- * mouse move 5px before a drag starts (below = click), create 4px;
- * touch long-press 250ms with 5px tolerance (movement past tolerance
- * before the delay cancels the drag so taps stay taps).
- */
 const EVENT_CALENDAR_ACTIVATION = {
   moveDistancePx: 5,
   createDistancePx: 4,
@@ -46,9 +40,7 @@ interface DayCellRect {
 }
 
 interface Surface {
-  /** Minute-precise day columns (week/day/days) or resource columns. */
   columns: TimeColumnRect[];
-  /** Day-precise cells (month grid, all-day row). */
   cells: DayCellRect[];
   viewport: HTMLElement | null;
   /**
@@ -69,7 +61,6 @@ interface Surface {
   scrollTop: number;
 }
 
-/** Module flag so chip onClick can ignore the click that ends a drag. */
 let lastGestureEndedAt = 0;
 function wasRecentDrag(): boolean {
   return performance.now() - lastGestureEndedAt < 250;
@@ -97,14 +88,6 @@ function wasRecentChipPress(): boolean {
   return performance.now() - lastChipPressAt < 300;
 }
 
-/**
- * Registry of in-flight gesture cancels. A gesture measures its surface (day
- * columns and cells) once at activation and then lives on window listeners, so
- * the CALENDAR - not the chip, chips legitimately unmount mid-gesture (lane
- * repacking, a "+N more" popover closing) - is what must be able to abort it.
- * Cancel fully reverts: listeners, overlays and the body drag state all clear,
- * and no update is committed.
- */
 const activeGestureCancels = new Set<() => void>();
 
 /** Cancel (and fully revert) every in-flight event calendar pointer gesture. */
@@ -112,11 +95,6 @@ function cancelActiveEventCalendarGestures(): void {
   for (const cancel of [...activeGestureCancels]) cancel();
 }
 
-/**
- * Mounted-consumer count for the gestures hook. Every chip holds one, so only
- * the LAST consumer leaving means the calendar itself is gone; aborting when
- * any single chip unmounts would kill a drag the user is still holding.
- */
 let gestureConsumers = 0;
 
 /**
@@ -134,8 +112,6 @@ function snapToPixel(value: number): number {
 }
 
 function collectSurface(origin: HTMLElement, fallbackRoot?: HTMLElement | null): Surface {
-  // A gesture from a portaled surface (the "+N more" popover) has no calendar
-  // ancestor, so fall back to the root the host registered on the instance.
   const root =
     origin.closest<HTMLElement>("[data-slot=event-calendar-time-grid]") ??
     origin.closest<HTMLElement>("[data-slot=event-calendar-resource-view]") ??
@@ -180,7 +156,6 @@ function findColumn(surface: Surface, clientX: number): TimeColumnRect | undefin
   for (const col of scrollAdjusted) {
     if (clientX >= col.rect.left && clientX < col.rect.right) return col;
     if (!best) best = col;
-    // clamp to nearest horizontal column
     const bestDist = Math.min(
       Math.abs(clientX - best.rect.left),
       Math.abs(clientX - best.rect.right),
@@ -212,14 +187,8 @@ interface BeginGestureConfig<TData> {
   origin: HTMLElement;
   startEvent: PointerEvent;
   segment?: EventCalendarSegment<TData>;
-  /** create only */
   createDay?: Date;
   createAllDay?: boolean;
-  /**
-   * Consumer classNames for the engine's vanilla-DOM overlays (carry clone,
-   * validation hint pill), forwarded by the gestures hook - the engine itself
-   * must never import from the React chip module.
-   */
   ui?: {
     dragCarry?: string;
     dragCarryInvalid?: string;
@@ -227,13 +196,6 @@ interface BeginGestureConfig<TData> {
   };
 }
 
-/**
- * A move/resize was refused (locked, per-event disabled, or interaction off).
- * Rather than silently swallow the press, track the pointer: once it crosses
- * the activation threshold - i.e. the user genuinely tried to drag - show a
- * not-allowed cursor and broadcast once via onDragBlocked so the consumer can
- * explain it. The calendar picks no message. Fires at most once per gesture.
- */
 function beginBlockedGesture<TData>(
   instance: EventCalendarInstance<TData>,
   startEvent: PointerEvent,
@@ -262,8 +224,6 @@ function beginBlockedGesture<TData>(
     }
     activated = true;
     document.body.style.cursor = "not-allowed";
-    // body class alongside the inline cursor so consumer CSS can restyle or
-    // detect the blocked-drag state (mirrors "ec-dragging")
     document.body.classList.add("ec-drag-blocked");
     // only now is there anything to get stuck: focus loss means the release
     // may never be delivered, leaving the cursor not-allowed document-wide
@@ -280,13 +240,9 @@ function beginBlockedGesture<TData>(
     if (activated) {
       document.body.style.cursor = "";
       document.body.classList.remove("ec-drag-blocked");
-      // the pointer travelled: suppress the trailing click so the event's own
-      // dialog does not open on top of the rejection message
       lastGestureEndedAt = performance.now();
     }
   };
-  // only the pointer that started the press may end it: a second finger
-  // lifting must not clear the not-allowed cursor out from under it
   const onRelease = (e: PointerEvent) => {
     if (e.pointerId !== pointerId) return;
     cleanup();
@@ -301,14 +257,10 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   const { settings, internals, api } = instance;
   const timeZone = settings.timeZone;
   const snap = settings.snapDuration;
-  // per-calendar tuning shallow-merged over the module defaults
   const activation = { ...EVENT_CALENDAR_ACTIVATION, ...settings.activation };
   const startX = startEvent.clientX;
   const startY = startEvent.clientY;
   const pointerId = startEvent.pointerId;
-  // Resolved once: the chip can be re-rendered away mid-gesture. A gesture
-  // from a portaled surface (the "+N more" popover) has no calendar ancestor,
-  // so fall back to the registered root - same reason as collectSurface.
   const announcer =
     origin
       .closest<HTMLElement>("[data-slot=event-calendar]")
@@ -317,9 +269,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     null;
 
   const isTouch = startEvent.pointerType === "touch";
-  // resize activates immediately on precise pointers; on touch it waits for
-  // the same long-press as a move, so a finger landing on the (invisible on
-  // touch) handle strip can never start a resize the user never asked for
   let active = kind.startsWith("resize") && !isTouch;
   let surface: Surface | null = active ? collectSurface(origin, internals.getRootEl()) : null;
   let rafScroll: number | null = null;
@@ -327,9 +276,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   let touchTimer: ReturnType<typeof setTimeout> | null = null;
   let hintEl: HTMLDivElement | null = null;
   let lastValid = true;
-  // Drag-create anchor minute, frozen at the first proposal: re-deriving it
-  // from the stale startY client coordinate + the CURRENT scroll delta would
-  // make the anchor drift with auto-scroll instead of staying pinned.
   let createAnchorMin: number | null = null;
   let lastPointer: PointerEvent = startEvent;
 
@@ -339,30 +285,14 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
       occurrence.end.getTime() - occurrence.start.getTime() > 24 * 60 * 60 * 1000
     : false;
 
-  // Preserve the grab offset so the event does not jump to the pointer
   let grabOffsetMin = 0;
-  /**
-   * The grabbed CHIP, not the whole occurrence. A cross-midnight event renders
-   * one chip per day, so the offset above is measured in the grabbed chip's own
-   * day frame (mixing the two frames jumps a tail chip a full day on grab) and
-   * these two carry that chip back to the occurrence. For a chip that fits in
-   * one day the lead is 0 and the duration is the occurrence's, i.e. unchanged.
-   */
   let grabLeadMs = 0;
   let grabSegDurationMs = occurrence ? occurrence.end.getTime() - occurrence.start.getTime() : 0;
-  /**
-   * Which day of a multi-day bar was grabbed. Without it the day-granular move
-   * slides the bar's START under the pointer, so a Mon-Fri bar grabbed on
-   * Wednesday teleports two days forward on the first nudge.
-   */
   let grabDayOffset = 0;
 
   const activationDistance =
     kind === "create" ? activation.createDistancePx : activation.moveDistancePx;
 
-  // Each gesture keeps its own cursor: a resize must stay ns/ew-resize for
-  // the whole drag (flipping to grabbing reads as a move) - vertical for
-  // timed blocks, horizontal for day-granular bars. Moves grab.
   const gestureCursor = kind.startsWith("resize")
     ? isBar
       ? "ew-resize"
@@ -378,23 +308,17 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   const activate = () => {
     if (active) return;
     active = true;
-    // armed with the gesture, not with the press: a press that never activates
-    // holds no drag state, no overlay and no body class to strand
     window.addEventListener("blur", onWindowBlur);
     surface = collectSurface(origin, internals.getRootEl());
     if (kind === "move" && occurrence) {
       const grabCell = findCell(surface, startX, startY);
       if (grabCell) {
         const originDay = zonedStartOfDay(occurrence.start, timeZone);
-        // end is exclusive, so step back an instant for the last covered day
         const lastDay = zonedStartOfDay(
           new Date(Math.max(occurrence.end.getTime() - 1, occurrence.start.getTime())),
           timeZone,
         );
         const offset = differenceInCalendarDays(zonedStartOfDay(grabCell.day, timeZone), originDay);
-        // A gesture from the "+N more" popover grabs over whatever cell that
-        // floating surface happens to cover, so only a day the event actually
-        // spans can be the grabbed day.
         if (offset >= 0 && offset <= differenceInCalendarDays(lastDay, originDay)) {
           grabDayOffset = offset;
         }
@@ -427,7 +351,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   } | null => {
     if (!surface) return null;
 
-    // ---- create: select a slot range
     if (kind === "create") {
       if (config.createAllDay || surface.columns.length === 0) {
         const anchor = zonedStartOfDay(config.createDay!, timeZone);
@@ -458,11 +381,8 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     if (!occurrence) return null;
     const durationMs = occurrence.end.getTime() - occurrence.start.getTime();
 
-    // ---- day-granularity: month cells and bars in the all-day row
     const overCell = findCell(surface, e.clientX, e.clientY);
 
-    // A timed event dropped on the all-day lane (a day cell inside a surface
-    // that also has time columns) converts to a full-day event on that day.
     if (kind === "move" && !isBar && surface.columns.length > 0 && overCell !== undefined) {
       const targetDay = zonedStartOfDay(overCell.day, timeZone);
       return {
@@ -481,8 +401,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
       const targetDay = zonedStartOfDay(cell.day, timeZone);
       if (kind === "move") {
         const originDay = zonedStartOfDay(occurrence.start, timeZone);
-        // minus the grabbed day: the bar follows the pointer by the distance
-        // travelled, it does not re-anchor its start under the pointer
         const delta = differenceInCalendarDays(targetDay, originDay) - grabDayOffset;
         const start = addDays(toZoned(occurrence.start, timeZone), delta);
         return {
@@ -492,7 +410,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
           dayGranular: true,
         };
       }
-      // bar edge resize: day granularity
       if (kind === "resize-start") {
         const time =
           occurrence.start.getTime() - zonedStartOfDay(occurrence.start, timeZone).getTime();
@@ -520,7 +437,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
       };
     }
 
-    // ---- minute-granularity: time-grid columns
     const col = findColumn(surface, e.clientX);
     if (!col) return null;
     const dayStart = zonedStartOfDay(col.day, timeZone);
@@ -528,8 +444,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
 
     if (kind === "move") {
       const newStartMin = snapMinutes(rawMin - grabOffsetMin, snap);
-      // the clamp keeps the grabbed CHIP inside the column it is over; the
-      // lead then carries the rest of a cross-midnight occurrence with it
       const chipDurationMin = Math.round(grabSegDurationMs / 60000);
       const clamped = Math.min(
         Math.max(newStartMin, col.boundsStartMin),
@@ -545,11 +459,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     }
 
     const min = snapMinutes(rawMin, snap);
-    // Both endpoints expressed in the POINTED column's day coordinates.
-    // Anchoring each endpoint to its OWN day breaks cross-midnight events:
-    // a 23:30 pointer in the start day's column would apply 1410 minutes to
-    // the end's next-day anchor and jump the end a full day late (and a
-    // midnight-ending event computes occEndMin 0 against its own day).
     const occStartMinInCol = Math.round((occurrence.start.getTime() - dayStart.getTime()) / 60000);
     const occEndMinInCol = Math.round((occurrence.end.getTime() - dayStart.getTime()) / 60000);
     if (kind === "resize-start") {
@@ -605,11 +514,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     });
   };
 
-  // Cursor-attached carry clone for MOVE gestures: the event travels freely
-  // with the pointer, like an absolutely positioned overlay, while the
-  // in-grid ghost renders only a faint dashed placeholder at the snapped
-  // drop slot (EVENT_CALENDAR_GHOST.move). Vanilla DOM: cloned once at
-  // activation, transformed per pointermove, zero React work per frame.
   let carryEl: HTMLDivElement | null = null;
   let carryDX = 0;
   let carryDY = 0;
@@ -654,9 +558,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     if (carryEl.className !== cls) carryEl.className = cls;
   };
 
-  // Cursor-following validation hint, visible ONLY while the proposal is
-  // rejected (canDropEvent / bounds). Vanilla DOM: zero React work per frame;
-  // pairs with the not-allowed cursor and the ghost's destructive marking.
   const updateHint = (e: PointerEvent) => {
     if (lastValid || !active) {
       hintEl?.remove();
@@ -679,29 +580,11 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   };
 
   const autoScroll = (e: PointerEvent) => {
-    // Cached rect (see Surface.viewportRect) - never getBoundingClientRect per
-    // move; the box is stable while the pointer is captured.
     const rect = surface?.viewportRect;
     if (!surface?.viewport || !rect) return;
     const edge = activation.autoScrollEdgePx;
     const step = activation.autoScrollMaxStepPx;
     let delta = 0;
-    /**
-     * The scroller wraps the time track ONLY - the day headers and the all-day
-     * row sit above it, outside the box - so its top edge is a hard floor. A
-     * pointer above that floor is over one of those rows, and both are drop
-     * targets in their own right (a bar moving across dates, a timed chip
-     * lifted onto the all-day lane to convert it); they are already fully
-     * visible, so reaching them is never a request to scroll. Without the
-     * floor, "past the top edge" is true on every single move of a horizontal
-     * all-day drag and the track pans out from under a gesture that only wants
-     * to change the date - fast, because the proximity ratio grows past 1 the
-     * further above the box the pointer sits.
-     *
-     * Below the track there is no such row, so overshooting the bottom keeps
-     * scrolling - that is how a grid is normally asked to keep going - but the
-     * eased speed is capped at one step per frame for the same reason.
-     */
     if (e.clientY >= rect.top) {
       if (e.clientY < rect.top + edge) {
         delta = -step * ((rect.top + edge - e.clientY) / edge);
@@ -722,8 +605,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
         surface!.viewport!.scrollTop = before + delta;
         const applied = surface!.viewport!.scrollTop - before;
         if (applied === 0) return;
-        // keep the tracked scrollTop in step so pointerMinutes stays a pure
-        // number read (no DOM scrollTop, no forced reflow)
         surface!.scrollTop += applied;
         applyProposal(e);
         rafScroll = requestAnimationFrame(tick);
@@ -732,8 +613,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
     }
   };
 
-  // idempotent: pointerup, pointercancel, Escape, blur and the calendar-level
-  // teardown can race; whichever lands first wins and the rest no-op
   let finished = false;
   const cleanup = () => {
     if (finished) return;
@@ -775,14 +654,11 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   const onWindowBlur = () => cancel();
 
   const onPointerMove = (e: PointerEvent) => {
-    // a second finger must not drive - or cancel the pending long press of -
-    // the gesture this pointer started
     if (e.pointerId !== pointerId) return;
     lastPointer = e;
     if (!active) {
       const distance = Math.hypot(e.clientX - startX, e.clientY - startY);
       if (isTouch) {
-        // Long-press pending: moving past tolerance means scroll, not drag
         if (distance > activation.touchTolerancePx) cancel();
         return;
       }
@@ -822,8 +698,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
       (drag.proposedResourceId === undefined ||
         drag.proposedResourceId === occurrence.event.resourceId);
     if (unchanged) return;
-    // Commit through the one validation funnel; consumer reject = automatic
-    // revert because the calendar never mutated during the gesture.
     const accepted = internals.applyProposedUpdate({
       event: occurrence.event,
       occurrence,
@@ -833,8 +707,6 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
       resourceId: drag.proposedResourceId,
       source: kind === "move" ? "drag" : (kind as "resize-start" | "resize-end"),
     });
-    // the polite live region is the only feedback a screen-reader user gets
-    // that the drop landed, and on what; a vetoed commit stays silent
     if (accepted && announcer) {
       announcer.textContent = `${occurrence.event.title}, ${settings.i18n.functions.formatEventTime(
         toZoned(drag.proposedStart, timeZone),
@@ -853,13 +725,10 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onCancel);
-  // a resize on a precise pointer is live from the first frame, so it never
-  // reaches activate() to arm its own blur cancel
   if (active) window.addEventListener("blur", onWindowBlur);
   window.addEventListener("keydown", onKeyDown, true);
   activeGestureCancels.add(cancel);
 
-  // Touch: long-press activation (movement past tolerance cancels above)
   if (isTouch && !active) {
     touchTimer = setTimeout(() => {
       activate();
@@ -868,11 +737,8 @@ function beginGesture<TData>(config: BeginGestureConfig<TData>) {
   }
 }
 
-/** Per-chip / per-surface pointer gesture wiring. */
 function useEventCalendarGestures<TData = unknown>() {
   const instance = useEventCalendar<TData>();
-  // Overlay classNames bridged from React config into the vanilla-DOM engine
-  // (which must never import from the chip module - circular).
   const { classNames } = useEventCalendarViewConfig<TData>();
   const ui = useMemo(
     () => ({
@@ -883,10 +749,6 @@ function useEventCalendarGestures<TData = unknown>() {
     [classNames],
   );
 
-  // An in-flight gesture lives on window listeners and body-appended overlays,
-  // so it must never outlive the calendar. Chips hold this hook too and they
-  // legitimately unmount mid-gesture, so only the LAST consumer leaving - the
-  // calendar itself going away - aborts.
   useEffect(() => {
     gestureConsumers += 1;
     return () => {
@@ -917,7 +779,6 @@ function useEventCalendarGestures<TData = unknown>() {
     (e: React.PointerEvent, segment: EventCalendarSegment<TData>) => {
       if (e.button !== 0) return;
       if (!canDrag(segment)) {
-        // refused, but still give feedback + broadcast on a real drag attempt
         beginBlockedGesture(instance, e.nativeEvent, segment, "move");
         return;
       }

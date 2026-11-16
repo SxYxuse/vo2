@@ -43,7 +43,6 @@ import {
   type TrainingPaces,
 } from "./training-paces.types.ts";
 
-/** Zone 2 is read from road runs of the last eight weeks: recent enough to be today's fitness. */
 const ZONE_2_WINDOW_DAYS = 8 * 7;
 const STREAM_BATCH = 40;
 
@@ -56,11 +55,6 @@ type RoadRun = {
   flatPaces: unknown;
 };
 
-/**
- * Every road run with its best efforts. A treadmill run is sport type Run too, but has no route,
- * and its watch distance is often several percent off. Hidden sport types count: hiding changes
- * views, not the athlete's fitness (ADR 0018).
- */
 async function roadRuns(userId: string) {
   const rows = await db
     .select({
@@ -97,7 +91,6 @@ async function roadRuns(userId: string) {
   return { rows, efforts };
 }
 
-/** Each run's flat running by heart rate and pace, building and storing the missing ones. */
 async function ensureFlatPaces(rows: RoadRun[]): Promise<FlatPaces[]> {
   const result: FlatPaces[] = [];
   const missing: string[] = [];
@@ -134,7 +127,6 @@ async function ensureFlatPaces(rows: RoadRun[]): Promise<FlatPaces[]> {
 
 type Metrics = Parameters<typeof athleteHeartRateFrom>[0] & { birthDate: string | null };
 
-/** Running zone 2 from the athlete's zone method, resolved as the heart rate page does. */
 async function zone2Bounds(userId: string, metrics: Metrics | undefined) {
   const rows = await db
     .select({
@@ -167,7 +159,6 @@ async function zone2Bounds(userId: string, metrics: Metrics | undefined) {
     : null;
 }
 
-/** The athlete's upcoming running A goals with a distance, soonest first. */
 async function upcomingRunningAGoals(userId: string, now: Date) {
   const today = now.toISOString().slice(0, 10);
   const rows = await db
@@ -188,7 +179,6 @@ async function upcomingRunningAGoals(userId: string, now: Date) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** The distance of the next running A goal, which breaks the estimate's near ties. */
 async function targetMetres(userId: string, now: Date) {
   const upcoming = await upcomingRunningAGoals(userId, now);
   return upcoming.find((goal) => canPredict(goal.distanceM))?.distanceM ?? DEFAULT_TARGET_M;
@@ -249,7 +239,6 @@ async function athleteTimeZone(userId: string) {
   return row?.timeZone ?? "UTC";
 }
 
-/** Each training week's end, Sunday in the athlete's time zone, from the first effort, then now. */
 function weekEnds(efforts: RunEffort[], now: Date, timeZone: string) {
   const today = dayKey(now, timeZone);
   const first = efforts.reduce<string | null>(
@@ -271,10 +260,6 @@ function weekEnds(efforts: RunEffort[], now: Date, timeZone: string) {
   return ends;
 }
 
-/**
- * The Automatic estimate week by week, for the next running A goal's distance when it has a
- * predicted race time, else 10 km. Worked out again on every read, never stored.
- */
 export async function predictedTimeTrendFor(
   userId: string,
   now = new Date(),
@@ -335,18 +320,12 @@ async function storePaceSettings(
     .onConflictDoUpdate({ target: athleteMetrics.userId, set: { ...values, updatedAt } });
 }
 
-/**
- * Sets the athlete's race result, which then sets the paces, or clears it with null; clearing
- * the result the paces came from goes back to Automatic.
- */
 export async function saveRaceResultImpl(raceResult: RaceResult | null) {
   const session = await getRequiredSession();
-  // A day of slack for athletes ahead of UTC; a result can't come from further in the future.
   const latest = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
   if (raceResult && raceResult.date > latest) {
     throw new Error("A race result can't be in the future.");
   }
-  // The form's earliest date is the athlete's local day, a day behind UTC for some; allow it.
   const yesterday = new Date(Date.now() - 86_400_000);
   if (raceResult && !isRaceResultCurrent(raceResult, yesterday)) {
     throw new Error("A race result must be from the last 16 weeks.");
@@ -362,10 +341,6 @@ export async function saveRaceResultImpl(raceResult: RaceResult | null) {
   return trainingPacesFor(session.user.id);
 }
 
-/**
- * Saves one choice: Automatic, a best effort from the athlete's own list (looked up again, so
- * only their own efforts can be picked), or where the easy pace comes from.
- */
 export async function savePaceChoiceImpl(choice: PaceChoice) {
   const session = await getRequiredSession();
   const userId = session.user.id;

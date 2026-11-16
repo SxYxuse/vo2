@@ -60,7 +60,6 @@ try {
   );
 }
 
-// Imported once the arguments are checked: the writer reads the app's environment.
 const [{ DEFAULT_COACH_MODEL, REASONING_LEVELS }, { textAdapter }, writer] = await Promise.all([
   import("../src/services/coach-models.ts"),
   import("../src/services/coach-model.server.ts"),
@@ -79,7 +78,6 @@ if (reasoning != null && !REASONING_LEVELS.includes(reasoning)) {
 }
 
 if (values["dry-run"]) {
-  // To a file: the app's logger prints to stdout as the writer loads, so stdout isn't clean JSON.
   const request = { provider, model, reasoning, ...writer.planRequest(prompt, ctx) };
   mkdirSync(".dev-seed", { recursive: true });
   writeFileSync(DRY_RUN_PATH, JSON.stringify({ ...request, output: "writtenPlanSchema" }, null, 2));

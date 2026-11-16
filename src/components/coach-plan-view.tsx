@@ -38,12 +38,6 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
-/*
- * The Plan view for coach-plan athletes: the week shown with arrows to the other written weeks,
- * its runs, rides, and swims as one unordered list (ADR 0048: no day, no order), and the plan against the
- * season (coach-plan-season.tsx). On desktop the season sits beside the week.
- */
-
 function PlanStatus({ state }: { state: CoachPlanState }) {
   const online = useOnline();
   const queryClient = useQueryClient();
@@ -168,7 +162,6 @@ function SessionCard({ run, state }: { run: PlannedSession; state: CoachPlanStat
           variant="ghost"
           className="flex-1 sm:flex-none"
           nativeButton={false}
-          // Marked, so the session's "Plan" button goes back here rather than adding an entry.
           render={
             <Link
               to="/week/run/$sessionId"
@@ -254,10 +247,6 @@ function WeekHeader({
   );
 }
 
-/**
- * `paused` while a time out is open: nothing is written, so there's nothing to ask for, and the
- * time out's banner (time-out-sheet.tsx) stands in for the week.
- */
 export function CoachPlanView({
   week: shown,
   paused = false,
@@ -268,14 +257,11 @@ export function CoachPlanView({
   const navigate = useNavigate();
   const { data: state } = useSuspenseQuery(coachPlanQueryOptions);
   const thisWeek = state.today ? mondayOf(state.today) : "";
-  // A plan written late in the week, on a Sunday with no session left to place, starts this week
-  // with none: that week is not shown, rather than read as an empty written week.
   const weeks = (state.plan?.weeks ?? [])
     .filter(
       (week) => week.weekStart > thisWeek || (week.weekStart === thisWeek && week.sessions.length),
     )
     .slice(0, 4);
-  // The week the view opens on: this week, or the first written one when the plan starts later.
   const home = weeks[0]?.weekStart ?? thisWeek;
   const index = Math.max(
     0,
@@ -300,7 +286,6 @@ export function CoachPlanView({
     },
   });
 
-  // While a time out is open its banner owns the page: only what's done this week stays.
   if (paused) {
     const done = weeks
       .find((item) => item.weekStart === thisWeek)
@@ -343,7 +328,6 @@ export function CoachPlanView({
                 {home === thisWeek ? "Back to this week" : "Back to the first week"}
               </Button>
             ) : null}
-            {/* Clipped for the swipe; a pixel of room keeps the cards' rings inside the clip. */}
             <div className="-m-px touch-pan-y overflow-hidden p-px">
               <div ref={swipe.ref} {...swipe.handlers}>
                 <WeekSessions week={week} state={state} />

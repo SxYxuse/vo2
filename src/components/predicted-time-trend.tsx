@@ -34,7 +34,6 @@ const CHART_CONFIG = {
   seconds: { label: "Predicted race time", color: "var(--color-ds-purple-700)" },
 } satisfies ChartConfig;
 
-/** Weekly points over 7 days or a month would be one or two dots, so those show 12 weeks. */
 const SHORTEST_WEEKS = 12;
 
 const DAY_MS = 86_400_000;
@@ -51,7 +50,6 @@ const PACES_FROM_NOTE = {
   race: "your race result",
 } as const;
 
-/** "10 km 44:12 → 43:01 · VDOT 46.1 → 47.4 over 12 weeks", or one week's time and VDOT. */
 function headline(metres: number, points: TrendWeek[]) {
   const change = trendChange(points);
   if (!change) return null;
@@ -72,7 +70,6 @@ function subtitle(metres: number, target: TrendTarget) {
   return `${distance} · no running goal`;
 }
 
-/** About four ticks on whole minutes, or whole multiples of five minutes for long races. */
 function minuteTicks(seconds: number[]) {
   if (!seconds.length) return undefined;
   const low = Math.min(...seconds);
@@ -86,7 +83,6 @@ function minuteTicks(seconds: number[]) {
   return ticks;
 }
 
-/** "1h55" past an hour, so the narrow phone axis fits it; "44:00" below. */
 function formatTick(seconds: number) {
   if (seconds < 3600) return formatDuration(seconds);
   const minutes = Math.round((seconds % 3600) / 60);
@@ -100,7 +96,6 @@ function periodStartKey(period: FitnessPeriod, timeZone: string) {
   return startMs == null ? "" : dayKey(new Date(startMs), timeZone);
 }
 
-/** Card on the Fitness page: the Automatic estimate's predicted race time, week by week. */
 export function PredictedTimeTrendCard({ timeOuts }: { timeOuts: TimeOut[] }) {
   const { data, isPending, isError } = useQuery(predictedTimeTrendQueryOptions);
   if (isPending) return <Skeleton className="h-72 w-full rounded-lg" />;

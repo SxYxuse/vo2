@@ -127,9 +127,7 @@ const STEP = Object.fromEntries(STEP_LIST.map((step) => [step.id, step])) as Rec
   (typeof STEP_LIST)[number]
 >;
 
-/** With planning off, the setup is saved after the style; the key step stays optional. */
 const OFF_FLOW: StepId[] = ["sync", "about", "sports", "style", "coach", "ready"];
-/** The coach plan needs the key first, then its A race, availability, and paces. */
 const COACH_PLAN_FLOW: StepId[] = [
   "sync",
   "about",
@@ -141,7 +139,6 @@ const COACH_PLAN_FLOW: StepId[] = [
   "paces",
   "ready",
 ];
-/** The coach plan's three plan steps share one segment of the progress bar. */
 const COACH_PLAN_STEPS: StepId[] = ["goal", "availability", "paces"];
 const COACH_PLAN_TITLES = [
   "Copy from Strava",
@@ -161,7 +158,6 @@ function progressOf(flow: StepId[], index: number) {
   return { step: id === "ready" ? 6 : index };
 }
 
-/** The step a progress segment opens: the first step it covers. */
 function stepOfSegment(flow: StepId[], segment: number) {
   if (flow !== COACH_PLAN_FLOW || segment < 5) return segment;
   return segment === 5 ? flow.indexOf("goal") : flow.indexOf("ready");
@@ -217,7 +213,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
     activityCount: syncStatus?.activityCount ?? 0,
   });
 
-  // The profile, sports, and planning style: the app opens once they are saved.
   const save = useMutation({
     mutationFn: async ({ values }: { values: OnboardingFormValues }) => {
       const saved = await saveAthleteSettings({
@@ -228,13 +223,10 @@ export function OnboardingForm({ userName }: { userName: string }) {
           planningStyle,
         },
       });
-      // Saved after the style, so the server starts writing the plan at once.
       if (planningStyle === "coachPlan") await saveAvailability.mutateAsync(availability);
       return saved;
     },
     onSuccess: (saved) => {
-      // Marking the profile done keeps the onboarding route on "You're set" instead of the
-      // profile prompt.
       void afterSettingsSaved(queryClient, saved, { profileDone: true });
       setSaveError(null);
       setStepIndex(flow.indexOf(planningStyle === "coachPlan" ? "ready" : "coach"));
@@ -253,7 +245,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
   async function continueStep() {
     if (step.id === "sync") {
       if (!syncStep.canContinue) return;
-      // Defaults read the history this sync just copied; keep anything already edited.
       form.reset(defaults, { keepDirtyValues: true });
       setStepIndex((current) => current + 1);
       return;
@@ -279,7 +270,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
       await startWith();
       return;
     }
-    // The A goal's sport starts with sessions, so a ride goal doesn't open on runs only.
     if (step.id === "goal") {
       setAvailability((current) => availabilityForGoal(current, coachPlan.data?.aGoal?.sportType));
     }
@@ -297,14 +287,11 @@ export function OnboardingForm({ userName }: { userName: string }) {
 
   const firstName = userName.trim().split(/\s+/)[0] || "there";
   const isReady = step.id === "ready";
-  // The setup is saved by now, so the steps before it stay closed.
   const planSaved = step.id === "coach" || isReady;
   const coachKey = useCoachAvailable("plan");
   const copyUnfinished = syncStatus?.status !== "complete";
   const coachPlan = useQuery({ ...coachPlanQueryOptions, enabled: planningStyle === "coachPlan" });
   const saveAvailability = useSaveAvailability();
-  // Each coach plan step needs its part before the next: the key and availability. The A race is
-  // optional: without one the plan builds base fitness.
   const canContinueCoachPlan =
     (step.id === "coachKey" && coachKey.available) ||
     (step.id === "goal" && coachPlan.data != null) ||
@@ -479,7 +466,6 @@ export function OnboardingForm({ userName }: { userName: string }) {
   );
 }
 
-/** One-step setup for athletes who finished onboarding before the birthday and weight were required. */
 export function ProfilePrompt() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

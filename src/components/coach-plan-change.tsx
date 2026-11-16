@@ -38,11 +38,8 @@ type Checked = Extract<PlanChangeProposal, { ok: true }>;
 type Approval = { toolCallId: string; resolveInterrupt: (approved: boolean) => void };
 
 type PlanChanges = {
-  /** Changes VO2 checked in this conversation, by proposal id: the only ones a card shows. */
   proposals: Map<string, Checked>;
-  /** Approvals waiting on the athlete, by tool call id. */
   approvals: Map<string, Approval>;
-  /** Apply and Decline need the server: off while offline or while the chat is busy. */
   canAnswer: boolean;
 };
 
@@ -54,7 +51,6 @@ const PlanChangeContext = createContext<PlanChanges>({
 
 export const PlanChangeProvider = PlanChangeContext.Provider;
 
-/** The checked proposals and waiting approvals of a conversation, for its change cards. */
 export function usePlanChanges(
   messages: readonly UIMessage[],
   interrupts: readonly { kind: string }[],
@@ -80,11 +76,9 @@ export function usePlanChanges(
 
 type Sign = "removed" | "added";
 type Row = { sign: Sign; side: NonNullable<ChangeSide> };
-/** One row, or a removed and an added row that replace each other. */
 type Entry = { rows: Row[]; showSteps: boolean };
 type WeekChanges = { weekStart: string; entries: Entry[]; changes: number; net: string };
 
-/** Weeks shown before the rest folds away, so Apply stays near the summary. */
 const OPEN_WEEKS = 2;
 
 function plural(count: number, sport: PlanSport) {
@@ -92,7 +86,6 @@ function plural(count: number, sport: PlanSport) {
   return count === 1 ? item?.label.toLowerCase() : item?.plural;
 }
 
-/** "−2 runs · +1 ride": what the week gains and loses, sport by sport. */
 function netText(changes: ChangedSession[]) {
   const net = new Map<PlanSport, number>();
   for (const { before, after } of changes) {
@@ -108,11 +101,6 @@ function netText(changes: ChangedSession[]) {
     .join(" · ");
 }
 
-/**
- * The change week by week, as removed and added rows. A session can't change sport, so a run
- * swapped for a ride is a drop and an add: an add right after a drop in the same week reads as
- * its replacement and joins it.
- */
 function weeksOf(sessions: ChangedSession[]): WeekChanges[] {
   const byWeek = new Map<string, ChangedSession[]>();
   for (const change of sessions) {
@@ -133,7 +121,6 @@ function weeksOf(sessions: ChangedSession[]): WeekChanges[] {
           entries.push({ rows, showSteps: false });
         }
       }
-      // A change of steps under the same title and time shows its steps, or both rows match.
       for (const entry of entries) {
         const [a, b] = entry.rows.map((row) => row.side);
         entry.showSteps = b != null && a.title === b.title && a.minutes === b.minutes;
@@ -171,7 +158,6 @@ function ChangeRow({ sign, side, showSteps }: Row & { showSteps: boolean }) {
           : null}
       </span>
       <span className="text-muted-foreground mt-0.5 text-xs whitespace-nowrap tabular-nums">
-        {/* The coach's titles usually lead with the distance ("4.3 km easy", "2,400 m long swim"). */}
         {side.sport === "ride" || side.title.includes(sessionAmountText(side))
           ? minutesText(side.minutes)
           : `${sessionAmountText(side)} · ${minutesText(side.minutes)}`}
@@ -207,7 +193,6 @@ const weekLabel = (weekStart: string) => format(parseISO(weekStart), "d MMM");
 const countText = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** The weeks of the change, the first ones open and the rest behind one tap. */
 function ChangeWeeks({ sessions }: { sessions: ChangedSession[] }) {
   const [showAll, setShowAll] = useState(false);
   const weeks = useMemo(() => weeksOf(sessions), [sessions]);
@@ -274,11 +259,6 @@ function Outcome({ call, what = "plan" }: { call: ToolCall; what?: "plan" | "bri
   return null;
 }
 
-/**
- * The change the coach offers with apply_plan_change, as removed and added sessions under their
- * weeks, with Decline and Apply. It shows only a change VO2 checked in this conversation: an id the checker
- * never answered gets no diff.
- */
 export function PlanChangeCard({ call }: { call: ToolCall }) {
   const { proposals, approvals, canAnswer } = use(PlanChangeContext);
   const input = call.input as { proposalId?: unknown } | undefined;
@@ -357,10 +337,6 @@ function BriefText({ label, text }: { label: string; text: string }) {
   );
 }
 
-/**
- * The brief change the coach offers with change_coach_brief (ADR 0065): the brief now and after,
- * with Decline and Apply. Applying rewrites the weeks ahead, so the card says so.
- */
 export function BriefChangeCard({ call }: { call: ToolCall }) {
   const { approvals, canAnswer } = use(PlanChangeContext);
   const input = call.input as Partial<BriefChangeInput> | undefined;

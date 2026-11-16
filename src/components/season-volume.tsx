@@ -15,25 +15,17 @@ import {
 import { daysBetween, eventPriority, type SeasonEvent } from "@/services/season.types.ts";
 import { PHASE_FILL, PRIORITY_FILL } from "@/components/season-style.ts";
 
-/*
- * A plan sport's weekly volume through the season (ADR 0058): one bar a week, its height the
- * budget, its colour the phase. Plan shows it read-only; Settings → Training redraws it live as
- * the athlete moves the progression. Both project with the same code the coach is held to.
- */
-
 export const SPORT_VOLUME_LABEL: Record<PlanSport, { name: string; unit: string }> = {
   run: { name: "Running", unit: "km per week" },
   ride: { name: "Riding", unit: "hours per week" },
   swim: { name: "Swimming", unit: "metres per week" },
 };
 
-/** The athlete's choice for a sport: growth (null is the default by week) and own peak. */
 export type SportChoice = { growth: number | null; peak: number | null };
 
 export const ceilingFor = (sport: SportVolume, choice: SportChoice) =>
   choice.peak ?? sport.recommended;
 
-/** The sport's amount each week of the season, at a progression and peak. */
 export function projectedAmounts(
   shape: WeekShape[],
   sport: SportVolume,
@@ -42,10 +34,6 @@ export function projectedAmounts(
   return projectSport(shape, sport.seed, sport.sport, choice.growth, ceilingFor(sport, choice));
 }
 
-/**
- * What each week would hold without the athlete's time outs: a time-out week's bar is hatched up
- * to it, so the athlete sees what it backs off from (ADR 0066).
- */
 export function amountsWithoutTimeOuts(
   shape: WeekShape[],
   sport: SportVolume,
@@ -58,10 +46,8 @@ export function amountsWithoutTimeOuts(
   );
 }
 
-/** Whether a time out takes days from the week. */
 export const timeOutWeek = (week: WeekShape) => (week.daysOn ?? 7) < 7;
 
-/** The season's budgets at the athlete's choices, as the plan check reads them. */
 export function projectedBudgets(
   volume: SeasonVolume,
   choices: Partial<Record<PlanSport, SportChoice>>,
@@ -85,7 +71,6 @@ export function projectedBudgets(
   }));
 }
 
-/** The first week at the ceiling's level, when the season reaches it. */
 export function weekReaching(shape: WeekShape[], amounts: number[], ceiling: number) {
   const index = amounts.findIndex(
     (amount, at) => shape[at]!.share === 1 && amount >= ceiling - Math.max(1, ceiling * 0.01),
@@ -93,7 +78,6 @@ export function weekReaching(shape: WeekShape[], amounts: number[], ceiling: num
   return index < 0 ? null : shape[index]!.weekStart;
 }
 
-/** A written week's budget for a sport, where the plan has one. */
 export function writtenAmount(week: PlanWeek | undefined, sport: PlanSport) {
   if (!week) return null;
   return budgetOf(week, sport);
@@ -116,11 +100,8 @@ export function VolumeChart({
   sport: PlanSport;
   shape: WeekShape[];
   amounts: number[];
-  /** What each week would hold without the time outs (amountsWithoutTimeOuts). */
   full: number[];
-  /** Weeks the coach wrote: outlined. */
   written: Set<string>;
-  /** What's done of the sport this week: the first bar fills to it. */
   doneThisWeek?: number;
   events: SeasonEvent[];
   lines?: Line[];
@@ -129,7 +110,6 @@ export function VolumeChart({
 }) {
   const first = shape[0]?.weekStart;
   if (!first) return null;
-  // A time-out week stands as tall as it would have, hatched above what it keeps.
   const height = (index: number) =>
     timeOutWeek(shape[index]!)
       ? Math.max(amounts[index] ?? 0, full[index] ?? 0)
@@ -144,7 +124,6 @@ export function VolumeChart({
       ({ week, index }) =>
         index === 0 || week.weekStart.slice(0, 7) !== shape[index - 1]!.weekStart.slice(0, 7),
     )
-    // A month label is skipped when it would crowd the next one.
     .filter(({ index }, at, all) => (all[at + 1]?.index ?? Infinity) - index >= 3);
   const Bar = onSelect ? "button" : "span";
   return (

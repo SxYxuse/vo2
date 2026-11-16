@@ -1,13 +1,7 @@
-/*
- * Names and headline numbers of personal bests, apart from the bests page so the top-effort
- * celebration in the app shell can use them without pulling in the page's charts.
- */
-
 import { formatDuration } from "@/services/activity-detail.types.ts";
 import { RUN_DISTANCES } from "@/services/best-efforts.ts";
 import type { Board } from "@/services/personal-bests.ts";
 
-/** Run distances are named the way runners say them; the rest read as plain km or m. */
 const RUN_LABEL = new Map<number, string>(
   RUN_DISTANCES.map((metres, index) => [
     metres,
@@ -26,7 +20,6 @@ const RUN_LABEL = new Map<number, string>(
   ]),
 );
 
-/** A run distance by its spoken name, such as "5 miles" or "Half marathon". */
 export function runDistanceLabel(metres: number) {
   return RUN_LABEL.get(metres) ?? `${Number((metres / 1000).toFixed(1))} km`;
 }
@@ -59,7 +52,6 @@ function formatMetres(metres: number) {
   return `${Math.round(metres).toLocaleString("en-US")} m`;
 }
 
-/** The headline number of an effort: a time, watts, or metres. */
 export function formatValue(board: Pick<Board, "sport" | "kind">, value: number) {
   if (board.kind === "time") return formatDuration(value);
   if (board.kind === "power") return `${value} W`;

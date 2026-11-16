@@ -1,10 +1,5 @@
 import { Encoder, Profile } from "@garmin/fitsdk";
 
-/**
- * A 30-minute ride as an Edge with dual-sided pedals and electronic shifting writes it: power
- * with left/right balance, platform center offset, and power phases, two stands, a few shifts,
- * and two laps. Built from formulas, so every run makes the same file.
- */
 export function rideFitFile(start: Date) {
   const encoder = new Encoder();
   const at = (seconds: number) => new Date(start.getTime() + seconds * 1000);
@@ -33,7 +28,6 @@ export function rideFitFile(start: Date) {
   write(MesgNum.ZONES_TARGET, { functionalThresholdPower: 250 });
   write(MesgNum.EVENT, { timestamp: start, event: "timer", eventType: "start" });
 
-  // Stand twice; shift up and down on a 2x cassette (data packs rear and front gears).
   const position = { seated: 0, standing: 1, transitionToSeated: 2, transitionToStanding: 3 };
   for (const [second, riderPosition] of [
     [0, "seated"],

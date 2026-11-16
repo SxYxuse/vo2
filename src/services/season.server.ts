@@ -36,7 +36,6 @@ export async function goalsFor(userId: string): Promise<Goal[]> {
   return rows as Goal[];
 }
 
-/** Past goals (oldest first) with the longest activity of their sport type on their date. */
 async function matchPastActivities(
   userId: string,
   past: Goal[],
@@ -71,7 +70,6 @@ async function matchPastActivities(
   });
 }
 
-/** The time zone saved with the coach plan's availability, else UTC. */
 export async function athleteTimeZone(userId: string) {
   const [row] = await db
     .select({ timeZone: coachPlans.timeZone })
@@ -122,7 +120,6 @@ export async function loadSeasonImpl(): Promise<SeasonData> {
   };
 }
 
-/** Refuses a supporting race in a main goal's taper, as the goal form does (ADR 0052). */
 async function assertRaceFits(userId: string, race: GoalInput, except: string[] = []) {
   const block = supportingRaceBlock(
     await goalsFor(userId),
@@ -148,7 +145,6 @@ export async function createGoalImpl(data: GoalInput) {
   return { id };
 }
 
-/** Several sports on one date, such as a triathlon: one goal per leg, named "Event · Leg". */
 export async function createEventImpl(data: { legs: GoalInput[] }) {
   const session = await getRequiredSession();
   const ids = data.legs.map(() => crypto.randomUUID());
@@ -167,7 +163,6 @@ export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }
   const all = await goalsFor(userId);
   const current = all.find((goal) => goal.id === id);
   if (!current) return;
-  // The legs of one event move, and matter, together.
   const siblings = otherLegs(current, all);
   const block = supportingRaceBlock(all, { date: data.date, priority: data.priority ?? "A" }, [
     id,
@@ -199,7 +194,6 @@ export async function updateGoalImpl({ id, ...data }: GoalInput & { id: string }
   }
 }
 
-/** Adds a copied season's goals, skipping those already on this athlete's season. */
 export async function pasteSeasonImpl(pasted: GoalInput[]) {
   const session = await getRequiredSession();
   const userId = session.user.id;

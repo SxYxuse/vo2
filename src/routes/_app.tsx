@@ -26,7 +26,6 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 
 export const Route = createFileRoute("/_app")({
   loader: async ({ context }) => {
-    // Offline, the views saved on this device are all there is to show.
     await context.offlineCopyRestored;
     const shell = await context.queryClient.query(loaderQuery(appShellQueryOptions));
     if (!shell.signedIn) {
@@ -69,15 +68,11 @@ function AppLayout() {
       <SyncAutoResume />
       <TopEffortCelebration />
       <AppSidebar />
-      {/* The coach chat scrolls inside itself, so its page is exactly one screen tall; other
-          pages grow and scroll the document. */}
-      {/* Phones keep the tab bar's height free at the bottom (--tab-bar, styles.css). */}
       <SidebarInset
         className={cn("pb-(--tab-bar)", pathname === "/coach" && "h-dvh overflow-hidden")}
       >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 pt-[max(0px,env(safe-area-inset-top))] md:pt-0">
           <SidebarTrigger className="max-md:hidden" />
-          {/* On phones the tab bar's More opens the menu, so the corner holds the name. */}
           <Link
             to="/"
             className="flex min-h-[2.75rem] items-center px-1 text-lg font-semibold md:hidden"

@@ -225,7 +225,6 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
     () => chartRowsFor(detail.chart, detail.sportType),
     [detail.chart, detail.sportType],
   );
-  // A flat elevation stream (a pool swim, a trainer ride) is a line along the floor: leave it out.
   const series = useMemo(
     () => detail.series.filter((key) => key !== "altitude" || !!detail.totalElevationGain),
     [detail.series, detail.totalElevationGain],
@@ -270,7 +269,6 @@ export function ActivityStreamCharts({ detail }: { detail: ActivityDetail }) {
         </Empty>
       ) : (
         <Card size="sm" className="gap-2 py-3">
-          {/* On phones the toggles above are the key; wider screens add each stream's summary. */}
           <div className="hidden flex-wrap gap-x-4 gap-y-1 px-3 sm:flex sm:px-4">
             {shown.map((key) => (
               <span key={key} className="flex min-w-0 items-center gap-1.5 text-xs">

@@ -63,7 +63,6 @@ export function sportGroupFor(sportType: string) {
   return MEMBER_TO_GROUP.get(sportType) ?? null;
 }
 
-/** A sport type outside the sport groups: never shown, but still counted (ADR 0029). */
 export function isOtherSportType(sportType: string) {
   return !MEMBER_TO_GROUP.has(sportType);
 }

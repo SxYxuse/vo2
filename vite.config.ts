@@ -23,7 +23,6 @@ const IGNORED_SERVER_WARNINGS = new Set([
   "MODULE_LEVEL_DIRECTIVE",
 ]);
 
-/** Busts the offline copy saved by another build, whose data shapes may differ (ADR 0031). */
 const BUILD_ID = Date.now().toString(36);
 
 const config = defineConfig({
@@ -55,13 +54,10 @@ const config = defineConfig({
   },
   resolve: { tsconfigPaths: true },
   server: {
-    // BETTER_AUTH_URL names this port, so sliding onto another one would break sign-in.
     port: Number(loadEnv("development", process.cwd(), "PORT").PORT) || DEFAULT_DEV_PORT,
     strictPort: true,
   },
   build: {
-    // MapLibre alone is about 1 MB minified and loads only with the map page; every other
-    // chunk stays well under the 500 kB default.
     chunkSizeWarningLimit: 1100,
   },
   environments: {

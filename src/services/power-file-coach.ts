@@ -3,11 +3,6 @@ import { powerFileTitle, type PowerFileDetail, type PowerFileListItem } from "./
 import { dayKey } from "./day-key.ts";
 import { roundLoad } from "./training-load.ts";
 
-/*
- * The coach chat's reading of a power file (ADR 0057): the analysis the Power page shows, without
- * the chart series, in the words of `src/coaching/power-files.md`.
- */
-
 const COACH_CURVE_SECONDS = new Set([5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 10800]);
 const MAX_LAPS = 40;
 const MAX_GEARS = 12;
@@ -30,7 +25,6 @@ function round2(value: number | null) {
   return value == null ? null : Math.round(value * 100) / 100;
 }
 
-/** Torque effectiveness and pedal smoothness only when the file has them, as most don't. */
 function side(pedal: SidePedaling) {
   return {
     pcoMm: pedal.pco,
@@ -54,7 +48,6 @@ function pedaling(value: Pedaling) {
   };
 }
 
-/** Pedaling time in 10 rpm bands, as % of pedaling time; bands under 1 % are left out. */
 function cadenceBands(histogram: [number, number][]) {
   const bands = new Map<number, number>();
   for (const [rpm, seconds] of histogram) {
@@ -79,7 +72,6 @@ export function powerFileForCoach(file: PowerFileDetail, timeZone: string) {
     title: powerFileTitle({ activity: file.activity, start: view.start }),
     day: dayKey(new Date(view.start), timeZone),
     start: view.start,
-    /** The synced ride it belongs to, read with the activity tools. */
     activity: file.activity,
     units: UNITS,
     ride: {
@@ -118,7 +110,6 @@ export function powerFileForCoach(file: PowerFileDetail, timeZone: string) {
     })),
     pedaling: {
       overall: pedaling(view.pedaling.overall),
-      /** The same metrics in each zone with at least 30 s, to compare at similar power. */
       byZone: view.zones
         .filter((zone) => zone.sec >= 30)
         .map((zone) => ({ zone: zone.id, ...pedaling(zone) })),

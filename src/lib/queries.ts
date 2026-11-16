@@ -20,7 +20,6 @@ import { listTimeOuts } from "@/services/time-outs.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadPredictedTimeTrend, loadTrainingPaces } from "@/services/training-paces.ts";
 
-// Apart so the sign-in page can read the app shell without loading every service's validators.
 export { appShellQueryOptions, loaderQuery, planningStyleOf } from "./app-shell-query.ts";
 
 export const homeQueryOptions = queryOptions({
@@ -53,7 +52,6 @@ export const fitnessQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-/** The athlete's time outs, shown on the fitness chart and the calendar (ADR 0066). */
 export const timeOutsQueryOptions = queryOptions({
   queryKey: ["time-outs"],
   queryFn: () => listTimeOuts(),
@@ -78,11 +76,6 @@ export const topEffortCelebrationsQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-/**
- * The coach plan. It changes on the server by itself (writing finishes, a new week is due), so
- * the saved copy shows at once and is checked again on every visit, and every few seconds while
- * the server writes it.
- */
 export const coachPlanQueryOptions = queryOptions({
   queryKey: ["coach-plan"],
   queryFn: () => loadCoachPlan(),
@@ -108,17 +101,14 @@ export const trainingPacesQueryOptions = queryOptions({
   staleTime: 5 * 60_000,
 });
 
-/** Reads every road run's best efforts, so it streams in below the fitness chart. */
 export const predictedTimeTrendQueryOptions = queryOptions({
   queryKey: ["predicted-time-trend"],
   queryFn: () => loadPredictedTimeTrend(),
   staleTime: 5 * 60_000,
 });
 
-/** Months start in the device's timezone, where the athlete reads them. */
 export const coachSpendingQueryOptions = queryOptions({
   queryKey: ["coach-spending"],
-  // Every coach answer adds to it, so opening the section reads it again.
   staleTime: 0,
   queryFn: () =>
     getCoachSpending({ data: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } }),
@@ -130,10 +120,6 @@ export const coachStatusQueryOptions = queryOptions({
   staleTime: 60_000,
 });
 
-/**
- * The models the coach model picker offers. The recommended ones stand in until it loads, so the
- * picker works offline; the catalog only changes with a deploy.
- */
 export const coachCatalogQueryOptions = queryOptions({
   queryKey: ["coach-catalog"],
   queryFn: () => loadCoachCatalog(),
@@ -141,17 +127,12 @@ export const coachCatalogQueryOptions = queryOptions({
   staleTime: Infinity,
 });
 
-/** The athlete's coach chats, newest first; each opens from the list in the coach chat. */
 export const coachChatsQueryOptions = queryOptions({
   queryKey: ["coach-chats"],
   queryFn: () => listCoachChats(),
   staleTime: 30_000,
 });
 
-/**
- * The last chat the athlete opened, as shown, so it still reads offline. Client-only: the chat
- * loads from the server through TanStack AI and writes here.
- */
 export function coachChatQueryKey(threadId: string) {
   return ["coach-chat", threadId] as const;
 }
@@ -165,14 +146,12 @@ export function activityDetailQueryOptions(id: string) {
   });
 }
 
-/** Imported FIT files, newest ride first; saved on the device like the other lists. */
 export const powerFilesQueryOptions = queryOptions({
   queryKey: ["power-files"],
   queryFn: () => listPowerFiles(),
   staleTime: 60_000,
 });
 
-/** One file's analysis. Like an activity's streams it is large, so it is not kept offline. */
 export function powerFileQueryOptions(id: string) {
   return queryOptions({
     queryKey: ["power-file", id] as const,

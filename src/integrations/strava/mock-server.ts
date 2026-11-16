@@ -39,7 +39,6 @@ const ZONES = {
   },
 };
 
-/** Far below Strava's real limits, so sync never pauses against the mock. */
 const RATE_LIMIT_HEADERS = {
   "X-ReadRateLimit-Limit": "100000,1000000",
   "X-ReadRateLimit-Usage": "0,0",
@@ -59,13 +58,10 @@ const TOKEN_TTL_SEC = 10 * 60;
 let lastIssuedAt = 0;
 let revokedAt = 0;
 
-/** Activities the athlete deleted "on Strava" since the server started. */
 const deletedActivityIds = new Set<number>();
 let subscriptionCallback: string | null = null;
 
-/** The weeks every catalog holds; their activity ids never change with the history. */
 const BASE_WEEKS = 8;
-/** At most ten years, so a typo can't make every request build an endless catalog. */
 const MAX_HISTORY_WEEKS = 10 * 53;
 let historyWeeks = BASE_WEEKS;
 
@@ -179,10 +175,6 @@ function deauthorize(request: Request) {
   return json({ access_token: token });
 }
 
-/**
- * Starts Better Auth's Strava sign-in on the browser's behalf and hands it the state cookie, so
- * one visit to this URL ends signed in as the mock athlete, wherever `next` points.
- */
 async function signIn(query: URLSearchParams) {
   const response = await fetch(`${env.BETTER_AUTH_URL}/api/auth/sign-in/social`, {
     method: "POST",
@@ -219,7 +211,6 @@ async function createSubscription(form: FormData) {
   return json({ id: 1 }, 201);
 }
 
-/** Without a subscription, events go to this app's own webhook so the dev loop needs no setup. */
 async function pushEvent(event: Record<string, unknown>) {
   const callback =
     subscriptionCallback ?? stravaWebhookUrl(env.BETTER_AUTH_URL, env.STRAVA_WEBHOOK_SECRET ?? "");
@@ -279,7 +270,6 @@ type MockSpec = {
   name: string;
   start: Date;
   minutes: number;
-  /** No strap or power meter, so training load has to borrow heart rate from similar sessions. */
   noSensors?: boolean;
 };
 
@@ -308,14 +298,9 @@ function listActivities(params: {
   return items.slice(start, start + params.perPage);
 }
 
-/**
- * Training relative to now, newest first, so every page has recent data: eight weeks, or the
- * history `POST /dev/history` set, repeating the same eight-week pattern further back.
- */
 function buildCatalog(now: Date): MockSpec[] {
   const items: MockSpec[] = [];
   const monday = startOfUtcMonday(now);
-  // Older weeks number their own ids, so the eight newest keep theirs whatever the history.
   let seq = 1;
   let olderSeq = 100_000;
   let older = false;
@@ -352,7 +337,6 @@ function buildCatalog(now: Date): MockSpec[] {
       push("virtualRide", "Indoor ride", atUtcHour(addUtcDays(weekMonday, 4), 18), 45);
     }
     if (pattern === 5) push("swim", "Pool swim", atUtcHour(addUtcDays(weekMonday, 4), 12), 30);
-    // A weekly swim and two very long rides, so every bests tab has distances to rank.
     push("swim", "Morning swim", atUtcHour(weekMonday, 7), 35 + (week % 3) * 10);
     if (pattern === 3) push("ride", "Gran fondo", atUtcHour(addUtcDays(weekMonday, 6), 7), 240);
     if (pattern === 6) push("ride", "Century ride", atUtcHour(addUtcDays(weekMonday, 6), 7), 260);
@@ -372,17 +356,12 @@ function hasGps(kind: MockKind) {
   return kind !== "virtualRide" && kind !== "swim";
 }
 
-/** Long rides and the trail run climb one real hill, so route predictions see climbing speed. */
 function climbFor(spec: MockSpec) {
   if (spec.name === "Long ride") return 420;
   if (spec.kind === "trailRun") return 260;
   return 0;
 }
 
-/**
- * Altitude, grade, speed and distance per sample. Flat activities keep the old gentle wave;
- * hilly ones climb from 30 % to 55 % of the time, descend until 75 %, and slow on the way up.
- */
 function terrainFor(spec: MockSpec, samples: number) {
   const base = speedMps(spec.kind) * formFactor(spec) * (isEasyRun(spec) ? EASY_RUN_SPEED : 1);
   const gpsOn = hasGps(spec.kind);
@@ -404,7 +383,6 @@ function terrainFor(spec: MockSpec, samples: number) {
     } else if (climbM === 0) {
       altitude.push(40 + wave * 18);
       grade.push(wave * 3);
-      // A faster stretch mid-session, so short bests beat long ones.
       speed.push(base * (progress > 0.4 && progress < 0.5 ? 1.08 : 1));
     } else {
       const up = Math.min(1, Math.max(0, (progress - 0.3) / 0.25));
@@ -506,10 +484,6 @@ function streamsFor(spec: MockSpec): StreamSet {
   } as StreamSet;
 }
 
-/**
- * Long runs are easy: slower, and held in running zone 2 after a short warm-up (about 124–131 bpm
- * for the LTHR the lunch runs give), so the easy pace from heart rate has flat zone 2 to read.
- */
 const EASY_RUN_SPEED = 0.84;
 
 function isEasyRun(spec: MockSpec) {
@@ -528,19 +502,13 @@ function heartAt(spec: MockSpec, progress: number) {
   return 142 + Math.round(Math.sin(progress * Math.PI) * 14);
 }
 
-/**
- * Each session a little faster or slower than the last, and the athlete fitter week by week,
- * so best efforts differ between activities and progress over the eight weeks.
- */
 function formFactor(spec: MockSpec) {
   const ageDays = (Date.now() - spec.start.getTime()) / 86_400_000;
   const jitter = ((spec.id * 7919) % 13) - 6;
-  // Floored, so years of history stay at a believable speed instead of reaching zero.
   return (1 + jitter / 100) * Math.max(0.7, 1 - ageDays * 0.0008);
 }
 
 function wattsAt(kind: MockKind, progress: number) {
-  // A short sprint in every ride, so the power curve has a real peak.
   if (progress > 0.5 && progress < 0.505) return 620;
   if (kind === "ftpRide") return progress < 0.2 ? 150 : progress < 0.6 ? 250 : 120;
   return 185 + Math.round(Math.sin(progress * Math.PI * 2) * 20);
@@ -553,7 +521,6 @@ function speedMps(kind: MockKind) {
   return 8;
 }
 
-/** A loop around the Eiffel Tower, so maps and heatmaps have something to draw. */
 function loopPoints(count: number): Array<[number, number]> {
   return Array.from({ length: count }, (_, i) => {
     const t = (i / Math.max(count - 1, 1)) * 2 * Math.PI;

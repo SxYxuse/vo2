@@ -19,7 +19,6 @@ import type {
   PowerMeterInfo,
 } from "./power-file-analysis.ts";
 
-/** A file the athlete picked that VO2 cannot analyse, with the reason in their words. */
 export class PowerFileRejected extends Error {}
 
 /** Garmin Connect's "Export original" is a zip holding the .fit; nothing larger is a ride. */
@@ -33,7 +32,6 @@ function u32(bytes: Uint8Array, at: number) {
   return (bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24)) >>> 0;
 }
 
-/** The first .fit file inside a zip, read from the central directory. */
 function fitFromZip(bytes: Uint8Array): Uint8Array {
   let end = -1;
   for (let at = bytes.length - 22; at >= Math.max(0, bytes.length - 65_557); at -= 1) {
@@ -63,7 +61,6 @@ function fitFromZip(bytes: Uint8Array): Uint8Array {
   throw new PowerFileRejected("This zip has no .fit file in it.");
 }
 
-/** The FIT bytes of an upload: the file itself, or the one inside Garmin's zip. */
 export function fitBytes(upload: Uint8Array): Uint8Array {
   const zipped = upload[0] === 0x50 && upload[1] === 0x4b && upload[2] === 0x03;
   return zipped ? fitFromZip(upload) : upload;
@@ -85,7 +82,6 @@ const MAKERS: Record<string, string> = {
   magene: "Magene",
 };
 
-/** "edge540" → "Edge 540", "faveroElectronics" → "Favero Electronics". */
 function humanize(value: string) {
   const spaced = value
     .replace(/([a-z])([A-Z0-9])/g, "$1 $2")
@@ -107,7 +103,6 @@ function time(value: unknown): number | null {
   return null;
 }
 
-/** Strava's sport type for the session, so VO2's ride rules (e-bikes, indoor) apply. */
 function sportTypeOf(session: SessionMesg): string | null {
   const sport = String(session.sport ?? "");
   const sub = String(session.subSport ?? "");
@@ -155,7 +150,6 @@ function arcOf(value: unknown) {
   return arc == null ? null : Math.round(arc);
 }
 
-/** Each record's position from the rider position events: standing until seated again. */
 function positionAt(events: EventMesg[]) {
   const changes = events
     .filter((event) => event.event === "riderPositionChange")
@@ -292,7 +286,6 @@ function triple(avg: unknown, min: unknown, max: unknown) {
   return values.avg == null && values.min == null && values.max == null ? null : values;
 }
 
-/** Reads a ride from a FIT file into plain samples, or says why it cannot. */
 export function readFitRide(bytes: Uint8Array): FitRide {
   const stream = Stream.fromByteArray(bytes);
   if (!Decoder.isFIT(stream)) {

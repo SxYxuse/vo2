@@ -63,7 +63,6 @@ function needsPowerStream(row: StoredLoadRow) {
   );
 }
 
-/** Power for rides without a Strava NP, and heart rate for recent efforts that could set LTHR. */
 async function attachStreams(rows: StoredLoadRow[]) {
   const now = new Date();
   const wantsPower = new Set<string>();
@@ -157,7 +156,6 @@ async function refreshTrainingLoads(userId: string) {
     age: ageFromBirthDate(profile?.birthDate ?? null),
     heartRate,
   });
-  // The columns keep estimates so clearing a setting falls back to them; load uses set values.
   const stored = persistableAnchors(estimated);
   const anchors = withAthleteAnchors(estimated, heartRate);
   await db

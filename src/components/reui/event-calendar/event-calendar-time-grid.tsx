@@ -45,7 +45,6 @@ import { addDays, addMinutes, differenceInMinutes, format } from "date-fns";
 import { cn } from "cn";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-/** Current time, refreshed on an interval and on tab focus. */
 function useNow(intervalMs = 30_000): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -107,8 +106,6 @@ function EventCalendarTimeGrid({
       cursor = zonedStartOfDay(addDays(toZoned(cursor, settings.timeZone), 1), settings.timeZone);
     }
     if (effective.weekends || view === "day") return result;
-    // Same weekend definition the month view filters on, so the toggle cannot
-    // hide one set of days here and another one there.
     const filtered = result.filter(
       (day) => !settings.weekendDays.includes(toZoned(day, settings.timeZone).getDay()),
     );
@@ -117,19 +114,16 @@ function EventCalendarTimeGrid({
     return filtered.length ? filtered : result;
   }, [visibleRange, settings.timeZone, settings.weekendDays, effective.weekends, view]);
 
-  // Initial scroll to scrollToHour + api.scrollToTime registration (contained)
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!contained) return;
     const el = scrollRef.current;
     if (!el) return;
     const viewport = el.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]");
-    // Measure a rendered slot row - the CSS var is in rem, rects are in px.
     const slotRow = el.querySelector<HTMLElement>("[data-slot=event-calendar-time-gutter] > div");
     const slotPx = slotRow?.getBoundingClientRect().height || 64;
     const pxPerMinute = slotPx / interval;
     const scrollTo = (minutes: number) => {
-      // keep the hour label above the target line visible (it hangs -top-2)
       viewport?.scrollTo({
         top: Math.max(0, (minutes - startHour * 60) * pxPerMinute - 12),
       });
@@ -171,12 +165,9 @@ function EventCalendarTimeGrid({
     startHour,
     interval,
     viewConfig.scrollToHour,
-    // scrollbars custom<->native swaps the scroller DOM: re-bind the
-    // viewport, the scroll wiring, and the measured --ec-scrollbar-w
     viewConfig.scrollbars,
   ]);
 
-  // Gutter slots in minutes from the zoned day start
   const slots = useMemo(() => {
     const result: number[] = [];
     for (let m = startHour * 60; m < endHour * 60; m += interval) {
@@ -185,9 +176,6 @@ function EventCalendarTimeGrid({
     return result;
   }, [startHour, endHour, interval]);
 
-  // Section-level all-day segments for renderAllDaySection - reads the same
-  // per-day index buckets the cells subscribe to; inert (stable empty array,
-  // so the subscription never re-renders) while the override is unset.
   const allDaySegments = useEventCalendarSelector<unknown, EventCalendarSegment[]>(
     () => {
       if (!viewConfig.renderAllDaySection) return EMPTY_ALL_DAY_SEGMENTS;
@@ -242,7 +230,6 @@ function EventCalendarTimeGrid({
     style: { "--ec-hour-height": "4rem" } as CSSProperties,
     children: (
       <>
-        {/* Day-header row (sticky below the nav in page scroll mode) */}
         <div
           className={cn(
             "flex border-b pe-(--ec-scrollbar-w,0px)",
@@ -257,7 +244,6 @@ function EventCalendarTimeGrid({
             ))}
           </div>
         </div>
-        {/* All-day row */}
         {showAllDay && (
           <div
             data-slot="event-calendar-all-day-section"
@@ -273,10 +259,6 @@ function EventCalendarTimeGrid({
               <>
                 <div
                   className={cn(
-                    // pt-1.5 matches the bar overlay's top inset; the inner box
-                    // is one bar-row tall and centers the label so it sits on
-                    // the SAME baseline as the first all-day chip and stays top-
-                    // aligned when the chips wrap onto more lanes
                     "text-muted-foreground w-(--ec-gutter-width,4.5rem) shrink-0 border-e ps-2 pe-2.5 pt-1.5",
                     viewConfig.classNames?.allDayLabel,
                   )}
@@ -290,7 +272,6 @@ function EventCalendarTimeGrid({
             )}
           </div>
         )}
-        {/* Time track: internal scroll (contained) or document flow (page) */}
         {contained ? (
           <div ref={scrollRef} className="min-h-0 flex-1">
             {viewConfig.scrollbars === "native" ? (
@@ -344,12 +325,6 @@ function EventCalendarDayHeader({ day, view }: { day: Date; view: CalendarView }
   );
 }
 
-/**
- * Continuous all-day bars for the week/N-days all-day row: consecutive-day
- * segments of one occurrence merge into a single bar spanning its columns
- * (same treatment as the month view), lane-packed. Returns CLONED segments -
- * the shared per-day segments must stay pristine (see packWeekRowLanes).
- */
 function useEventCalendarAllDayBars(days: Date[]): {
   bars: EventCalendarSegment[];
   laneCount: number;
@@ -432,12 +407,6 @@ function useEventCalendarAllDayBars(days: Date[]): {
         a.bars.length === b.bars.length &&
         a.bars.every((s, i) => {
           const o = b.bars[i];
-          // Compare the OCCURRENCE by identity, not by key: the key encodes
-          // id+start only, so a title/color/data edit compared equal and the
-          // all-day row kept its stale bars. Occurrences come from the
-          // memoized index (rebuilt exactly when events change), so identity
-          // also subsumes the end-time check it replaces. The positional
-          // fields stay because they are recomputed on every read.
           return (
             s.occurrence === o.occurrence &&
             s.colStart === o.colStart &&
@@ -451,11 +420,6 @@ function useEventCalendarAllDayBars(days: Date[]): {
   );
 }
 
-/**
- * The all-day row body: drop-target cells underneath, one continuous bar per
- * occurrence in an overlay grid on top (month-view treatment), plus the
- * standardized day-granular drag ghost for moves/resizes in this lane.
- */
 function EventCalendarAllDayBars({
   days,
   gridTemplateColumns,
@@ -534,9 +498,6 @@ function EventCalendarAllDayBars({
         className="grid h-full"
         style={{
           gridTemplateColumns,
-          // always reserve at least one bar row so the all-day row keeps the
-          // same height whether or not the day has all-day events (an empty
-          // row would otherwise collapse to the label height and misalign)
           minHeight: `calc(${Math.max(effectiveLanes, 1)} * var(--ec-month-bar-h, 1.625rem) + 0.625rem)`,
         }}
       >
@@ -674,9 +635,6 @@ function EventCalendarAllDayCell({ day }: { day: Date }) {
     },
   );
 
-  // All-day drags select whole DAYS, so this row reads a date range, matching
-  // the month grid. Without it, dragging the all-day strip in week view would
-  // be the one create gesture in the calendar with no readout at all.
   const allDayDraftRange = useEventCalendarSelector<unknown, { start: Date; end: Date } | null>(
     (state) => {
       const draft = state.slotDraft;
@@ -703,8 +661,6 @@ function EventCalendarAllDayCell({ day }: { day: Date }) {
         "relative flex min-w-0 flex-col gap-0.5 border-e px-1 py-1.5 last:border-e-0",
         isOff && offClassName,
         viewConfig.dayClassName?.(day),
-        // No drop-target bg fill on move/resize (see month view) - a subtle
-        // dashed inset outline below marks the target instead.
         inDraft &&
           cn(
             EVENT_CALENDAR_SLOT_DRAFT.surface,
@@ -724,10 +680,6 @@ function EventCalendarAllDayCell({ day }: { day: Date }) {
         }
       }}
     >
-      {/* Only on the first cell of the selection, same rule as the month grid,
-          so a three-day all-day drag labels itself once rather than three
-          times. pointer-events-none keeps the cell's own pointerdown guard
-          (`e.target === e.currentTarget`) intact. */}
       {inDraft?.isStart && allDayDraftRange && (
         <span
           aria-hidden
@@ -775,8 +727,6 @@ function EventCalendarTimeGutter({
     >
       {slots.map((minutes) => {
         const time = addMinutes(zonedStartOfDay(referenceDay, settings.timeZone), minutes);
-        // Always consult renderTimeGutterSlot (a consumer may label the first
-        // slot); only the DEFAULT label is suppressed at the day-start edge.
         const label =
           viewConfig.renderTimeGutterSlot?.({
             time,
@@ -818,7 +768,6 @@ function EventCalendarTimeGutter({
  */
 const EVENT_TRACK_WIDTH = "(100% - var(--ec-event-gutter, 0.75rem))";
 
-/** Absolute overlay block positioned by minutes (ghosts + drafts). */
 function minuteBlockStyle(startMin: number, endMin: number, boundsStartMin: number): CSSProperties {
   const top = (startMin - boundsStartMin) / 60;
   const height = Math.max((endMin - startMin) / 60, 0.25);
@@ -866,7 +815,6 @@ function EventCalendarDayColumn({
   const boundsEndMin = Math.min(endHour * 60, totalMinutes);
   const boundsMinutes = Math.max(60, boundsEndMin - boundsStartMin);
 
-  // Minute window of a proposal intersecting THIS day, or null
   const windowFor = (start: Date, end: Date): [number, number] | null => {
     if (start >= dayEnd || end <= dayStart) return null;
     const from = Math.max(
@@ -930,9 +878,6 @@ function EventCalendarDayColumn({
     },
   );
 
-  // The draft's true instants, kept separate from `draftWindow` above because
-  // that one is clipped to this column's day bounds - the readout has to show
-  // what the user actually drew, not the clipped remainder.
   const draftRange = useEventCalendarSelector<unknown, { start: Date; end: Date } | null>(
     (state) => {
       const draft = state.slotDraft;
@@ -949,9 +894,6 @@ function EventCalendarDayColumn({
     },
   );
 
-  // Segments the day bounds clip away still occupy a column in the shared
-  // index's packing, leaving a phantom empty half beside the first in-bounds
-  // chip. Repack the visible subset; clones keep the index cache untouched.
   const packedTimed = useMemo(() => {
     const visible = segments.timed.filter((segment) => {
       const startMin = Math.max(segment.startMin ?? 0, boundsStartMin);
@@ -996,8 +938,6 @@ function EventCalendarDayColumn({
       className={cn(
         "relative min-w-0 border-e last:border-e-0",
         isOff && offClassName,
-        // time grid keeps today's column on the normal background (the header
-        // marks today); only a consumer todayClassName can tint it
         isToday && viewConfig.todayClassName,
         viewConfig.dayClassName?.(day),
         viewConfig.classNames?.dayColumn,
@@ -1033,14 +973,9 @@ function EventCalendarDayColumn({
         const column = segment.column ?? 0;
         const span = segment.columnSpan ?? 1;
         const zIndex = segment.occurrence.event.zIndex ?? 10 + column;
-        // Strict side-by-side columns - no cascade overlap (fade-truncate +
-        // hover reveal carry the legibility); the ring separates neighbors.
         return (
           <div
             key={segment.occurrence.key}
-            // min-h keeps 15-min chips readable (Google-style: the block may
-            // slightly outgrow its true window); hover raises a squeezed
-            // cascade chip above its overlapping neighbors
             className="absolute z-(--ec-z) min-h-(--ec-event-min-h,1.5rem) px-0.5 hover:z-40"
             style={
               {
@@ -1055,8 +990,6 @@ function EventCalendarDayColumn({
               segment={segment}
               className={cn(
                 columnCount > 1 && "ring-background ring-1",
-                // short chips: single centered row, exact-fit line height so
-                // the title never slices mid-glyph
                 endMin - startMin < viewConfig.compactEventMinutes
                   ? "h-full gap-1 py-0 leading-4"
                   : "h-full flex-col items-start justify-start gap-0 py-1",
@@ -1066,10 +999,6 @@ function EventCalendarDayColumn({
           </div>
         );
       })}
-      {/* Drag ghost, standardized (EVENT_CALENDAR_GHOST). Move: a faint
-          dashed placeholder at the snapped slot - the cursor-attached carry
-          clone owns the visual. Resize: the chip clone with a dashed boundary
-          at the proposed extent. Invalid: destructive marking. */}
       {dragGhost && (
         <div
           data-slot="event-calendar-drag-ghost"
@@ -1122,7 +1051,6 @@ function EventCalendarDayColumn({
           )}
         </div>
       )}
-      {/* Drag-create draft */}
       {draftWindow && (
         <div
           data-slot="event-calendar-slot-draft"
@@ -1133,13 +1061,6 @@ function EventCalendarDayColumn({
           )}
           style={minuteBlockStyle(draftWindow[0], draftWindow[1], boundsStartMin)}
         >
-          {/* Live range readout while dragging, the way Outlook and Google
-              Calendar do it: the entire point of the gesture is to pick a
-              time, so show the time being picked instead of an empty box.
-              Reuses `formatEventTime`, the same formatter the chips use, so
-              locale, time zone and 12/24-hour all match the rest of the
-              calendar for free. `truncate` plus the wrapper's overflow-hidden
-              keeps a 15-minute draft from spilling past its own border. */}
           {draftRange && (
             <span className={cn("block", EVENT_CALENDAR_SLOT_DRAFT.label)}>
               {settings.i18n.functions.formatEventTime(
@@ -1198,9 +1119,7 @@ function EventCalendarNowIndicator({
       className="pointer-events-none absolute inset-x-0 z-40"
       style={{ top: `calc(var(--ec-hour-height) * ${top})` }}
     >
-      {/* hairline across the content columns only (clear of the time gutter) */}
       <div className="bg-destructive/40 absolute start-(--ec-gutter-width,4.5rem) end-0 h-px" />
-      {/* stronger segment + dot over today's column */}
       <div
         className="absolute h-px"
         style={{
@@ -1209,9 +1128,6 @@ function EventCalendarNowIndicator({
         }}
       >
         <div className="bg-destructive absolute inset-x-0 top-0 h-px" />
-        {/* dot leads the line at today's column-start border: pulled 1px left of
-            center (-start-1 = -4px vs the 6px/size-1.5 circle) so it reads as a
-            distinct bullet instead of merging into the line to its right */}
         <div className="bg-destructive absolute -start-1 top-0 size-1.5 -translate-y-1/2 rounded-full" />
       </div>
     </div>

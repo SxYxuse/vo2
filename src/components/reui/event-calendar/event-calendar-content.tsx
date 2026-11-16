@@ -14,8 +14,6 @@ import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DEFAULT_VIEW_COMPONENTS = {
-  // Static: the activity calendar imports the month view directly, so lazy loading it here
-  // could never move it into its own chunk.
   month: EventCalendarMonthView,
   week: lazy(() =>
     import("@/components/reui/event-calendar/event-calendar-time-grid").then((mod) => ({

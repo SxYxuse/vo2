@@ -1,11 +1,3 @@
-/**
- * The per-activity summaries built lazily from `activity_streams` and cached back on that row:
- * the detail view builds the ride and heart analyses, the fitness page the best efforts, the paces the flat running by heart rate. Clear
- * them together whenever their inputs change; the next read rebuilds them. An algorithm change
- * bumps the version each one carries instead (`isRideAnalysis`, `isHeartAnalysis`,
- * `isBestEfforts`, `isFlatPaces`). The chart preview is not listed: the sync rewrites it with every stream
- * copy, and it reads only the streams.
- */
 export const CLEARED_DERIVED_CACHES = {
   rideAnalysis: null,
   heartAnalysis: null,
@@ -13,7 +5,6 @@ export const CLEARED_DERIVED_CACHES = {
   flatPaces: null,
 } as const;
 
-/** The activity fields the derived caches are built from, besides the streams. */
 export type DerivedCacheInputs = {
   id: string;
   sportType: string;
@@ -21,7 +12,6 @@ export type DerivedCacheInputs = {
   totalElevationGain: number | null;
 };
 
-/** Ids of stored activities whose cache inputs differ in the fresh copy from Strava. */
 export function staleDerivedCacheIds(
   stored: DerivedCacheInputs[],
   fresh: DerivedCacheInputs[],

@@ -19,20 +19,16 @@ const LIGHTHOUSE_CATEGORIES = [
   ["agentic-browsing", "Agentic browsing"],
 ] as const;
 
-/** One run on the same page varies by up to about this many points, so a smaller change is noise. */
 const NOISE_POINTS = 5;
 
 type LighthousePage = { path: string; scores: Record<string, number> };
 
-/** A Lighthouse CI assertion, such as `["error", { "minScore": 0.9 }]`. */
 type Assertion = [level: "error" | "warn" | "off", options?: { minScore?: number }];
 
 type LighthouseInput = {
   sha: string;
   result: string;
-  /** Each page's category scores from 0 to 1, from its median Lighthouse run. */
   pages: LighthousePage[] | null;
-  /** The same from the previous successful run on main, to compare against. */
   baseline: { sha: string; pages: LighthousePage[] } | null;
   assertions: Record<string, Assertion>;
   reportUrl: string | null;
@@ -137,10 +133,6 @@ function readJson<T>(path: string): T | null {
 
 type ManifestRun = { url: string; isRepresentativeRun: boolean; summary: Record<string, number> };
 
-/**
- * One column per page, in the order scripts/lighthouse.ts ran them. Agentic Browsing comes from
- * a separate Lighthouse 13 run of the sign-in page (lighthouse.yml), when it ran.
- */
 function lighthousePages(manifest: ManifestRun[] | null, agentic?: number | null) {
   if (!manifest) return null;
   return manifest
@@ -149,7 +141,6 @@ function lighthousePages(manifest: ManifestRun[] | null, agentic?: number | null
       const path = new URL(run.url).pathname;
       const withAgentic = path === "/sign-in" && agentic != null;
       return {
-        // An activity id says nothing in a table header.
         path: path.replace(/^\/activities\/[^/]+$/, "/activities/…"),
         scores: withAgentic ? { ...run.summary, "agentic-browsing": agentic } : run.summary,
       };
@@ -166,7 +157,6 @@ function readLighthousePages(lighthouseDir: string) {
   );
 }
 
-/** The previous run's scores, when lighthouse.yml found one to download. */
 function lighthouseBaseline(baselineDir: string | undefined, sha: string | undefined) {
   if (!baselineDir || !sha) return null;
   const pages = readLighthousePages(baselineDir);

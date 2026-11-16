@@ -1,8 +1,3 @@
-/*
- * Calendar day keys ("2026-10-30") in the athlete's time zone. Apart from the services that use
- * them so the calendar's URL parsing, which ships with the app's entry, loads nothing else.
- */
-
 import { TZDate } from "@date-fns/tz";
 import { addDays, startOfDay } from "date-fns";
 

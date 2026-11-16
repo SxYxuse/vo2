@@ -32,7 +32,6 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** A picked toggle reads at a glance, not only as a faint muted fill. */
 const PICKED =
   "aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground/90";
 
@@ -47,7 +46,6 @@ function reasoningText(choice: CoachModelChoice) {
   return choice.reasoning == null ? "Auto" : REASONING_LABELS[choice.reasoning];
 }
 
-/** A coach feature's model and reasoning in Settings → Coach; opens the picker. */
 export function CoachModelRow({
   feature,
   choice,
@@ -57,7 +55,6 @@ export function CoachModelRow({
   feature: Feature;
   choice: CoachModelChoice;
   keys: Keys;
-  /** The mock coach answers without a key, so a missing one is no warning. */
   mocked: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -69,13 +66,11 @@ export function CoachModelRow({
       queryClient.setQueryData(settingsSnapshotQueryOptions.queryKey, (current) =>
         current ? { ...current, settings: { ...current.settings, coachModels } } : current,
       );
-      // Whether the feature can run depends on the new model's provider having a key.
       await queryClient.invalidateQueries(coachStatusQueryOptions);
     },
   });
   const catalog = useQuery(coachCatalogQueryOptions);
   const shown = save.isPending ? save.variables : choice;
-  // Until the catalog loads, only the recommended models are known: no warning yet.
   const offered = catalog.isPlaceholderData || findIn(catalog.data ?? [], shown) != null;
   const keyMissing = keys != null && !mocked && !(shown.provider in keys);
 
@@ -140,8 +135,6 @@ function CoachModelPicker({
   const catalog = useQuery(coachCatalogQueryOptions).data ?? [];
   const listed = findIn(catalog, choice);
   const needle = query.trim().toLowerCase();
-  // Only providers with a key are offered: a keyless model can't run. The current pick stays so
-  // the athlete sees what they're on, and the mock coach needs no key, so it offers every model.
   const keyed = (id: CoachProvider) => keys == null || mocked || id in keys;
   const offered = catalog.filter(
     (model) =>
@@ -178,7 +171,6 @@ function CoachModelPicker({
         <ResponsiveDialogTitle>{feature.label}</ResponsiveDialogTitle>
         <ResponsiveDialogDescription>{feature.hint}</ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
-      {/* The drawer pads its header but not its body; the desktop dialog pads both. */}
       <div className="flex flex-col gap-2 px-4 pt-2 md:px-0">
         <InputGroup>
           <InputGroupAddon>

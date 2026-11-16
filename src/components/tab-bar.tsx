@@ -42,24 +42,15 @@ const TABS: Tab[] = [
 const TAB_CLASS =
   "flex min-h-[2.75rem] flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
-// Like an iOS tab bar: the active tab is drawn solid with a heavier stroke, the rest muted.
 function TabIcon({ icon: Icon, active }: { icon: LucideIcon; active: boolean }) {
   return <Icon aria-hidden className="size-6" strokeWidth={active ? 2.25 : 1.75} />;
 }
 
-/**
- * Phones get the main screens at the bottom, where the thumb rests; More opens the full menu.
- * Desktop keeps the sidebar alone. It never moves while a field has focus: a bar that stepped
- * aside for the keyboard came back mid-tap when the tap blurred the field, and the tap missed.
- */
 export function TabBar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   const { openMobile, setOpenMobile } = useSidebar();
-  // With planning off, Plan leaves the tabs as it leaves the sidebar.
   const tabs = shell.planningStyle === "off" ? TABS.filter((tab) => tab.to !== "/week") : TABS;
-  // A page with no tab of its own lights More, which leads to it; Plan with planning off has
-  // neither, so nothing lights.
   const onTab = tabs.some((tab) => tab.matches(pathname));
   const moreActive = openMobile || (!onTab && !TABS.some((tab) => tab.matches(pathname)));
 

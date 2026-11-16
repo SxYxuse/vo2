@@ -2,14 +2,10 @@ import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import { isPowerCyclingSport } from "./training-load.ts";
 
-/** Bump when the stored shape or the math changes, so cached rows are rebuilt on next view. */
 export const RIDE_ANALYSIS_VERSION = 1;
 
-/** Longest gap one sample may stand for; longer gaps are recording dropouts, not riding. */
 const MAX_INTERVAL_SEC = 30;
-/** Below this speed a sample counts as stopped when Strava sent no `moving` stream. */
 const STOPPED_SPEED_MS = 0.5;
-/** Half-window (samples) for deriving grade from altitude and distance. */
 const GRADE_HALF_WINDOW = 5;
 const MIN_GRADE_DISTANCE_M = 10;
 const MIN_BAND_SEC = 30;
@@ -32,16 +28,13 @@ export type RideGradeBand = {
   maxGrade: number;
   durationSec: number;
   distanceM: number | null;
-  /** Includes coasting zeros, like Strava's average power. */
   avgWatts: number | null;
-  /** Pedaling only: coasting zeros are left out. */
   avgCadence: number | null;
   avgSpeedKmh: number | null;
   avgHeartrate: number | null;
   coastingPct: number | null;
 };
 
-/** FTP-independent ride breakdown, cached next to the chart preview. */
 export type RideAnalysis = {
   version: typeof RIDE_ANALYSIS_VERSION;
   hasPower: boolean;
@@ -56,7 +49,6 @@ export type RideAnalysis = {
 export type RideSummary = {
   hasPower: boolean;
   hasCadence: boolean;
-  /** Power came from Strava's estimate, not a power meter. */
   estimatedPower: boolean;
   variabilityIndex: number | null;
   intensityFactor: number | null;
@@ -68,9 +60,7 @@ export type RideSummary = {
 export type RideContext = {
   sportType: string;
   movingTime: number;
-  /** Strava's `average_watts`. */
   averageWatts: number | null;
-  /** Strava's `weighted_average_watts`. */
   normalizedWatts: number | null;
   deviceWatts: boolean;
   ftp: number | null;
@@ -220,10 +210,6 @@ export function isRideAnalysis(value: unknown): value is RideAnalysis {
   return analysis.version === RIDE_ANALYSIS_VERSION && Array.isArray(analysis.bands);
 }
 
-/**
- * Adds the FTP-dependent numbers at read time, so changing FTP never needs a cache rebuild.
- * IF and TSS follow the training-load rules: power-meter rides only, never e-bikes.
- */
 export function summarizeRide(analysis: RideAnalysis, context: RideContext): RideSummary | null {
   if (!analysis.hasPower && !analysis.hasCadence) return null;
 
@@ -260,7 +246,6 @@ export function summarizeRide(analysis: RideAnalysis, context: RideContext): Rid
   };
 }
 
-/** Labels the value as shown (two decimals), so "1.05" never reads as "Mixed". */
 export function variabilityLabel(index: number) {
   const shown = round(index, 2);
   if (shown <= 1.05) return "Steady";

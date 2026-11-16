@@ -77,7 +77,6 @@ function estimateLine(estimate: PaceEstimate) {
     : `your strongest, ${effort}`;
 }
 
-/** Where the paces come from, in a sentence. */
 function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
   if (paces.source === "race") {
     return `From your race result: ${raceLine(paces.raceResult!)}. VDOT ${paces.vdot}.`;
@@ -93,7 +92,6 @@ function sourceText(paces: Extract<TrainingPaces, { vdot: number }>) {
 
 type Paces = TrainingPaces;
 
-/** Saves a Paces change and refreshes what reads the paces. */
 function useSavePaces<T>(save: (value: T) => Promise<Paces>) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -108,7 +106,6 @@ function useSavePaces<T>(save: (value: T) => Promise<Paces>) {
   });
 }
 
-/** The athlete's training paces, predicted race times, and what they are read from. */
 export function TrainingPacesSection({ idPrefix }: { idPrefix: string }) {
   const { data: paces } = useQuery(trainingPacesQueryOptions);
   if (!paces) {
@@ -272,10 +269,6 @@ function SaveError({ show }: { show: boolean }) {
   ) : null;
 }
 
-/**
- * What the paces are read from. Automatic saves at once; a best effort or a race result only
- * once one is picked or entered, so choosing the option alone changes no pace.
- */
 function PacesFromField({ idPrefix, paces }: { idPrefix: string; paces: Paces }) {
   const online = useOnline();
   const [choice, setChoice] = useState<PacesFrom>(paces.from);
@@ -325,7 +318,6 @@ function PacesFromField({ idPrefix, paces }: { idPrefix: string; paces: Paces })
 
 const effortKey = (effort: RunEffort) => `${effort.activityId}:${effort.metres}`;
 
-/** The recent and all-time best at each race distance, and the one picked. */
 function EffortPicker({
   idPrefix,
   paces,
@@ -430,7 +422,6 @@ const EASY_FROM_OPTIONS: { id: EasyFrom; label: string; hint: string }[] = [
   },
 ];
 
-/** Why the easy pace isn't from heart rate although the athlete chose it. */
 function easyFallbackNote(paces: Paces) {
   if (paces.easyFrom !== "heartRate" || paces.source === "none") return null;
   if (paces.easySource === "heartRate") return null;
@@ -444,7 +435,6 @@ function easyFallbackNote(paces: Paces) {
   return `Not enough zone 2 running yet: ${paces.heart.minutes} of ${ZONE_2_MIN_SEC / 60} minutes on flat road runs of the last 8 weeks. Until then your easy pace comes from your VDOT.`;
 }
 
-/** Where the easy pace comes from; the other paces always come from the VDOT. */
 function EasyFromField({ idPrefix, paces }: { idPrefix: string; paces: Paces }) {
   const online = useOnline();
   const save = useSavePaces((easyFrom: EasyFrom) =>
@@ -483,10 +473,6 @@ const oldestRaceKey = () => format(subDays(new Date(), ESTIMATE_WINDOW_DAYS), "y
 const WINDOW_DAYS = ESTIMATE_WINDOW_DAYS;
 const WINDOW_WEEKS = ESTIMATE_WINDOW_DAYS / 7;
 
-/**
- * Sets or clears the race result the paces are read from. Saved on its own with a button, not
- * with the settings form's autosave: a half-typed time would change every pace.
- */
 function RaceResultField({
   idPrefix,
   raceResult,
@@ -494,7 +480,6 @@ function RaceResultField({
 }: {
   idPrefix: string;
   raceResult: RaceResult | null;
-  /** Whether the result still sets the paces, or is older than the estimate window. */
   current: boolean;
 }) {
   const online = useOnline();
@@ -560,7 +545,6 @@ function RaceResultField({
           </Button>
         </Field>
       ) : (
-        // Settings is a form already: Enter in these fields saves the result, not the page.
         <div
           className="flex flex-col gap-3"
           onKeyDown={(event) => {

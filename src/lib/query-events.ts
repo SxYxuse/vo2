@@ -12,13 +12,6 @@ import {
 } from "@/lib/queries.ts";
 import type { SavedAthleteSettings } from "@/services/athlete-settings.ts";
 
-/*
- * Callers name what happened; this module decides what goes stale. Settings, the profile, and
- * the local copy feed nearly every query, so those events refresh all of them: only queries on
- * screen refetch, and a new query is covered without editing a key list.
- */
-
-/** Settings show at once; every view built on them goes stale. */
 export function afterSettingsSaved(
   queryClient: QueryClient,
   saved: SavedAthleteSettings,
@@ -49,7 +42,6 @@ export function afterSettingsSaved(
   return queryClient.invalidateQueries();
 }
 
-/** Age reshapes max HR, zones, and training load on every page. */
 export function afterProfileSaved(queryClient: QueryClient) {
   queryClient.setQueryData(appShellQueryOptions.queryKey, (current) =>
     current ? { ...current, hasProfile: true } : current,
@@ -57,10 +49,6 @@ export function afterProfileSaved(queryClient: QueryClient) {
   return queryClient.invalidateQueries();
 }
 
-/**
- * Goals shape the coach plan and show on the calendar and fitness chart. A change to the goals
- * ahead writes the coach plan again (ADR 0037), so it goes stale too.
- */
 export async function afterGoalsChanged(queryClient: QueryClient) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: seasonQueryOptions.queryKey }),
@@ -70,10 +58,6 @@ export async function afterGoalsChanged(queryClient: QueryClient) {
   ]);
 }
 
-/**
- * A time out was marked, edited, ended, or deleted: the chart shows it, and the coach plan paused
- * or started writing again (ADR 0066).
- */
 export async function afterTimeOutsChanged(queryClient: QueryClient) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: timeOutsQueryOptions.queryKey }),
@@ -81,18 +65,14 @@ export async function afterTimeOutsChanged(queryClient: QueryClient) {
   ]);
 }
 
-/** A sync call copied activities or streams, so every view of the local copy goes stale. */
 export async function afterLocalCopyChanged(queryClient: QueryClient) {
   const detail = activityDetailQueryOptions("").queryKey[0];
   await Promise.all([
     queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== detail }),
-    // Sync resumes on its own while the app is open, so refetching an open activity's streams
-    // after every call would download them again on each pass of a long stream copy.
     queryClient.invalidateQueries({ queryKey: [detail], refetchType: "none" }),
   ]);
 }
 
-/** Nothing cached for the athlete may outlive the session; the shell shows signed out at once. */
 export function afterSignOut(queryClient: QueryClient) {
   queryClient.setQueryData(appShellQueryOptions.queryKey, {
     signedIn: false,

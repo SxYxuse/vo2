@@ -91,7 +91,6 @@ const SERIES_INFO = {
   tsb: "Fitness minus fatigue after that day's known training (today: as of now). Around −10 to −30 is normal while building; positive means fresh, which is what you want before a race or a hard test. It is not a performance score.",
 } as const;
 
-/** "Sick · 12–14 Jun", or "Sick · since Mon 15 Jun" while it lasts. */
 function timeOutLabel(timeOut: TimeOut) {
   const days =
     timeOut.end == null
@@ -100,7 +99,6 @@ function timeOutLabel(timeOut: TimeOut) {
   return `${timeOutKind(timeOut)} · ${days}`;
 }
 
-/** The athlete's time outs in the period, or ahead of it, each opening the sheet to edit it. */
 function TimeOutList({
   timeOuts,
   onEdit,
@@ -135,7 +133,6 @@ function TimeOutList({
 }
 
 const PMC_Y_DOMAIN = ["auto", "auto"] as const;
-/** A colour no series uses, so estimated days stand out on any line. */
 const ESTIMATED_DOT_COLOR = "var(--color-ds-pink-700)";
 
 type EstimatedDotProps = {
@@ -144,7 +141,6 @@ type EstimatedDotProps = {
   payload?: { estimatedLoad?: number };
 };
 
-/** Marks a day whose load is partly estimated, on whichever line carries the marks. */
 function EstimatedDot({ cx, cy, payload }: EstimatedDotProps) {
   if (cx == null || cy == null || !payload?.estimatedLoad) return null;
   return (
@@ -181,7 +177,6 @@ const DATE_TICK = new Intl.DateTimeFormat("en-US", { month: "short", day: "numer
 const DATE_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" });
 const DATE_FULL = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
-// Form between −10 and −30 is ordinary training, not a warning.
 function formTone(tsb: number) {
   if (tsb >= 5) return "text-success";
   if (tsb >= -30) return "text-muted-foreground";
@@ -194,7 +189,6 @@ function formBadgeTone(tsb: number): StatTrend["tone"] {
   return "destructive";
 }
 
-// Same tints as the success and warning badges.
 const PHASE_TONE = {
   positive: { box: "border-success/25 bg-success/10", title: "text-success" },
   neutral: { box: "border-border bg-muted/40", title: "" },
@@ -204,7 +198,6 @@ const PHASE_TONE = {
 const PHASE_INFO =
   "Read from the last week's change in fitness, the trend over four weeks, and form. Training moves through phases: build while you absorb the load, consolidate, recover, then freshen up before a goal. A dipping fitness line in a recovery week is part of the plan.";
 
-// Easing off is ordinary between blocks; only a steep change either way is worth a colour.
 function rampTone(ramp: number) {
   if (ramp > 8 || ramp < -8) return "text-warning";
   if (ramp >= 2) return "text-success";
@@ -245,7 +238,6 @@ function Sparkline({
   );
 }
 
-/** The next goal with form and fitness on race day if every week hits its target. */
 function NextGoal({ goals, pmc, timeZone }: { goals: Goal[]; pmc: PmcPoint[]; timeZone: string }) {
   const today = dayKey(new Date(), timeZone);
   const latest = pmc.at(-1);
@@ -292,7 +284,6 @@ export function FitnessChart({
 }: {
   loads: FitnessLoad[];
   goals?: Goal[];
-  /** Shaded on the chart; tapping one edits it (ADR 0066). */
   timeOuts?: TimeOut[];
   onEditTimeOut?: (timeOut: TimeOut) => void;
 }) {
@@ -309,7 +300,6 @@ export function FitnessChart({
     [pmc, period, timeZone, isDesktop],
   );
   const latest = series.at(-1);
-  // Goals inside the period, on the x value of their day.
   const goalMarks = useMemo(() => {
     const byDate = new Map(series.map((point) => [point.date, point.t]));
     return goals.flatMap((goal) => {
@@ -317,7 +307,6 @@ export function FitnessChart({
       return t == null ? [] : [{ id: goal.id, t }];
     });
   }, [goals, series]);
-  // Time outs in the period, clipped to the days the chart shows.
   const timeOutBands = useMemo(() => {
     const first = series[0];
     const last = series.at(-1);
@@ -354,7 +343,6 @@ export function FitnessChart({
   const showAtl = visible.includes("atl");
   const showTsb = visible.includes("tsb");
   const showPmc = showCtl || showAtl || showTsb;
-  // One line carries the estimate marks, so they never stack: fitness first.
   const markedLine = showCtl ? "ctl" : showAtl ? "atl" : showTsb ? "tsb" : null;
   const hasEstimatedDays = series.some((point) => point.estimatedLoad > 0);
 
@@ -433,7 +421,6 @@ export function FitnessChart({
               <StatCard
                 label="Form (TSB)"
                 value={roundLoad(latest.tsb).toFixed(1)}
-                // The "Right now" callout above may already name the form; say it once.
                 trend={
                   formLabel(latest.tsb) === phase.title
                     ? undefined

@@ -34,7 +34,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
-/** The session page of a coach-plan run, ride, or swim: its shape, steps, why, and whether it's done. */
 export function CoachSession({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const navigate = useNavigate();
@@ -72,8 +71,6 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
           variant="ghost"
           size="sm"
           className="self-start"
-          // Opened from the plan: go back to it, as it was, so the back gesture on Plan
-          // leaves rather than returning here. Opened from a link or reloaded: replace this page.
           onClick={() => {
             if (router.state.location.state.planSessionPushed) router.history.back();
             else void navigate({ to: "/week", search: { week: run.weekStart }, replace: true });
@@ -154,7 +151,6 @@ export function CoachSession({ sessionId }: { sessionId: string }) {
             </Card>
           ) : null}
           <Card>
-            {/* The title's badge already says done; this card only says how to change it. */}
             <CardHeader>
               <CardDescription>
                 {ahead

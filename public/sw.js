@@ -1,17 +1,9 @@
-// Opens the installed app with no signal (ADR 0031): pages are network first and fall back to
-// the copy saved on the last load, and the hashed build files are kept once fetched. Athlete data
-// itself lives in the query cache saved to IndexedDB, not here.
-//
-// Bump VERSION when these caching rules change; activating a new version drops the old caches.
 const VERSION = 1;
 const PAGES = `vo2-pages-v${VERSION}`;
 const ASSETS = `vo2-assets-v${VERSION}`;
 
-// Past this, a slow connection (a train between stations) opens the saved page instead.
 const NETWORK_TIMEOUT_MS = 4000;
-// Build file names change on every deploy; keep the newest few deploys' worth.
 const MAX_ASSETS = 400;
-// Pages to open instead when the one asked for was never saved. "/" is the start URL.
 const FALLBACK_PAGES = ["/", "/week"];
 
 self.addEventListener("install", () => {
@@ -34,13 +26,11 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // Sign-in callbacks and server functions must always reach the server.
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_serverFn/")) return;
   if (request.mode === "navigate") event.respondWith(page(event, url));
   else if (url.pathname.startsWith("/assets/")) event.respondWith(asset(event));
 });
 
-/** A page the server rendered for the signed-in athlete, worth opening again offline. */
 function savable(response) {
   return (
     response.ok &&
@@ -85,13 +75,11 @@ async function asset(event) {
   return response;
 }
 
-/** Drops the oldest build files; the cache lists them in the order they were saved. */
 async function trim(cache) {
   const keys = await cache.keys();
   for (const key of keys.slice(0, Math.max(0, keys.length - MAX_ASSETS))) await cache.delete(key);
 }
 
-/** Never opened with a connection on this device, so there is nothing saved to show. */
 function offlinePage() {
   const html = `<!doctype html>
 <html lang="en">

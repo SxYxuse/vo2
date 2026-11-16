@@ -1,10 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { cn } from "cn";
 
-/**
- * Every screen's title row: an icon and the title, actions on the right of the same row, and an
- * optional line under it saying what the screen is for. One component, so screens can't drift.
- */
 export function PageHeader({
   icon: Icon,
   title,
@@ -16,9 +12,7 @@ export function PageHeader({
   icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   title: ReactNode;
   description?: ReactNode;
-  /** Buttons or a status, at the end of the title row. */
   actions?: ReactNode;
-  /** A link back up, above the title. */
   back?: ReactNode;
   className?: string;
 }) {

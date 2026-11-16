@@ -10,10 +10,8 @@ import {
   type BoardKind,
 } from "./personal-bests.ts";
 
-/** A celebrated activity must have started this recently when its effort is found (ADR 0027). */
 export const CELEBRATE_WITHIN_DAYS = 7;
 
-/** One top 10 effort as celebrated: its board, value, and the ranks it held when found. */
 export type TopEffortPlacement = {
   boardId: string;
   sport: BestsSport;
@@ -22,18 +20,12 @@ export type TopEffortPlacement = {
   value: number;
   distanceM?: number | null;
   gradePct?: number | null;
-  /** Place among every effort on the board, or null outside the top 10. */
   allTimeRank: number | null;
-  /** Place within the activity's calendar year, or null outside its top 10. */
   yearRank: number | null;
   year: number;
   activity: BestsActivity;
 };
 
-/**
- * The top 10 efforts the given activities set, best placement first. A year's board needs ten
- * earlier efforts before a year rank counts, or every January run would rank (ADR 0027).
- */
 export function findTopEfforts(
   boards: Board[],
   activities: BestsActivity[],
@@ -76,7 +68,6 @@ export function findTopEfforts(
   return placements.sort(byBestPlacement);
 }
 
-/** All-time rank first, then year rank. */
 export function byBestPlacement(a: TopEffortPlacement, b: TopEffortPlacement) {
   const rank = (value: number | null) => value ?? TOP_EFFORTS + 1;
   return rank(a.allTimeRank) - rank(b.allTimeRank) || rank(a.yearRank) - rank(b.yearRank);
@@ -86,7 +77,6 @@ function rankOf(ranked: { rank: number; activity: BestsActivity }[], activityId:
   return ranked.find((effort) => effort.activity.id === activityId)?.rank ?? null;
 }
 
-/** The whole activity a top 10 effort came from, shown on the back of its card. */
 export type CelebratedActivity = {
   distance: number | null;
   movingTime: number;
@@ -95,7 +85,6 @@ export type CelebratedActivity = {
   averageWatts: number | null;
 };
 
-/** Top 10 efforts found but not yet seen, and the activities they came from. */
 export type TopEffortCelebrations = {
   activityIds: string[];
   placements: TopEffortPlacement[];

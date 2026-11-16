@@ -29,7 +29,6 @@ async function waitForServer() {
   throw new Error(`The server did not answer on ${BASE} within a minute`);
 }
 
-/** Onboards a new athlete and returns their session cookie and one of their activities. */
 async function signedInAthlete() {
   const browser = await chromium.launch(
     process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : { channel: "chrome" },
@@ -40,7 +39,6 @@ async function signedInAthlete() {
     await onboardNewAthlete(page);
     await page.goto("/");
     const activity = page.locator("[data-event-id]").first();
-    // Early in a month the calendar's current period has no activity yet: step back one.
     const shown = await activity.waitFor({ timeout: 10_000 }).then(
       () => true,
       () => false,
@@ -75,7 +73,6 @@ try {
     ...extraFlags,
   );
 
-  // Upload first, so a failed assertion still leaves the reports for the pull request.
   lhci("upload");
   lhci("assert");
 } finally {

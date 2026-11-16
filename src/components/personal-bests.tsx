@@ -51,15 +51,12 @@ const SPORT_COLOR = {
   swimming: "var(--color-ds-teal-700)",
 } satisfies Record<BestsSport, string>;
 
-/** Power durations shown as cards; the curve above them carries every other duration. */
 const POWER_CARDS = [5, 60, 300, 1200, 3600];
 
 const PERIOD_LABEL = { all: "All time", "12m": "12 months", "6w": "6 weeks" };
 
-// A four-digit year: "Sep 26" read as the 26th, not September 2026.
 const MONTH_YEAR = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" });
 const DAY_MONTH = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
-/** "Sep 20" this year, "Nov 3, 2025" before it. */
 function cardDate(iso: string, now: Date) {
   const date = new Date(iso);
   return date.getFullYear() === now.getFullYear() ? DAY_MONTH.format(date) : FULL_DATE.format(date);
@@ -98,7 +95,6 @@ function formatDetail(
   return null;
 }
 
-/** "0:19 faster" or "12 W more" than the best before it. */
 function formatGain(board: Board, from: number, to: number) {
   const gain = Math.abs(to - from);
   if (board.kind === "time") return `${formatDuration(gain)} faster than your previous best`;
@@ -118,13 +114,11 @@ function emptyText(board: Board) {
 
 type BestsViewProps = {
   data: BestsData;
-  /** Older history or streams are still being copied, so a best can still change. */
   copyIncomplete: boolean;
   search: BestsSearch;
   onSearchChange: (next: BestsSearch, options?: { replace?: boolean }) => void;
 };
 
-/** Personal bests per sport: cards for every distance and duration, and a sheet per board. */
 export function BestsView({ data, copyIncomplete, search, onSearchChange }: BestsViewProps) {
   // Read on every render, so a PWA resumed days later measures "New" and periods from today.
   const now = new Date();
@@ -148,7 +142,6 @@ export function BestsView({ data, copyIncomplete, search, onSearchChange }: Best
   }
 
   const openBoard = data.boards.find((board) => board.id === search.best) ?? null;
-  // A board opened from a link (Fitness, or back from an activity) brings its own tab.
   const wanted = search.sport ?? openBoard?.sport;
   const sport = wanted && sports.includes(wanted) ? wanted : sports[0];
   const period: BestsPeriod =
@@ -169,7 +162,6 @@ export function BestsView({ data, copyIncomplete, search, onSearchChange }: Best
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        {/* Same control as the period below, and as Heart rate's sport filter. */}
         <ToggleGroup
           size="sm"
           variant="outline"
@@ -351,7 +343,6 @@ function BestCard({
         <span className="truncate tabular-nums">
           {best ? (detail ?? best.activity.name) : emptyText(board)}
         </span>
-        {/* The badge took the date's place at the top. */}
         {fresh ? <span className="shrink-0">{date}</span> : null}
       </span>
     </button>
@@ -465,7 +456,6 @@ function BestSheet({
   onClose,
   ...ctx
 }: BoardContext & { board: Board | null; onClose: () => void }) {
-  // On desktop the top 10 sits beside the chart, so the dialog widens when there is one.
   const charted = board != null && hasProgressionChart(board, ctx);
   return (
     <ResponsiveDialog open={board != null} onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -523,7 +513,6 @@ function BestSheetBody({
           </div>
         ) : null}
       </ResponsiveDialogHeader>
-      {/* The drawer pads its header but not its body; the desktop dialog pads both. */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:flex-row md:items-start md:gap-6 md:px-0 md:pb-0">
         {points.length > 1 ? (
           <section className="flex flex-col gap-2 md:min-w-0 md:flex-1">
@@ -547,10 +536,7 @@ function BestSheetBody({
             <h3 className="text-sm font-semibold">Top {Math.min(top.length, 10)}</h3>
             <span className="text-xs text-muted-foreground">One per activity</span>
           </div>
-          {/* Desktop shows five rows (3.25rem plus a 1px border each) and scrolls the rest;
-              the phone drawer scrolls the whole sheet instead. */}
           <ScrollArea className="md:**:data-[slot=scroll-area-viewport]:max-h-[calc(5*(3.25rem+1px))]">
-            {/* Clears the overlay scrollbar off the chevrons. */}
             <ol className="flex flex-col md:pe-3">
               {top.map((effort) => (
                 <li key={effort.activity.id} className="border-b last:border-b-0">
@@ -608,7 +594,6 @@ function ProgressionChart({
     bestSoFar: { label: "Best so far", color: "var(--color-foreground)" },
   } satisfies ChartConfig;
   const data = points.map((point) => ({ ...point, t: new Date(point.start).getTime() }));
-  // Over a few months, month ticks would repeat; name the day instead.
   const short = (data.at(-1)?.t ?? 0) - (data[0]?.t ?? 0) < 120 * 86_400_000;
   const tickFormat = short ? DAY_MONTH : MONTH_YEAR;
   return (

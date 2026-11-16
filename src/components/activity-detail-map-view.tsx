@@ -18,7 +18,6 @@ import { resolveThemeColor } from "./map-theme-color.ts";
 type ActivityDetailMapViewProps = {
   trace: ActivityMapTrace;
   color: string;
-  /** False on the page card: a pannable map there catches the thumb while scrolling. */
   interactive: boolean;
   onFail: () => void;
 };
@@ -39,10 +38,6 @@ function FitTrace({ bounds, padding }: { bounds: [LngLat, LngLat]; padding: numb
 // A stalled worker or style request fires no error, so give up on the basemap after this long.
 const FIRST_LOAD_TIMEOUT_MS = 10_000;
 
-/**
- * Hands over to the plain outline when the basemap can't load (offline, weak signal). Only the
- * first load counts: a tile failing later, mid-pan, keeps the map.
- */
 function FailBeforeLoad({ onFail }: { onFail: () => void }) {
   const { map } = useMap();
 

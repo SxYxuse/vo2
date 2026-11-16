@@ -4,7 +4,6 @@ import { setTrainingPeriod } from "@/hooks/use-training-period.ts";
 import { FITNESS_PERIODS, type FitnessPeriod } from "@/services/training-load.ts";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-/** Period picker shared by every training view; changing it here changes it everywhere. */
 export function PeriodToggle({ period }: { period: FitnessPeriod | null }) {
   return (
     <ToggleGroup

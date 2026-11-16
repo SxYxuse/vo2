@@ -11,9 +11,6 @@ import {
 } from "./worktree-env.ts";
 import { psql, worktreePaths } from "./worktree-setup.ts";
 
-// `vp run db:prune [--dry-run]`: drops vo2_wt_* databases whose worktree no longer exists. A
-// database belongs to the worktree whose path hash ends its name, so renaming a branch keeps it.
-
 const dryRun = process.argv.includes("--dry-run");
 
 const paths = worktreePaths();
@@ -35,7 +32,6 @@ for (const name of stale) {
     console.log(`Would drop ${name}`);
     continue;
   }
-  // No WITH (FORCE): a session means something still uses it, so skip it and keep going.
   try {
     psql(`DROP DATABASE "${assertSafeIdentifier(name)}"`);
     console.log(`Dropped ${name}`);

@@ -7,10 +7,6 @@ import { addDayKey } from "./day-key.ts";
 import { seasonPhase, supportingRaceBlock } from "./season-phase.ts";
 import { currentGoalWeight, seasonCopySchema, type Goal, type GoalEffort } from "./season.types.ts";
 
-// The behaviour of a goal's priority and effort (ADR 0052), through the pure functions that
-// decide it: the week's phase and load, the plan's rule checks, and the taper guard.
-
-/** A Sunday main goal; its race week starts Monday 22 March, its taper on 15 March. */
 const MAIN_DAY = "2027-03-28";
 const RACE_WEEK = "2027-03-22";
 
@@ -30,7 +26,6 @@ function goal(date: string, effort: GoalEffort | null = null, distanceM = 42_195
 }
 
 const main = goal(MAIN_DAY);
-/** Six and five weeks before the main goal's race week: build weeks. */
 const supportWeek = addDayKey(RACE_WEEK, -42);
 const weekAfter = addDayKey(supportWeek, 7);
 const supportDay = addDayKey(supportWeek, 6);

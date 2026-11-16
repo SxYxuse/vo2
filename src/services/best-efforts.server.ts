@@ -19,10 +19,6 @@ type BestEffortsRow = {
   bestEfforts: unknown;
 };
 
-/**
- * Each row's cached best efforts, building and storing the ones that are missing or from an
- * older version. Rows without streams, or of a sport with no bests, are left out.
- */
 export async function ensureBestEfforts(rows: BestEffortsRow[]) {
   const result = new Map<string, BestEfforts>();
   const missing: BestEffortsRow[] = [];

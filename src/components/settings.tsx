@@ -55,9 +55,7 @@ import { SportTypesFields } from "@/components/sport-types-fields.tsx";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 
-// Sliders report every step; waiting this long after the last one saves once the thumb settles.
 const SAVE_DELAY_MS = 400;
-// Typed fields save on blur, so a weight is not saved one keystroke at a time.
 function isTypedField(name: string) {
   return name === "weightKg" || (name.startsWith("heartRate.") && !name.endsWith(".method"));
 }
@@ -92,8 +90,6 @@ export function SettingsForm({
     defaultValues: emptyDefaults,
     mode: "onTouched",
   });
-  // A save in flight finishes after leaving settings; only a failed one would be lost silently.
-  // The settings list unmounts the form too, so it counts as leaving.
   const blocker = useBlocker({
     shouldBlockFn: ({ next }) =>
       status === "error" && (!isSettingsPath(next.pathname) || next.pathname === "/settings"),
@@ -107,7 +103,6 @@ export function SettingsForm({
 
   useEffect(() => {
     if (!data) return;
-    // Saved values come back while the athlete may still be editing; keep what they changed.
     form.reset(
       settingsFormDefaults({
         profile: data.profile,
@@ -163,7 +158,6 @@ export function SettingsForm({
       clearTimeout(timer.current);
       timer.current = setTimeout(requestSave, SAVE_DELAY_MS);
     });
-    // Backgrounding the PWA or leaving settings must not drop a change still waiting to save.
     const flush = () => {
       if (timer.current != null) requestSave();
     };
@@ -269,7 +263,6 @@ export function SettingsForm({
                     />
                   )}
                 />
-                {/* Off keeps the coach plan's setup; only its settings hide. */}
                 {planningStyle === "coachPlan" ? (
                   <>
                     <FieldSeparator />

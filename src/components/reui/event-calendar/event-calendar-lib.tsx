@@ -23,20 +23,16 @@ import {
 
 type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
-/** Packing-effective minimum in minutes so tiny events do not stack invisibly. */
 const MIN_PACK_SLOT = 30;
 
-/** The instant re-expressed in the display time zone (TZDate extends Date). */
 function toZoned(date: Date, timeZone: string): TZDate {
   return new TZDate(date.getTime(), timeZone);
 }
 
-/** Zoned midnight of the day containing the instant. */
 function zonedStartOfDay(date: Date, timeZone: string): TZDate {
   return startOfDay(toZoned(date, timeZone));
 }
 
-/** Stable per-day key in the display time zone. */
 function getDayKey(date: Date, timeZone: string): string {
   return format(toZoned(date, timeZone), "yyyy-MM-dd");
 }
@@ -103,18 +99,15 @@ function getViewDateRange(view: CalendarView, date: Date, opts: ViewRangeOptions
     return { activeRange: range, visibleRange: range };
   }
 
-  // agenda
   const start = startOfDay(zoned);
   const range = { start, end: addDays(start, Math.max(1, agendaDayCount)) };
   return { activeRange: range, visibleRange: range };
 }
 
-/** Day of month of the last day of the month containing the zoned date. */
 function lastDayOfZonedMonth(date: Date): number {
   return addDays(startOfMonth(addMonths(date, 1)), -1).getDate();
 }
 
-/** The anchor date stepped one period forward or backward for the view. */
 function stepDate(
   view: CalendarView,
   date: Date,
@@ -146,15 +139,6 @@ function eventsOverlap(a: { start: Date; end: Date }, b: { start: Date; end: Dat
   return a.start < b.end && a.end > b.start;
 }
 
-/**
- * The one canonical multi-day segmentation. Splits an occurrence into per-day
- * segments clamped to the range. Rules (unit-tested in M1): exclusive end - an
- * event ending exactly at zoned midnight emits NO segment for that day;
- * zero-duration events emit one min-height segment; allDay occurrences walk
- * the same absolute instants as timed ones and only drop startMin/endMin, so
- * their bounds have to already BE display-zone midnights (see
- * CalendarEvent.allDay) or the bar paints on the wrong days.
- */
 function segmentOccurrence<TData>(
   occurrence: EventCalendarOccurrence<TData>,
   range: EventCalendarDateRange,
@@ -201,7 +185,6 @@ function segmentOccurrence<TData>(
   return segments;
 }
 
-/** True when the occurrence should render as a bar (all-day row / month lanes). */
 function isBarOccurrence(occurrence: EventCalendarOccurrence, timeZone?: string): boolean {
   return occurrence.allDay || spansMultipleDays(occurrence, timeZone);
 }
@@ -225,11 +208,6 @@ interface PackedPosition {
   columnSpan: number;
 }
 
-/**
- * Google-style overlap packing for one day's timed segments.
- * Mutates column/columnCount/columnSpan on the segments, in place.
- * z resolution happens at render: event.zIndex verbatim, else 10 + column.
- */
 function packTimedSegments<TData>(segments: EventCalendarSegment<TData>[]): void {
   if (segments.length === 0) return;
 
@@ -256,7 +234,6 @@ function packTimedSegments<TData>(segments: EventCalendarSegment<TData>[]): void
         a.seg.occurrence.key.localeCompare(b.seg.occurrence.key),
     );
 
-  // Sweep into connected clusters
   const clusters: Working[][] = [];
   let current: Working[] = [];
   let clusterEnd = -Infinity;
@@ -271,7 +248,6 @@ function packTimedSegments<TData>(segments: EventCalendarSegment<TData>[]): void
   }
 
   for (const cluster of clusters) {
-    // Greedy column assignment
     const colEnds: number[] = [];
     const byColumn = new Map<number, Working[]>();
     for (const item of cluster) {
@@ -288,7 +264,6 @@ function packTimedSegments<TData>(segments: EventCalendarSegment<TData>[]): void
     }
     const columnCount = colEnds.length;
 
-    // Partial-overlap expansion: widen rightward into free columns
     for (const item of cluster) {
       let span = 1;
       const col = item.seg.column ?? 0;
@@ -304,19 +279,6 @@ function packTimedSegments<TData>(segments: EventCalendarSegment<TData>[]): void
   }
 }
 
-/**
- * Greedy lane packing for bar segments within one week row (7 columns).
- * Mutates lane/rowIndex/colStart/colSpan on the segments, in place.
- */
-/**
- * Build the laned month-row bars for one week: consecutive-day segments of
- * the same occurrence merge into ONE bar (colStart -> colSpan) stacked into
- * lanes. Returns NEW segment objects - the shared per-day segments (also
- * rendered by the all-day rows and day cells) must stay pristine: mutating
- * their isEnd/continues flags gave the first-day chip a whole-bar shape and
- * a bogus end resize handle in the week all-day row, where dragging it
- * collapsed the event to a single day.
- */
 function packWeekRowLanes<TData>(
   segments: EventCalendarSegment<TData>[],
   rowIndex: number,
@@ -348,7 +310,6 @@ function packWeekRowLanes<TData>(
     };
   });
 
-  // Merge consecutive-day segments of the same occurrence into one bar per row
   const merged = new Map<string, Bar>();
   for (const bar of bars) {
     const key = bar.seg.occurrence.key;
@@ -415,7 +376,6 @@ interface EventCalendarDayBucket<TData = unknown> {
 interface EventCalendarWeekRow<TData = unknown> {
   rowIndex: number;
   rowStart: Date;
-  /** Laned bar segments (one per occurrence per row). */
   bars: EventCalendarSegment<TData>[];
 }
 
@@ -452,10 +412,6 @@ function buildEventIndex<TData>(
   const { timeZone, weekStartsOn } = opts;
   const order = opts.eventOrder ?? defaultEventOrder;
 
-  // RECURRENCE-ID override replacement: an event carrying recurringEventId +
-  // originalStart is an edited single occurrence of that series. The parent's
-  // expansion drops the replaced instant; the override renders as its own
-  // occurrence through the normal path below.
   const overrideTimes = new Map<string, Set<number>>();
   for (const event of events) {
     if (!event.recurringEventId || !event.originalStart) continue;
@@ -543,12 +499,10 @@ function buildEventIndex<TData>(
   return { occurrences, byDay, weekRows };
 }
 
-/** Cache key for index memoization; cheap string compare. */
 function getRangeKey(range: EventCalendarDateRange): string {
   return `${range.start.getTime()}-${range.end.getTime()}`;
 }
 
-/** Depth-first flatten of the resource tree (parents included). */
 function flattenResources(
   resources: EventCalendarResource[],
   depth = 0,
@@ -565,12 +519,6 @@ function flattenResources(
 
 const DEFAULT_WEEKEND_DAYS = [0, 6];
 
-/**
- * Resolves whether a day is an off day (non-working) in the display zone.
- * Callers pass the calendar's own weekendDays so the shading cannot contradict
- * the weekend the rest of the calendar renders; an explicit offDays.weekendDays
- * still wins over it.
- */
 function resolveOffDay(
   day: Date,
   timeZone: string,

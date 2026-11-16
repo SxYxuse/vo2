@@ -50,7 +50,6 @@ function signed(value: number, digits = 1, unit = "") {
   return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}${unit}`;
 }
 
-/** Weekly aerobic efficiency vs fitness for one sport, inside the shared period. */
 export function EfficiencyTrendCard({
   sport,
   period,

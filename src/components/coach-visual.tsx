@@ -20,7 +20,6 @@ function subscribeTheme(onChange: () => void) {
   return () => observer.disconnect();
 }
 
-/** The app's colour scheme and theme variables, read again whenever the theme class flips. */
 function readTheme() {
   const root = document.documentElement;
   const style = getComputedStyle(root);
@@ -32,10 +31,6 @@ function readTheme() {
   });
 }
 
-/**
- * A visual the coach wrote, in a sandboxed frame with no network and no access to the app
- * (ADR 0035). The frame reports its height so it never scrolls inside the chat.
- */
 export function CoachVisual({ title, html }: { title: string; html: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(240);

@@ -1,10 +1,5 @@
 name: Release
 
-# Cuts a release from the latest commit on main. The tag push deploys prod
-# through Dokploy, so this runs only on demand, and only after CI is green on
-# the commit being released and Lighthouse passes on it. Staging deploys from
-# main on its own.
-
 on:
   workflow_dispatch:
     inputs:
@@ -17,7 +12,6 @@ on:
           - minor
           - major
 
-# One release at a time; a second run waits instead of racing the first.
 concurrency:
   group: release
   cancel-in-progress: false
@@ -48,8 +42,6 @@ jobs:
           echo "Run the release from main." >&2
           exit 1
 
-      # The commit Lighthouse checked, not main's HEAD now: something may have merged while it ran.
-      # If main moved, the push below fails rather than tag an unchecked commit.
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
@@ -83,8 +75,6 @@ jobs:
           bun pm version "$BUMP" --message "chore(release): %s"
           bun scripts/release-check.ts "$RUNNER_TEMP/before.json" package.json
 
-      # Notes are written before anything is pushed: the tag push deploys prod,
-      # so a failure here must not leave prod deployed with no release page.
       - name: Write the release notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,8 +91,6 @@ jobs:
           git push origin HEAD:main
           git push origin "$TAG"
 
-      # If this step fails after the push, prod is live without a release page.
-      # To recover by hand: gh release create <tag> --verify-tag --generate-notes.
       - name: Create the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

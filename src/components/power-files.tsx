@@ -45,17 +45,12 @@ const RIDE_DATE = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
-/** "L 52 / R 48" from the right pedal's share. */
 export function formatBalance(rightPct: number | null) {
   if (rightPct == null) return "—";
   const right = Math.round(rightPct);
   return `L ${100 - right} / R ${right}`;
 }
 
-/**
- * Picks FIT files and imports them one at a time. A single file opens its analysis; a file
- * imported before opens that import.
- */
 export function ImportPowerFileButton({ className }: { className?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const online = useOnline();
@@ -92,7 +87,6 @@ export function ImportPowerFileButton({ className }: { className?: string }) {
     const saved = results.filter((result) => result.status !== "rejected");
     if (!saved.length) return;
     await queryClient.invalidateQueries({ queryKey: ["power-files"] });
-    // The ride's activity page links to its power file.
     void queryClient.invalidateQueries({ queryKey: ["activity"] });
     if (files.length === 1) {
       void navigate({ to: "/power/$fileId", params: { fileId: saved[0].id } });

@@ -509,7 +509,6 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  /* The phone tab bar's height, which pages and toasts keep free (src/components/tab-bar.tsx). */
   --tab-bar: 0px;
 }
 
@@ -551,7 +550,6 @@ body {
   }
 }
 
-/* Top 10 effort cards (ADR 0027): dealt onto the table, the personal best with a turning sheen. */
 @keyframes top-effort-deal {
   from {
     transform: translateY(120%) rotate(-18deg);
@@ -565,11 +563,6 @@ body {
   }
 }
 
-/*
- * A time out's days (ADR 0066), on every screen: a grey diagonal hatch that reads as "not
- * training", drawn from the foreground so it has a dark-mode version, and clear of every colour a
- * sport, series, or phase owns. The fitness chart's SVG band draws the same stripe as a pattern.
- */
 @utility hatch-time-out {
   background-image: repeating-linear-gradient(
     -45deg,

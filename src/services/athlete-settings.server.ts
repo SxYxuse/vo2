@@ -54,7 +54,6 @@ export async function storedPlanningStyle(userId: string) {
   return (await storedAthleteSettings(userId))?.planningStyle ?? null;
 }
 
-/** Settings with an entry for every sport type in the athlete's local copy. */
 export async function getAthleteSettings(userId: string): Promise<AthleteSettings> {
   const [stored, sportTypes] = await Promise.all([
     storedAthleteSettings(userId),
@@ -77,7 +76,6 @@ async function getHeartRateSettings(userId: string): Promise<HeartRateSettings> 
   return parseHeartRateSettings(row?.heartRate);
 }
 
-/** What VO2 would use with nothing set: the same max-HR rule as every view, without overrides. */
 async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
   const [rows, [metrics]] = await Promise.all([
     db
@@ -245,8 +243,6 @@ export async function saveAthleteSettingsImpl(
         target: athleteSettings.userId,
         set: { value: settings, updatedAt },
       });
-    // Turning celebrations off drops the ones not yet seen, so turning them on again later
-    // shows no backlog (ADR 0027).
     if (!settings.topEffortsSince) {
       await tx
         .delete(topEffortCelebrations)
@@ -254,15 +250,11 @@ export async function saveAthleteSettingsImpl(
     }
   });
 
-  // Switching back to the coach plan writes it again from today (ADR 0037). Imported here, not
-  // at the top: the coach plan reads these settings too.
   if (settings.planningStyle === "coachPlan" && stored?.planningStyle !== "coachPlan") {
     const { requestCoachPlanRewrite } = await import("./coach-plan.server.ts");
     await requestCoachPlanRewrite(userId);
   }
 
-  // Age caps the max-HR anchor, which sets LTHR and so heart-rate training load; set anchors
-  // score it directly. Either way every past activity is rescored (ADR 0021).
   if (previousProfile.birthDate !== value.profile.birthDate || heartRateChanged) {
     await refreshTrainingLoadsForUser(userId);
   }
@@ -285,7 +277,6 @@ export async function saveProfileImpl(value: ProfileSave): Promise<void> {
   logger.info("profile.saved");
 }
 
-/** The models the athlete picked for each coach feature, or the defaults. */
 export async function coachModelsFor(userId: string): Promise<CoachModels> {
   return ((await storedAthleteSettings(userId)) ?? DEFAULT_ATHLETE_SETTINGS).coachModels;
 }

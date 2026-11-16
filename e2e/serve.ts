@@ -4,8 +4,6 @@ import pg from "pg";
 
 import { E2E_DATABASE, E2E_NOW, E2E_PORT, E2E_URL, e2eDatabaseUrl } from "./env.ts";
 
-// Playwright's web server: a fresh database, then the production build against mock Strava.
-
 const admin = new pg.Client({ connectionString: e2eDatabaseUrl("postgres") });
 await admin.connect();
 await admin.query(`DROP DATABASE IF EXISTS "${E2E_DATABASE}" WITH (FORCE)`);

@@ -12,16 +12,6 @@ import {
   type Page,
 } from "./test.ts";
 
-// Every test starts from the athlete the setup onboarded (resetAthlete in e2e/test.ts): eight
-// weeks of mock rides, runs, and swims synced; born 15 January 1990, 72 kg; rides and runs on;
-// planning off with no plan written; no goals; automatic paces with the zone 2 easy pace and the
-// estimated LTHR; GPT-6 Luna with auto reasoning for every coach feature; no keys, chats, or power
-// files. The reset puts the database back, so a test needs no cleanup for it. Restore anything
-// else a test changes, such as mock Strava's state, in `finally`.
-//
-// The phone calendar shows one week and the desktop one four, so a step that moves the calendar
-// works at either size, and an event may be off screen on a phone.
-
 // An installed PWA has no browser back button: the in-app link is the way back on iOS, and the
 // system back gesture on Android.
 const WAYS_BACK = {
@@ -34,7 +24,6 @@ for (const [way, goBack] of Object.entries(WAYS_BACK)) {
   test(`returning from an activity by ${way} keeps the calendar where it was`, async ({ page }) => {
     await page.goto("/");
     await settle(page);
-    // One week on a phone, a month on desktop: either way, step back once.
     await page.getByRole("button", { name: /^Previous / }).click();
     const range = page.locator('button[aria-haspopup="dialog"][aria-live="polite"]');
     const shown = await range.innerText();
@@ -47,7 +36,6 @@ for (const [way, goBack] of Object.entries(WAYS_BACK)) {
   });
 }
 
-/** Taps an option in a coach feature's model picker and waits for its save. */
 async function pickInModelPicker(page: Page, option: Locator, saves: string) {
   await waitForSave(page, saves, () => option.click());
 }
@@ -79,7 +67,6 @@ test("a model and reasoning picked for a coach feature stay picked on every visi
   await expect(modelRow(page, "Plan writing")).toContainText("GPT-6 Luna");
   await expect(modelRow(page, "Plan writing")).toContainText("Auto reasoning");
 
-  // Beyond the recommended models, OpenRouter's catalog is searchable and pickable too.
   await modelRow(page, "Coach chat").click();
   await picker.getByRole("searchbox", { name: "Search models" }).fill("claude-sonnet-4.6");
   await expect(picker.getByText(/Not tested with VO2/)).toBeVisible();
@@ -93,7 +80,6 @@ test("a model and reasoning picked for a coach feature stay picked on every visi
   await expect(modelRow(page, "Coach chat")).not.toContainText("no longer offered");
 });
 
-/** Picks a planning style in Settings → Training and waits until it is saved everywhere. */
 async function choosePlanningStyle(page: Page, label: "Off" | "Coach plan", style: string) {
   if (!page.url().endsWith("/settings/training")) await page.goto("/settings/training");
   await settle(page);
@@ -102,7 +88,6 @@ async function choosePlanningStyle(page: Page, label: "Off" | "Coach plan", styl
     await radio.click();
     await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   }
-  // A reload restores the device's copy: wait until the app shell and settings carry `style`.
   await waitForOfflineCopy(
     page,
     (views) =>
@@ -115,8 +100,6 @@ async function choosePlanningStyle(page: Page, label: "Off" | "Coach plan", styl
 test("an athlete with planning off sees no plan, and turns the coach plan on from Plan", async ({
   page,
 }) => {
-  // The sidebar is open on desktop. A phone has the tab bar, and More opens the sidebar as a
-  // sheet, left open for the next load: both must agree.
   const planLinks = async () => {
     if (test.info().project.name !== "phone") {
       return page.getByRole("link", { name: "Plan", exact: true }).count();
@@ -141,7 +124,6 @@ test("an athlete with planning off sees no plan, and turns the coach plan on fro
     mask: [syncButton(page)],
   });
   expect(await planLinks()).toBe(0);
-  // The week planner's plan builder is gone: its old link opens Plan (ADR 0050).
   await page.goto("/plan");
   await page.waitForURL("/week");
   await expect(planningOff).toBeVisible();
@@ -149,7 +131,6 @@ test("an athlete with planning off sees no plan, and turns the coach plan on fro
   await page.getByRole("button", { name: "Choose a planning style" }).click();
   await page.waitForURL("/settings/training");
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
-  // No A goal: the plan builds base fitness (ADR 0067), and Plan asks only for availability.
   await expect(page.getByText(BASE_FITNESS)).toBeVisible();
 
   await page.goto("/week");
@@ -173,7 +154,6 @@ test("an athlete with no race gets a coach plan that builds base fitness, then a
   await expect(page.getByText("Base now.")).toBeVisible();
   await expect(page.getByText(/^Progression: running Standard$/)).toBeVisible();
 
-  // A race added in Season leads the season from then on: the plan is written toward it.
   const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
   await pasteGoal(page, {
     name: "Autumn half",
@@ -220,13 +200,11 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
     }),
   );
   await page.getByRole("button", { name: "Add goals" }).click();
-  // The race result sets the paces, so the 10 km prediction is the race itself.
   await expect(page.getByText("Predicted 42:30")).toBeVisible();
   await expect(page.getByRole("region", { name: "Upcoming goals" })).toHaveScreenshot(
     "season-prediction.png",
   );
 
-  // The way out: clearing the result the paces came from goes back to Automatic.
   await openFresh(page, "/settings/paces");
   await page.getByRole("radio", { name: /^A race result/ }).click();
   await page.getByRole("button", { name: "Clear race result" }).click();
@@ -236,7 +214,6 @@ test("an athlete sets a race result, sees a predicted race time, and clears it",
 test("an athlete adds a steady supporting race, is kept out of the main goal's taper, and removes it", async ({
   page,
 }) => {
-  // A main goal on Sunday 12 July: its taper is the week from 29 June and its race week.
   await pasteGoal(page, {
     name: "Summer 10K",
     sportType: "Run",
@@ -259,7 +236,6 @@ test("an athlete adds a steady supporting race, is kept out of the main goal's t
   await page.getByRole("textbox", { name: "Distance" }).fill("5");
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
-  // A supporting race takes an effort, steady unless another is picked, and none in the taper.
   await page.getByRole("radio", { name: /^Supporting race/ }).click();
   await expect(page.getByRole("radio", { name: /^Strong and steady/ })).toBeChecked();
   await expect(page.getByText(/falls in the taper for Summer 10K/)).toBeVisible();
@@ -268,7 +244,6 @@ test("an athlete adds a steady supporting race, is kept out of the main goal's t
     mask: [syncButton(page)],
   });
 
-  // Two days earlier it is clear of the taper.
   await page.getByRole("button", { name: "Back" }).click();
   await pickDate("27/06/2026");
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -278,7 +253,6 @@ test("an athlete adds a steady supporting race, is kept out of the main goal's t
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Upcoming goals" })).toContainText("Steady");
 
-  // And the way out: removing it leaves the main goal alone.
   await deleteGoalIfThere(page, /Run · 5\.00 km/);
   await expect(page.getByRole("region", { name: "Upcoming goals" })).not.toContainText("Steady");
 });
@@ -297,12 +271,10 @@ test("an athlete picks a best effort for their paces, and goes back to Automatic
   });
   await efforts.getByRole("radio", { name: /^5 km/ }).first().click();
   await expect(page.getByText(/^From your best effort: 5 km in/)).toBeVisible();
-  // The pick is saved: it is still there on the next visit.
   await openFresh(page, "/settings/paces");
   await expect(page.getByRole("radio", { name: /^One of your best efforts/ })).toBeChecked();
   await expect(page.getByText(/^From your best effort: 5 km in/)).toBeVisible();
 
-  // And back to Automatic.
   await page.getByRole("radio", { name: /^Automatic/ }).click();
   await expect(page.getByText(/^Estimated from /)).toBeVisible();
 });
@@ -319,7 +291,6 @@ test("an athlete switches where the easy pace comes from, and sees why zone 2 is
   await page.getByRole("radio", { name: /^Heart rate \(zone 2\)/ }).click();
   await expect(easyHint).toBeVisible();
 
-  // A running LTHR this low puts zone 2 below every run, so there is no zone 2 to read.
   await setRunningLthr(page, "110");
   await openFresh(page, "/settings/paces");
   await expect(page.getByText(/^Not enough zone 2 running yet/)).toBeVisible();
@@ -330,7 +301,6 @@ test("an athlete switches where the easy pace comes from, and sees why zone 2 is
   });
 });
 
-/** Sets the running LTHR in Settings → Heart rate. */
 async function setRunningLthr(page: Page, bpm: string) {
   await page.goto("/settings/heart-rate");
   await settle(page);
@@ -340,7 +310,6 @@ async function setRunningLthr(page: Page, bpm: string) {
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 }
 
-/** Opens Paste: from the empty state of a season with no goals, or from its menu. */
 async function openSeasonPaste(page: Page) {
   const fromEmpty = page.getByRole("button", { name: "Paste a season" });
   if (await fromEmpty.isVisible()) return fromEmpty.click();
@@ -348,7 +317,6 @@ async function openSeasonPaste(page: Page) {
   await page.getByRole("menuitem", { name: "Paste season" }).click();
 }
 
-/** Pastes goals into Season: one, or each leg of a multisport event. */
 async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await page.goto("/season");
   await settle(page);
@@ -360,7 +328,6 @@ async function pasteGoal(page: Page, ...goals: Record<string, unknown>[]) {
   await expect(page.getByRole("heading", { name: "Paste a season" })).toHaveCount(0);
 }
 
-/** Deletes the goal whose button matches `name`, if it is there. */
 async function deleteGoalIfThere(page: Page, name: RegExp) {
   await page.goto("/season");
   await settle(page);
@@ -372,10 +339,6 @@ async function deleteGoalIfThere(page: Page, name: RegExp) {
   await expect(goal).toHaveCount(0);
 }
 
-/**
- * Runs, rides, and swims a week (none unless given). Availability is only how many (ADR 0048, ADR
- * 0050, ADR 0061): no days, no long run day, and no time per day (ADR 0041).
- */
 async function setAvailability(
   page: Page,
   { runs, rides, swims = 0 }: { runs: number; rides: number; swims?: number },
@@ -388,28 +351,18 @@ async function setAvailability(
   await expect(page.getByText("Time you have")).toHaveCount(0);
 }
 
-/** The shown week's sessions: one unordered list, no day (ADR 0048). */
 const weekSessions = (page: Page) =>
   page.getByRole("region", { name: "The week's sessions" }).getByRole("listitem");
 
-/** Waits for the plan to be written: an earlier plan stays on screen while the next is written. */
 async function expectPlanWritten(page: Page, writing: Promise<unknown>) {
   await writing;
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
-  // A failed rewrite also ends the writing, with the earlier plan still on screen.
   await expect(page.getByText("Plan writing failed")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: WEEK_HEADING })).toBeVisible();
 }
 
-/** A written week's heading: "This week · Build · 24 km running · 3 h riding". */
 const WEEK_HEADING = /^(This week|Week of .+) · .+ · \d+ km running/;
 
-/**
- * Resolves once the app shows a writing in progress, which it does only when the server started
- * one: the answer that started it says "writing" until the next check, three seconds later.
- * Started before the step that should write, and kept across pages, so a plan already on screen
- * can't pass for a new one.
- */
 function writingStarts(page: Page) {
   return expect(page.getByText("Writing your plan…").first()).toBeVisible({ timeout: 30_000 });
 }
@@ -417,16 +370,13 @@ function writingStarts(page: Page) {
 test("an athlete switches to the coach plan, sets it up, and switches away and back", async ({
   page,
 }) => {
-  // Two plan writings and four style switches, each saved and checked on the device.
   test.setTimeout(90_000);
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
   await expect(page.getByText(BASE_FITNESS)).toBeVisible();
 
-  // Runs and rides: the half marathon leads, the rides hold beside it (ADR 0050).
   await addRaceAndWritePlan(page, { runs: 4, rides: 2 });
   await page.goto("/settings/training");
   await settle(page);
-  // A plan may be written again while the first copy's streams still move FTP or paces.
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
   await expect(page).toHaveScreenshot("settings-training-coach-plan.png", {
     fullPage: true,
@@ -439,8 +389,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     mask: [syncButton(page)],
   });
 
-  // The plan opens on this week, its runs a list with no day. The arrows change the week,
-  // stopping at the written ones, and "Back to this week" brings this week back.
   const weekHeading = page.getByRole("heading", { name: WEEK_HEADING });
   await expect(weekHeading).toHaveText(/ · [^·]+ riding$/);
   const previous = page.getByRole("button", { name: "Previous week" });
@@ -458,13 +406,11 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
     await next.click();
     await expect(weekHeading).not.toHaveText(shown ?? "");
     await expect(weekHeading).toHaveText(/^Week of /);
-    // A week ahead may still be written again: its runs can't be marked done yet.
     await expect(markDone).toHaveCount(0);
   }
   await expect(next).toBeDisabled();
   await expect(page).toHaveURL(/[?&]week=/);
 
-  // A session ahead says when it can be marked, and Plan goes back to its week.
   const shownWeek = await weekHeading.textContent();
   await page.getByRole("button", { name: "Open the session" }).first().click();
   await expect(page.getByText("You can mark it done from its week on.")).toBeVisible();
@@ -476,7 +422,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   await expect(weekHeading).toHaveText(/^This week · /);
   await expect(back).toHaveCount(0);
 
-  // The season beside the week, with a row per written week.
   const season = page.getByRole("region", { name: "Your season" });
   const writtenWeeks = season.getByRole("list", { name: "Written weeks" }).getByRole("button");
   await expect(writtenWeeks).toHaveCount(4);
@@ -486,7 +431,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   await writtenWeeks.first().click();
   await expect(weekHeading).toHaveText(/^This week · /);
 
-  // This week's runs are marked done by hand, and open again the same way.
   const first = weekSessions(page).first();
   await first.getByRole("button", { name: "Mark done" }).click();
   await expect(first.getByRole("button", { name: "Done" })).toHaveAttribute("aria-pressed", "true");
@@ -503,7 +447,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
   await expect(page.getByText(/^0 of 6 done/)).toBeVisible();
 
-  // A ride is planned by time and aimed at a cycling zone.
   await weekSessions(page)
     .filter({ has: page.getByLabel("Ride") })
     .first()
@@ -513,7 +456,6 @@ test("an athlete switches to the coach plan, sets it up, and switches away and b
   await expect(page.getByText(/endurance/).first()).toBeVisible();
   await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
 
-  // Off and back: the setup stays, and the plan is written again.
   await choosePlanningStyle(page, "Off", "off");
   await page.goto("/week");
   await expect(page.getByText("Planning is off", { exact: true })).toBeVisible();
@@ -530,7 +472,6 @@ test("an athlete sets their own running peak, holds running, and goes back to th
   test.setTimeout(120_000);
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
   await addRaceAndWritePlan(page, { runs: 4, rides: 2 });
-  // Plan charts each sport's season (ADR 0058) and names the progression with a way to change it.
   const season = page.getByRole("region", { name: "Your season" });
   await expect(season.getByText(/^Progression: running Standard · riding Hold/)).toBeVisible();
 
@@ -542,7 +483,6 @@ test("an athlete sets their own running peak, holds running, and goes back to th
   const save = page.getByRole("button", { name: "Save progression" });
   await expect(save).toBeDisabled();
 
-  // My own peak, above the recommended one: Settings says by how much.
   await running.getByRole("button", { name: "My own" }).click();
   for (let step = 0; step < 6; step++) {
     await running.getByRole("button", { name: "Raise running peak" }).click();
@@ -554,7 +494,6 @@ test("an athlete sets their own running peak, holds running, and goes back to th
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
   await expect(season.getByText(/running Standard, your peak \d+ km/)).toBeVisible();
 
-  // Hold: running no longer builds toward the A goal, and Plan says so.
   await page.goto("/settings/training");
   await settle(page);
   await slider.focus();
@@ -568,7 +507,6 @@ test("an athlete sets their own running peak, holds running, and goes back to th
     season.getByText("Running is set to Hold, so it won't build toward Autumn half."),
   ).toBeVisible();
 
-  // The way back: Standard and the recommended peak.
   await page.goto("/settings/training");
   await settle(page);
   await running.getByRole("button", { name: "Recommended" }).click();
@@ -582,7 +520,6 @@ test("an athlete sets their own running peak, holds running, and goes back to th
   await expect(season.getByText(/^Progression: running Standard · riding Hold$/)).toBeVisible();
 });
 
-/** The A race the coach plan needs, then availability; ends on Plan with the plan written. */
 async function addRaceAndWritePlan(page: Page, availability: { runs: number; rides: number }) {
   const raceDay = new Date(Date.parse(E2E_NOW) + 70 * 86_400_000).toISOString().slice(0, 10);
   await pasteGoal(page, {
@@ -596,7 +533,6 @@ async function addRaceAndWritePlan(page: Page, availability: { runs: number; rid
   await saveAvailabilityAndWrite(page, availability);
 }
 
-/** Saves availability in Settings → Training; ends on Plan with the plan written. */
 async function saveAvailabilityAndWrite(
   page: Page,
   availability: { runs: number; rides: number; swims?: number },
@@ -606,10 +542,8 @@ async function saveAvailabilityAndWrite(
   await expect(page.getByText("The coach plan can't be written yet")).toHaveCount(0);
   const written = writingStarts(page);
   await setAvailability(page, availability);
-  // The availability may already be saved as asked: then the new goal has the plan written again.
   const save = page.getByRole("button", { name: /^Save (availability|and rewrite plan)$/ });
   if (await save.isEnabled()) await save.click();
-  // Saved before leaving, or leaving would cancel the save on its way.
   await expect(page.getByRole("button", { name: "Save and rewrite plan" })).toBeDisabled();
 
   await page.goto("/week");
@@ -630,22 +564,18 @@ test("a triathlete plans swims beside rides and runs, opens a swim, and stops sw
     priority: "A",
   });
   await choosePlanningStyle(page, "Coach plan", "coachPlan");
-  // A triathlon is one A goal per leg on the same day; every leg builds (ADR 0061).
   await pasteGoal(page, leg("Swim", 1500), leg("Ride", 40_000), leg("Run", 10_000));
   await saveAvailabilityAndWrite(page, { runs: 3, rides: 2, swims: 2 });
 
   const weekHeading = page.getByRole("heading", { name: WEEK_HEADING });
   await expect(weekHeading).toHaveText(/ · [\d,]+ m swimming$/);
   const swims = weekSessions(page).filter({ has: page.getByLabel("Swim") });
-  // This week may hold fewer than two, when its budget or its days left allow only one.
   await expect(swims.first()).toBeVisible();
-  // Every leg of the A triathlon builds, swimming too (ADR 0061).
   const season = page.getByRole("region", { name: "Your season" });
   await expect(
     season.getByText(/^Progression: running Standard · riding Standard · swimming Standard$/),
   ).toBeVisible();
 
-  // A swim is planned in metres and aimed at swim zones from CSS, read from the mock swims.
   await swims.first().getByRole("button", { name: "Open the session" }).click();
   await expect(page.getByText("Width is distance, height and colour are effort.")).toBeVisible();
   await expect(page.getByText(/^[\d,]+ m$/).first()).toBeVisible();
@@ -657,8 +587,6 @@ test("a triathlete plans swims beside rides and runs, opens a swim, and stops sw
   });
   await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
 
-  // A technique swim names its drills in its steps and says how to swim each (ADR 0063).
-  // This week may hold only the long swim; next week holds the second.
   await page.getByRole("button", { name: "Next week" }).click();
   await weekSessions(page)
     .filter({ hasText: "Technique: catch-up and fist" })
@@ -673,7 +601,6 @@ test("a triathlete plans swims beside rides and runs, opens a swim, and stops sw
   });
   await page.getByRole("main").getByRole("button", { name: "Plan", exact: true }).click();
 
-  // The way out: no swims a week, and the plan is written again without them.
   await saveAvailabilityAndWrite(page, { runs: 3, rides: 2, swims: 0 });
   await expect(weekHeading).not.toHaveText(/swimming/);
   await expect(weekSessions(page).filter({ has: page.getByLabel("Swim") })).toHaveCount(0);
@@ -687,8 +614,6 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await addRaceAndWritePlan(page, { runs: 4, rides: 0 });
   await expect(weekSessions(page)).toHaveCount(4);
 
-  // From the plan, the chat opens ready for a change. The coach proposes one that passed the
-  // rules; declining it changes nothing.
   await page.getByRole("button", { name: "Ask the coach to change my plan" }).click();
   await page.getByRole("button", { name: "I can only run twice this week" }).click();
   const card = page.getByRole("group", { name: "Plan change" }).last();
@@ -696,14 +621,12 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await expect(card).toContainText("Week of 15 Jun");
   await expect(card.getByRole("listitem")).toHaveCount(1);
   await expect(card.getByRole("listitem")).toContainText("Removed:");
-  // Nothing else can be asked until the change is answered.
   const composer = page.getByRole("textbox", { name: "Message the coach" });
   await expect(composer).toBeDisabled();
   await card.getByRole("button", { name: "Decline" }).click();
   await expect(card).toContainText("Declined: your plan stays as it was");
   await expect(page.getByText("No problem: your plan stays as it was.")).toBeVisible();
 
-  // A change over several weeks folds the weeks past the first two.
   await composer.fill("I'm travelling for a while");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(card.getByRole("button", { name: /^Apply \d+ changes$/ })).toBeVisible({
@@ -715,7 +638,6 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await card.getByRole("button", { name: "Decline" }).click();
   await expect(card).toContainText("Declined: your plan stays as it was");
 
-  // Asked again and applied: this week has one run fewer.
   await composer.fill("I can only run twice this week");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
@@ -723,7 +645,6 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await expect(card).toContainText("Applied to your plan");
   await expect(page.getByText("Done: the change is in your plan.")).toBeVisible();
 
-  // A change proposed before the plan changed again is not applied.
   await composer.fill("This week feels too hard");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
@@ -738,7 +659,6 @@ test("an athlete changes the coach plan from the chat and from a note on a week"
   await expect(page.getByRole("button", { name: "Indoor only" })).toHaveCount(0);
 });
 
-/** Saves the coach brief in Settings → Training; ends on Plan with the plan written again. */
 async function saveBriefAndWrite(page: Page, brief: string) {
   await page.goto("/settings/training");
   await settle(page);
@@ -759,7 +679,6 @@ test("an athlete writes a coach brief, the coach changes it in the chat, and the
   const notFit = page.getByRole("alert").filter({ hasText: "Not all of your brief fit" });
   await expect(notFit).toHaveCount(0);
 
-  // Saving a brief rewrites the plan; the mock coach says what it couldn't fit (ADR 0065).
   await saveBriefAndWrite(page, "Fridays: 30 min at most.");
   await expect(notFit).toContainText("The mock coach doesn't read your brief.");
   await settle(page);
@@ -768,7 +687,6 @@ test("an athlete writes a coach brief, the coach changes it in the chat, and the
     mask: [syncButton(page)],
   });
 
-  // The coach offers a brief change with the brief before and after; declining keeps it.
   await page.goto("/coach");
   const composer = page.getByRole("textbox", { name: "Message the coach" });
   await composer.fill("From now on, no track sessions.");
@@ -778,14 +696,12 @@ test("an athlete writes a coach brief, the coach changes it in the chat, and the
   await expect(card).toContainText("Fridays: 30 min at most.");
   await expect(card).toContainText("Applying rewrites your coming weeks.");
   await settle(page);
-  // The chat's scroll button may float over the card while the reply settles.
   await expect(card).toHaveScreenshot("coach-brief-change.png", {
     mask: [page.getByRole("button", { name: "Scroll to end" })],
   });
   await card.getByRole("button", { name: "Decline" }).click();
   await expect(card).toContainText("Declined: your brief stays as it was");
 
-  // A brief change offered before the brief changed again is not applied.
   await composer.fill("From now on, no track sessions.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
@@ -796,7 +712,6 @@ test("an athlete writes a coach brief, the coach changes it in the chat, and the
     client.query("update coach_plans set brief = 'Fridays: 30 min at most.'"),
   );
 
-  // Applied: the brief holds both lines, and the plan is written again from it.
   await composer.fill("From now on, no track sessions.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(card.getByRole("button", { name: "Apply" })).toBeVisible({ timeout: 30_000 });
@@ -808,32 +723,23 @@ test("an athlete writes a coach brief, the coach changes it in the chat, and the
     "Fridays: 30 min at most.\nNo track sessions.",
   );
 
-  // The way out: a cleared brief rewrites the plan, and Plan says nothing about it. The rewrite
-  // the applied change started finishes first.
   await page.goto("/week");
   await expect(page.getByText("Writing your plan…")).toHaveCount(0, { timeout: 30_000 });
   await saveBriefAndWrite(page, "");
   await expect(notFit).toHaveCount(0);
 });
 
-// The mock coach answers without a key, so this proves the client and server still speak the
-// same stream after a TanStack AI upgrade.
 test("an athlete asks the coach a question and gets an answer", async ({ page }) => {
   await page.goto("/coach");
   await page.getByRole("button", { name: "How did my last run go?" }).click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 
-  // The mock coach reports a cost like OpenRouter does, so the answer counts toward spending.
   await page.goto("/settings/coach");
   await expect(page.getByText(/Coach chat (< \$0\.01|\$(?!0\.00)\d+\.\d\d)/).first()).toBeVisible();
 });
 
 type ViewCounts = { inView: number; outOfView: number; stopped?: boolean };
 
-/**
- * Counts the animation frames in which a chat message, once shown, is in and out of the chat's
- * view, until the counts are read. Sampled in the page, so a jump of a frame or two is caught.
- */
 async function watchInView(page: Page, text: string) {
   await page.evaluate((text) => {
     const counts: ViewCounts = { inView: 0, outOfView: 0 };
@@ -869,10 +775,8 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
     .click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible({ timeout: 30_000 });
 
-  // The reply is saved once it's finished.
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 
-  // A new chat keeps the first one; it reopens from Chats, also after a reload.
   await page.getByRole("button", { name: "New chat" }).click();
   await expect(page.getByText("Ask the coach", { exact: true })).toBeVisible();
   await page.reload();
@@ -881,20 +785,16 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
   await sheet.getByRole("link", { name: "Am I fresh enough for a hard session tomorrow?" }).click();
   await expect(page.getByText(/This is the mock coach/)).toBeVisible();
 
-  // A follow-up in the reopened chat stays in view while the coach replies: when every question
-  // anchored the scroller, the view jumped back to the top mid-reply.
   const followUp = "And how is my form?";
   const viewCounts = await watchInView(page, followUp);
   await page.getByRole("textbox", { name: "Message the coach" }).fill(followUp);
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText(/This is the mock coach/)).toHaveCount(2, { timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
-  // Seen at all, so a renamed slot or message can't pass by counting nothing.
   const { inView, outOfView } = await viewCounts();
   expect(inView).toBeGreaterThan(0);
   expect(outOfView).toBe(0);
 
-  // Deleting the open chat starts a new one, and the chat is gone from the list.
   await page.getByRole("button", { name: "Chats" }).click();
   await sheet
     .getByRole("button", { name: "Delete “Am I fresh enough for a hard session tomorrow?”" })
@@ -906,7 +806,6 @@ test("an athlete reopens an earlier coach chat from Chats, then deletes it", asy
   ).toHaveCount(0);
 });
 
-// Last: with a key saved, the coach would call the provider instead of the mock coach.
 test("an athlete saves a key for each provider, sees them kept, and removes them", async ({
   page,
 }) => {
@@ -922,7 +821,6 @@ test("an athlete saves a key for each provider, sees them kept, and removes them
     await expect(field.getByText(/^Saved /)).toBeVisible();
   }
 
-  // Saved with the account, never shown back.
   await page.reload();
   for (const provider of ["OpenRouter", "OpenAI"]) {
     const field = page.getByRole("group", { name: `${provider} key` });
@@ -937,7 +835,6 @@ test("an athlete tries each phone calendar layout from Settings, and goes back t
   page,
 }) => {
   test.skip(test.info().project.name !== "phone", "The calendar layouts are for phones.");
-  // Injured since Monday with no end: each layout marks Monday to today.
   await withDatabase((client) =>
     client.query(
       `insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-injured', id, 'injured', '2026-06-15', null from "user"`,
@@ -989,18 +886,14 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   const sheet = page.getByRole("dialog", { name: "Sick or injured" });
   const banner = page.getByRole("region", { name: "Sick" });
 
-  // A session done this week stays when the plan pauses.
   await weekSessions(page).first().getByRole("button", { name: "Mark done" }).click();
   await expect(page.getByText(/^1 of \d+ done/)).toBeVisible();
 
-  // Today is Wednesday 17 June: sick since Monday, no end yet. The open sessions and the weeks
-  // ahead go, and nothing is written while it lasts (ADR 0066).
   await page.getByRole("button", { name: "Sick or injured" }).click();
   await sheet.getByRole("button", { name: "From", exact: true }).click();
   await page.locator('[data-day="15/06/2026"]').click();
   await sheet.getByRole("button", { name: "Save" }).click();
   await expect(sheet).toHaveCount(0);
-  // The banner owns the page: the header's way in, the week's navigation, and the season go.
   await expect(banner).toContainText("Sick · day 3");
   await expect(banner).toContainText("Sick since Mon 15 Jun");
   await expect(banner).toContainText(
@@ -1016,8 +909,6 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   await expect(banner).toBeVisible();
   await expect(page.getByText("Writing your plan…")).toHaveCount(0);
 
-  // "I'm back": the time out ends yesterday, and the plan is written again from this week, which
-  // keeps five of its seven days' budget.
   const rewritten = writingStarts(page);
   await banner.getByRole("button", { name: "I'm back" }).click();
   await expectPlanWritten(page, rewritten);
@@ -1026,8 +917,6 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   expect(await km()).toBeLessThan(fullWeek);
   await expect(page.getByText(/^1 of \d+ done/)).toBeVisible();
 
-  // The first week back ramps up from 80 % of what it would have held after two days off, so it
-  // stays under the full week before the time out (ADR 0066).
   await page.getByRole("button", { name: "Next week" }).click();
   await expect(weekHeading).toHaveText(/^Week of /);
   expect(await km()).toBeLessThan(fullWeek);
@@ -1035,7 +924,6 @@ test("an athlete on the coach plan marks themselves sick on Plan, comes back, an
   await page.getByRole("button", { name: "Previous week" }).click();
   await expect(weekHeading).toHaveText(/^This week · /);
 
-  // The way out: deleting it from Fitness writes this week in full again.
   await page.goto("/fitness");
   await settle(page);
   await page.getByRole("button", { name: "Edit Sick · 15–16 Jun" }).click();
@@ -1061,9 +949,6 @@ test("an athlete on the coach plan marks a time out past the written weeks, and 
   const before = await km("27 Jul");
   expect(before).toBeGreaterThan(0);
 
-  // Today is Wednesday 17 June, and the plan is written to the week of 6 July. Injured for the
-  // two weeks of 13 and 20 July: both forecast weeks are empty, and the first week back keeps
-  // 40 % of what it would have held, as the coach plan will write them (ADR 0066).
   await withDatabase((client) =>
     client.query(
       "insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-ahead', id, 'injured', '2026-07-13', '2026-07-26' from \"user\"",
@@ -1077,8 +962,6 @@ test("an athlete on the coach plan marks a time out past the written weeks, and 
   await settle(page);
   await expect(season).toHaveScreenshot("plan-season-time-out.png");
 
-  // Injured for the whole written week of 29 June too: its row shows the kind instead of the
-  // phase, and the week after eases back from 60 % after seven days off.
   await withDatabase((client) =>
     client.query(
       "insert into time_outs (id, user_id, kind, start_day, end_day) select 'e2e-written', id, 'injured', '2026-06-29', '2026-07-05' from \"user\"",
@@ -1097,18 +980,14 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
 }) => {
   await page.goto("/fitness");
   await settle(page);
-  // By name: a date popover is a dialog too, and may still be closing.
   const sheet = page.getByRole("dialog", { name: "Sick or injured" });
   const pickDay = async (field: "From" | "Until", day: string) => {
     await sheet.getByRole("button", { name: field, exact: true }).click();
     await page.locator(`[data-day="${day}"]`).click();
-    // The next field's calendar would show the same day while this one is still closing.
     await expect(page.locator("[data-day]")).toHaveCount(0);
   };
-  // The fitness chart's bands, which a tap edits; the predicted race time trend only shades them.
   const band = page.locator(".recharts-reference-area.cursor-pointer");
 
-  // Today is Wednesday 17 June: sick from Friday to Sunday.
   await page.getByRole("button", { name: "Sick or injured" }).click();
   await expect(sheet.getByRole("button", { name: "Sick", pressed: true })).toBeVisible();
   await pickDay("From", "12/06/2026");
@@ -1118,8 +997,6 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
   await expect(page.getByRole("button", { name: "Edit Sick · 12–14 Jun" })).toBeVisible();
   await expect(band).toHaveCount(1);
 
-  // Tapping the band opens that one, with its days: it was an injury. A past one can't be
-  // ended, only edited or deleted.
   await band.click();
   await expect(sheet.getByRole("button", { name: "From", exact: true })).toHaveText("Fri 12 Jun");
   await expect(sheet.getByRole("button", { name: "Until", exact: true })).toHaveText("Sun 14 Jun");
@@ -1130,13 +1007,11 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
   const injured = page.getByRole("button", { name: "Edit Injured · 12–14 Jun" });
   await expect(injured).toBeVisible();
 
-  // Its chip opens it too.
   await injured.click();
   await expect(sheet.getByRole("button", { name: "Injured", pressed: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
 
-  // An open one can't overlap it, and ends yesterday with "I'm back".
   await page.getByRole("button", { name: "Sick or injured" }).click();
   await pickDay("From", "14/06/2026");
   await sheet.getByRole("button", { name: "Save" }).click();
@@ -1150,7 +1025,6 @@ test("an athlete with planning off marks a time out from Fitness, edits it, ends
   await expect(page.getByRole("button", { name: "Edit Sick · 15–16 Jun" })).toBeVisible();
   await expect(band).toHaveCount(2);
 
-  // The way out: deleting them leaves the chart as it was.
   for (const timeOut of [injured, page.getByRole("button", { name: /^Edit Sick/ })]) {
     await timeOut.click();
     await sheet.getByRole("button", { name: "Delete" }).click();

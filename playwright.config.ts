@@ -16,11 +16,6 @@ const { version } = JSON.parse(
 ) as { version: string };
 const browserContainer = `vo2-e2e-browser-${E2E_BROWSER_PORT}`;
 
-/**
- * Phone first (AGENTS.md): every spec runs at a phone size and again at desktop size. Athletes
- * mostly install the app on an iPhone, where layout bugs showed that Chromium never did, so the
- * screens also run in WebKit at iPhone size.
- */
 const phone = devices["Pixel 7"];
 const desktop = devices["Desktop Chrome"];
 const iphone = devices["iPhone 15"];
@@ -28,12 +23,9 @@ const iphone = devices["iPhone 15"];
 export default defineConfig({
   testDir: "e2e",
   snapshotPathTemplate: "e2e/screenshots/{projectName}/{arg}{ext}",
-  // Mock Strava has one athlete, so specs share it and run one at a time.
   workers: 1,
   forbidOnly: ci,
   retries: ci ? 1 : 0,
-  // No HTML report locally: building it has kept a finished run alive past an agent's time limit.
-  // A failure's trace stays in test-results/ (`bunx playwright show-trace <trace.zip>`).
   reporter: ci ? [["github"], ["html", { open: "never" }]] : [["list"]],
   expect: {
     toHaveScreenshot: { animations: "disabled", caret: "hide", maxDiffPixelRatio: 0.002 },
@@ -44,11 +36,8 @@ export default defineConfig({
     timezoneId: "Europe/Brussels",
     colorScheme: "light",
     reducedMotion: "reduce",
-    // A cached service worker would serve the last run's build; offline gets its own spec later.
     serviceWorkers: "block",
     trace: "retain-on-failure",
-    // One run-server launches whichever browser a project asks for: Chromium or WebKit.
-    // <loopback> sends the container's localhost back to this machine, where the app runs.
     connectOptions: {
       wsEndpoint: `ws://127.0.0.1:${E2E_BROWSER_PORT}/`,
       exposeNetwork: "<loopback>",
@@ -77,8 +66,6 @@ export default defineConfig({
       use: { ...desktop, storageState: "e2e/.auth/athlete.json" },
     },
     {
-      // Screens only: layout is where WebKit has differed. The journeys would make this the
-      // slowest CI job, and a swipe needs touch events whatever the engine (AGENTS.md).
       name: "webkit",
       dependencies: ["setup"],
       testMatch: /screens\.spec\.ts/,
@@ -95,7 +82,6 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      // Removes a container a killed run left behind, then serves the browser until the run ends.
       command:
         `docker rm -f ${browserContainer} >/dev/null 2>&1; ` +
         `docker run --rm --init --name ${browserContainer} -p ${E2E_BROWSER_PORT}:${E2E_BROWSER_PORT} ` +

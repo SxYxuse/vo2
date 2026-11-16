@@ -1,12 +1,10 @@
 import { useEffect, useRef } from "react";
 import { RefreshCwIcon } from "lucide-react";
 
-// Pull distance (px, after resistance) that triggers a reload on release.
 const THRESHOLD = 70;
 const MAX_PULL = 110;
 const RESISTANCE = 0.5;
 
-// Surfaces that own their own vertical drag gestures.
 const IGNORE_SELECTOR = '.maplibregl-map, [role="dialog"], [data-slot="drawer-popup"]';
 
 function isStandalone() {
@@ -16,7 +14,6 @@ function isStandalone() {
   );
 }
 
-/** True when the touch target and every scrollable ancestor are scrolled to the top. */
 function isAtTop(target: Element | null) {
   if (window.scrollY > 0) return false;
   for (let el = target; el && el !== document.body; el = el.parentElement) {
@@ -25,10 +22,6 @@ function isAtTop(target: Element | null) {
   return true;
 }
 
-/**
- * Browser-style pull-to-refresh for the installed PWA, which has no reload
- * button. Browser tabs already have their own, so it only runs standalone.
- */
 export function PullToRefresh() {
   const indicatorRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<SVGSVGElement>(null);
@@ -69,7 +62,6 @@ export function PullToRefresh() {
       if (!tracking) return;
       const dx = e.touches[0].clientX - startX;
       const dy = e.touches[0].clientY - startY;
-      // Give up on upward or mostly horizontal drags (carousels, sliders).
       if (pull === 0 && (dy <= 0 || Math.abs(dx) > dy)) {
         tracking = false;
         return;

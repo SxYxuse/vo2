@@ -32,7 +32,6 @@ export function readIsDesktop() {
   return typeof window !== "undefined" && window.matchMedia(DESKTOP_MQ).matches;
 }
 
-/** `null` on the server until the client snapshot runs, so SSR does not assume a layout. */
 export function useDesktopMedia(): boolean | null {
   return useSyncExternalStore(subscribe, getDesktopSnapshot, () => null);
 }

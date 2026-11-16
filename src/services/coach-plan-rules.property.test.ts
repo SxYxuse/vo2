@@ -47,18 +47,9 @@ import {
   type RunEffort,
 } from "./training-paces.types.ts";
 
-/*
- * The property guard for the coach plan's rules, budgets and paces (#204). Review found every
- * past blocker here by running the pure functions over thousands of generated athletes, so this
- * does the same on every gate: generated availabilities, histories, goals, progressions and paces,
- * seeded so a failure names a case that replays. Extend the generators when you add an input.
- */
-
-/** Each athlete costs about 3 ms in weekBudgets alone; 600 keep the guard to a few seconds. */
 const CASES = 600;
 const PACE_CASES = 3000;
 
-/** A seeded generator (mulberry32), so every run checks the same athletes. */
 function random(seed: number) {
   let state = seed;
   const next = () => {
@@ -77,7 +68,6 @@ function random(seed: number) {
 }
 type Random = ReturnType<typeof random>;
 
-/** A Monday: the plan's current week. */
 const CURRENT_WEEK = "2027-01-04";
 const SPORT_TYPE: Record<PlanSport, Goal["sportType"]> = { run: "Run", ride: "Ride", swim: "Swim" };
 
@@ -91,14 +81,9 @@ function availabilityOf(r: Random): Availability {
   }
 }
 
-/**
- * Six months of one sport: none, steady, building, or back from a break, at a weekly level from
- * little to a lot, in 1 to 6 sessions a week with one longer.
- */
 function historyOf(r: Random, sport: PlanSport, today: string): SportDay[] {
   const shape = r.pick(["none", "steady", "building", "break"] as const);
   if (shape === "none") return [];
-  // Weekly level in km of running, km of riding at 25 km/h, km of swimming.
   const level = { run: r.between(5, 110), ride: r.between(30, 400), swim: r.between(1, 25) }[sport];
   const perWeek = r.int(1, 6);
   const breakWeeks = shape === "break" ? r.int(2, 12) : 0;
@@ -117,16 +102,13 @@ function historyOf(r: Random, sport: PlanSport, today: string): SportDay[] {
       days.push({ date, km, minutes });
     }
   }
-  // This week's sessions before today.
   for (let date = CURRENT_WEEK; date < today; date = addDayKey(date, 1)) {
     if (r.next() < 0.4) days.push({ date, km: level / 5, minutes: level });
   }
   return days;
 }
 
-/** An A goal in a planned sport 1 to 30 weeks out, and sometimes a supporting race before it. */
 function goalsOf(r: Random, availability: Availability, today: string): Goal[] {
-  // Some athletes have no race ahead: the plan builds base fitness.
   if (r.next() < 0.15) return [];
   const sport = r.pick(plannedSports(availability));
   const distanceM = {
@@ -179,10 +161,6 @@ function progressionOf(r: Random): Progression {
   return progression;
 }
 
-/**
- * The athlete's time outs (ADR 0066): none, one in the past, a few days of one week, whole weeks,
- * one still open, one ahead, or one ending in the weeks before the A goal's taper.
- */
 function timeOutsOf(r: Random, today: string, aGoal: Goal | null): TimeOutDays[] {
   const shape = r.pick(["none", "past", "partial", "weeks", "open", "ahead", "taper"] as const);
   if (shape === "none") return [];
@@ -210,7 +188,6 @@ function timeOutsOf(r: Random, today: string, aGoal: Goal | null): TimeOutDays[]
   return [{ start, end: r.next() < 0.3 ? null : addDayKey(start, r.int(0, 20)) }];
 }
 
-/** An athlete as the server reads them, and the context the coach's plan is checked against. */
 function athlete(seed: number) {
   const r = random(seed);
   const today = addDayKey(CURRENT_WEEK, r.int(0, 6));
@@ -220,7 +197,6 @@ function athlete(seed: number) {
   const goals = goalsOf(r, availability, today);
   const aGoal = goals.find((goal) => goal.priority === "A") ?? null;
   const timeOuts = timeOutsOf(r, today, aGoal);
-  // Nothing is trained inside a time out.
   const outside = (days: SportDay[]) =>
     days.filter(
       (day) =>
@@ -247,7 +223,6 @@ function athlete(seed: number) {
     progression: progressionOf(r),
   };
   const budgets = weekBudgets({ ...budgetInput, timeOuts });
-  /** The budgets as they were before time outs: the same athlete without them. */
   const before = timeOuts.length ? weekBudgets(budgetInput) : budgets;
   const lastDay = addDayKey(budgets.at(-1)!.weekStart, 6);
   const easyRun = stepSecPerKm(
@@ -283,16 +258,13 @@ const EASY_STEP = {
 } as const;
 
 let generated: ReturnType<typeof athlete>[] | undefined;
-/** Generated in the first test that reads them, so their time counts as the guard's. */
 const athletes = () =>
   (generated ??= Array.from({ length: CASES }, (_, index) => athlete(index + 1)));
-/** The athlete's seed and setup, so a failure can be replayed with athlete(seed). */
 const label = ({ seed, ctx }: ReturnType<typeof athlete>) =>
   `seed ${seed}: ${JSON.stringify(ctx.availability)}, today ${ctx.today}, budgets ${JSON.stringify(
     ctx.weeks.map((week) => [week.budgetKm, week.budgetMinutes, week.budgetSwimM]),
   )}`;
 
-/** The longest session's time cap in the sport's unit, worked out here from the rule's minutes. */
 function timeCap(sport: PlanSport, ctx: RuleContext) {
   if (sport === "run") return (MAX_LONG_MINUTES * 60) / ctx.easySecPerKm;
   if (sport === "swim") return ((MAX_LONG_SWIM_MINUTES * 60) / ctx.easySecPer100m) * 100;
@@ -300,17 +272,10 @@ function timeCap(sport: PlanSport, ctx: RuleContext) {
 }
 
 const BUDGET_KEY = { run: "budgetKm", ride: "budgetMinutes", swim: "budgetSwimM" } as const;
-/** The budgets' rounding: whole km, 5 minutes, 100 m. */
 const ROUND_TO = { run: 1, ride: 5, swim: 100 } as const;
 
-/** Each week back after the first adds this share of the level (ADR 0066). */
 const RAMP_STEP = 0.15;
 
-/**
- * The ramp's share of the level in a week after a time out ends (ADR 0066): 80 / 60 / 40 % after
- * 1–6 / 7–13 / 14 or more days off in the first week that starts after it, then 15 points a week.
- * Null before the first week back.
- */
 function rampShare({ start, end }: TimeOutDays, weekStart: string) {
   if (end == null || end >= weekStart) return null;
   const daysOff = daysTo(start, end) + 1;
@@ -327,8 +292,6 @@ describe("coach plan property guard", () => {
         for (const sport of plannedSports(ctx.availability)) {
           const floor = weekFloor(week, ctx, sport);
           if (floor == null) continue;
-          // The largest valid week: every session available, equal (so the long session's share
-          // holds), each at the longest rule 2 and the time cap allow, and the budget's 5 % over.
           const longest = Math.min(
             timeCap(sport, ctx),
             longestAllowed(week.weekStart, sport, ctx, []).limit,
@@ -354,7 +317,6 @@ describe("coach plan property guard", () => {
       item.ctx.weeks.forEach((week, index) => {
         const before = item.before[index]!;
         const days = daysOutside(week.weekStart, item.timeOuts);
-        // The weeks before every time out are budgeted as they were without them.
         const untouched = item.timeOuts.every((timeOut) => timeOut.start > week.weekStart);
         for (const { id: sport } of PLAN_SPORTS) {
           const key = BUDGET_KEY[sport];
@@ -377,7 +339,6 @@ describe("coach plan property guard", () => {
     for (const item of athletes()) {
       const [timeOut] = item.timeOuts;
       if (!timeOut) continue;
-      /** The week's ramp share, and its share of the level without the time out. */
       const at = (index: number) => {
         const week = item.ctx.weeks[index];
         if (!week || daysOutside(week.weekStart, item.timeOuts) < 7) return null;
@@ -396,17 +357,12 @@ describe("coach plan property guard", () => {
             broken.push(
               `${label(item)}: ${sport} week ${week.weekStart} at ramp ${now.ramp}, share ${now.share} ${why}, ${JSON.stringify(item.timeOuts)}: ${before} → ${week[key]}`,
             );
-          // Its share of what the week would have held, give or take both roundings; a week the
-          // ramp doesn't cut is exactly as it would have been. Growth runs on underneath either way.
           const expected = (before * kept) / now.share;
           if (
             kept === now.share ? week[key] !== before : Math.abs(week[key] - expected) > step + 1
           ) {
             fail(`not at its share (${expected.toFixed(1)})`);
           }
-          // Points of the level the week would have had: none climbs more than 15 over a week the
-          // ramp cut, the step onto the first full week included. A lighter week the ramp didn't
-          // cut steps back up as the season does.
           const then = at(index - 1);
           const previous = item.before[index - 1]?.[key] ?? 0;
           if (!then || then.ramp >= then.share || before === 0 || previous === 0) continue;
@@ -424,15 +380,12 @@ describe("coach plan property guard", () => {
 
   it("forecasts the season the coach plan writes, time outs included", () => {
     const broken: string[] = [];
-    // Athletes with a time out, a third of them: a season's seeds cost too much to read for all.
     for (const item of athletes()
       .filter((athlete) => athlete.timeOuts.length)
       .slice(0, 200)) {
       const { budgetInput, timeOuts } = item;
-      // Past the written weeks, through a time out's ramp back.
       const input = { ...budgetInput, count: 12, timeOuts };
       const written = weekBudgets(input);
-      // The season chart's volume, as the server sends it to Plan and Settings → Training.
       const shape = withTimeOuts(
         seasonShape(input.goals, input.aGoal, input.firstWeek, input.count),
         timeOuts,
@@ -480,7 +433,6 @@ describe("coach plan property guard", () => {
       // Up to 76: from about 76.7, a world-class marathoner's, the marathon range's fast end
       // runs into threshold's slow end by a few seconds (#223). Widen to 90 when it's fixed.
       const vdot = r.between(20, 76);
-      // Zone 2 found anywhere from far too fast to far too slow, or not at all.
       const fast = r.int(150, 520);
       const paces = trainingPaces({
         settings: { from: "automatic", effort: null, easyFrom: r.pick(["heartRate", "vdot"]) },
@@ -515,13 +467,11 @@ describe("coach plan property guard", () => {
     const r = random(161);
     const broken: string[] = [];
     for (let index = 0; index < PACE_CASES; index += 1) {
-      // Two to six hard runs, each with best efforts at a few race distances from 5 km up...
       const hard = Array.from({ length: r.int(2, 6) }, (_, run) =>
         effortsOf(`hard-${run}`, r.between(32, 70), r.int(0, 15), r),
       ).flat();
       const before = estimateVdot(hard, NOW, r.pick(RACE_DISTANCES));
       if (!before) continue;
-      // ...then easy runs, long and short, each slower than every hard run's best.
       const weakest = Math.min(
         ...hard.map((effort) => vdotFromRace(effort.metres, effort.seconds)),
       );
@@ -546,7 +496,6 @@ const EFFORT: RunEffort = {
   seconds: 2700,
 };
 
-/** One run's best efforts at a run of `vdot`, at 5 km and some longer race distances. */
 function effortsOf(activityId: string, vdot: number, weeksOld: number, r: Random): RunEffort[] {
   const start = new Date(NOW.getTime() - weeksOld * 7 * 86_400_000).toISOString();
   const longest = r.int(2, RACE_DISTANCES.length - 1);
@@ -555,7 +504,6 @@ function effortsOf(activityId: string, vdot: number, weeksOld: number, r: Random
     name: activityId,
     start,
     metres,
-    // A run's longer efforts are a little slower than its best, as in a real run's pace profile.
     seconds: predictRaceSeconds(vdot * (metres === 5000 ? 1 : r.between(0.97, 1)), metres),
   }));
 }

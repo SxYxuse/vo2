@@ -3,22 +3,9 @@ import { join } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vite-plus/test";
 
-/*
- * UI text kept using words GLOSSARY.md lists under _Avoid_ ("safety limit" for the cap). This
- * fails when a string or JSX text in src/**\/*.tsx uses one. Only phrases of several words or
- * with a hyphen are checked: single words ("block", "client", "Calendar") are ordinary English
- * and CSS classes. Phrases with a qualifier in parentheses, rules such as "CTL used alone" or
- * over four words, phrases that are glossary terms themselves, and "A race" (an article in most
- * sentences) are skipped, because they are only wrong in some sentences.
- */
-
 const ROOT = join(import.meta.dirname, "..");
 const glossary = readFileSync(join(ROOT, "GLOSSARY.md"), "utf8");
 
-/**
- * Uses from before this guard, by phrase and file. Remove a line once its text follows the
- * glossary; never add one for new text.
- */
 const KNOWN: Record<string, string[]> = {
   "all-time best": ["src/components/training-paces.tsx"],
   "power zone": ["src/components/power-file-detail.tsx"],
@@ -45,7 +32,6 @@ const avoided = [
     !glossaryTerms.has(phrase),
 );
 
-/** Every string literal and JSX text in one file, without import paths. */
 function uiText(file: string): string[] {
   const source = ts.createSourceFile(
     file,
@@ -58,7 +44,7 @@ function uiText(file: string): string[] {
   const visit = (node: ts.Node) => {
     if (ts.isImportDeclaration(node)) return;
     if (ts.isJsxText(node) || ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node))
-      texts.push(node.text.replace(/\s+/g, " ")); // JSX prose wraps across lines
+      texts.push(node.text.replace(/\s+/g, " "));
     ts.forEachChild(node, visit);
   };
   visit(source);
@@ -95,5 +81,9 @@ describe("glossary terms in UI text", () => {
         .map((file) => `${file}: "${phrase}"`),
     );
     expect(fixed, "Remove these from KNOWN").toEqual([]);
+  });
+
+  it("never grow KNOWN: new text uses the glossary term", () => {
+    expect(Object.values(KNOWN).flat().length).toBeLessThanOrEqual(3);
   });
 });

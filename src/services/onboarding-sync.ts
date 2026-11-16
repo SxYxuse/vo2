@@ -10,12 +10,6 @@ export type OnboardingSyncStep = {
   phase: OnboardingSyncPhase;
 };
 
-/**
- * Gate for the first onboarding step. The athlete may continue once the newest page of
- * activities is copied; older history and streams keep copying behind them (ADR 0012).
- * `syncFailed` and `syncPaused` describe the sync run in this session: a pause still lets
- * the athlete move on after its window has passed and the stored copy reads incomplete again.
- */
 export function onboardingSyncStep(input: {
   status: SyncKind;
   syncing: boolean;

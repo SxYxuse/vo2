@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 
 type MapViewComponent = typeof import("./activity-detail-map-view.tsx").ActivityDetailMapView;
 
-// The outline is the fallback, so a chunk that can't download offline still leaves a map card.
 const ActivityDetailMapView = lazy(() =>
   import("./activity-detail-map-view.tsx")
     .then((mod) => ({ default: mod.ActivityDetailMapView }))
@@ -22,12 +21,10 @@ const ActivityDetailMapView = lazy(() =>
 
 const DEFAULT_COLOR = "var(--color-ds-blue-700)";
 
-/** The line on a plain background: no map library, no tiles, so it draws at once and offline. */
 function ActivityOutline({ trace, color }: { trace: ActivityMapTrace; color: string }) {
   const { path, start, finish, viewBox } = useMemo(() => {
     const lats = trace.coordinates.map(([, lat]) => lat);
     const midLat = ((Math.min(...lats) + Math.max(...lats)) / 2) * (Math.PI / 180);
-    // Squash longitude by latitude so the shape matches the map's.
     const project = ([lng, lat]: [number, number]) => [lng * Math.cos(midLat), -lat] as const;
     const points = trace.coordinates.map(project);
     const xs = points.map(([x]) => x);
@@ -102,10 +99,6 @@ function ActivityMapSurface({
   );
 }
 
-/**
- * Where the activity happened. A still card on the page that opens a pannable map full screen;
- * activities without an outline (indoor sessions) get no card at all.
- */
 export function ActivityDetailMap({
   outline,
   title,

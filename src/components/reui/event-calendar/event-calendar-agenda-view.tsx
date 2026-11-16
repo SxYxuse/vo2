@@ -26,8 +26,6 @@ import { cn } from "cn";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CalendarIcon } from "lucide-react";
 
-// The agenda window length is the agendaDayCount SETTING (the store derives
-// visibleRange from it); a per-view prop here would silently disagree.
 type EventCalendarAgendaViewProps = useRender.ComponentProps<"div">;
 
 function EventCalendarAgendaView({ className, render, ...props }: EventCalendarAgendaViewProps) {
@@ -40,7 +38,6 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
       isEqual: (a, b) => getRangeKey(a) === getRangeKey(b),
     },
   );
-  // Subscribe to event changes via the day-bucket content of the whole range
   useEventCalendarSelector((state) => state.events);
 
   const days = useMemo(() => {
@@ -89,10 +86,6 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
           )}
         </div>
       ) : (
-        // Drop the very last row's bottom border so it does not double up with
-        // the calendar container's own bottom border. Targets the last day
-        // group's last child (its last agenda item); per-item `border-b` is
-        // kept everywhere else, including each day's internal rows.
         <div className="flex flex-col [&>*:last-child>*:last-child]:border-b-0">
           {groups.map(({ day, bucket }) => {
             const items = [...(bucket?.allDay ?? []), ...(bucket?.timed ?? [])];
@@ -106,30 +99,17 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
                 key={day.getTime()}
                 data-slot="event-calendar-agenda-day"
                 data-today={isToday(day) || undefined}
-                // A named group per day so a screen reader can step day by day
-                // (and hear how full one is) instead of arrowing every row.
                 role="group"
                 aria-label={`${weekday}, ${dayDate}, ${settings.i18n.labels.events(items.length)}`}
                 className="content-visibility-auto"
                 style={{ contentVisibility: "auto", containIntrinsicSize: "auto 8rem" }}
               >
-                {/* Group header: weekday (leading) + full date (trailing) */}
                 <div
                   data-slot="event-calendar-agenda-day-header"
-                  // The day bar is the agenda's only structure, so give it a
-                  // heading level: the H key and the rotor can jump between
-                  // days, which is the whole point of a long agenda.
                   role="heading"
                   aria-level={3}
                   className={cn(
                     "bg-muted/60 sticky top-0 z-10 flex items-baseline justify-between gap-4 border-b px-4 py-2",
-                    // The custom ScrollArea's overlay scrollbar (w-2.5 = 10px)
-                    // is painted UNDER this sticky, z-10, opaque header, so the
-                    // thumb vanishes behind the day bar at the top of the view.
-                    // Inset the header by the scrollbar lane so its background
-                    // stops before the scrollbar instead of covering it. Native
-                    // scrollbars already sit outside the content box, so this
-                    // only applies to the custom-scrollbar path.
                     !native && "me-2.5",
                     viewConfig.classNames?.agendaDayHeader,
                   )}
@@ -155,9 +135,6 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
   const defaultProps = {
     "data-slot": "event-calendar-agenda-view",
     "data-view": "agenda",
-    // Unlike the grid views the agenda has no row/column semantics to carry a
-    // name, so label the region with the day range it covers - through
-    // formatDayRange, so a consumer override reaches it.
     role: "group",
     "aria-label": settings.i18n.functions.formatDayRange(visibleRange, {
       locale: settings.locale,
@@ -191,18 +168,12 @@ function EventCalendarAgendaView({ className, render, ...props }: EventCalendarA
   );
 }
 
-/**
- * One agenda row: a full-width, selectable table row - time column, color dot,
- * and title (all replaceable via renderAgendaEvent). Clicking selects the
- * event (drag/resize stay off in the agenda).
- */
 function EventCalendarAgendaItem({ segment }: { segment: EventCalendarSegment }) {
   const viewConfig = useEventCalendarViewConfig();
   return (
     <EventCalendarEvent
       segment={segment}
       className={cn(
-        // read-only list: hover only, no selected/focused styling on click
         "hover:bg-accent/40 gap-3 rounded-none border-b px-4 py-2.5 transition-colors",
         viewConfig.classNames?.agendaItem,
       )}

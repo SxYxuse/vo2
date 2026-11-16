@@ -12,7 +12,6 @@ export type {
   StrokeAngles,
 } from "./power-file-analysis.ts";
 
-/** The synced Strava ride that started within a few minutes of the file (ADR 0056). */
 export type MatchedActivity = { id: string; name: string };
 
 export type PowerFileListItem = {
@@ -40,7 +39,6 @@ export type PowerFileImport =
   | { status: "imported" | "duplicate"; id: string }
   | { status: "rejected"; reason: string };
 
-/** A ride's title: the synced ride's name, else the kind of ride and its date. */
 export function powerFileTitle(file: { activity: MatchedActivity | null; start: string }) {
   if (file.activity) return file.activity.name;
   const day = new Date(file.start).toLocaleDateString("en-US", {
@@ -65,7 +63,6 @@ export const getPowerFile = createServerFn({ method: "GET" })
     return getPowerFileImpl(data.id);
   });
 
-/** Takes the file as form data: a ride's FIT file is a few megabytes of binary. */
 export const importPowerFile = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     if (!(data instanceof FormData)) throw new Error("Expected a file upload");
