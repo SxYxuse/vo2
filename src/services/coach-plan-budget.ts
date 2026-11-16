@@ -179,6 +179,9 @@ export function seasonShape(
   return Array.from({ length: count }, (_, index) => {
     const weekStart = addDayKey(firstWeek, 7 * index);
     const phase = seasonPhase(goals, weekStart);
+    const anchorSports = [
+      ...new Set(phase.anchor.flatMap((goal) => planSportOf(goal.sportType) ?? [])),
+    ];
     const weeksLeft = aGoal ? Math.floor(daysBetween(weekStart, aGoal.date) / 7) : -1;
     const taper = aGoal && weeksLeft >= 0 ? taperShare(weeksLeft, aGoal) : null;
     return {
@@ -187,9 +190,7 @@ export function seasonShape(
       lighter: phase.lighter && taper == null,
       taper: taper != null || phase.kind === "taper" || phase.kind === "race",
       share: taper ?? phase.loadFactor ?? 1,
-      anchorSports: phase.anchor.length
-        ? [...new Set(phase.anchor.flatMap((goal) => planSportOf(goal.sportType) ?? []))]
-        : PLAN_SPORTS.map((sport) => sport.id),
+      anchorSports: anchorSports.length ? anchorSports : PLAN_SPORTS.map((sport) => sport.id),
     };
   });
 }

@@ -503,7 +503,7 @@ function volumeOf(inputs: Inputs): SeasonVolume | null {
         sport,
         seed,
         growth: progression[sport]?.growth ?? null,
-        defaultGrowth: aSports.includes(sport) ? STANDARD_GROWTH : 0,
+        defaultGrowth: !aGoal || aSports.includes(sport) ? STANDARD_GROWTH : 0,
         peak: progression[sport]?.peak ?? null,
         recommended: recommendedPeak(sport, seed.usual, goal),
         goal: goal ? { name: goal.name, floor: racePeak(sport, goal).floor } : null,
