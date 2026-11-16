@@ -6,6 +6,7 @@ import { createFileRoute, type ErrorComponentProps } from "@tanstack/react-route
 import { ThermometerIcon, TrendingUpIcon } from "lucide-react";
 
 import { FitnessChart } from "@/components/fitness-chart.tsx";
+import { PredictedTimeTrendCard } from "@/components/predicted-time-trend.tsx";
 import { ProgressCards } from "@/components/progress-cards.tsx";
 import { SignInPanel } from "@/components/sign-in-panel.tsx";
 import { TimeOutSheet, type TimeOutEditing } from "@/components/time-out-sheet.tsx";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   fitnessQueryOptions,
   loaderQuery,
+  predictedTimeTrendQueryOptions,
   progressQueryOptions,
   timeOutsQueryOptions,
 } from "@/lib/queries.ts";
@@ -35,6 +37,7 @@ export const Route = createFileRoute("/_app/fitness")({
   loader: ({ context }) => {
     // Progress reads streams and may build best efforts, so it streams in below the graph.
     void context.queryClient.query(loaderQuery(progressQueryOptions)).catch(noop);
+    void context.queryClient.query(loaderQuery(predictedTimeTrendQueryOptions)).catch(noop);
     return Promise.all([
       context.queryClient.query(loaderQuery(fitnessQueryOptions)),
       context.queryClient.query(loaderQuery(timeOutsQueryOptions)),
@@ -80,6 +83,7 @@ function FitnessPage() {
             onEditTimeOut={setEditing}
           />
           <TimeOutSheet editing={editing} onClose={() => setEditing(null)} />
+          <PredictedTimeTrendCard />
           <ProgressCards />
         </>
       ) : (

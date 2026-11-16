@@ -1,12 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { paceChoiceSchema, raceResultSchema, type TrainingPaces } from "./training-paces.types.ts";
+import {
+  paceChoiceSchema,
+  raceResultSchema,
+  type PredictedTimeTrend,
+  type TrainingPaces,
+} from "./training-paces.types.ts";
 
 export const loadTrainingPaces = createServerFn({ method: "GET" }).handler(
   async (): Promise<TrainingPaces> => {
     const { loadTrainingPacesImpl } = await import("./training-paces.server.ts");
     return loadTrainingPacesImpl();
+  },
+);
+
+export const loadPredictedTimeTrend = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PredictedTimeTrend> => {
+    const { loadPredictedTimeTrendImpl } = await import("./training-paces.server.ts");
+    return loadPredictedTimeTrendImpl();
   },
 );
 

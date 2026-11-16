@@ -18,7 +18,7 @@ import { loadTopEffortCelebrations } from "@/services/top-efforts.ts";
 import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { listTimeOuts } from "@/services/time-outs.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
-import { loadTrainingPaces } from "@/services/training-paces.ts";
+import { loadPredictedTimeTrend, loadTrainingPaces } from "@/services/training-paces.ts";
 
 // Apart so the sign-in page can read the app shell without loading every service's validators.
 export { appShellQueryOptions, loaderQuery, planningStyleOf } from "./app-shell-query.ts";
@@ -105,6 +105,13 @@ export const heartRateQueryOptions = queryOptions({
 export const trainingPacesQueryOptions = queryOptions({
   queryKey: ["training-paces"],
   queryFn: () => loadTrainingPaces(),
+  staleTime: 5 * 60_000,
+});
+
+/** Reads every road run's best efforts, so it streams in below the fitness chart. */
+export const predictedTimeTrendQueryOptions = queryOptions({
+  queryKey: ["predicted-time-trend"],
+  queryFn: () => loadPredictedTimeTrend(),
   staleTime: 5 * 60_000,
 });
 

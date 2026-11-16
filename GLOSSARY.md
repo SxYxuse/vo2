@@ -125,7 +125,7 @@ A technique exercise a coach plan step names, such as catch-up or kick with a bo
 _Avoid_: Technique set, exercise
 
 **Predicted race time**:
-The time VO2 expects the athlete to run a goal's distance today, read from their training paces. Goals have no target time; the prediction takes its place.
+The time VO2 expects the athlete to run a goal's distance today, read from their training paces. Goals have no target time; the prediction takes its place. The Fitness page charts it week by week from the Automatic estimate, for the next running A goal's distance or 10 km.
 _Avoid_: Goal time, target time, race estimate
 
 **Plan change**:

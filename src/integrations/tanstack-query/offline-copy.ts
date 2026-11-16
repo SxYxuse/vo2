@@ -27,6 +27,7 @@ export const OFFLINE_QUERY_KEYS = [
   "heart-rate",
   "power-files",
   "training-paces",
+  "predicted-time-trend",
   "settings-snapshot",
   "coach-chats",
   "coach-chat",
