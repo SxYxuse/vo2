@@ -509,7 +509,7 @@ export function readCoachPlan(value: unknown): CoachPlan | null {
 export type CoachPlanStatus = "idle" | "writing" | "failed";
 
 /** What the coach plan still needs before it can be written. */
-export type CoachPlanMissing = "key" | "goal" | "availability" | "goalSport";
+export type CoachPlanMissing = "key" | "availability" | "goalSport";
 
 export type GoalSummary = Pick<Goal, "id" | "name" | "date" | "distanceM" | "sportType">;
 
@@ -519,14 +519,14 @@ export type CoachPlanState = {
   availability: Availability | null;
   /** The coach brief, or "" for none. */
   brief: string;
-  /** The upcoming A run, ride, or swim with a distance the plan builds toward. */
+  /** The upcoming A run, ride, or swim with a distance the plan builds toward; none builds base. */
   aGoal: GoalSummary | null;
   missing: CoachPlanMissing[];
   plan: CoachPlan | null;
   status: CoachPlanStatus;
   /** Why the last writing failed, in words for the athlete. */
   error: string | null;
-  /** The season week by week, from this one through the last goal ahead. */
+  /** The season week by week, from this one through the last goal ahead or the base weeks shown. */
   road: SeasonWeek[];
   /** The goals ahead, every sport, in date order. */
   goals: Goal[];

@@ -135,14 +135,6 @@ const MISSING: Record<CoachPlanMissing, { text: string; link: ReactNode }> = {
       </Link>
     ),
   },
-  goal: {
-    text: "The plan builds toward an upcoming A goal: a run, a ride, or a swim with a distance.",
-    link: (
-      <Link to="/season" className="underline">
-        Add one in Season
-      </Link>
-    ),
-  },
   availability: {
     text: "The coach needs to know how many times a week you run, ride, and swim.",
     link: (
@@ -273,7 +265,8 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
       <FieldDescription>
         The coach plan builds toward an A race: a run, a ride, or a swim with a distance. Add yours
         here; you can add more goals, of any sport, in Season later. A triathlon is one goal per
-        leg, on the same day.
+        leg, on the same day. No race yet? Continue without one: the plan builds your base fitness
+        until you add one.
       </FieldDescription>
       <FieldSet>
         <FieldLegend variant="label">Sport</FieldLegend>
@@ -461,11 +454,21 @@ export function CoachPlanSettings() {
   return (
     <FieldGroup>
       <CoachPlanMissingAlert missing={missing} />
-      {state.aGoal ? (
-        <FieldDescription>
-          Building toward <strong>{state.aGoal.name}</strong> on {state.aGoal.date}.
-        </FieldDescription>
-      ) : null}
+      <FieldDescription>
+        {state.aGoal ? (
+          <>
+            Building toward <strong>{state.aGoal.name}</strong> on {state.aGoal.date}.
+          </>
+        ) : (
+          <>
+            No A goal ahead: the plan builds your base fitness.{" "}
+            <Link to="/season" className="underline">
+              Add a race in Season
+            </Link>{" "}
+            to build toward it.
+          </>
+        )}
+      </FieldDescription>
       <AvailabilityFields value={draft} onChange={setDraft} />
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Button

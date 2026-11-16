@@ -74,6 +74,8 @@ import { canPredict, predictRaceSeconds } from "./training-paces.types.ts";
 
 /** The current week and the three after it are written (ADR 0037). */
 const WEEKS_AHEAD = 4;
+/** Weeks of base fitness Plan shows ahead without a main goal. */
+const BASE_WEEKS_SHOWN = 12;
 /** Weeks gone by stay with the plan, frozen, this long. */
 const KEEP_PAST_WEEKS = 12;
 /** History read for the budget's floor: six months and the week before. */
@@ -257,7 +259,6 @@ export const anchorsOf = (inputs: Inputs): PlanAnchors => ({
 function missingOf(inputs: Inputs): CoachPlanMissing[] {
   const missing: CoachPlanMissing[] = [];
   if (inputs.coach.kind === "missing") missing.push("key");
-  if (!inputs.aGoal) missing.push("goal");
   if (!inputs.availability) missing.push("availability");
   // An A goal whose sport has no sessions a week has nothing building toward it.
   const goalSport = inputs.aGoal ? planSportOf(inputs.aGoal.sportType) : null;
@@ -273,10 +274,15 @@ const upcomingOf = (inputs: Inputs) =>
     .filter((goal) => goal.date >= inputs.today)
     .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
 
-/** The season week by week, from this one through the last goal ahead. */
+/**
+ * The season week by week, from this one through the last goal ahead. Without a main goal ahead
+ * it runs at least BASE_WEEKS_SHOWN weeks: base fitness has no end to run to.
+ */
 function roadOf(inputs: Inputs) {
   const last = upcomingOf(inputs).at(-1)?.date;
-  return last ? seasonWeeks(inputs.goals, inputs.currentWeek, last) : [];
+  const baseEnd = addDayKey(inputs.currentWeek, 7 * BASE_WEEKS_SHOWN - 1);
+  const end = !inputs.aGoal && (!last || last < baseEnd) ? baseEnd : last;
+  return end ? seasonWeeks(inputs.goals, inputs.currentWeek, end) : [];
 }
 
 /** Goals the plan is written around: upcoming runs, rides, and swims, and every upcoming A goal. */
@@ -474,14 +480,14 @@ const SPORT_DOING: Record<PlanSport, string> = {
 };
 
 /**
- * The season's volume through the last goal, for Plan and the progression setting (ADR 0058):
- * each planned sport's start, progression, and peak, so the app projects the same budgets the
- * coach is held to. Null without an A goal or availability: nothing builds.
+ * The season's volume through the road, for Plan and the progression setting (ADR 0058): each
+ * planned sport's start, progression, and peak, so the app projects the same budgets the coach is
+ * held to. Null without availability: nothing builds.
  */
 function volumeOf(inputs: Inputs): SeasonVolume | null {
   const { aGoal, availability, progression } = inputs;
   const road = roadOf(inputs);
-  if (!aGoal || !availability || !road.length) return null;
+  if (!availability || !road.length) return null;
   const shape = withTimeOuts(
     seasonShape(inputs.goals, aGoal, inputs.currentWeek, road.length),
     inputs.timeOuts,
@@ -744,7 +750,7 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
     const inputs = await gather(userId);
     gathered = inputs;
     const { availability, aGoal, coach } = inputs;
-    if (!availability || !aGoal || coach.kind === "missing") {
+    if (!availability || coach.kind === "missing") {
       await finish(userId, claimedAt, failedValues(inputs, "The coach plan is missing its setup."));
       return;
     }
@@ -789,18 +795,20 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
       ...paceContext(inputs),
     };
     const prompt = {
-      task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, toward their main goal (aGoal) and the rest of their season, following the coaching knowledge and every rule below.`,
+      task: `Write the athlete's sessions for each week from ${fromWeek} to ${weeks.at(-1)!.weekStart}, ${aGoal ? "toward their main goal (aGoal) and the rest of their season" : "building their base fitness: no main goal is ahead, so the weeks are mostly easy aerobic volume with a long session that grows and a little quality to stay sharp, around any supporting races in otherGoals"}, following the coaching knowledge and every rule below.`,
       today: inputs.today,
-      aGoal: {
-        name: aGoal.name,
-        date: aGoal.date,
-        sportType: aGoal.sportType,
-        distanceKm: (aGoal.distanceM ?? 0) / 1000,
-        elevationGainM: aGoal.elevationGainM,
-        weeksToGo: Math.floor(daysBetween(inputs.currentWeek, aGoal.date) / 7),
-      },
+      aGoal: aGoal
+        ? {
+            name: aGoal.name,
+            date: aGoal.date,
+            sportType: aGoal.sportType,
+            distanceKm: (aGoal.distanceM ?? 0) / 1000,
+            elevationGainM: aGoal.elevationGainM,
+            weeksToGo: Math.floor(daysBetween(inputs.currentWeek, aGoal.date) / 7),
+          }
+        : null,
       otherGoals: inputs.goals
-        .filter((goal) => goal.id !== aGoal.id && goal.date >= inputs.today)
+        .filter((goal) => goal.id !== aGoal?.id && goal.date >= inputs.today)
         .map((goal) => ({
           name: goal.name,
           date: goal.date,
@@ -929,7 +937,7 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
   if (!before.row) throw new Error("Set your availability first.");
   const nextWeek = addDayKey(before.currentWeek, 7);
   let requestedFrom: string | null = null;
-  if (before.plan && before.aGoal && before.availability) {
+  if (before.plan && before.availability) {
     const budgets = weekBudgets({
       runs: before.runs,
       rides: before.rides,

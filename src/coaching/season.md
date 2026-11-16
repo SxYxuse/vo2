@@ -4,7 +4,7 @@ The athlete's plan can hold runs, rides, and swims, toward goals of any of them.
 
 ## How VO2 splits the season (rules)
 
-- **The main goal's sport builds.** Each week, the sports of the event the season builds toward (the next main goal) grow with the phase. A supporting race never leads the season. The other sports hold where they are, unless the athlete set a progression for them: their budget doesn't grow, so they keep the fitness the athlete has.
+- **The main goal's sport builds.** Each week, the sports of the event the season builds toward (the next main goal) grow with the phase. A supporting race never leads the season. The other sports hold where they are, unless the athlete set a progression for them: their budget doesn't grow, so they keep the fitness the athlete has. Without a main goal ahead, every sport builds base fitness.
 - **Lighter weeks, the taper, and recovery apply to every sport.** In the main goal's taper, cut the other sports first: keep their sessions easy and short.
 - **At most 3 quality sessions a week across runs, rides, and swims**, races included (but not races for fun), besides each sport's own limit.
 

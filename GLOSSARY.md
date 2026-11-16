@@ -161,11 +161,11 @@ The athlete's goals in date order. The coach plan works toward the next A run or
 _Avoid_: Calendar, year, block
 
 **Phase**:
-Where the week sits on the way to the next A goal, read at the start of Monday: base, build (or maintain when the last goal was close or ended under two weeks ago), peak, taper, race week, recovery, or hold without a goal. It sets how the coach plan's budgets grow and what sessions the coach writes (ADR 0021, 0022).
+Where the week sits on the way to the next A goal, read at the start of Monday: base, build (or maintain when the last goal was close or ended under two weeks ago), peak, taper, race week, recovery. Without a main goal ahead, the season builds base fitness: base weeks, every fourth one lighter. It sets how the coach plan's budgets grow and what sessions the coach writes (ADR 0021, 0022, 0067).
 _Avoid_: Build pace, block, training phase (that is read from fitness)
 
 **Lighter week**:
-Every fourth week before the peak, counted back from the goal: 70 % of the usual budgets, so the work of the three weeks before sinks in.
+Every fourth week before the peak, counted back from the goal, or on the calendar without a main goal: 70 % of the usual budgets, so the work of the three weeks before sinks in.
 _Avoid_: Rest week, deload, recovery (that follows a goal)
 
 **Guardrail**:

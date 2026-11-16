@@ -348,7 +348,7 @@ export function PlanSeason({
           </>
         ) : (
           <p className="text-muted-foreground text-xs">
-            No goals ahead: the plan holds your fitness.
+            No goals ahead: the plan builds your base fitness.
           </p>
         )}
       </div>
