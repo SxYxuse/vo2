@@ -147,7 +147,7 @@ function CollapsibleNavGroup({
 }
 
 function isActiveNavItem(item: NavItem, pathname: string) {
-  if (item.to === "/") return pathname === "/" || pathname.startsWith("/activities/");
+  if ("matches" in item) return item.matches(pathname);
   return pathname === item.to || (item.to === "/power" && pathname.startsWith("/power/"));
 }
 
