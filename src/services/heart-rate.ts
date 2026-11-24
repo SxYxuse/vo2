@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { formatSportType, type AthleteSettings } from "./athlete-settings.types.ts";
+import { BPM_MAX, BPM_MIN, emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import type { HeartRateSettings } from "./heart-rate-settings.ts";
 import {
   estimateMaxHrAnchor,
@@ -12,8 +13,6 @@ import {
 import { SPORT_GROUPS, sharesGroupData, sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 
 export const ALL_SPORTS = "all";
-export const BPM_MIN = 40;
-export const BPM_MAX = 230;
 
 export const HR_ZONES = [
   {
@@ -291,14 +290,6 @@ export function heartRateFamily(sportType: string): HeartRateFamily {
 
 function zoneModelFor(sportType: string) {
   return ZONE_MODELS[heartRateFamily(sportType)];
-}
-
-export function emptyHistogram() {
-  return Array.from({ length: BPM_MAX + 1 }, () => 0);
-}
-
-export function isPlausibleBpm(value: number | null | undefined) {
-  return value != null && Number.isFinite(value) && value >= BPM_MIN && value <= BPM_MAX;
 }
 
 export function histogramSeconds(histogram: number[]) {

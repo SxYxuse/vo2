@@ -9,7 +9,6 @@ import {
   type SettingsFormInput,
 } from "@/lib/settings-form.ts";
 import {
-  emptyHistogram,
   formatZoneBpm,
   HR_ZONES,
   missingAnchor,
@@ -20,6 +19,7 @@ import {
   type ZonedFamily,
   type ZoneMethod,
 } from "@/services/heart-rate.ts";
+import { emptyHistogram } from "@/services/bpm.ts";
 import {
   heartRateSettingsIssues,
   ZONE_METHOD_ANCHORS,

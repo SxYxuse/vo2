@@ -4,7 +4,7 @@ import {
   type ActivityChartPoint,
   type StreamSeriesKey,
 } from "@/services/activity-detail.types.ts";
-import { isPlausibleBpm } from "@/services/heart-rate.ts";
+import { isPlausibleBpm } from "@/services/bpm.ts";
 import {
   chartLocomotionValue,
   formatPaceClock,

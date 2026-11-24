@@ -2,7 +2,6 @@ import { formatLocomotion } from "./locomotion.ts";
 import { formatSportType } from "./athlete-settings.types.ts";
 import {
   athleteMaxHr,
-  emptyHistogram,
   heartRateFamily,
   HR_ZONES,
   isZonedFamily,
@@ -13,6 +12,7 @@ import {
   type ResolvedHeartRate,
   type ZoneAnchors,
 } from "./heart-rate.ts";
+import { histogramFromStreams } from "./heart-insights.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 
@@ -780,17 +780,10 @@ function zoneSharesFromSamples(
   sportType: string,
   anchors: ZoneAnchors,
 ): ZoneShare[] {
-  const histogram = emptyHistogram();
-  const time = samples.map((sample) => sample.t);
-  for (let index = 0; index < samples.length; index += 1) {
-    const bpm = Math.round(samples[index].heartrate ?? 0);
-    if (bpm < 40 || bpm > 230) continue;
-    const current = time[index];
-    const previous = index > 0 ? time[index - 1] : undefined;
-    const delta =
-      current != null && previous != null ? Math.max(0, Math.min(30, current - previous)) : 1;
-    histogram[bpm] += delta > 0 ? delta : 1;
-  }
+  const histogram = histogramFromStreams(
+    samples.map((sample) => sample.heartrate),
+    samples.map((sample) => sample.t),
+  );
   const zones = zonesFromHistogram(histogram, sportType, anchors);
   const total = zones.reduce((sum, zone) => sum + zone.seconds, 0);
   if (total <= 0) return [];

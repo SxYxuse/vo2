@@ -15,7 +15,8 @@ import {
   type ProfileSettings,
 } from "@/services/athlete-settings.types.ts";
 import type { AthleteSettingsSave, SavedAthleteSettings } from "@/services/athlete-settings.ts";
-import { BPM_MAX, BPM_MIN, ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
+import { ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
+import { BPM_MAX, BPM_MIN } from "@/services/bpm.ts";
 import {
   DEFAULT_HEART_RATE_SETTINGS,
   REST_HR_MAX,

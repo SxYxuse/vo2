@@ -1,14 +1,13 @@
 import { z } from "zod";
 
 import {
-  BPM_MAX,
-  BPM_MIN,
   ZONED_FAMILIES,
   resolveHeartRate,
   type AthleteHeartRate,
   type ZoneMethod,
   type ZonedFamily,
 } from "./heart-rate.ts";
+import { BPM_MAX, BPM_MIN } from "./bpm.ts";
 
 export const ZONED_FAMILY_LABELS: Record<ZonedFamily, string> = {
   cycling: "Cycling",

@@ -22,7 +22,8 @@ import type {
 } from "./athlete-settings.ts";
 import type { CoachFeature, CoachModelChoice, CoachModels } from "./coach-models.ts";
 import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
-import { heartRateFamily, isPlausibleBpm, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
+import { heartRateFamily, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import {
   DEFAULT_HEART_RATE_SETTINGS,
   heartRateSettingsIssues,

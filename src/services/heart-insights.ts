@@ -1,13 +1,7 @@
 import { subMonths } from "date-fns";
 
-import {
-  BPM_MAX,
-  BPM_MIN,
-  emptyHistogram,
-  isPlausibleBpm,
-  type HeartRateFamily,
-  type HeartRateZoneStat,
-} from "./heart-rate.ts";
+import type { HeartRateFamily, HeartRateZoneStat } from "./heart-rate.ts";
+import { BPM_MAX, BPM_MIN, emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
 const MAX_HR_WINDOW_MONTHS = 18;
@@ -198,7 +192,7 @@ function isMoving(streams: HeartStreams, index: number) {
   return speed == null || speed >= STOPPED_SPEED_MS;
 }
 
-export function histogramFromStreams(heartrate: number[] | null, time: number[] | null) {
+export function histogramFromStreams(heartrate: (number | null)[] | null, time: number[] | null) {
   const histogram = emptyHistogram();
   if (!heartrate?.length) return histogram;
   for (let index = 0; index < heartrate.length; index += 1) {

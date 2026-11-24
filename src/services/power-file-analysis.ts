@@ -1,7 +1,8 @@
 import { powerBests, type PowerBest } from "./best-efforts.ts";
 import { RIDE_ZONES, type RideZone } from "./coach-plan.types.ts";
 import { computeDecoupling, efficiencyFactor, type DecouplingResult } from "./heart-insights.ts";
-import { heartRateFamily, isPlausibleBpm } from "./heart-rate.ts";
+import { heartRateFamily } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import {
   buildRideAnalysis,

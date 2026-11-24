@@ -7,11 +7,11 @@ import type { HeartRateSettings } from "./heart-rate-settings.ts";
 import type { Goal } from "./season.types.ts";
 import {
   heartRateFamily,
-  isPlausibleBpm,
   isZonedFamily,
   type HeartRateFamily,
   type ZonedFamily,
 } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import {
   LTHR_MIN_SECONDS,
   LTHR_WINDOW_DAYS,
