@@ -133,13 +133,17 @@ export const coachChatsQueryOptions = queryOptions({
   staleTime: 30_000,
 });
 
+export const COACH_CHAT_KEY = "coach-chat";
+
 export function coachChatQueryKey(threadId: string) {
-  return ["coach-chat", threadId] as const;
+  return [COACH_CHAT_KEY, threadId] as const;
 }
+
+export const ACTIVITY_DETAIL_KEY = "activity";
 
 export function activityDetailQueryOptions(id: string) {
   return queryOptions({
-    queryKey: ["activity", id] as const,
+    queryKey: [ACTIVITY_DETAIL_KEY, id] as const,
     queryFn: () => getActivityDetail({ data: { id } }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,

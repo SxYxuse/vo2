@@ -21,6 +21,8 @@ import { formatBalance } from "@/components/power-files.tsx";
 import { StatGridSkeleton } from "@/components/route-states.tsx";
 import { StatCard, StatGrid } from "@/components/stat-card.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
+import { afterPowerFilesChanged } from "@/lib/query-events.ts";
+import { powerFileQueryOptions } from "@/lib/queries.ts";
 import {
   formatActivitySchedule,
   formatBpm,
@@ -758,9 +760,8 @@ function DeletePowerFile({ id }: { id: string }) {
   const deletion = useMutation({
     mutationFn: () => deletePowerFile({ data: { id } }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["power-files"] });
-      void queryClient.invalidateQueries({ queryKey: ["activity"] });
-      queryClient.removeQueries({ queryKey: ["power-file", id] });
+      await afterPowerFilesChanged(queryClient);
+      queryClient.removeQueries({ queryKey: powerFileQueryOptions(id).queryKey });
       void navigate({ to: "/power", replace: true });
     },
   });

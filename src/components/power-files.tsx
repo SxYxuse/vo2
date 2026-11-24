@@ -6,6 +6,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRightIcon, UploadIcon, ZapIcon } from "lucide-react";
 
 import { useOnline } from "@/hooks/use-online.ts";
+import { afterPowerFilesChanged } from "@/lib/query-events.ts";
 import { formatDistanceKm, formatDuration, formatWatts } from "@/services/activity-detail.ts";
 import {
   importPowerFile,
@@ -86,8 +87,7 @@ export function ImportPowerFileButton({ className }: { className?: string }) {
     setProgress(null);
     const saved = results.filter((result) => result.status !== "rejected");
     if (!saved.length) return;
-    await queryClient.invalidateQueries({ queryKey: ["power-files"] });
-    void queryClient.invalidateQueries({ queryKey: ["activity"] });
+    await afterPowerFilesChanged(queryClient);
     if (files.length === 1) {
       void navigate({ to: "/power/$fileId", params: { fileId: saved[0].id } });
       return;

@@ -50,6 +50,7 @@ import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
 import { applyPlanChangeDef, changeCoachBriefDef } from "@/services/coach-tools.ts";
 import {
+  COACH_CHAT_KEY,
   coachChatQueryKey,
   coachChatsQueryOptions,
   homeQueryOptions,
@@ -501,7 +502,7 @@ export function CoachChat({
   useEffect(() => {
     if (isLoading || isHydrating || !messages.length) return;
     queryClient.removeQueries({
-      queryKey: ["coach-chat"],
+      queryKey: [COACH_CHAT_KEY],
       predicate: (query) => query.queryKey[1] !== threadId,
     });
     queryClient.setQueryData(coachChatQueryKey(threadId), messages);
