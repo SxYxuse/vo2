@@ -1,5 +1,4 @@
 import type { ReasoningLevel } from "@tanstack/ai";
-import { byokMissing } from "@tanstack/ai/byok";
 import { createOpenaiChat } from "@tanstack/ai-openai";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 
@@ -16,7 +15,7 @@ type ListedOpenAIModel = Parameters<typeof createOpenaiChat>[0];
  * The stored id is a plain string: a model dropped from the curated list keeps running until the
  * athlete picks another. The adapters' types name only the ids they list, hence the casts.
  */
-export function textAdapter({ provider, model }: CoachModelChoice, key: string) {
+function textAdapter({ provider, model }: CoachModelChoice, key: string) {
   switch (provider) {
     case "openai":
       return createOpenaiChat(model as ListedOpenAIModel, key);
@@ -44,10 +43,17 @@ export async function coachModelFor(userId: string, feature: CoachFeature): Prom
   const choice = (await coachModelsFor(userId))[feature];
   const key = await coachKeyFor(userId, choice.provider);
   if (!key) {
-    return env.STRAVA_MOCK
+    return isCoachMocked()
       ? { kind: "mock", provider: choice.provider, model: "mock" }
       : { kind: "missing", provider: choice.provider };
   }
+  return liveCoachModel(choice, key);
+}
+
+export function liveCoachModel(
+  choice: CoachModelChoice,
+  key: string,
+): Extract<CoachModel, { kind: "live" }> {
   return {
     kind: "live",
     provider: choice.provider,
@@ -56,10 +62,6 @@ export async function coachModelFor(userId: string, feature: CoachFeature): Prom
     reasoning: choice.reasoning ?? undefined,
     key,
   };
-}
-
-export function coachKeyMissing(provider: CoachProvider) {
-  return byokMissing(provider);
 }
 
 export function isCoachMocked() {

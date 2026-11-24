@@ -5,6 +5,7 @@ import {
   maxIterations,
   toServerSentEventsResponse,
 } from "@tanstack/ai";
+import { byokMissing } from "@tanstack/ai/byok";
 import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
 import { inlineSkill, withSkills } from "@tanstack/ai-skills";
 
@@ -34,7 +35,7 @@ import { recordCoachUsage } from "./coach-usage.server.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts";
 import { mockCoachText } from "./coach-mock.ts";
-import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
+import { coachModelFor } from "./coach-model.server.ts";
 import {
   applyBriefChange,
   applyPlanChange,
@@ -396,7 +397,7 @@ export async function handleCoachChat(request: Request) {
     coachModelFor(session.user.id, "chat"),
     storedPlanningStyle(session.user.id),
   ]);
-  if (coach.kind === "missing") return coachKeyMissing(coach.provider);
+  if (coach.kind === "missing") return byokMissing(coach.provider);
   const params = await chatParamsFromRequest(request);
   if (await chatOwnedByOther(session.user.id, params.threadId)) {
     return new Response("Not found", { status: 404 });
