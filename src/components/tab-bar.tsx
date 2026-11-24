@@ -3,41 +3,21 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "cn";
-import {
-  CalendarDaysIcon,
-  EllipsisIcon,
-  FlagIcon,
-  SparklesIcon,
-  TargetIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { EllipsisIcon, type LucideIcon } from "lucide-react";
 
 import { appShellQueryOptions } from "@/lib/app-shell-query.ts";
+import { trainingNavFor, type TrainingNavItem } from "@/components/training-nav.ts";
 import { useSidebar } from "@/components/ui/sidebar";
 
-type Tab = { title: string; to: string; icon: LucideIcon; matches: (pathname: string) => boolean };
+const TAB_MATCHES: Record<TrainingNavItem["to"], (pathname: string) => boolean> = {
+  "/": (pathname) => pathname === "/" || pathname.startsWith("/activities/"),
+  "/week": (pathname) => pathname === "/week" || pathname.startsWith("/week/"),
+  "/season": (pathname) => pathname === "/season",
+  "/coach": (pathname) => pathname === "/coach",
+};
 
-const TABS: Tab[] = [
-  {
-    title: "Calendar",
-    to: "/",
-    icon: CalendarDaysIcon,
-    matches: (pathname) => pathname === "/" || pathname.startsWith("/activities/"),
-  },
-  {
-    title: "Plan",
-    to: "/week",
-    icon: TargetIcon,
-    matches: (pathname) => pathname === "/week" || pathname.startsWith("/week/"),
-  },
-  { title: "Season", to: "/season", icon: FlagIcon, matches: (pathname) => pathname === "/season" },
-  {
-    title: "Coach",
-    to: "/coach",
-    icon: SparklesIcon,
-    matches: (pathname) => pathname === "/coach",
-  },
-];
+const onAnyTab = (pathname: string) =>
+  Object.values(TAB_MATCHES).some((matches) => matches(pathname));
 
 const TAB_CLASS =
   "flex min-h-[2.75rem] flex-1 flex-col items-center justify-center gap-0.5 text-[0.6875rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
@@ -50,9 +30,8 @@ export function TabBar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
   const { openMobile, setOpenMobile } = useSidebar();
-  const tabs = shell.planningStyle === "off" ? TABS.filter((tab) => tab.to !== "/week") : TABS;
-  const onTab = tabs.some((tab) => tab.matches(pathname));
-  const moreActive = openMobile || (!onTab && !TABS.some((tab) => tab.matches(pathname)));
+  const tabs = trainingNavFor(shell.planningStyle);
+  const moreActive = openMobile || !onAnyTab(pathname);
 
   return (
     <nav
@@ -61,7 +40,7 @@ export function TabBar() {
       className="bg-background/95 supports-[backdrop-filter]:bg-background/80 fixed inset-x-0 bottom-0 z-40 flex border-t px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
     >
       {tabs.map((tab) => {
-        const active = !openMobile && tab.matches(pathname);
+        const active = !openMobile && TAB_MATCHES[tab.to](pathname);
         return (
           <Link
             key={tab.to}
