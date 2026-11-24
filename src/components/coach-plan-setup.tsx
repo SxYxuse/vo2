@@ -5,9 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CalendarCheckIcon, FlagIcon, MessageSquareTextIcon } from "lucide-react";
 
+import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { useOnline } from "@/hooks/use-online.ts";
 import { cn } from "@/lib/utils";
-import { coachPlanQueryOptions, seasonQueryOptions } from "@/lib/queries.ts";
+import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { saveCoachPlanAvailability, saveCoachPlanBrief } from "@/services/coach-plan.ts";
 import {
   availabilitySchema,
@@ -218,11 +219,7 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           priority: "A",
         },
       }),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries(coachPlanQueryOptions),
-        queryClient.invalidateQueries(seasonQueryOptions),
-      ]),
+    onSuccess: () => afterGoalsChanged(queryClient),
   });
   if (!state) {
     return (
