@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { weekBudgets, type SportDay } from "./coach-plan-budget.ts";
+import { coachPlanGoal } from "./coach-plan.types.ts";
 import { addDayKey } from "./day-key.ts";
 import type { Goal } from "./season.types.ts";
 
@@ -49,12 +50,15 @@ describe("weekBudgets without a main goal", () => {
       rides: [],
       swims: [],
       goals: [hike],
-      aGoal: null,
+      aGoal: coachPlanGoal([hike], FIRST_WEEK),
       firstWeek: FIRST_WEEK,
       count: 2,
       availability: { runsPerWeek: 3, ridesPerWeek: 0, swimsPerWeek: 0 },
       progression: {},
     });
-    expect(budgets.map((week) => week.budgetKm)).toEqual([30, 32]);
+    expect(budgets.map((week) => [week.phase, week.budgetKm])).toEqual([
+      ["base", 30],
+      ["base", 32],
+    ]);
   });
 });

@@ -1,9 +1,10 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { describe, expect, it } from "vite-plus/test";
 
 import { projectedBudgets } from "../components/season-volume.tsx";
 import {
   ceilingOf,
-  daysOutside,
   seasonShape,
   sportSeed,
   weekBudgets,
@@ -13,6 +14,7 @@ import {
 } from "./coach-plan-budget.ts";
 import { mockCoachPlan } from "./coach-plan-mock.ts";
 import {
+  BUDGET_TOLERANCE,
   checkPlan,
   longestAllowed,
   MAX_LONG_MINUTES,
@@ -283,6 +285,18 @@ function rampShare({ start, end }: TimeOutDays, weekStart: string) {
   return Math.round((first + RAMP_STEP * Math.floor((daysTo(end, weekStart) - 1) / 7)) * 100) / 100;
 }
 
+const DAY_MS = 86_400_000;
+
+function uncoveredDays(weekStart: string, timeOuts: { start: string; end: string | null }[]) {
+  const first = Date.parse(`${weekStart}T00:00:00Z`);
+  let days = 0;
+  for (let index = 0; index < 7; index += 1) {
+    const day = new Date(first + index * DAY_MS).toISOString().slice(0, 10);
+    if (!timeOuts.some(({ start, end }) => start <= day && (end == null || day <= end))) days += 1;
+  }
+  return days;
+}
+
 describe("coach plan property guard", () => {
   it("never sets a weekly floor above the largest valid week", () => {
     const broken: string[] = [];
@@ -297,7 +311,7 @@ describe("coach plan property guard", () => {
             longestAllowed(week.weekStart, sport, ctx, []).limit,
           );
           const largest = Math.min(
-            week[BUDGET_KEY[sport]] * 1.05,
+            week[BUDGET_KEY[sport]] * BUDGET_TOLERANCE,
             sessionsAvailable(week, ctx, sport) * longest,
           );
           if (floor > largest + 1e-6) {
@@ -316,7 +330,7 @@ describe("coach plan property guard", () => {
     for (const item of athletes()) {
       item.ctx.weeks.forEach((week, index) => {
         const before = item.before[index]!;
-        const days = daysOutside(week.weekStart, item.timeOuts);
+        const days = uncoveredDays(week.weekStart, item.timeOuts);
         const untouched = item.timeOuts.every((timeOut) => timeOut.start > week.weekStart);
         for (const { id: sport } of PLAN_SPORTS) {
           const key = BUDGET_KEY[sport];
@@ -341,7 +355,7 @@ describe("coach plan property guard", () => {
       if (!timeOut) continue;
       const at = (index: number) => {
         const week = item.ctx.weeks[index];
-        if (!week || daysOutside(week.weekStart, item.timeOuts) < 7) return null;
+        if (!week || uncoveredDays(week.weekStart, item.timeOuts) < 7) return null;
         const ramp = rampShare(timeOut, week.weekStart);
         return ramp == null ? null : { ramp: Math.min(1, ramp), share: item.shares[index]! };
       };
@@ -407,7 +421,7 @@ describe("coach plan property guard", () => {
         };
       });
       const forecast = projectedBudgets({ shape, sports }, {});
-      if (JSON.stringify(forecast) !== JSON.stringify(written)) {
+      if (!isDeepStrictEqual(forecast, written)) {
         broken.push(`${label(item)}, time outs ${JSON.stringify(timeOuts)}`);
       }
     }

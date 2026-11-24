@@ -248,7 +248,7 @@ export function projectSport(
 
 export type TimeOutDays = { start: string; end: string | null };
 
-export function daysOutside(weekStart: string, timeOuts: TimeOutDays[]) {
+function daysOutside(weekStart: string, timeOuts: TimeOutDays[]) {
   let days = 0;
   for (let index = 0; index < 7; index += 1) {
     const day = addDayKey(weekStart, index);

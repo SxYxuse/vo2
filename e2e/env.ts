@@ -24,9 +24,13 @@ export function e2eDatabaseUrl(database = E2E_DATABASE) {
   return url.toString();
 }
 
-export const E2E_PORT = (Number(process.env.PORT) || DEFAULT_DEV_PORT) + 1000;
+export const E2E_PORT_OFFSET = 1000;
+export const E2E_BROWSER_PORT_OFFSET = 2000;
+
+const DEV_PORT = Number(process.env.PORT) || DEFAULT_DEV_PORT;
+export const E2E_PORT = DEV_PORT + E2E_PORT_OFFSET;
 export const E2E_URL = `http://localhost:${E2E_PORT}`;
 
-export const E2E_BROWSER_PORT = E2E_PORT + 1000;
+export const E2E_BROWSER_PORT = DEV_PORT + E2E_BROWSER_PORT_OFFSET;
 
 export const E2E_NOW = "2026-06-17T09:00:00.000Z";

@@ -6,7 +6,6 @@ import {
   DEFAULT_DEV_PORT,
   inPortRange,
   assertSafeIdentifier,
-  pathHash,
   pickPort,
   planEnv,
   readEnvValue,
@@ -14,13 +13,16 @@ import {
   usesRenamedVoDatabase,
   worktreeDatabaseName,
 } from "./worktree-env.ts";
+import { E2E_BROWSER_PORT_OFFSET, E2E_PORT_OFFSET } from "../e2e/env.ts";
 
 const path = "/Users/me/.t3/worktrees/sxyxuse-vo2/t3-763c4ce5";
+// worktree-prune finds a worktree's database by this hash, so it must not change.
+const PATH_HASH = "eb3fbe";
 
 describe("worktreeDatabaseName", () => {
   it("sanitizes the branch and ends with a hash of the worktree path", () => {
     expect(worktreeDatabaseName("fix/app-slowness", path)).toBe(
-      `vo2_wt_fix_app_slowness_${pathHash(path)}`,
+      `vo2_wt_fix_app_slowness_${PATH_HASH}`,
     );
     expect(worktreeDatabaseName("Feat/Ünïcode--Branch", path)).toMatch(
       /^vo2_wt_feat_n_code_branch_[0-9a-f]{6}$/,
@@ -34,13 +36,13 @@ describe("worktreeDatabaseName", () => {
   it("stays within Postgres's 63-character identifier limit", () => {
     const name = worktreeDatabaseName(`feat/${"x".repeat(200)}`, path);
     expect(name).toHaveLength(63);
-    expect(name.endsWith(`_${pathHash(path)}`)).toBe(true);
+    expect(name.endsWith(`_${PATH_HASH}`)).toBe(true);
     expect(() => assertSafeIdentifier(name)).not.toThrow();
   });
 
   it("never produces the shared database name", () => {
     expect(worktreeDatabaseName("vo2", path)).not.toBe("vo2");
-    expect(worktreeDatabaseName("", path)).toBe(`vo2_wt_head_${pathHash(path)}`);
+    expect(worktreeDatabaseName("", path)).toBe(`vo2_wt_head_${PATH_HASH}`);
   });
 });
 
@@ -108,6 +110,9 @@ describe("pickPort", () => {
   it("skips ports other worktrees own and ports that are listening", async () => {
     const listening = async (port: number) => port === 3101;
     expect(await pickPort(undefined, new Set([3100]), listening)).toBe(3102);
+  });
+
+  it("replaces a current port outside the worktree range", async () => {
     expect(await pickPort(3000, new Set(), nothingListens)).toBe(3100);
   });
 });
@@ -120,7 +125,7 @@ describe("DEFAULT_DEV_PORT", () => {
   });
 
   it("keeps its dev, e2e and browser ports clear of every worktree's", () => {
-    const offsets = [0, 1000, 2000];
+    const offsets = [0, E2E_PORT_OFFSET, E2E_BROWSER_PORT_OFFSET];
     for (const ours of offsets) {
       for (const theirs of offsets) {
         expect(inPortRange(DEFAULT_DEV_PORT + ours - theirs)).toBe(false);

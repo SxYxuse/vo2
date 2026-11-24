@@ -3,7 +3,6 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   activePacesFrom,
   estimateVdot,
-  predictRaceSeconds,
   predictedTimeTrend,
   trendChange,
   type RunEffort,
@@ -52,14 +51,9 @@ describe("predictedTimeTrend", () => {
       run("2026-02-01T09:00:00Z"),
       run("2026-02-20T09:00:00Z", 21_097.5, 5400),
     ];
-    const today = estimateVdot(efforts, now, 21_097.5);
     const points = predictedTimeTrend(efforts, [new Date("2026-02-22T12:00:00Z"), now], 21_097.5);
-    expect(today).not.toBeNull();
-    expect(points.at(-1)).toEqual({
-      at: now,
-      vdot: today!.vdot,
-      seconds: predictRaceSeconds(today!.vdot, 21_097.5),
-    });
+    expect(estimateVdot(efforts, now, 21_097.5)?.vdot).toBe(50.3);
+    expect(points.at(-1)).toEqual({ at: now, vdot: 50.3, seconds: 5463 });
   });
 
   it("fades 1 % of VDOT a week without a new best", () => {
@@ -69,7 +63,7 @@ describe("predictedTimeTrend", () => {
     expect(point?.vdot).toBe(46.7);
   });
 
-  it("follows the stronger run, using the target distance only for near ties", () => {
+  it("follows the stronger run even off the target distance", () => {
     const at = new Date("2026-01-04T12:00:00Z");
     const twoDistances = (start: string, fiveKSeconds: number): RunEffort[] => {
       const tenK = run(start);
