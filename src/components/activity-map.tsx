@@ -2,16 +2,9 @@
 
 import { lazy, Suspense } from "react";
 
-import type { AthleteSettings } from "@/services/athlete-settings.types.ts";
-import type { ActivityMapTrack } from "@/services/activity-map.types.ts";
+import type { ActivityMapProps } from "./activity-map-view.tsx";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-
-export type ActivityMapProps = {
-  tracks: ActivityMapTrack[];
-  sportTypes: AthleteSettings["sportTypes"];
-  sportGroupShares: AthleteSettings["sportGroupShares"];
-};
 
 const ActivityMapView = lazy(() =>
   import("./activity-map-view.tsx").then((mod) => ({ default: mod.ActivityMapView })),
