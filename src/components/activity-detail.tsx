@@ -23,7 +23,7 @@ import { ActivityHeartAnalysis } from "@/components/activity-heart.tsx";
 import { ActivityRideAnalysis } from "@/components/activity-ride-analysis.tsx";
 import { StatGridSkeleton } from "@/components/route-states.tsx";
 import { StatCard, StatGrid } from "@/components/stat-card.tsx";
-import { isCyclingSport } from "@/services/training-load.ts";
+import { isCyclingSport } from "@/services/sport-groups.ts";
 import { monthKey, type DiarySearch } from "@/services/diary-window.ts";
 import type { BestsReturn } from "@/services/personal-bests.ts";
 import { weekStartKey } from "@/services/day-key.ts";

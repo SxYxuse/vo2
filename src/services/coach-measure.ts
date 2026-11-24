@@ -1,5 +1,5 @@
 import { isSwimSport, movingClock, type DistanceSport } from "./best-efforts.ts";
-import { isCyclingSport } from "./training-load.ts";
+import { isCyclingSport } from "./sport-groups.ts";
 
 export type MeasureStreams = {
   time: number[] | null;

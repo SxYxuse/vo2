@@ -43,7 +43,7 @@ import {
 } from "./ride-analysis.ts";
 import { powerFileIdFor } from "./power-file.server.ts";
 import { isOtherSportType } from "./sport-groups.ts";
-import { isCyclingSport } from "./training-load.ts";
+import { isCyclingSport } from "./sport-groups.ts";
 
 function isChartPreview(value: unknown): value is ActivityChartPreview {
   if (!value || typeof value !== "object") return false;

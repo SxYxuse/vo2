@@ -20,6 +20,7 @@ import {
 } from "./lthr-estimate.ts";
 import { dayKey } from "./day-key.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
+import { isCyclingSport, isPowerCyclingSport } from "./sport-groups.ts";
 
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
@@ -85,26 +86,6 @@ export type PmcPoint = {
   tsb: number;
 };
 
-const CYCLING_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "EMountainBikeRide",
-  "EBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
-
-const POWER_CYCLING_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
-
 function toZoned(date: Date, timeZone: string) {
   return new TZDate(date.getTime(), timeZone);
 }
@@ -136,19 +117,11 @@ function clampRestHr(value: number) {
   return Math.min(75, Math.max(40, Math.round(value)));
 }
 
-export function isCyclingSport(sportType: string) {
-  return CYCLING_SPORTS.has(sportType);
-}
-
-export function isPowerCyclingSport(sportType: string) {
-  return POWER_CYCLING_SPORTS.has(sportType);
-}
-
 function durationIntensity(sportType: string) {
   if (sportType === "EBikeRide" || sportType === "EMountainBikeRide") return 0.45;
   if (sportType === "Walk" || sportType === "Hike") return 0.45;
   if (sportType === "Run" || sportType === "TrailRun" || sportType === "VirtualRun") return 0.7;
-  if (CYCLING_SPORTS.has(sportType)) return 0.65;
+  if (isCyclingSport(sportType)) return 0.65;
   if (sportType === "Swim" || sportType === "OpenWaterSwim") return 0.65;
   if (sportType === "Workout" || sportType === "WeightTraining") return 0.5;
   return 0.55;

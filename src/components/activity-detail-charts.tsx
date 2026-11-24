@@ -18,7 +18,7 @@ import {
   type ActivityDetail,
   type StreamSeriesKey,
 } from "@/services/activity-detail.ts";
-import { isCyclingSport } from "@/services/training-load.ts";
+import { isCyclingSport } from "@/services/sport-groups.ts";
 import {
   chartConfigFor,
   chartRowsFor,

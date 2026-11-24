@@ -1,5 +1,5 @@
 import { allElevationClimbs, buildActivitySamples } from "./activity-analysis.types.ts";
-import { isPowerCyclingSport } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 const BEST_EFFORTS_VERSION = 2;
 

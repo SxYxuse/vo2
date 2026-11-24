@@ -63,6 +63,16 @@ export function sportGroupFor(sportType: string) {
   return MEMBER_TO_GROUP.get(sportType) ?? null;
 }
 
+export function isCyclingSport(sportType: string) {
+  return sportGroupFor(sportType)?.id === "cycling";
+}
+
+const E_BIKE_SPORTS = new Set(["EBikeRide", "EMountainBikeRide"]);
+
+export function isPowerCyclingSport(sportType: string) {
+  return isCyclingSport(sportType) && !E_BIKE_SPORTS.has(sportType);
+}
+
 export function isOtherSportType(sportType: string) {
   return !MEMBER_TO_GROUP.has(sportType);
 }

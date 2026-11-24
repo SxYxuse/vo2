@@ -21,7 +21,7 @@ import {
   type ProgressData,
   type ProgressSport,
 } from "./progress.ts";
-import { isPowerCyclingSport } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 function progressSport(row: { sportType: string; deviceWatts: boolean }): ProgressSport | null {
   if (isPowerCyclingSport(row.sportType) && row.deviceWatts) return "cycling";

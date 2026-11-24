@@ -3,6 +3,7 @@ import { subMonths } from "date-fns";
 import type { HeartRateFamily, HeartRateZoneStat } from "./heart-rate.ts";
 import { BPM_MAX, BPM_MIN, emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 const MAX_HR_WINDOW_MONTHS = 18;
 const ABOVE_AGE_LIMIT_BPM = 25;
@@ -447,15 +448,6 @@ const MIN_MODEL_R = 0.3;
 const RANGE_MARGIN = 0.05;
 const AEROBIC_LTHR_SHARE = 0.94;
 
-const POWER_EF_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
-
 export type EfficiencyKind = "power" | "speed";
 
 export type EfficiencyInput = {
@@ -478,7 +470,7 @@ export type EfficiencyPoint = {
 };
 
 export function efficiencyKindFor(sportType: string): EfficiencyKind | null {
-  if (POWER_EF_SPORTS.has(sportType)) return "power";
+  if (isPowerCyclingSport(sportType)) return "power";
   if (sportType === "Run") return "speed";
   return null;
 }

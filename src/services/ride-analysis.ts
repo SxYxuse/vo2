@@ -1,6 +1,6 @@
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
-import { isPowerCyclingSport } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 const RIDE_ANALYSIS_VERSION = 1;
 

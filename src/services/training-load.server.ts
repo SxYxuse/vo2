@@ -11,7 +11,6 @@ import {
   activityTrainingLoad,
   couldHoldThreshold,
   estimateLoadAnchors,
-  isPowerCyclingSport,
   toFitnessLoad,
   type FitnessPageData,
   type LoadAnchors,
@@ -19,6 +18,7 @@ import {
   type LoadSource,
   withAthleteAnchors,
 } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 type StoredLoadRow = LoadInputs & {
   id: string;
