@@ -337,44 +337,28 @@ async function storeStreams(activityId: string, streams: StreamSet) {
     velocitySmooth: streams.velocity_smooth?.data ?? null,
     altitude: streams.altitude?.data ?? null,
   });
+  const stored = {
+    time: streams.time?.data ?? null,
+    latlng,
+    distance: streams.distance?.data ?? null,
+    altitude: streams.altitude?.data ?? null,
+    velocitySmooth: streams.velocity_smooth?.data ?? null,
+    heartrate: streams.heartrate?.data ?? null,
+    cadence: streams.cadence?.data ?? null,
+    watts: streams.watts?.data ?? null,
+    temp: streams.temp?.data ?? null,
+    moving: streams.moving?.data ?? null,
+    gradeSmooth: streams.grade_smooth?.data ?? null,
+    chartPreview,
+    raw: streams,
+    syncedAt: now,
+  };
   await db
     .insert(activityStreams)
-    .values({
-      activityId,
-      time: streams.time?.data ?? null,
-      latlng,
-      distance: streams.distance?.data ?? null,
-      altitude: streams.altitude?.data ?? null,
-      velocitySmooth: streams.velocity_smooth?.data ?? null,
-      heartrate: streams.heartrate?.data ?? null,
-      cadence: streams.cadence?.data ?? null,
-      watts: streams.watts?.data ?? null,
-      temp: streams.temp?.data ?? null,
-      moving: streams.moving?.data ?? null,
-      gradeSmooth: streams.grade_smooth?.data ?? null,
-      chartPreview,
-      raw: streams,
-      syncedAt: now,
-    })
+    .values({ activityId, ...stored })
     .onConflictDoUpdate({
       target: activityStreams.activityId,
-      set: {
-        time: streams.time?.data ?? null,
-        latlng,
-        distance: streams.distance?.data ?? null,
-        altitude: streams.altitude?.data ?? null,
-        velocitySmooth: streams.velocity_smooth?.data ?? null,
-        heartrate: streams.heartrate?.data ?? null,
-        cadence: streams.cadence?.data ?? null,
-        watts: streams.watts?.data ?? null,
-        temp: streams.temp?.data ?? null,
-        moving: streams.moving?.data ?? null,
-        gradeSmooth: streams.grade_smooth?.data ?? null,
-        chartPreview,
-        ...CLEARED_DERIVED_CACHES,
-        raw: streams,
-        syncedAt: now,
-      },
+      set: { ...stored, ...CLEARED_DERIVED_CACHES },
     });
   await db
     .update(activities)
