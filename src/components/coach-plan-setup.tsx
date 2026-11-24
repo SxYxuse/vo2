@@ -38,8 +38,9 @@ import { ProgressionSettings, savedProgressionKey } from "@/components/progressi
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { localTimeZone } from "@/services/time-zone.ts";
 
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const timeZone = () => localTimeZone();
 
 export function useSaveAvailability(onSaved?: (state: CoachPlanState) => void) {
   const queryClient = useQueryClient();

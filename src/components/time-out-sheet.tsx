@@ -36,6 +36,7 @@ import {
   updateTimeOut,
   type TimeOut,
 } from "@/services/time-outs.ts";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 export type TimeOutEditing = TimeOut | "new" | null;
 
@@ -64,7 +65,7 @@ export function TimeOutSheet({
 }
 
 function deviceTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return localTimeZone();
 }
 
 export function currentTimeOut(timeOuts: TimeOut[], today: string) {

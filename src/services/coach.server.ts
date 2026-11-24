@@ -71,6 +71,7 @@ import { loadPowerFile, loadPowerFiles, powerFileIdFor } from "./power-file.serv
 import { topEfforts, type BestsPeriod } from "./personal-bests.ts";
 import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
+import { isTimeZone } from "./time-zone.ts";
 import { loadFitnessDataImpl } from "./training-load.server.ts";
 import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
 
@@ -113,13 +114,7 @@ const DAY_MS = 86_400_000;
 const MAX_FITNESS_DAYS = 180;
 
 function validTimeZone(value: unknown) {
-  if (typeof value !== "string" || !value) return "UTC";
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value });
-    return value;
-  } catch {
-    return "UTC";
-  }
+  return typeof value === "string" && value && isTimeZone(value) ? value : "UTC";
 }
 
 function round1(value: number | null | undefined) {

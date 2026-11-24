@@ -19,6 +19,7 @@ import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { listTimeOuts } from "@/services/time-outs.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadPredictedTimeTrend, loadTrainingPaces } from "@/services/training-paces.ts";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 export { appShellQueryOptions, loaderQuery, planningStyleOf } from "./app-shell-query.ts";
 
@@ -110,8 +111,7 @@ export const predictedTimeTrendQueryOptions = queryOptions({
 export const coachSpendingQueryOptions = queryOptions({
   queryKey: ["coach-spending"],
   staleTime: 0,
-  queryFn: () =>
-    getCoachSpending({ data: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } }),
+  queryFn: () => getCoachSpending({ data: { timeZone: localTimeZone() } }),
 });
 
 export const coachStatusQueryOptions = queryOptions({

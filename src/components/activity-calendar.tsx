@@ -15,6 +15,7 @@ import {
   HeartOffIcon,
 } from "lucide-react";
 
+import { localTimeZone } from "@/services/time-zone.ts";
 import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
 import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
 import { DiaryJumpPicker } from "@/components/diary-jump-picker.tsx";
@@ -458,7 +459,7 @@ export function ActivityCalendar({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const router = useRouter();
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const phoneView = initialSettings.phoneCalendarView;
   const byMonth = isDesktop && initialSettings.calendarPeriod !== "weeks";
   const weeks = isDesktop ? DESKTOP_WEEKS : MOBILE_WEEKS;

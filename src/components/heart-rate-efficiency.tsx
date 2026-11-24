@@ -24,6 +24,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const CHART_CONFIG = {
   ef: { label: "Efficiency", color: "var(--color-ds-red-700)" },
@@ -58,7 +59,7 @@ export function EfficiencyTrendCard({
   period: FitnessPeriod;
 }) {
   const isDesktop = useDesktopMedia();
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const { data: fitness } = useQuery(fitnessQueryOptions);
   const kind = sport.efficiencyKind;
 

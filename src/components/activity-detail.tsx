@@ -37,6 +37,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const ActivityStreamCharts = lazy(() =>
   import("@/components/activity-detail-charts.tsx").then((mod) => ({
@@ -154,7 +155,7 @@ function BackLink({ diary, start }: { diary?: ActivitySearch; start?: string }) 
       </Link>
     );
   }
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZone = localTimeZone();
   let search: DiarySearch = {};
   if (diary?.month || diary?.week) {
     search = { month: diary.month, week: diary.week };

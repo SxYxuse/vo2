@@ -7,19 +7,9 @@ import {
   progressionSchema,
   type CoachPlanState,
 } from "./coach-plan.types.ts";
+import { isTimeZone } from "./time-zone.ts";
 
-export const timeZoneSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .refine((timeZone) => {
-    try {
-      new Intl.DateTimeFormat("en", { timeZone });
-      return true;
-    } catch {
-      return false;
-    }
-  });
+export const timeZoneSchema = z.string().min(1).max(64).refine(isTimeZone);
 
 export const loadCoachPlan = createServerFn({ method: "GET" }).handler(
   async (): Promise<CoachPlanState> => {

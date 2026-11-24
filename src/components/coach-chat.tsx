@@ -1,5 +1,6 @@
 "use client";
 
+import { localTimeZone } from "@/services/time-zone.ts";
 import { PageHeader } from "@/components/page-header.tsx";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -488,7 +489,7 @@ export function CoachChat({
     persistence: true,
     onFinish: () =>
       void queryClient.invalidateQueries({ queryKey: coachChatsQueryOptions.queryKey }),
-    forwardedProps: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    forwardedProps: { timeZone: localTimeZone() },
     tools: [applyPlanChangeDef, changeCoachBriefDef],
   });
 

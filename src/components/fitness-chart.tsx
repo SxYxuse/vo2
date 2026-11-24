@@ -68,6 +68,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const SERIES_KEYS = ["load", "ctl", "atl", "tsb"] as const;
 
@@ -287,7 +288,7 @@ export function FitnessChart({
   timeOuts?: TimeOut[];
   onEditTimeOut?: (timeOut: TimeOut) => void;
 }) {
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const isDesktop = useDesktopMedia();
   const sharedPeriod = useTrainingPeriod();
   const [visible, setVisible] = useState<string[]>(() => [...SERIES_KEYS]);

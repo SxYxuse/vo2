@@ -34,6 +34,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { RouteError } from "@/components/route-states.tsx";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 type WeekSearch = {
   week?: string;
@@ -72,7 +73,7 @@ function WeekTargetPage() {
 function CoachPlanPage({ week }: { week?: string }) {
   const { timeOuts } = useSuspenseQuery(timeOutsQueryOptions).data;
   const [editing, setEditing] = useState<TimeOutEditing>(null);
-  const today = dayKey(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const today = dayKey(new Date(), localTimeZone());
   const timeOut = currentTimeOut(timeOuts, today);
   return (
     <>

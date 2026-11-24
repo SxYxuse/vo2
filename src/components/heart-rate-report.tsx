@@ -25,6 +25,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const CHART_CONFIG = Object.fromEntries(
   HR_ZONES.map((zone) => [zone.id, { label: `${zone.label} · ${zone.name}`, color: zone.color }]),
@@ -64,7 +65,7 @@ export function HeartRateReportCard({
   period: FitnessPeriod;
 }) {
   const isDesktop = useDesktopMedia();
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const size = reportBucketSize(period);
   const report = useMemo(
     () =>

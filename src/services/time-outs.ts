@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { addDayKey } from "./day-key.ts";
 import { daysBetween } from "./season.types.ts";
+import { isTimeZone } from "./time-zone.ts";
 
 export type TimeOut = {
   id: string;
@@ -113,14 +114,7 @@ export function timeOutProblem(
 }
 
 const dayKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const timeZoneSchema = z.string().refine((zone) => {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-});
+const timeZoneSchema = z.string().refine(isTimeZone);
 const timeOutInputSchema = z.object({
   kind: z.enum(["sick", "injured"]),
   start: dayKeySchema,
