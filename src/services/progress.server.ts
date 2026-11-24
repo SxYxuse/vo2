@@ -10,7 +10,7 @@ import { ensureBestEfforts } from "./best-efforts.server.ts";
 import type { BestEfforts } from "./best-efforts.ts";
 import { toEfficiencyPoint, type EfficiencyPoint } from "./heart-insights.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import {
   BEST_YEAR_DAYS,
   compareEfficiency,

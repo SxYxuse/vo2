@@ -9,7 +9,7 @@ import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { ensureBestEfforts } from "./best-efforts.server.ts";
 import { buildFlatPaces, isFlatPaces, zone2Pace, type FlatPaces } from "./easy-pace.ts";
 import { estimateMaxHrAnchor } from "./heart-insights.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
 import { athleteMaxHr, heartRateFamily, sportHeartRate, zonesFromHistogram } from "./heart-rate.ts";
 import { emptyHistogram, isPlausibleBpm } from "./bpm.ts";

@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger.server.ts";
 import { ageFromBirthDate } from "./athlete-settings.types.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { goalsFor } from "./season.server.ts";
+import { goalsFor } from "./goals.server.ts";
 import {
   activityTrainingLoad,
   couldHoldThreshold,

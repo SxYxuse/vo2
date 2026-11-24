@@ -63,7 +63,7 @@ import {
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonWeeks } from "./season-phase.ts";
-import { goalsFor } from "./season.server.ts";
+import { goalsFor } from "./goals.server.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";

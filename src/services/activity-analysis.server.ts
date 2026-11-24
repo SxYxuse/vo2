@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/index.ts";
 import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import {
   buildActivitySamples,
   buildOverview,

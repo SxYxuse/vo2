@@ -34,7 +34,7 @@ import {
 } from "./heart-rate.ts";
 import { isPlausibleBpm } from "./bpm.ts";
 import { athleteHeartRateFrom, type HeartRateMetricsRow } from "./heart-rate-settings.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import {
   buildRideAnalysis,
   isRideAnalysis,
