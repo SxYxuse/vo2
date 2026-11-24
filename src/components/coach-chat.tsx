@@ -302,7 +302,7 @@ function VisualBlock({ call, live }: { call: ToolCall; live: boolean }) {
   );
 }
 
-export function CoachMessage({
+function CoachMessage({
   message,
   lookup,
   live,

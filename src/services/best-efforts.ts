@@ -1,7 +1,7 @@
 import { allElevationClimbs, buildActivitySamples } from "./activity-analysis.types.ts";
 import { isPowerCyclingSport } from "./training-load.ts";
 
-export const BEST_EFFORTS_VERSION = 2;
+const BEST_EFFORTS_VERSION = 2;
 
 const MILE = 1609.344;
 
@@ -61,7 +61,7 @@ const CLIMB_SPORTS = new Set([...OUTDOOR_RIDE_SPORTS, "Run", "TrailRun"]);
 
 export type PowerBest = { seconds: number; watts: number };
 export type DistanceBest = { metres: number; seconds: number };
-export type ClimbBest = { gainM: number; distanceM: number | null; avgGradePct: number | null };
+type ClimbBest = { gainM: number; distanceM: number | null; avgGradePct: number | null };
 
 export type BestEfforts = {
   version: typeof BEST_EFFORTS_VERSION;
@@ -138,7 +138,7 @@ export function movingClock(distance: number[], time: number[], sport: DistanceS
   return clock;
 }
 
-export function distanceBests(
+function distanceBests(
   distance: number[] | null,
   time: number[] | null,
   distances: readonly number[],

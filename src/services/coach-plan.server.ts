@@ -321,7 +321,7 @@ function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
   return Math.abs(written.secPerKm - now.secPerKm) >= EASY_CHANGE_SEC_PER_KM;
 }
 
-export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
+function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = inputs.currentWeek;
   const { plan, row, today } = inputs;
   if (openTimeOut(inputs)) return null;

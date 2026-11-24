@@ -1,4 +1,3 @@
-import { sportGroupFor, type SportGroupId } from "./sport-groups.ts";
 import { ATL_DAYS, CTL_DAYS } from "./training-load.ts";
 import { addDayKey } from "./day-key.ts";
 import {
@@ -25,18 +24,16 @@ export const PHASES = {
   recovery: { label: "Recovery", hint: "Easy days after the race. No hard sessions." },
 } as const;
 
-export const LIGHTER_HINT = "A lighter week so the last three weeks of work sink in.";
-
 export type PhaseKind = keyof typeof PHASES;
 
-export const BASE_WEEKS = 12;
-export const PEAK_WEEKS = 3;
-export const REBUILD_WEEKS = 8;
-export const LIGHTER_EVERY_WEEKS = 4;
-export const LIGHTER_LOAD_FACTOR = 0.7;
-export const STEADY_RACE_LOAD_FACTOR = 0.85;
-export const NO_RAMP_AFTER_A_DAYS = 13;
-export const MAX_RAMP_RATIO = 1.1;
+const BASE_WEEKS = 12;
+const PEAK_WEEKS = 3;
+const REBUILD_WEEKS = 8;
+const LIGHTER_EVERY_WEEKS = 4;
+const LIGHTER_LOAD_FACTOR = 0.7;
+const STEADY_RACE_LOAD_FACTOR = 0.85;
+const NO_RAMP_AFTER_A_DAYS = 13;
+const MAX_RAMP_RATIO = 1.1;
 
 export type SeasonPhase = {
   kind: PhaseKind;
@@ -46,8 +43,6 @@ export type SeasonPhase = {
   ramp: number;
   loadFactor: number | null;
 };
-
-export type GroupPace = { kmh: number; climbPerKm: number };
 
 const RAMP = { base: 5, build: 7, peak: 5 } as const;
 
@@ -187,56 +182,7 @@ export function supportingRaceBlock(
     : null;
 }
 
-const PACE_DAYS = 120;
-
-export function recentPaces(
-  rows: {
-    sportType: string;
-    startDate: Date;
-    movingTime: number;
-    distance: number | null;
-    totalElevationGain: number | null;
-  }[],
-  now: Date,
-): Partial<Record<SportGroupId, GroupPace>> {
-  const since = now.getTime() - PACE_DAYS * 86_400_000;
-  const totals = new Map<SportGroupId, { km: number; hours: number; climb: number }>();
-  for (const row of rows) {
-    const group = sportGroupFor(row.sportType)?.id;
-    if (!group || !row.distance || row.movingTime <= 0 || row.startDate.getTime() < since) continue;
-    if (row.sportType.startsWith("Virtual")) continue;
-    const total = totals.get(group) ?? { km: 0, hours: 0, climb: 0 };
-    total.km += row.distance / 1000;
-    total.hours += row.movingTime / 3600;
-    total.climb += row.totalElevationGain ?? 0;
-    totals.set(group, total);
-  }
-  const paces: Partial<Record<SportGroupId, GroupPace>> = {};
-  for (const [group, total] of totals) {
-    if (total.hours < 1 || total.km <= 0) continue;
-    paces[group] = { kmh: total.km / total.hours, climbPerKm: total.climb / total.km };
-  }
-  return paces;
-}
-
-const CLIMB_MINUTES_PER_100M: Record<SportGroupId, number> = {
-  cycling: 6,
-  running: 10,
-  walking: 15,
-  swimming: 0,
-};
-export function expectedGoalMinutes(
-  goal: Pick<Goal, "sportType" | "distanceM" | "elevationGainM">,
-  pace: GroupPace | undefined,
-) {
-  const group = sportGroupFor(goal.sportType)?.id;
-  if (!group || goal.distanceM == null || !pace || pace.kmh <= 0) return null;
-  const km = goal.distanceM / 1000;
-  const extraClimb = Math.max(0, (goal.elevationGainM ?? 0) - pace.climbPerKm * km);
-  return Math.round((km / pace.kmh) * 60 + (extraClimb / 100) * CLIMB_MINUTES_PER_100M[group]);
-}
-
-export function rampFor(ramp: number, form: number) {
+function rampFor(ramp: number, form: number) {
   if (form < -30) return Math.min(ramp, 0);
   if (form < -18) return Math.min(ramp, 5);
   if (form < -10) return Math.min(ramp, 8);
@@ -248,7 +194,7 @@ export type WeekLoad = {
   limitedBy: "ramp-cap" | "form" | null;
 };
 
-export function phaseWeekLoad(
+function phaseWeekLoad(
   phase: Pick<SeasonPhase, "ramp" | "loadFactor">,
   fitness: { ctl: number; atl: number },
   recentAverageLoad: number | null = null,
@@ -266,7 +212,7 @@ export function phaseWeekLoad(
   return { load: wanted, limitedBy: formLimited ? "form" : null };
 }
 
-export function rampBaseLoad(weekLoads: number[]): number | null {
+function rampBaseLoad(weekLoads: number[]): number | null {
   const recent = weekLoads.slice(-4);
   if (!recent.length || recent.every((load) => load <= 0)) return null;
   const kept = recent.length > 3 ? [...recent].sort((a, b) => b - a).slice(0, 3) : recent;

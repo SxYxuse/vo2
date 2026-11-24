@@ -2,7 +2,7 @@ import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import { isPowerCyclingSport } from "./training-load.ts";
 
-export const RIDE_ANALYSIS_VERSION = 1;
+const RIDE_ANALYSIS_VERSION = 1;
 
 const MAX_INTERVAL_SEC = 30;
 const STOPPED_SPEED_MS = 0.5;

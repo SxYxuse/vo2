@@ -1,6 +1,6 @@
 export type ActivityMention = { id: string; name: string; powerFile?: boolean };
 
-export function activityLink(activity: ActivityMention) {
+function activityLink(activity: ActivityMention) {
   const label = activity.name.replace(/[[\]\\]/g, (char) => `\\${char}`);
   const page = activity.powerFile ? "power" : "activities";
   return `[${label}](/${page}/${encodeURIComponent(activity.id)})`;

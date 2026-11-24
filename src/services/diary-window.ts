@@ -16,7 +16,7 @@ export function stepDiaryMonth(cursorMonth: string, direction: 1 | -1, currentMo
   return next > currentMonth ? currentMonth : next;
 }
 
-export function parseDiaryMonthSearch(value: unknown) {
+function parseDiaryMonthSearch(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return undefined;
   return value;
 }
@@ -45,7 +45,7 @@ export function stepDiaryWeek(
   return next > currentWeek ? currentWeek : next;
 }
 
-export function parseDiaryWeekSearch(value: unknown) {
+function parseDiaryWeekSearch(value: unknown) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return undefined;
@@ -64,7 +64,7 @@ export function lastWeekOfMonth(month: string) {
   return addDayKey(lastDay.toISOString().slice(0, 10), -offset);
 }
 
-export function firstWeekOfMonth(month: string) {
+function firstWeekOfMonth(month: string) {
   const firstDay = new Date(`${month}-01T00:00:00Z`);
   const offset = (firstDay.getUTCDay() + 6) % 7;
   return addDayKey(`${month}-01`, -offset);

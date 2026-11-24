@@ -225,7 +225,7 @@ export function isZonedFamily(family: HeartRateFamily | null): family is ZonedFa
   return family === "cycling" || family === "running" || family === "swimming";
 }
 
-export type AnchorSource = "athlete" | "estimated";
+type AnchorSource = "athlete" | "estimated";
 
 export type FamilyEstimates = {
   restHr: number | null;
@@ -289,7 +289,7 @@ export function heartRateFamily(sportType: string): HeartRateFamily {
   return group ? FAMILY_BY_GROUP[group.id] : "other";
 }
 
-export function zoneModelFor(sportType: string) {
+function zoneModelFor(sportType: string) {
   return ZONE_MODELS[heartRateFamily(sportType)];
 }
 
@@ -305,7 +305,7 @@ export function histogramSeconds(histogram: number[]) {
   return histogram.reduce((sum, seconds) => sum + seconds, 0);
 }
 
-export function histogramAvgBpm(histogram: number[]) {
+function histogramAvgBpm(histogram: number[]) {
   let sum = 0;
   let seconds = 0;
   for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm += 1) {
@@ -315,7 +315,7 @@ export function histogramAvgBpm(histogram: number[]) {
   return seconds > 0 ? Math.round((sum / seconds) * 10) / 10 : null;
 }
 
-export function histogramMaxBpm(histogram: number[]) {
+function histogramMaxBpm(histogram: number[]) {
   for (let bpm = BPM_MAX; bpm >= BPM_MIN; bpm -= 1) {
     if ((histogram[bpm] ?? 0) > 0) return bpm;
   }
@@ -337,7 +337,7 @@ export function estimateLthrFromMax(maxHeartrate: number | null, family: HeartRa
   return Math.round(maxHeartrate * ZONE_MODELS[family].lthrFactor);
 }
 
-export function zoneMethodFor(sportType: string, method: ZoneMethod | undefined): ZoneMethod {
+function zoneMethodFor(sportType: string, method: ZoneMethod | undefined): ZoneMethod {
   const model = zoneModelFor(sportType);
   if (model.anchor === "hrmax") return "max";
   return method ?? "lthr";
@@ -492,7 +492,7 @@ function sportZoneAnchors(sport: HeartRateSport): ZoneAnchors {
   };
 }
 
-export function toHeartRateSport(
+function toHeartRateSport(
   bucket: SportBucket,
   athlete?: AthleteHeartRate,
   options: { age?: number | null; now?: Date } = {},
@@ -616,13 +616,13 @@ export function overallFromSports(sports: HeartRateSport[]): HeartRateSport {
   };
 }
 
-export function sortHeartRateSports(sports: HeartRateSport[]) {
+function sortHeartRateSports(sports: HeartRateSport[]) {
   return [...sports].sort((a, b) =>
     formatSportType(a.sportType).localeCompare(formatSportType(b.sportType)),
   );
 }
 
-export function mergeSportBuckets(buckets: SportBucket[], canonicalType: string): SportBucket {
+function mergeSportBuckets(buckets: SportBucket[], canonicalType: string): SportBucket {
   const merged = createSportBucket(canonicalType);
   for (const bucket of buckets) {
     merged.activityCount += bucket.activityCount;

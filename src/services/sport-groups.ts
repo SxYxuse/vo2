@@ -1,4 +1,4 @@
-export const SPORT_GROUP_IDS = ["cycling", "running", "swimming", "walking"] as const;
+const SPORT_GROUP_IDS = ["cycling", "running", "swimming", "walking"] as const;
 
 export type SportGroupId = (typeof SPORT_GROUP_IDS)[number];
 

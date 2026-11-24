@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { DistanceBest, PowerBest } from "./best-efforts.ts";
 import type { EfficiencyPoint } from "./heart-insights.ts";
 
-export const PROGRESS_WINDOW_DAYS = 42;
+const PROGRESS_WINDOW_DAYS = 42;
 export const BEST_YEAR_DAYS = 365;
 export const PROGRESS_POWER_DURATIONS = [60, 300, 1200, 3600] as const;
 export const PROGRESS_RUN_DISTANCES = [1000, 5000, 10000, 21097.5] as const;
@@ -13,7 +13,7 @@ const DAY_MS = 86_400_000;
 
 export type ProgressSport = "cycling" | "running";
 
-export type EfficiencyWindow = { output: number; count: number };
+type EfficiencyWindow = { output: number; count: number };
 
 export type EfficiencyComparison = {
   referenceBpm: number;

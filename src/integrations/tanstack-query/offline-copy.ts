@@ -6,7 +6,7 @@ import {
 } from "@tanstack/query-persist-client-core";
 import { del, get, set } from "idb-keyval";
 
-export const OFFLINE_QUERY_KEYS = [
+const OFFLINE_QUERY_KEYS = [
   "app-shell",
   "home",
   "coach-plan",
@@ -25,14 +25,14 @@ export const OFFLINE_QUERY_KEYS = [
   "coach-spending",
 ] as const;
 
-export const OFFLINE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+const OFFLINE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 
 const SAVE_DELAY_MS = 1000;
 const STORAGE_KEY = "vo2-offline-copy";
 
 const BUILD_ID: string = import.meta.env.VITE_BUILD_ID ?? "dev";
 
-export type OfflineStorage = {
+type OfflineStorage = {
   get: (key: string) => Promise<PersistedClient | undefined>;
   set: (key: string, value: PersistedClient) => Promise<void>;
   del: (key: string) => Promise<void>;
@@ -44,7 +44,7 @@ const indexedDbStorage: OfflineStorage = { get, set, del };
  * Saves the latest snapshot at most once per `delay`. IndexedDB stores it by structured clone,
  * so dates and maps in query data come back as they were, which JSON would not do.
  */
-export function throttledPersister(storage: OfflineStorage, delay = SAVE_DELAY_MS): Persister {
+function throttledPersister(storage: OfflineStorage, delay = SAVE_DELAY_MS): Persister {
   let latest: PersistedClient | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   return {
@@ -67,7 +67,7 @@ export function throttledPersister(storage: OfflineStorage, delay = SAVE_DELAY_M
   };
 }
 
-export function isOfflineQuery(query: Pick<Query, "queryKey" | "state">) {
+function isOfflineQuery(query: Pick<Query, "queryKey" | "state">) {
   return (
     query.state.status === "success" &&
     (OFFLINE_QUERY_KEYS as readonly unknown[]).includes(query.queryKey[0])

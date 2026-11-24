@@ -117,7 +117,7 @@ export function RunShape({
   );
 }
 
-export const rangeText = (range: PaceRange) =>
+const rangeText = (range: PaceRange) =>
   `${formatPaceClock(range.fastSecPerKm)}–${formatPaceClock(range.slowSecPerKm)}/km`;
 
 const PART_LABEL = { warmup: "Warm-up", cooldown: "Cool-down" } as const;
@@ -130,7 +130,7 @@ function rideTargetText(step: PlannedStep) {
   return zone.label;
 }
 
-export function stepText(step: PlannedStep, sport: PlanSport) {
+function stepText(step: PlannedStep, sport: PlanSport) {
   const part =
     step.part in PART_LABEL ? `${PART_LABEL[step.part as keyof typeof PART_LABEL]}: ` : "";
   const amount = stepAmountText(step, sport);

@@ -122,7 +122,7 @@ export function progressionLabel(growth: number) {
 export const plannedSports = (availability: Availability) =>
   PLAN_SPORT_IDS.filter((sport) => sessionsPerWeek(availability, sport) > 0);
 
-export const SESSION_KINDS = [
+const SESSION_KINDS = [
   { id: "easy", run: "Easy run", ride: "Endurance ride", swim: "Endurance swim" },
   { id: "recovery", run: "Recovery run", ride: "Recovery ride", swim: "Recovery swim" },
   { id: "long", run: "Long run", ride: "Long ride", swim: "Long swim" },
@@ -292,8 +292,8 @@ export function sessionDrills(session: Pick<PlannedSession, "blocks">) {
   return [...ids].map(drillOf).filter((drill) => drill != null);
 }
 
-export const STEP_PARTS = ["warmup", "work", "recovery", "cooldown"] as const;
-export type StepPart = (typeof STEP_PARTS)[number];
+const STEP_PARTS = ["warmup", "work", "recovery", "cooldown"] as const;
+type StepPart = (typeof STEP_PARTS)[number];
 
 const stepSchema = z.object({
   part: z.enum(STEP_PARTS),
@@ -410,7 +410,7 @@ export type CoachPlanStatus = "idle" | "writing" | "failed";
 
 export type CoachPlanMissing = "key" | "availability" | "goalSport";
 
-export type GoalSummary = Pick<Goal, "id" | "name" | "date" | "distanceM" | "sportType">;
+type GoalSummary = Pick<Goal, "id" | "name" | "date" | "distanceM" | "sportType">;
 
 export type CoachPlanState = {
   signedIn: boolean;
@@ -505,7 +505,7 @@ export function swimSecPer100m(step: Pick<Step, "zone" | "effort">, css: number 
 
 const isRest = (step: Pick<Step, "distanceM">) => step.distanceM == null;
 
-export function sessionSize(
+function sessionSize(
   sport: PlanSport,
   blocks: { repeat: number; steps: Step[] }[],
   anchors: Pick<PlanAnchors, "paces" | "css">,

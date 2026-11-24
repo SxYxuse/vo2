@@ -75,7 +75,6 @@ export const heartRateSettingsSchema = z.object({
 });
 
 export type HeartRateSettings = z.output<typeof heartRateSettingsSchema>;
-export type SportHeartRateSettings = HeartRateSettings["sports"][ZonedFamily];
 
 export const DEFAULT_HEART_RATE_SETTINGS: HeartRateSettings = heartRateSettingsSchema.parse({});
 

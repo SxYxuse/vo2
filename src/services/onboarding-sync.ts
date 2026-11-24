@@ -1,6 +1,6 @@
 import type { SyncKind } from "./strava-sync.types.ts";
 
-export type OnboardingSyncAction = "start" | "sync" | "retry" | null;
+type OnboardingSyncAction = "start" | "sync" | "retry" | null;
 
 export type OnboardingSyncPhase = SyncKind | "syncing";
 

@@ -7,8 +7,6 @@ import {
   isOtherSportType,
   mergeSportGroupShares,
   sportGroupFor,
-  SPORT_GROUPS,
-  type SportGroupId,
 } from "./sport-groups.ts";
 
 const GEIST_HUES = ["blue", "red", "amber", "green", "teal", "purple", "pink", "gray"] as const;
@@ -130,7 +128,6 @@ export const shownSportTypesSchema = athleteSettingsSchema.shape.sportTypes.refi
   { error: SHOW_ONE_SPORT_MESSAGE },
 );
 
-type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type AthleteSettings = z.infer<typeof athleteSettingsSchema>;
 export type SportTypeSettings = AthleteSettings["sportTypes"];
 
@@ -142,18 +139,6 @@ export function sportTypeColor(sportTypes: SportTypeSettings, sportType: string)
   return sportTypes[sportType]?.color ?? defaultColorForSport(sportType);
 }
 
-export type SportCollectors = {
-  heartRate: boolean;
-  power: boolean;
-  powerPartial: boolean;
-};
-
-const EMPTY_COLLECTORS: SportCollectors = {
-  heartRate: true,
-  power: false,
-  powerPartial: false,
-};
-
 export function sportOffersPower(sportType: string) {
   return sportGroupFor(sportType)?.id === "cycling";
 }
@@ -163,23 +148,6 @@ export function heartRateCollectorLabel(sportType: string) {
   if (group === "cycling") return "HR belt";
   if (group === "running" || group === "walking") return "HR watch";
   return "Heart rate";
-}
-
-export function familyCollectors(
-  sportTypes: SportTypeSettings,
-  family: SportGroupId,
-): SportCollectors {
-  const members = SPORT_GROUPS.find((group) => group.id === family)?.members ?? [];
-  const pool = members
-    .map((sportType) => sportTypes[sportType])
-    .filter((setting): setting is SportTypeSetting => Boolean(setting));
-  if (!pool.length) return EMPTY_COLLECTORS;
-  const withPower = pool.filter((setting) => setting.power).length;
-  return {
-    heartRate: pool.some((setting) => setting.heartRate),
-    power: withPower > 0,
-    powerPartial: withPower > 0 && withPower < pool.length,
-  };
 }
 
 export function nextTopEffortsSince(
@@ -280,7 +248,7 @@ export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 200;
 const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
 
-export const profileSettingsSchema = z.object({
+const profileSettingsSchema = z.object({
   birthDate: birthDateSchema.nullable(),
   weightKg: weightKgSchema.nullable(),
 });

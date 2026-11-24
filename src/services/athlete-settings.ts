@@ -24,7 +24,7 @@ import {
 } from "./heart-rate-settings.ts";
 import type { FitnessLoad } from "./training-load.ts";
 
-export const athleteSettingsSaveSchema = z.object({
+const athleteSettingsSaveSchema = z.object({
   profile: profileSaveSchema,
   sportTypes: shownSportTypesSchema,
   sportGroupShares: z.record(z.string(), z.boolean()),

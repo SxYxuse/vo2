@@ -401,7 +401,7 @@ function CoachBriefField({ state }: { state: CoachPlanState }) {
   );
 }
 
-export function coachPlanStatusText(state: CoachPlanState) {
+function coachPlanStatusText(state: CoachPlanState) {
   if (state.status === "writing") return "Writing your plan…";
   if (state.status === "failed") return `Failed: ${state.error ?? "try again"}`;
   if (state.plan) return `Written ${new Date(state.plan.writtenAt).toLocaleString()}`;

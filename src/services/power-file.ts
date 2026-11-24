@@ -6,7 +6,6 @@ import type { PowerFileView } from "./power-file-analysis.ts";
 export type {
   Pedaling,
   PowerFileView,
-  PowerZoneRow,
   Quadrants,
   SidePedaling,
   StrokeAngles,

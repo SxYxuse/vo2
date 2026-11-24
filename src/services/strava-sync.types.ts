@@ -43,7 +43,7 @@ export function stopsAfterNewestPage(input: { firstCopy: boolean; newestUpserted
   return input.firstCopy && input.newestUpserted > 0;
 }
 
-export const NEW_ACTIVITY_CHECK_GAP_MS = 15 * 60_000;
+const NEW_ACTIVITY_CHECK_GAP_MS = 15 * 60_000;
 
 export type AutoResumePlan =
   | { kind: "sync" }
@@ -117,7 +117,7 @@ export function storedPauseResult(
  * Return before Bun.serve's 10s idleTimeout (and typical preview proxies) close
  * the request. The client loops until history and streams are caught up.
  */
-export const SYNC_REQUEST_BUDGET_MS = 6_000;
+const SYNC_REQUEST_BUDGET_MS = 6_000;
 export const SYNC_POSTPROCESS_MIN_MS = 2_000;
 export const SYNC_TRANSIENT_RETRIES = 3;
 

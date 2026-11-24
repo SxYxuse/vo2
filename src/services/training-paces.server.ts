@@ -260,7 +260,7 @@ function weekEnds(efforts: RunEffort[], now: Date, timeZone: string) {
   return ends;
 }
 
-export async function predictedTimeTrendFor(
+async function predictedTimeTrendFor(
   userId: string,
   now = new Date(),
 ): Promise<PredictedTimeTrend> {

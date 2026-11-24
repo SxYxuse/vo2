@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export const DESKTOP_MQ = "(min-width: 768px)";
+const DESKTOP_MQ = "(min-width: 768px)";
 
 type Listener = () => void;
 
@@ -26,10 +26,6 @@ function subscribe(onStoreChange: Listener) {
 function getDesktopSnapshot() {
   desktopQuery ??= window.matchMedia(DESKTOP_MQ);
   return desktopQuery.matches;
-}
-
-export function readIsDesktop() {
-  return typeof window !== "undefined" && window.matchMedia(DESKTOP_MQ).matches;
 }
 
 export function useDesktopMedia(): boolean | null {

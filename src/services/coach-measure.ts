@@ -13,7 +13,7 @@ export type MeasureRequest =
   | { kind: "range"; unit: "metres" | "seconds"; start: number; end: number }
   | { kind: "splits" | "fastest"; unit: "metres" | "seconds"; length: number };
 
-export type Measure = {
+type Measure = {
   startM: number;
   endM: number;
   distanceM: number;

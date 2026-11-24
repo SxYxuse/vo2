@@ -40,8 +40,8 @@ export function predictRaceSeconds(vdot: number, metres: number) {
   return Math.round((fast + slow) / 2);
 }
 
-export const PREDICTION_MIN_M = 1500;
-export const PREDICTION_MAX_M = 42_500;
+const PREDICTION_MIN_M = 1500;
+const PREDICTION_MAX_M = 42_500;
 
 export function canPredict(metres: number) {
   return metres >= PREDICTION_MIN_M && metres <= PREDICTION_MAX_M;
@@ -140,7 +140,7 @@ export function parseRaceResult(value: unknown): RaceResult | null {
   return parsed.success ? parsed.data : null;
 }
 
-export const runEffortSchema = z.object({
+const runEffortSchema = z.object({
   activityId: z.string().min(1),
   name: z.string(),
   start: z.iso.datetime({ offset: true }),
@@ -150,10 +150,10 @@ export const runEffortSchema = z.object({
 
 export type RunEffort = z.infer<typeof runEffortSchema>;
 
-export const PACES_FROM = ["automatic", "effort", "race"] as const;
+const PACES_FROM = ["automatic", "effort", "race"] as const;
 export type PacesFrom = (typeof PACES_FROM)[number];
 
-export const EASY_FROM = ["heartRate", "vdot"] as const;
+const EASY_FROM = ["heartRate", "vdot"] as const;
 export type EasyFrom = (typeof EASY_FROM)[number];
 
 const paceSettingsSchema = z.object({
@@ -291,11 +291,11 @@ export function isRaceResultCurrent(raceResult: RaceResult, now: Date) {
   return isInWindow(raceResult.date, now);
 }
 
-export function roundVdot(vdot: number) {
+function roundVdot(vdot: number) {
   return Math.round(vdot * 10) / 10;
 }
 
-export const EFFORT_CHOICE_DISTANCES = RACE_DISTANCES;
+const EFFORT_CHOICE_DISTANCES = RACE_DISTANCES;
 
 export type EffortChoice = {
   metres: number;

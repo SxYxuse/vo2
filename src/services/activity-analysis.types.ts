@@ -16,14 +16,7 @@ import {
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 
-export const ANALYSIS_STREAMS = [
-  "heartrate",
-  "watts",
-  "cadence",
-  "speed",
-  "altitude",
-  "grade",
-] as const;
+const ANALYSIS_STREAMS = ["heartrate", "watts", "cadence", "speed", "altitude", "grade"] as const;
 
 export type AnalysisStreamKey = (typeof ANALYSIS_STREAMS)[number];
 
@@ -38,7 +31,7 @@ export type ActivitySample = {
   cadence: number | null;
 };
 
-export type TerrainKind = "climb" | "descent" | "flat";
+type TerrainKind = "climb" | "descent" | "flat";
 
 export type TerrainSegment = {
   kind: TerrainKind;
@@ -55,7 +48,7 @@ export type TerrainSegment = {
   likelyHike: boolean;
 };
 
-export type StreamCorrelation = {
+type StreamCorrelation = {
   x: AnalysisStreamKey;
   y: AnalysisStreamKey;
   n: number;
@@ -66,14 +59,14 @@ export type StreamCorrelation = {
   note: string;
 };
 
-export type SessionThird = {
+type SessionThird = {
   part: 1 | 2 | 3;
   durationSec: number;
   avgHeartrate: number | null;
   avgSpeedKmh: number | null;
 };
 
-export type ZoneShare = {
+type ZoneShare = {
   id: string;
   name: string;
   seconds: number;
@@ -82,7 +75,7 @@ export type ZoneShare = {
   maxBpm: number | null;
 };
 
-export type GradeBucket = {
+type GradeBucket = {
   label: string;
   minGrade: number;
   maxGrade: number;
@@ -92,7 +85,7 @@ export type GradeBucket = {
   avgWatts: number | null;
 };
 
-export type EffortPhase = {
+type EffortPhase = {
   kind: "surge" | "recovery" | "steady";
   startSec: number;
   endSec: number;
@@ -289,7 +282,7 @@ function availableStreams(samples: ActivitySample[]): AnalysisStreamKey[] {
   return ANALYSIS_STREAMS.filter((key) => present.has(key));
 }
 
-export function sampleValueFor(sample: ActivitySample, key: AnalysisStreamKey) {
+function sampleValueFor(sample: ActivitySample, key: AnalysisStreamKey) {
   if (key === "heartrate") return sample.heartrate;
   if (key === "watts") return sample.watts;
   if (key === "cadence") return sample.cadence;

@@ -29,12 +29,9 @@ export type StreamAxisPlacement = {
 const FITTED_DOMAIN = ["auto", "auto"] as const;
 const FROM_ZERO_DOMAIN = [0, "auto"] as const;
 const PACE_SLOW_PERCENTILE = 0.95;
-export const PACE_CHART_WINDOW_S = 60;
+const PACE_CHART_WINDOW_S = 60;
 
-export function chartPointForStream(
-  point: ActivityChartPoint,
-  sportType: string,
-): ActivityChartPoint {
+function chartPointForStream(point: ActivityChartPoint, sportType: string): ActivityChartPoint {
   return {
     ...point,
     heartrate: isPlausibleBpm(point.heartrate) ? point.heartrate : undefined,

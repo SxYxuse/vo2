@@ -28,7 +28,7 @@ import type { PaceRange, PaceType } from "./training-paces.types.ts";
 
 export type RuleBreak = { rule: string; message: string };
 
-export type RaceWeek = { weekStart: string; date: string; sport: PlanSport; effort: RaceEffort };
+type RaceWeek = { weekStart: string; date: string; sport: PlanSport; effort: RaceEffort };
 export type RaceEffort = "perform" | GoalEffort;
 
 export function raceWeeks(goals: Goal[], fromWeek: string, lastDay: string) {
@@ -247,7 +247,7 @@ function drillIssue(sport: PlanSport, step: Step) {
   return null;
 }
 
-export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
+function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const session of sessions) {
     if (!kindFitsSport(session.kind, session.sport)) {
@@ -274,7 +274,7 @@ export function formatBreaks(sessions: PlannedSession[], ctx: RuleContext): Rule
   return breaks;
 }
 
-export function weekBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
+function weekBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const written = ctx.weeks.filter((week) => week.weekStart >= ctx.fromWeek);
   const open = new Set(written.map((week) => week.weekStart));
   const breaks: RuleBreak[] = [];
@@ -308,7 +308,7 @@ export function leftToWrite(week: WeekBudget, ctx: RuleContext, sport: PlanSport
   return { sessions: Math.max(0, sessions), budget };
 }
 
-export function availabilityBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
+function availabilityBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const { id: sport } of PLAN_SPORTS) {
     const perWeek = sessionsPerWeek(ctx.availability, sport);
@@ -375,7 +375,7 @@ export function weekFloor(week: WeekBudget, ctx: RuleContext, sport: PlanSport):
   return Math.round(Math.min(budgetOf(week, sport), reach) * BUDGET_FLOOR * 10) / 10;
 }
 
-export function budgetBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
+function budgetBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   for (const sport of plannedSports(ctx.availability)) {
     const { text, plural } = SPORT_RULES[sport];
@@ -403,7 +403,7 @@ export function budgetBreaks(sessions: PlannedSession[], ctx: RuleContext): Rule
   return breaks;
 }
 
-export function spikeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
+function spikeBreaks(sessions: PlannedSession[], ctx: RuleContext): RuleBreak[] {
   const breaks: RuleBreak[] = [];
   const planned = [...ctx.frozen, ...ctx.neighbours, ...sessions];
   for (const session of sessions) {

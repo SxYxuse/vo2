@@ -70,7 +70,7 @@ async function matchPastActivities(
   });
 }
 
-export async function athleteTimeZone(userId: string) {
+async function athleteTimeZone(userId: string) {
   const [row] = await db
     .select({ timeZone: coachPlans.timeZone })
     .from(coachPlans)

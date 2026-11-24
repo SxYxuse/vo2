@@ -23,7 +23,7 @@ import { normalizedPowerFromWatts } from "./normalized-power.ts";
 
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
-export const DEFAULT_REST_HR = 60;
+const DEFAULT_REST_HR = 60;
 const DAY_MS = 86_400_000;
 
 export type LoadSource = "power" | "heartRate" | "similarHeartRate" | "duration";
@@ -322,7 +322,7 @@ function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
 
 const SIMILAR_HR_NEIGHBOURS = 5;
 const SIMILAR_HR_MIN_MATCHES = 3;
-export const SIMILAR_HR_WINDOW_DAYS = 60;
+const SIMILAR_HR_WINDOW_DAYS = 60;
 
 function averageSpeed(activity: LoadInputs) {
   if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;
@@ -362,11 +362,7 @@ function median(values: number[]) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-export function estimateHrIntensity(
-  activity: LoadInputs,
-  pool: LoadInputs[],
-  anchors: LoadAnchors,
-) {
+function estimateHrIntensity(activity: LoadInputs, pool: LoadInputs[], anchors: LoadAnchors) {
   if (activity.movingTime <= 0) return null;
   const neighbours: { intensity: number; score: number }[] = [];
   for (const other of pool) {
@@ -501,7 +497,7 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
   return points;
 }
 
-export function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
+function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
   return point.ctl - point.atl;
 }
 
@@ -558,7 +554,7 @@ export function formLabel(tsb: number) {
   return "Very fatigued";
 }
 
-export type TrainingPhaseId =
+type TrainingPhaseId =
   | "starting"
   | "deep-fatigue"
   | "ramping-fast"

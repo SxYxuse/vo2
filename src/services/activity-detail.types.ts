@@ -15,7 +15,7 @@ export type ActivityChartPoint = {
   altitude?: number;
 };
 
-export type ActivityKpis = {
+type ActivityKpis = {
   avgHeartrate: number | null;
   maxHeartrate: number | null;
   avgWatts: number | null;

@@ -6,7 +6,7 @@ import { SPORT_GROUPS, sportGroupFor } from "./sport-groups.ts";
 
 type StravaSportType = components["schemas"]["SportType"];
 
-export const GOAL_SPORT_TYPES = SPORT_GROUPS.flatMap((group) => group.members) as StravaSportType[];
+const GOAL_SPORT_TYPES = SPORT_GROUPS.flatMap((group) => group.members) as StravaSportType[];
 
 export const GOAL_PRIORITIES = [
   {
@@ -228,12 +228,6 @@ export function otherLegs<T extends Pick<Goal, "id" | "name" | "date">>(goal: T,
       other.date === goal.date &&
       other.name.split(LEG_SEPARATOR)[0]!.trim() === base,
   );
-}
-
-export function legLabel(goal: Goal, event: SeasonEvent) {
-  if (event.goals.length < 2) return null;
-  const [, leg] = goal.name.split(LEG_SEPARATOR);
-  return leg?.trim() || null;
 }
 
 export function anchorEvent(events: SeasonEvent[]): SeasonEvent | null {

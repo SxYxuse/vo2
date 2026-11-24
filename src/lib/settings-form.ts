@@ -122,7 +122,7 @@ export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 export type HeartRateFormInput = z.input<typeof heartRateFormSchema>;
-export type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][ZonedFamily];
+type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][ZonedFamily];
 
 export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
@@ -148,7 +148,7 @@ function bpmString(value: number | null) {
   return value == null ? "" : String(value);
 }
 
-export function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFormInput {
+function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFormInput {
   const sport = (family: ZonedFamily): SportHeartRateFormInput => {
     const value = settings.sports[family];
     return {
@@ -188,7 +188,7 @@ export function heartRateFormPreview(values: HeartRateFormInput): HeartRateSetti
   });
 }
 
-export function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
+function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
   return heartRateFormSchema.safeParse(values).success ? heartRateFormPreview(values) : null;
 }
 
