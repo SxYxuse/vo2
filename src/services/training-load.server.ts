@@ -141,7 +141,7 @@ async function writeLoads(
   `);
 }
 
-async function refreshTrainingLoads(userId: string) {
+export async function refreshTrainingLoads(userId: string) {
   const rows = await loadActivityRows(userId);
   if (!rows.length) return;
 
@@ -178,10 +178,6 @@ async function refreshTrainingLoads(userId: string) {
     swimLthr: anchors.swimLthr,
     restHr: anchors.restHr,
   });
-}
-
-export async function refreshTrainingLoadsForUser(userId: string) {
-  await refreshTrainingLoads(userId);
 }
 
 export async function loadFitnessDataImpl(): Promise<FitnessPageData> {

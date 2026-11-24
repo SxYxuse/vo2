@@ -50,17 +50,12 @@ export function locomotionFor(sportType: string): Locomotion {
   return SPEED;
 }
 
-function showsPaceByDefault(sportType: string) {
-  const group = sportGroupFor(sportType)?.id;
-  return group === "running" || group === "walking" || group === "swimming";
-}
-
 export function defaultVisibleSeries(detail: {
   sportType: string;
   series: readonly StreamSeriesKey[];
 }) {
   const offByDefault = new Set<StreamSeriesKey>(["cadence"]);
-  if (!showsPaceByDefault(detail.sportType)) offByDefault.add("speed");
+  if (locomotionFor(detail.sportType).kind !== "pace") offByDefault.add("speed");
   if (sportGroupFor(detail.sportType)?.id === "running") offByDefault.add("watts");
   return detail.series.filter((key) => !offByDefault.has(key));
 }

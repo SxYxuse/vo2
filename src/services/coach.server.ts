@@ -73,7 +73,8 @@ import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
 import { isTimeZone } from "./time-zone.ts";
 import { loadFitnessDataImpl } from "./training-load.server.ts";
-import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
+import { buildPmc, roundLoad, trainingPhase } from "./training-load.ts";
+import { dayKey } from "./day-key.ts";
 
 type CoachRuntime = { userId: string; timeZone: string };
 

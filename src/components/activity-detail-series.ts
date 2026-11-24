@@ -69,8 +69,7 @@ function chartLocomotionAt(
   const loco = locomotionFor(sportType);
   const kmh = chart[index]?.speed;
   if (loco.kind === "speed") return kmh;
-  if (kmh == null || kmh <= 0) return paceSeconds(PACE_STOP_KMH, loco.unit) ?? undefined;
-  if (kmh < PACE_STOP_KMH) return paceSeconds(PACE_STOP_KMH, loco.unit) ?? undefined;
+  if (kmh == null || kmh < PACE_STOP_KMH) return paceSeconds(PACE_STOP_KMH, loco.unit) ?? undefined;
   const meanKmh = meanMovingSpeedKmh(chart, index, PACE_CHART_WINDOW_S);
   if (meanKmh == null) return paceSeconds(PACE_STOP_KMH, loco.unit) ?? undefined;
   return paceSeconds(meanKmh, loco.unit) ?? undefined;

@@ -762,7 +762,6 @@ function powerRoleFor(sportType: string, hasWatts: boolean): ActivityOverview["p
   if (!hasWatts) return "none";
   const group = sportGroupFor(sportType)?.id;
   if (group === "cycling") return "meter";
-  if (group === "running") return "estimated";
   return "estimated";
 }
 

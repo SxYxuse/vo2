@@ -32,7 +32,7 @@ import {
   type HeartRateSettings,
 } from "./heart-rate-settings.ts";
 import { toFitnessLoad } from "./training-load.ts";
-import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
+import { refreshTrainingLoads } from "./training-load.server.ts";
 
 async function storedAthleteSettings(userId: string) {
   const [row] = await db
@@ -257,7 +257,7 @@ export async function saveAthleteSettingsImpl(
   }
 
   if (previousProfile.birthDate !== value.profile.birthDate || heartRateChanged) {
-    await refreshTrainingLoadsForUser(userId);
+    await refreshTrainingLoads(userId);
   }
 
   logger.info("settings.saved", { planningStyle: settings.planningStyle });
@@ -273,7 +273,7 @@ export async function saveProfileImpl(value: ProfileSave): Promise<void> {
     .values({ userId: session.user.id, ...fields })
     .onConflictDoUpdate({ target: athleteMetrics.userId, set: fields });
   if (previousProfile.birthDate !== value.birthDate) {
-    await refreshTrainingLoadsForUser(session.user.id);
+    await refreshTrainingLoads(session.user.id);
   }
   logger.info("profile.saved");
 }

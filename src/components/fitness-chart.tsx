@@ -27,7 +27,6 @@ import {
   averageWeeklyMovingSeconds,
   buildPmc,
   ctlChange,
-  dayKey,
   formLabel,
   periodStartMs,
   trainingPhase,
@@ -38,6 +37,7 @@ import {
   type FitnessPeriod,
   type PmcPoint,
 } from "@/services/training-load.ts";
+import { dayKey } from "@/services/day-key.ts";
 import { mondayOf, projectRaceDay, weekLoadsBefore } from "@/services/season-phase.ts";
 import {
   anchorEvent,

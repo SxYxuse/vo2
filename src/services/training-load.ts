@@ -627,5 +627,3 @@ export const loadFitnessData = createServerFn({ method: "GET" }).handler(
     return loadFitnessDataImpl();
   },
 );
-
-export { dayKey };
