@@ -49,7 +49,12 @@ import {
 } from "@/components/coach-plan-change.tsx";
 import { CoachKeyPrompt, useCoachAvailable } from "@/components/coach-key.tsx";
 import { useOnline } from "@/hooks/use-online.ts";
-import { applyPlanChangeDef, changeCoachBriefDef } from "@/services/coach-tools.ts";
+import {
+  applyPlanChangeDef,
+  changeCoachBriefDef,
+  showVisualDef,
+  type CoachToolName,
+} from "@/services/coach-tools.ts";
 import {
   COACH_CHAT_KEY,
   coachChatQueryKey,
@@ -110,7 +115,9 @@ const PLAN_STARTERS: Starter[] = [
   { text: "I can only run on a treadmill this week", icon: RepeatIcon },
 ];
 
-const TOOL_STEPS: Record<string, { running: string; done: string; icon: LucideIcon }> = {
+const TOOL_STEPS: Partial<
+  Record<CoachToolName | "load_skill", { running: string; done: string; icon: LucideIcon }>
+> = {
   find_activities: {
     running: "Finding activities",
     done: "Found activities",
@@ -189,11 +196,11 @@ function blocksOf(parts: readonly Part[]): Block[] {
       else blocks.push({ kind: "text", text: part.content });
     } else if (part.type === "thinking" && part.content.trim()) {
       blocks.push({ kind: "thinking", text: part.content });
-    } else if (part.type === "tool-call" && part.name === "show_visual") {
+    } else if (part.type === "tool-call" && part.name === showVisualDef.name) {
       blocks.push({ kind: "visual", call: part });
-    } else if (part.type === "tool-call" && part.name === "apply_plan_change") {
+    } else if (part.type === "tool-call" && part.name === applyPlanChangeDef.name) {
       blocks.push({ kind: "change", call: part });
-    } else if (part.type === "tool-call" && part.name === "change_coach_brief") {
+    } else if (part.type === "tool-call" && part.name === changeCoachBriefDef.name) {
       blocks.push({ kind: "brief", call: part });
     } else if (part.type === "tool-call") {
       if (last?.kind === "tools") last.calls.push(part);
@@ -238,7 +245,7 @@ function ToolTrace({
         <TraceCollapsibleContent>
           <Trace>
             {calls.map((call) => {
-              const step = TOOL_STEPS[call.name] ?? {
+              const step = TOOL_STEPS[call.name as CoachToolName] ?? {
                 running: call.name,
                 done: call.name,
                 icon: SparklesIcon,

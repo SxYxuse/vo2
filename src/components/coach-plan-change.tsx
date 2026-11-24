@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { SPORT_ICON } from "@/components/coach-run.tsx";
+import { proposePlanChangeDef } from "@/services/coach-tools.ts";
 
 type Part = UIMessage["parts"][number];
 type ToolCall = Extract<Part, { type: "tool-call" }>;
@@ -60,7 +61,7 @@ export function usePlanChanges(
     const proposals = new Map<string, Checked>();
     for (const message of messages) {
       for (const part of message.parts) {
-        if (part.type !== "tool-call" || part.name !== "propose_plan_change") continue;
+        if (part.type !== "tool-call" || part.name !== proposePlanChangeDef.name) continue;
         const output = part.output as PlanChangeProposal | undefined;
         if (output?.ok) proposals.set(output.proposalId, output);
       }
