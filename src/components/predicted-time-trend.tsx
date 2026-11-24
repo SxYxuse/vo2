@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CartesianGrid, Line, LineChart, ReferenceArea, XAxis, YAxis } from "recharts";
 
 import { runDistanceLabel } from "@/components/best-labels.ts";
-import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { TIME_OUT_FILL, TimeOutPattern } from "@/components/time-out-hatch.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

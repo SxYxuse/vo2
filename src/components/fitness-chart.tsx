@@ -17,7 +17,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
 import { StatCard, StatGrid, type StatTrend } from "@/components/stat-card.tsx";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";

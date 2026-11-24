@@ -17,7 +17,7 @@ import {
 
 import { localTimeZone } from "@/services/time-zone.ts";
 import { prefetchActivityDetail, prefetchActivityDetails } from "@/lib/prefetch.ts";
-import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 import { DiaryJumpPicker } from "@/components/diary-jump-picker.tsx";
 import { useWeekSwipe } from "@/hooks/use-week-swipe.ts";
 import {

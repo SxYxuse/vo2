@@ -23,8 +23,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-export { useDesktopMedia, useIsDesktop } from "@/hooks/use-desktop-media.ts";
-
 const desktopOverlay = {
   Content: DialogContent,
   Header: DialogHeader,
