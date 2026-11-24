@@ -381,6 +381,11 @@ export function statusOf(
   return { status: row.status as CoachPlanStatus, error: row.error };
 }
 
+function noActiveWriter(now: Date) {
+  const stale = new Date(now.getTime() - STALE_WRITING_MS);
+  return or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale));
+}
+
 function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
   return {
     signedIn: true,
@@ -494,16 +499,10 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   if (!due) return row;
   const attemptKey = attemptKeyOf(due);
   if (!force && row.status === "failed" && row.attemptKey === attemptKey) return row;
-  const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [claimed] = await db
     .update(coachPlans)
     .set({ status: "writing", error: null, statusAt: new Date(), attemptKey })
-    .where(
-      and(
-        eq(coachPlans.userId, userId),
-        or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale)),
-      ),
-    )
+    .where(and(eq(coachPlans.userId, userId), noActiveWriter(inputs.now)))
     .returning();
   if (!claimed) return row;
   logger.info("coach_plan.writing", { fromWeek: due.fromWeek, reason: due.reason });
@@ -762,6 +761,11 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
   }
 }
 
+async function currentState(userId: string, { force = false } = {}) {
+  const inputs = await gather(userId);
+  return stateOf(inputs, await startIfDue(userId, inputs, force));
+}
+
 const SIGNED_OUT: CoachPlanState = {
   signedIn: false,
   today: "",
@@ -781,8 +785,7 @@ const SIGNED_OUT: CoachPlanState = {
 export async function loadCoachPlanImpl(): Promise<CoachPlanState> {
   const session = await getOptionalSession();
   if (!session) return SIGNED_OUT;
-  const inputs = await gather(session.user.id);
-  return stateOf(inputs, await startIfDue(session.user.id, inputs));
+  return currentState(session.user.id);
 }
 
 export async function saveAvailabilityImpl(
@@ -801,8 +804,7 @@ export async function saveAvailabilityImpl(
     ridesPerWeek: availability.ridesPerWeek,
     swimsPerWeek: availability.swimsPerWeek,
   });
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function saveProgressionImpl(progression: Progression): Promise<CoachPlanState> {
@@ -836,8 +838,7 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
     })
     .where(eq(coachPlans.userId, userId));
   logger.info("coach_plan.progression_saved", { rewrite: requestedFrom != null });
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function saveBrief(userId: string, brief: string, expected?: string) {
@@ -859,8 +860,7 @@ export async function saveBriefImpl(brief: string): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const userId = session.user.id;
   if (!(await saveBrief(userId, brief))) throw new Error("Set your availability first.");
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function startCoachPlanIfDue(userId: string) {
@@ -869,8 +869,7 @@ export async function startCoachPlanIfDue(userId: string) {
 
 export async function writeCoachPlanAgainImpl(): Promise<CoachPlanState> {
   const session = await getRequiredSession();
-  const inputs = await gather(session.user.id);
-  return stateOf(inputs, await startIfDue(session.user.id, inputs, true));
+  return currentState(session.user.id, { force: true });
 }
 
 export async function requestCoachPlanRewrite(userId: string) {
@@ -899,16 +898,10 @@ export async function markSessionImpl(sessionId: string, done: boolean): Promise
       sessions: week.sessions.map((item) => (item.id === sessionId ? { ...item, done } : item)),
     })),
   };
-  const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [saved] = await db
     .update(coachPlans)
     .set({ plan: next, updatedAt: new Date() })
-    .where(
-      and(
-        eq(coachPlans.userId, userId),
-        or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale)),
-      ),
-    )
+    .where(and(eq(coachPlans.userId, userId), noActiveWriter(inputs.now)))
     .returning();
   if (!saved) throw new Error("Your plan is being written again: mark it once it's written.");
   logger.info("coach_plan.session_marked", { done });
