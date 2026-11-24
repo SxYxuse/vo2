@@ -22,7 +22,6 @@ import {
   type HeartRateEstimates,
   type HeartRateSettings,
 } from "./heart-rate-settings.ts";
-import type { FitnessLoad } from "./training-load.ts";
 
 const athleteSettingsSaveSchema = z.object({
   profile: profileSaveSchema,
@@ -45,7 +44,6 @@ export type SavedAthleteSettings = {
 
 export type SettingsSnapshot = SavedAthleteSettings & {
   signedIn: boolean;
-  fitnessLoads: FitnessLoad[];
   heartRateEstimates: HeartRateEstimates;
 };
 

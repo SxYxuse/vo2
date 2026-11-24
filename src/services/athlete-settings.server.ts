@@ -34,7 +34,6 @@ import {
   type HeartRateSettings,
   storedLthr,
 } from "./heart-rate-settings.ts";
-import { toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoads } from "./training-load.server.ts";
 
 async function storedAthleteSettings(userId: string) {
@@ -144,27 +143,17 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
   if (!session) {
     return {
       signedIn: false,
-      fitnessLoads: [],
       profile: DEFAULT_PROFILE_SETTINGS,
       settings: DEFAULT_ATHLETE_SETTINGS,
       heartRate: DEFAULT_HEART_RATE_SETTINGS,
       heartRateEstimates: NO_ESTIMATES,
     };
   }
-  const [profile, settings, heartRate, estimates, loadRows] = await Promise.all([
+  const [profile, settings, heartRate, estimates] = await Promise.all([
     getAthleteProfile(session.user.id),
     getAthleteSettings(session.user.id),
     getHeartRateSettings(session.user.id),
     heartRateEstimates(session.user.id),
-    db
-      .select({
-        startDate: activities.startDate,
-        movingTime: activities.movingTime,
-        trainingLoad: activities.trainingLoad,
-        loadSource: activities.loadSource,
-      })
-      .from(activities)
-      .where(eq(activities.userId, session.user.id)),
   ]);
   return {
     signedIn: true,
@@ -172,14 +161,6 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
     settings,
     heartRate,
     heartRateEstimates: estimates,
-    fitnessLoads: loadRows.map((row) =>
-      toFitnessLoad(
-        row.startDate,
-        row.trainingLoad ?? 0,
-        row.loadSource ?? "duration",
-        row.movingTime,
-      ),
-    ),
   };
 }
 
