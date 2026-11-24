@@ -40,10 +40,8 @@ type OfflineStorage = {
 
 const indexedDbStorage: OfflineStorage = { get, set, del };
 
-/**
- * Saves the latest snapshot at most once per `delay`. IndexedDB stores it by structured clone,
- * so dates and maps in query data come back as they were, which JSON would not do.
- */
+// IndexedDB stores the snapshot by structured clone, so dates and maps in query data come back
+// as they were, which JSON would not do.
 function throttledPersister(storage: OfflineStorage, delay = SAVE_DELAY_MS): Persister {
   let latest: PersistedClient | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
