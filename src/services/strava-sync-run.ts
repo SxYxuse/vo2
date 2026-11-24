@@ -7,7 +7,6 @@ import { StravaDailyLimitError, StravaShortLimitError } from "@/integrations/str
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import type { SyncKind, SyncResult } from "./strava-sync.types.ts";
 import {
-  isAbortError,
   historyCompleteFromRun,
   isOverSyncBudget,
   remainingSyncBudgetMs,
@@ -16,6 +15,7 @@ import {
   storedPauseResult,
   STRAVA_RECONNECT_MESSAGE,
 } from "./strava-sync.types.ts";
+import { isAbortError } from "@/lib/is-abort-error.ts";
 
 const ACTIVITY_PAGE_SIZE = 200;
 const ACTIVITY_PAGES_PER_CALL = 1;

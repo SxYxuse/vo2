@@ -1,4 +1,5 @@
 import { format, formatDistanceStrict } from "date-fns";
+import { isAbortError } from "@/lib/is-abort-error.ts";
 
 export type SyncKind = "never" | "complete" | "incomplete" | "paused" | "failed";
 
@@ -135,15 +136,6 @@ export function remainingSyncBudgetMs(
   budgetMs = SYNC_REQUEST_BUDGET_MS,
 ) {
   return budgetMs - (now - startedAt);
-}
-
-export function isAbortError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "name" in error &&
-    (error as { name: unknown }).name === "AbortError"
-  );
 }
 
 /**
