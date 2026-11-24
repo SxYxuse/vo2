@@ -97,11 +97,26 @@ export function athleteHeartRateFrom(
   return {
     settings: parseHeartRateSettings(row?.heartRate),
     restHr: row?.restHr ?? null,
-    lthr: {
-      cycling: row?.cyclingLthr ?? row?.lthr ?? null,
-      running: row?.runLthr ?? null,
-      swimming: row?.swimLthr ?? null,
-    },
+    lthr: storedLthr(row),
+  };
+}
+
+export function storedCyclingLthr(
+  row: Pick<HeartRateMetricsRow, "cyclingLthr" | "lthr"> | null | undefined,
+) {
+  return row?.cyclingLthr ?? row?.lthr ?? null;
+}
+
+export function storedLthr(
+  row:
+    | Pick<HeartRateMetricsRow, "cyclingLthr" | "lthr" | "runLthr" | "swimLthr">
+    | null
+    | undefined,
+): Record<ZonedFamily, number | null> {
+  return {
+    cycling: storedCyclingLthr(row),
+    running: row?.runLthr ?? null,
+    swimming: row?.swimLthr ?? null,
   };
 }
 

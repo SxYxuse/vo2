@@ -30,6 +30,7 @@ import {
   parseHeartRateSettings,
   type HeartRateEstimates,
   type HeartRateSettings,
+  storedLthr,
 } from "./heart-rate-settings.ts";
 import { toFitnessLoad } from "./training-load.ts";
 import { refreshTrainingLoads } from "./training-load.server.ts";
@@ -119,11 +120,7 @@ async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
   return {
     restHr: metrics?.restHr ?? null,
     maxHr: { cycling: maxHr("cycling"), running: maxHr("running"), swimming: maxHr("swimming") },
-    lthr: {
-      cycling: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
-      running: metrics?.runLthr ?? null,
-      swimming: metrics?.swimLthr ?? null,
-    },
+    lthr: storedLthr(metrics),
   };
 }
 

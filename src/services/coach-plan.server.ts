@@ -64,7 +64,7 @@ import {
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonWeeks } from "./season-phase.ts";
 import { goalsFor } from "./goals.server.ts";
-import { parseHeartRateSettings } from "./heart-rate-settings.ts";
+import { parseHeartRateSettings, storedCyclingLthr } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { swimCssFor } from "./swim-css.server.ts";
@@ -149,10 +149,7 @@ export async function gather(userId: string, now = new Date()) {
   const rides = all.filter((item) => planSportOf(item.sportType) === "ride");
   const swims = all.filter((item) => planSportOf(item.sportType) === "swim");
   const rideLthr =
-    parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ??
-    metrics?.cyclingLthr ??
-    metrics?.lthr ??
-    null;
+    parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ?? storedCyclingLthr(metrics);
   return {
     row,
     style,
