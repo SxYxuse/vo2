@@ -4,6 +4,7 @@ import type { HeartRateFamily, HeartRateZoneStat } from "./heart-rate.ts";
 import { BPM_MAX, BPM_MIN, emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import { isPowerCyclingSport } from "./sport-groups.ts";
+import { median } from "./stats.ts";
 
 const MAX_HR_WINDOW_MONTHS = 18;
 const ABOVE_AGE_LIMIT_BPM = 25;
@@ -509,13 +510,6 @@ export function toEfficiencyPoint(
     avgHeartrate: input.averageHeartrate,
     aerobic: isAerobicSession(input.averageHeartrate, lthr),
   };
-}
-
-function median(values: number[]) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function priorPoints(points: EfficiencyPoint[], beforeIso: string, days: number) {

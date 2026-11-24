@@ -21,6 +21,7 @@ import {
 import { dayKey } from "./day-key.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import { isCyclingSport, isPowerCyclingSport } from "./sport-groups.ts";
+import { median, percentile } from "./stats.ts";
 
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
@@ -92,16 +93,6 @@ function toZoned(date: Date, timeZone: string) {
 
 function zonedDayStart(date: Date, timeZone: string) {
   return startOfDay(toZoned(date, timeZone));
-}
-
-function percentile(values: number[], p: number) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = (sorted.length - 1) * p;
-  const low = Math.floor(index);
-  const high = Math.ceil(index);
-  if (low === high) return sorted[low];
-  return sorted[low] * (high - index) + sorted[high] * (index - low);
 }
 
 function hoursFromMoving(seconds: number) {
@@ -327,12 +318,6 @@ function dissimilarity(activity: LoadInputs, other: LoadInputs) {
   if (speed && otherSpeed) score += 2 * Math.abs(Math.log(speed / otherSpeed));
   if (activity.sportType !== other.sportType) score += 0.5;
   return score;
-}
-
-function median(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function estimateHrIntensity(activity: LoadInputs, pool: LoadInputs[], anchors: LoadAnchors) {

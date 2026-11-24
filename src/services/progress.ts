@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 import type { DistanceBest, PowerBest } from "./best-efforts.ts";
 import type { EfficiencyPoint } from "./heart-insights.ts";
+import { median } from "./stats.ts";
 
 const PROGRESS_WINDOW_DAYS = 42;
 export const BEST_YEAR_DAYS = 365;
@@ -42,13 +43,6 @@ export type ProgressData = {
 };
 
 export type DatedBests<T> = { start: string; bests: T[] };
-
-function median(values: number[]) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
 
 function windowOf(start: string, now: Date) {
   const age = (now.getTime() - new Date(start).getTime()) / DAY_MS;

@@ -15,6 +15,7 @@ import {
 import { histogramFromStreams } from "./heart-insights.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
+import { percentile } from "./stats.ts";
 
 const ANALYSIS_STREAMS = ["heartrate", "watts", "cadence", "speed", "altitude", "grade"] as const;
 
@@ -620,16 +621,6 @@ export function correlateStreams(
     return ok;
   });
   return { pairs: usable.map(([x, y]) => correlatePair(samples, x, y)), notes };
-}
-
-function percentile(values: number[], p: number) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = (sorted.length - 1) * p;
-  const low = Math.floor(index);
-  const high = Math.ceil(index);
-  if (low === high) return sorted[low];
-  return sorted[low] * (high - index) + sorted[high] * (index - low);
 }
 
 export function summarizeEffort(samples: ActivitySample[]): EffortReport {
