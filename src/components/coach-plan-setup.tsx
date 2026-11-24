@@ -40,13 +40,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { localTimeZone } from "@/services/time-zone.ts";
 
-const timeZone = () => localTimeZone();
-
 export function useSaveAvailability(onSaved?: (state: CoachPlanState) => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (availability: Availability) =>
-      saveCoachPlanAvailability({ data: { availability, timeZone: timeZone() } }),
+      saveCoachPlanAvailability({ data: { availability, timeZone: localTimeZone() } }),
     onSuccess: (state) => {
       queryClient.setQueryData(coachPlanQueryOptions.queryKey, state);
       onSaved?.(state);

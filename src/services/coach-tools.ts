@@ -170,23 +170,10 @@ export const changeCoachBriefDef = toolDefinition({
   needsApproval: true,
 });
 
-export type CoachToolName = (
-  | typeof findActivitiesDef
-  | typeof getActivityDef
-  | typeof measureActivityDef
-  | typeof getActivityStreamsDef
-  | typeof findPowerFilesDef
-  | typeof getPowerFileDef
-  | typeof findClimbsDef
-  | typeof correlateStreamsDef
-  | typeof summarizeEffortPhasesDef
-  | typeof getFitnessDef
-  | typeof getPersonalBestsDef
-  | typeof getSeasonDef
-  | typeof getAthleteProfileDef
-  | typeof showVisualDef
-  | typeof getCoachPlanDef
-  | typeof proposePlanChangeDef
-  | typeof applyPlanChangeDef
-  | typeof changeCoachBriefDef
-)["name"];
+type Definitions = typeof import("./coach-tools.ts");
+
+export type CoachToolName = {
+  [K in keyof Definitions]: Definitions[K] extends { __toolSide: "definition"; name: infer N }
+    ? N
+    : never;
+}[keyof Definitions];
