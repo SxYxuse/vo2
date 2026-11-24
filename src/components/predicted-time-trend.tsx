@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CartesianGrid, Line, LineChart, ReferenceArea, XAxis, YAxis } from "recharts";
 
 import { runDistanceLabel } from "@/components/best-labels.ts";
-import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 import { InfoTooltip } from "@/components/tap-tooltip.tsx";
 import { TIME_OUT_FILL, TimeOutPattern } from "@/components/time-out-hatch.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import {
   type TrendTarget,
   type TrendWeek,
 } from "@/services/training-paces.types.ts";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const CHART_CONFIG = {
   seconds: { label: "Predicted race time", color: "var(--color-ds-purple-700)" },
@@ -112,7 +113,7 @@ export function PredictedTimeTrendCard({ timeOuts }: { timeOuts: TimeOut[] }) {
 }
 
 function TrendCard({ trend, timeOuts }: { trend: PredictedTimeTrend; timeOuts: TimeOut[] }) {
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const isDesktop = useDesktopMedia();
   const period = useTrainingPeriod() ?? "7d";
   const points = useMemo(() => {

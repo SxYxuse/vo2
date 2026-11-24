@@ -32,7 +32,7 @@ const EARTH_RADIUS_M = 6_371_008.8;
 const LAT_M = (Math.PI / 180) * EARTH_RADIUS_M;
 const RAD = Math.PI / 180;
 
-export function distanceM(from: GpxPoint, to: GpxPoint) {
+function distanceM(from: GpxPoint, to: GpxPoint) {
   const dLat = (to.lat - from.lat) * RAD;
   const dLng = (to.lng - from.lng) * RAD;
   const h =
@@ -123,7 +123,7 @@ function indexAt(distances: number[], m: number) {
   return low;
 }
 
-export function pointAt(track: GpxTrack, m: number): GpxPoint {
+function pointAt(track: GpxTrack, m: number): GpxPoint {
   const { points, distances } = track;
   const at = clamp(m, 0, trackLength(track));
   const index = indexAt(distances, at);
@@ -173,7 +173,7 @@ function segmentProjection(
 
 const PASS_SLACK_M = 30;
 
-export function nearestOnTrack(track: GpxTrack, target: GpxPoint, nearM?: number) {
+function nearestOnTrack(track: GpxTrack, target: GpxPoint, nearM?: number) {
   const project = projector(target);
   const projected = track.points.map(project);
   if (projected.length === 1) return { m: 0, gapM: Math.hypot(...projected[0]!) };

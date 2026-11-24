@@ -2,7 +2,6 @@ import { formatLocomotion } from "./locomotion.ts";
 import { formatSportType } from "./athlete-settings.types.ts";
 import {
   athleteMaxHr,
-  emptyHistogram,
   heartRateFamily,
   HR_ZONES,
   isZonedFamily,
@@ -13,17 +12,12 @@ import {
   type ResolvedHeartRate,
   type ZoneAnchors,
 } from "./heart-rate.ts";
+import { histogramFromStreams } from "./heart-insights.ts";
 import { bandIndexForGrade, GRADE_BANDS } from "./grade-bands.ts";
 import { sportGroupFor } from "./sport-groups.ts";
+import { percentile } from "./stats.ts";
 
-export const ANALYSIS_STREAMS = [
-  "heartrate",
-  "watts",
-  "cadence",
-  "speed",
-  "altitude",
-  "grade",
-] as const;
+const ANALYSIS_STREAMS = ["heartrate", "watts", "cadence", "speed", "altitude", "grade"] as const;
 
 export type AnalysisStreamKey = (typeof ANALYSIS_STREAMS)[number];
 
@@ -38,7 +32,7 @@ export type ActivitySample = {
   cadence: number | null;
 };
 
-export type TerrainKind = "climb" | "descent" | "flat";
+type TerrainKind = "climb" | "descent" | "flat";
 
 export type TerrainSegment = {
   kind: TerrainKind;
@@ -55,7 +49,7 @@ export type TerrainSegment = {
   likelyHike: boolean;
 };
 
-export type StreamCorrelation = {
+type StreamCorrelation = {
   x: AnalysisStreamKey;
   y: AnalysisStreamKey;
   n: number;
@@ -66,14 +60,14 @@ export type StreamCorrelation = {
   note: string;
 };
 
-export type SessionThird = {
+type SessionThird = {
   part: 1 | 2 | 3;
   durationSec: number;
   avgHeartrate: number | null;
   avgSpeedKmh: number | null;
 };
 
-export type ZoneShare = {
+type ZoneShare = {
   id: string;
   name: string;
   seconds: number;
@@ -82,7 +76,7 @@ export type ZoneShare = {
   maxBpm: number | null;
 };
 
-export type GradeBucket = {
+type GradeBucket = {
   label: string;
   minGrade: number;
   maxGrade: number;
@@ -92,7 +86,7 @@ export type GradeBucket = {
   avgWatts: number | null;
 };
 
-export type EffortPhase = {
+type EffortPhase = {
   kind: "surge" | "recovery" | "steady";
   startSec: number;
   endSec: number;
@@ -289,7 +283,7 @@ function availableStreams(samples: ActivitySample[]): AnalysisStreamKey[] {
   return ANALYSIS_STREAMS.filter((key) => present.has(key));
 }
 
-export function sampleValueFor(sample: ActivitySample, key: AnalysisStreamKey) {
+function sampleValueFor(sample: ActivitySample, key: AnalysisStreamKey) {
   if (key === "heartrate") return sample.heartrate;
   if (key === "watts") return sample.watts;
   if (key === "cadence") return sample.cadence;
@@ -629,16 +623,6 @@ export function correlateStreams(
   return { pairs: usable.map(([x, y]) => correlatePair(samples, x, y)), notes };
 }
 
-function percentile(values: number[], p: number) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = (sorted.length - 1) * p;
-  const low = Math.floor(index);
-  const high = Math.ceil(index);
-  if (low === high) return sorted[low];
-  return sorted[low] * (high - index) + sorted[high] * (index - low);
-}
-
 export function summarizeEffort(samples: ActivitySample[]): EffortReport {
   const notes: string[] = [];
   const buckets = GRADE_BANDS.map((band) => ({
@@ -778,7 +762,6 @@ function powerRoleFor(sportType: string, hasWatts: boolean): ActivityOverview["p
   if (!hasWatts) return "none";
   const group = sportGroupFor(sportType)?.id;
   if (group === "cycling") return "meter";
-  if (group === "running") return "estimated";
   return "estimated";
 }
 
@@ -787,17 +770,10 @@ function zoneSharesFromSamples(
   sportType: string,
   anchors: ZoneAnchors,
 ): ZoneShare[] {
-  const histogram = emptyHistogram();
-  const time = samples.map((sample) => sample.t);
-  for (let index = 0; index < samples.length; index += 1) {
-    const bpm = Math.round(samples[index].heartrate ?? 0);
-    if (bpm < 40 || bpm > 230) continue;
-    const current = time[index];
-    const previous = index > 0 ? time[index - 1] : undefined;
-    const delta =
-      current != null && previous != null ? Math.max(0, Math.min(30, current - previous)) : 1;
-    histogram[bpm] += delta > 0 ? delta : 1;
-  }
+  const histogram = histogramFromStreams(
+    samples.map((sample) => sample.heartrate),
+    samples.map((sample) => sample.t),
+  );
   const zones = zonesFromHistogram(histogram, sportType, anchors);
   const total = zones.reduce((sum, zone) => sum + zone.seconds, 0);
   if (total <= 0) return [];

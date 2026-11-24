@@ -5,7 +5,7 @@ import { activities, activityStreams } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
-import { goalsFor } from "./season.server.ts";
+import { goalsFor } from "./goals.server.ts";
 import { DEFAULT_ATHLETE_SETTINGS, isSportTypeShown } from "./athlete-settings.types.ts";
 import type { CalendarActivity, HomeData } from "./home-data.types.ts";
 

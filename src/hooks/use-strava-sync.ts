@@ -15,7 +15,7 @@ import {
 } from "@/services/strava-sync.types.ts";
 import { toast } from "@/components/ui/toast";
 
-export const stravaSyncMutationKey = ["strava-sync"] as const;
+const stravaSyncMutationKey = ["strava-sync"] as const;
 
 function countLabel(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -89,7 +89,7 @@ function finishSyncToast(
   });
 }
 
-export function useStravaSyncPending() {
+function useStravaSyncPending() {
   return useIsMutating({ mutationKey: stravaSyncMutationKey }) > 0;
 }
 

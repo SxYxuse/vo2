@@ -3,12 +3,17 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, LineString, MultiLineString } from "geojson";
 
-import { formatSportType, sportTypeColor } from "@/services/athlete-settings.types.ts";
+import {
+  formatSportType,
+  sportTypeColor,
+  type AthleteSettings,
+} from "@/services/athlete-settings.types.ts";
 import {
   ALL_SPORTS,
   focusBoundsOf,
   decodePolyline,
   mapSportOptions,
+  type ActivityMapTrack,
   type LngLat,
 } from "@/services/activity-map.types.ts";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +24,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { resolveThemeColor } from "./map-theme-color.ts";
 
-import type { ActivityMapProps } from "./activity-map.tsx";
+export type ActivityMapProps = {
+  tracks: ActivityMapTrack[];
+  sportTypes: AthleteSettings["sportTypes"];
+  sportGroupShares: AthleteSettings["sportGroupShares"];
+};
 
 type DecoratedTrack = ActivityMapProps["tracks"][number] & { coordinates: LngLat[] };
 

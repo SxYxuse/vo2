@@ -15,7 +15,7 @@ function requiredString(name: string) {
 
 const optionalString = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 
-export const env$ = z
+const env$ = z
   .object({
     DATABASE_URL: requiredString("DATABASE_URL"),
     BETTER_AUTH_SECRET: requiredString("BETTER_AUTH_SECRET"),

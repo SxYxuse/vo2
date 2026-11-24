@@ -7,11 +7,11 @@ import type { HeartRateSettings } from "./heart-rate-settings.ts";
 import type { Goal } from "./season.types.ts";
 import {
   heartRateFamily,
-  isPlausibleBpm,
   isZonedFamily,
   type HeartRateFamily,
   type ZonedFamily,
 } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import {
   LTHR_MIN_SECONDS,
   LTHR_WINDOW_DAYS,
@@ -20,10 +20,12 @@ import {
 } from "./lthr-estimate.ts";
 import { dayKey } from "./day-key.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
+import { isCyclingSport, isPowerCyclingSport } from "./sport-groups.ts";
+import { median, percentile } from "./stats.ts";
 
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
-export const DEFAULT_REST_HR = 60;
+const DEFAULT_REST_HR = 60;
 const DAY_MS = 86_400_000;
 
 export type LoadSource = "power" | "heartRate" | "similarHeartRate" | "duration";
@@ -85,42 +87,12 @@ export type PmcPoint = {
   tsb: number;
 };
 
-const CYCLING_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "EMountainBikeRide",
-  "EBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
-
-const POWER_CYCLING_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
-
 function toZoned(date: Date, timeZone: string) {
   return new TZDate(date.getTime(), timeZone);
 }
 
 function zonedDayStart(date: Date, timeZone: string) {
   return startOfDay(toZoned(date, timeZone));
-}
-
-function percentile(values: number[], p: number) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = (sorted.length - 1) * p;
-  const low = Math.floor(index);
-  const high = Math.ceil(index);
-  if (low === high) return sorted[low];
-  return sorted[low] * (high - index) + sorted[high] * (index - low);
 }
 
 function hoursFromMoving(seconds: number) {
@@ -136,19 +108,11 @@ function clampRestHr(value: number) {
   return Math.min(75, Math.max(40, Math.round(value)));
 }
 
-export function isCyclingSport(sportType: string) {
-  return CYCLING_SPORTS.has(sportType);
-}
-
-export function isPowerCyclingSport(sportType: string) {
-  return POWER_CYCLING_SPORTS.has(sportType);
-}
-
 function durationIntensity(sportType: string) {
   if (sportType === "EBikeRide" || sportType === "EMountainBikeRide") return 0.45;
   if (sportType === "Walk" || sportType === "Hike") return 0.45;
   if (sportType === "Run" || sportType === "TrailRun" || sportType === "VirtualRun") return 0.7;
-  if (CYCLING_SPORTS.has(sportType)) return 0.65;
+  if (isCyclingSport(sportType)) return 0.65;
   if (sportType === "Swim" || sportType === "OpenWaterSwim") return 0.65;
   if (sportType === "Workout" || sportType === "WeightTraining") return 0.5;
   return 0.55;
@@ -322,7 +286,7 @@ function hrIntensity(activity: LoadInputs, anchors: LoadAnchors) {
 
 const SIMILAR_HR_NEIGHBOURS = 5;
 const SIMILAR_HR_MIN_MATCHES = 3;
-export const SIMILAR_HR_WINDOW_DAYS = 60;
+const SIMILAR_HR_WINDOW_DAYS = 60;
 
 function averageSpeed(activity: LoadInputs) {
   if (!activity.distance || activity.distance <= 0 || activity.movingTime <= 0) return null;
@@ -356,17 +320,7 @@ function dissimilarity(activity: LoadInputs, other: LoadInputs) {
   return score;
 }
 
-function median(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
-
-export function estimateHrIntensity(
-  activity: LoadInputs,
-  pool: LoadInputs[],
-  anchors: LoadAnchors,
-) {
+function estimateHrIntensity(activity: LoadInputs, pool: LoadInputs[], anchors: LoadAnchors) {
   if (activity.movingTime <= 0) return null;
   const neighbours: { intensity: number; score: number }[] = [];
   for (const other of pool) {
@@ -501,7 +455,7 @@ export function buildPmc(loads: FitnessLoad[], timeZone: string): PmcPoint[] {
   return points;
 }
 
-export function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
+function formAfterLoad(point: Pick<PmcPoint, "ctl" | "atl">) {
   return point.ctl - point.atl;
 }
 
@@ -558,7 +512,7 @@ export function formLabel(tsb: number) {
   return "Very fatigued";
 }
 
-export type TrainingPhaseId =
+type TrainingPhaseId =
   | "starting"
   | "deep-fatigue"
   | "ramping-fast"
@@ -673,5 +627,3 @@ export const loadFitnessData = createServerFn({ method: "GET" }).handler(
     return loadFitnessDataImpl();
   },
 );
-
-export { dayKey };

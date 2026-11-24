@@ -4,7 +4,7 @@ import { timingSafeEqual } from "node:crypto";
  * Strava pushes events to `${STRAVA_WEBHOOK_PATH}/<STRAVA_WEBHOOK_SECRET>`. Strava does not sign
  * events, so the secret path is what keeps anyone else from deleting athletes (ADR 0034).
  */
-export const STRAVA_WEBHOOK_PATH = "/api/strava-webhook";
+const STRAVA_WEBHOOK_PATH = "/api/strava-webhook";
 
 export function stravaWebhookUrl(appUrl: string, secret: string) {
   return `${appUrl}${STRAVA_WEBHOOK_PATH}/${secret}`;

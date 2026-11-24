@@ -17,7 +17,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { useDesktopMedia } from "@/components/responsive-dialog.tsx";
+import { useDesktopMedia } from "@/hooks/use-desktop-media.ts";
 import { PeriodToggle } from "@/components/period-toggle.tsx";
 import { StatCard, StatGrid, type StatTrend } from "@/components/stat-card.tsx";
 import { useTrainingPeriod } from "@/hooks/use-training-period.ts";
@@ -27,7 +27,6 @@ import {
   averageWeeklyMovingSeconds,
   buildPmc,
   ctlChange,
-  dayKey,
   formLabel,
   periodStartMs,
   trainingPhase,
@@ -38,6 +37,7 @@ import {
   type FitnessPeriod,
   type PmcPoint,
 } from "@/services/training-load.ts";
+import { dayKey } from "@/services/day-key.ts";
 import { mondayOf, projectRaceDay, weekLoadsBefore } from "@/services/season-phase.ts";
 import {
   anchorEvent,
@@ -68,6 +68,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const SERIES_KEYS = ["load", "ctl", "atl", "tsb"] as const;
 
@@ -287,7 +288,7 @@ export function FitnessChart({
   timeOuts?: TimeOut[];
   onEditTimeOut?: (timeOut: TimeOut) => void;
 }) {
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const isDesktop = useDesktopMedia();
   const sharedPeriod = useTrainingPeriod();
   const [visible, setVisible] = useState<string[]>(() => [...SERIES_KEYS]);

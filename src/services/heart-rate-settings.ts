@@ -1,14 +1,13 @@
 import { z } from "zod";
 
 import {
-  BPM_MAX,
-  BPM_MIN,
   ZONED_FAMILIES,
   resolveHeartRate,
   type AthleteHeartRate,
   type ZoneMethod,
   type ZonedFamily,
 } from "./heart-rate.ts";
+import { BPM_MAX, BPM_MIN } from "./bpm.ts";
 
 export const ZONED_FAMILY_LABELS: Record<ZonedFamily, string> = {
   cycling: "Cycling",
@@ -75,7 +74,6 @@ export const heartRateSettingsSchema = z.object({
 });
 
 export type HeartRateSettings = z.output<typeof heartRateSettingsSchema>;
-export type SportHeartRateSettings = HeartRateSettings["sports"][ZonedFamily];
 
 export const DEFAULT_HEART_RATE_SETTINGS: HeartRateSettings = heartRateSettingsSchema.parse({});
 
@@ -99,11 +97,26 @@ export function athleteHeartRateFrom(
   return {
     settings: parseHeartRateSettings(row?.heartRate),
     restHr: row?.restHr ?? null,
-    lthr: {
-      cycling: row?.cyclingLthr ?? row?.lthr ?? null,
-      running: row?.runLthr ?? null,
-      swimming: row?.swimLthr ?? null,
-    },
+    lthr: storedLthr(row),
+  };
+}
+
+export function storedCyclingLthr(
+  row: Pick<HeartRateMetricsRow, "cyclingLthr" | "lthr"> | null | undefined,
+) {
+  return row?.cyclingLthr ?? row?.lthr ?? null;
+}
+
+export function storedLthr(
+  row:
+    | Pick<HeartRateMetricsRow, "cyclingLthr" | "lthr" | "runLthr" | "swimLthr">
+    | null
+    | undefined,
+): Record<ZonedFamily, number | null> {
+  return {
+    cycling: storedCyclingLthr(row),
+    running: row?.runLthr ?? null,
+    swimming: row?.swimLthr ?? null,
   };
 }
 

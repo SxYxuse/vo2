@@ -24,6 +24,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { localTimeZone } from "@/services/time-zone.ts";
+import { median } from "@/services/stats.ts";
 
 const CHART_CONFIG = {
   ef: { label: "Efficiency", color: "var(--color-ds-red-700)" },
@@ -34,12 +36,6 @@ const WEEK_TICK = new Intl.DateTimeFormat("en-US", { month: "short", day: "numer
 
 const EF_INFO =
   "Output per heartbeat on aerobic sessions (below the top of zone 3): normalized power ÷ average heart rate on rides with a power meter, speed ÷ average heart rate on flat runs. A rising line means you do more work for the same heart rate. Plotted as the weekly median next to fitness, so you can see whether the load is turning into aerobic gains.";
-
-function median(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
 
 function weekLabel(week: string) {
   const [year, month, day] = week.split("-").map(Number);
@@ -58,7 +54,7 @@ export function EfficiencyTrendCard({
   period: FitnessPeriod;
 }) {
   const isDesktop = useDesktopMedia();
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const { data: fitness } = useQuery(fitnessQueryOptions);
   const kind = sport.efficiencyKind;
 
@@ -79,7 +75,7 @@ export function EfficiencyTrendCard({
         const ctl = ctlByDay.get(end) ?? (latest && latest.date < end ? latest.ctl : null) ?? null;
         return {
           week,
-          ef: Math.round(median(values) * 1000) / 1000,
+          ef: Math.round(median(values)! * 1000) / 1000,
           count: values.length,
           ctl: ctl == null ? null : Math.round(ctl * 10) / 10,
         };

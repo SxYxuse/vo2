@@ -60,7 +60,7 @@ try {
   );
 }
 
-const [{ DEFAULT_COACH_MODEL, REASONING_LEVELS }, { textAdapter }, writer] = await Promise.all([
+const [{ DEFAULT_COACH_MODEL, REASONING_LEVELS }, { liveCoachModel }, writer] = await Promise.all([
   import("../src/services/coach-models.ts"),
   import("../src/services/coach-model.server.ts"),
   import("../src/services/coach-plan-writer.server.ts"),
@@ -87,14 +87,7 @@ if (values["dry-run"]) {
 
 const started = Date.now();
 const result = await writer.writeSessions(
-  {
-    kind: "live",
-    provider,
-    model,
-    adapter: textAdapter({ provider, model, reasoning }, key!),
-    reasoning: reasoning ?? undefined,
-    key: key!,
-  },
+  liveCoachModel({ provider, model, reasoning }, key!),
   prompt,
   ctx,
   anchors,

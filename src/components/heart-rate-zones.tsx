@@ -35,6 +35,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const DATE_MED = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
@@ -73,7 +74,7 @@ export function HeartRateZones({
 }) {
   const [sportType, setSportType] = useState(ALL_SPORTS);
   const period = useTrainingPeriod();
-  const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+  const timeZone = useMemo(() => localTimeZone(), []);
   const startMs = period ? periodStartMs(period, timeZone) : null;
   const periodLabel = FITNESS_PERIODS.find((item) => item.id === period)?.label;
   const sports = useMemo(

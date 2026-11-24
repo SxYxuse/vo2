@@ -105,6 +105,9 @@ describe("mock Strava OAuth", () => {
 describe("StravaApi against mock Strava", () => {
   let accessToken = "";
   beforeEach(async () => {
+    // The catalogue is built from today's date: a fixed one keeps it the same across calls.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-17T09:00:00.000Z"));
     accessToken = (await signIn()).access_token;
   });
 

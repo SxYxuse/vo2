@@ -1,7 +1,8 @@
 import { powerBests, type PowerBest } from "./best-efforts.ts";
 import { RIDE_ZONES, type RideZone } from "./coach-plan.types.ts";
 import { computeDecoupling, efficiencyFactor, type DecouplingResult } from "./heart-insights.ts";
-import { heartRateFamily, isPlausibleBpm } from "./heart-rate.ts";
+import { heartRateFamily } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
 import {
   buildRideAnalysis,
@@ -10,7 +11,7 @@ import {
   type RideSummary,
 } from "./ride-analysis.ts";
 
-export const POWER_FILE_ANALYSIS_VERSION = 1;
+const POWER_FILE_ANALYSIS_VERSION = 1;
 
 const MAX_SAMPLE_SEC = 10;
 const POWER_BIN_W = 10;
@@ -129,7 +130,7 @@ export type PedalSums = {
   right: SideSums;
 };
 
-export type PowerFileSeries = {
+type PowerFileSeries = {
   bucketSec: number;
   t: number[];
   watts: (number | null)[];
@@ -143,7 +144,7 @@ export type PowerFileSeries = {
   standingPct: (number | null)[];
 };
 
-export type GearUse = {
+type GearUse = {
   front: number;
   rear: number;
   sec: number;
@@ -690,7 +691,7 @@ export type Pedaling = {
   right: SidePedaling;
 };
 
-export type PowerZoneRow = Pedaling & {
+type PowerZoneRow = Pedaling & {
   id: RideZone;
   label: string;
   minWatts: number;
@@ -704,7 +705,7 @@ export type Quadrants = {
   pct: [number, number, number, number];
 };
 
-export type Anchor = { value: number; source: "vo2" | "file" };
+type Anchor = { value: number; source: "vo2" | "file" };
 
 export type PowerFileView = Omit<
   PowerFileAnalysis,

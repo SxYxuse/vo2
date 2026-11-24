@@ -1,16 +1,12 @@
 import { subMonths } from "date-fns";
 
-import {
-  BPM_MAX,
-  BPM_MIN,
-  emptyHistogram,
-  isPlausibleBpm,
-  type HeartRateFamily,
-  type HeartRateZoneStat,
-} from "./heart-rate.ts";
+import type { HeartRateFamily, HeartRateZoneStat } from "./heart-rate.ts";
+import { BPM_MAX, BPM_MIN, emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import { normalizedPowerFromWatts } from "./normalized-power.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
+import { median } from "./stats.ts";
 
-export const MAX_HR_WINDOW_MONTHS = 18;
+const MAX_HR_WINDOW_MONTHS = 18;
 const ABOVE_AGE_LIMIT_BPM = 25;
 const ISOLATED_GAP_BPM = 8;
 const EASY_AVG_SHARE = 0.7;
@@ -34,7 +30,7 @@ export type MaxHrAnchor = {
 };
 
 /** Tanaka et al. 2001: 208 − 0.7 × age. */
-export function predictedMaxHr(age: number | null | undefined) {
+function predictedMaxHr(age: number | null | undefined) {
   if (age == null || !Number.isFinite(age) || age < 10 || age > 100) return null;
   return Math.round(208 - 0.7 * age);
 }
@@ -140,7 +136,7 @@ export function maxHrAnchorInfo(anchor: MaxHrAnchor) {
   return parts.join(" ");
 }
 
-export const HEART_ANALYSIS_VERSION = 2;
+const HEART_ANALYSIS_VERSION = 2;
 
 const MAX_INTERVAL_SEC = 30;
 const STOPPED_SPEED_MS = 0.5;
@@ -149,7 +145,7 @@ const MIN_DECOUPLING_SEC = 35 * 60;
 const MAX_STEADY_VI = 1.15;
 const MAX_STEADY_SPEED_CV = 0.15;
 const MAX_STEADY_POWER_CV = 0.25;
-export const MAX_FLAT_GAIN_M_PER_KM = 15;
+const MAX_FLAT_GAIN_M_PER_KM = 15;
 
 export type HeartStreams = {
   time: number[] | null;
@@ -198,7 +194,7 @@ function isMoving(streams: HeartStreams, index: number) {
   return speed == null || speed >= STOPPED_SPEED_MS;
 }
 
-export function histogramFromStreams(heartrate: number[] | null, time: number[] | null) {
+export function histogramFromStreams(heartrate: (number | null)[] | null, time: number[] | null) {
   const histogram = emptyHistogram();
   if (!heartrate?.length) return histogram;
   for (let index = 0; index < heartrate.length; index += 1) {
@@ -209,7 +205,7 @@ export function histogramFromStreams(heartrate: number[] | null, time: number[] 
   return histogram;
 }
 
-export function sparseHistogram(histogram: number[]): [number, number][] {
+function sparseHistogram(histogram: number[]): [number, number][] {
   const pairs: [number, number][] = [];
   for (let bpm = BPM_MIN; bpm <= BPM_MAX; bpm += 1) {
     if ((histogram[bpm] ?? 0) > 0) pairs.push([bpm, histogram[bpm]]);
@@ -262,7 +258,7 @@ function outputVariation(values: number[], weights: number[]) {
   return Math.sqrt(variance) / mean;
 }
 
-export function isFlatEnough(distance: number | null, gain: number | null) {
+function isFlatEnough(distance: number | null, gain: number | null) {
   if (!distance || distance <= 0) return false;
   return (gain ?? 0) / (distance / 1000) <= MAX_FLAT_GAIN_M_PER_KM;
 }
@@ -359,7 +355,7 @@ function meanTemp(temp: number[] | null) {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
-export const PEAK_HR_DURATIONS = [60, 300, 1200] as const;
+const PEAK_HR_DURATIONS = [60, 300, 1200] as const;
 
 export type SustainedHeartrate = { seconds: number; bpm: number };
 
@@ -445,22 +441,13 @@ export function decouplingInfo(result: DecouplingResult) {
 
 const MIN_EF_SECONDS = 20 * 60;
 const MIN_EF_HEARTRATE = 90;
-export const EF_NORM_DAYS = 42;
-export const USUAL_HR_DAYS = 90;
+const EF_NORM_DAYS = 42;
+const USUAL_HR_DAYS = 90;
 const MIN_NORM_POINTS = 3;
 const MIN_MODEL_POINTS = 6;
 const MIN_MODEL_R = 0.3;
 const RANGE_MARGIN = 0.05;
 const AEROBIC_LTHR_SHARE = 0.94;
-
-const POWER_EF_SPORTS = new Set([
-  "Ride",
-  "VirtualRide",
-  "GravelRide",
-  "MountainBikeRide",
-  "Velomobile",
-  "Handcycle",
-]);
 
 export type EfficiencyKind = "power" | "speed";
 
@@ -484,7 +471,7 @@ export type EfficiencyPoint = {
 };
 
 export function efficiencyKindFor(sportType: string): EfficiencyKind | null {
-  if (POWER_EF_SPORTS.has(sportType)) return "power";
+  if (isPowerCyclingSport(sportType)) return "power";
   if (sportType === "Run") return "speed";
   return null;
 }
@@ -506,7 +493,7 @@ export function efficiencyFactor(input: EfficiencyInput) {
   return { kind, output, ef: output / hr };
 }
 
-export function isAerobicSession(avgHeartrate: number, lthr: number | null) {
+function isAerobicSession(avgHeartrate: number, lthr: number | null) {
   return lthr == null || avgHeartrate <= lthr * AEROBIC_LTHR_SHARE;
 }
 
@@ -523,13 +510,6 @@ export function toEfficiencyPoint(
     avgHeartrate: input.averageHeartrate,
     aerobic: isAerobicSession(input.averageHeartrate, lthr),
   };
-}
-
-function median(values: number[]) {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function priorPoints(points: EfficiencyPoint[], beforeIso: string, days: number) {

@@ -5,9 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { CalendarCheckIcon, FlagIcon, MessageSquareTextIcon } from "lucide-react";
 
+import { afterGoalsChanged } from "@/lib/query-events.ts";
 import { useOnline } from "@/hooks/use-online.ts";
 import { cn } from "@/lib/utils";
-import { coachPlanQueryOptions, seasonQueryOptions } from "@/lib/queries.ts";
+import { coachPlanQueryOptions } from "@/lib/queries.ts";
 import { saveCoachPlanAvailability, saveCoachPlanBrief } from "@/services/coach-plan.ts";
 import {
   availabilitySchema,
@@ -38,14 +39,13 @@ import { ProgressionSettings, savedProgressionKey } from "@/components/progressi
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+import { localTimeZone } from "@/services/time-zone.ts";
 
 export function useSaveAvailability(onSaved?: (state: CoachPlanState) => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (availability: Availability) =>
-      saveCoachPlanAvailability({ data: { availability, timeZone: timeZone() } }),
+      saveCoachPlanAvailability({ data: { availability, timeZone: localTimeZone() } }),
     onSuccess: (state) => {
       queryClient.setQueryData(coachPlanQueryOptions.queryKey, state);
       onSaved?.(state);
@@ -219,11 +219,7 @@ export function CoachPlanGoalField({ state }: { state: CoachPlanState | undefine
           priority: "A",
         },
       }),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries(coachPlanQueryOptions),
-        queryClient.invalidateQueries(seasonQueryOptions),
-      ]),
+    onSuccess: () => afterGoalsChanged(queryClient),
   });
   if (!state) {
     return (
@@ -401,7 +397,7 @@ function CoachBriefField({ state }: { state: CoachPlanState }) {
   );
 }
 
-export function coachPlanStatusText(state: CoachPlanState) {
+function coachPlanStatusText(state: CoachPlanState) {
   if (state.status === "writing") return "Writing your plan…";
   if (state.status === "failed") return `Failed: ${state.error ?? "try again"}`;
   if (state.plan) return `Written ${new Date(state.plan.writtenAt).toLocaleString()}`;

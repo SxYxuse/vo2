@@ -1,4 +1,5 @@
 import { createCsrfMiddleware, createMiddleware, createStart } from "@tanstack/react-start";
+import { isAbortError } from "@/lib/is-abort-error.ts";
 
 const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
@@ -29,15 +30,6 @@ type BunTimeoutRequest = Request & {
 
 function extendBunIdleTimeout(request: Request, seconds: number) {
   (request as BunTimeoutRequest).runtime?.bun?.server?.timeout?.(request, seconds);
-}
-
-function isAbortError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "name" in error &&
-    (error as { name: unknown }).name === "AbortError"
-  );
 }
 
 const requestLogger = createMiddleware().server(async ({ next, request, pathname }) => {

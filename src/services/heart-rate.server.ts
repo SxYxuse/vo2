@@ -5,6 +5,7 @@ import { activities, activityStreams, athleteMetrics } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import { ageFromBirthDate, isSportTypeShown } from "./athlete-settings.types.ts";
 import { efficiencyKindFor, histogramFromStreams, toEfficiencyPoint } from "./heart-insights.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
@@ -19,15 +20,6 @@ import {
   type HeartRateSport,
 } from "./heart-rate.ts";
 const STREAM_BATCH = 40;
-
-export const HEART_RATE_METRICS = {
-  heartRate: athleteMetrics.heartRate,
-  restHr: athleteMetrics.restHr,
-  cyclingLthr: athleteMetrics.cyclingLthr,
-  runLthr: athleteMetrics.runLthr,
-  swimLthr: athleteMetrics.swimLthr,
-  lthr: athleteMetrics.lthr,
-};
 
 const EMPTY_OVERALL: HeartRateSport = {
   sportType: ALL_SPORTS,

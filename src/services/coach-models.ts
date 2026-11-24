@@ -84,7 +84,7 @@ const LOW_TO_MAX: ReasoningLevel[] = ["low", "medium", "high", "xhigh", "max"];
  * adapter clamps the level it is sent to the model's own, so a list that falls behind only offers
  * a level that runs as its nearest neighbour.
  */
-export const COACH_MODELS = [
+const COACH_MODELS = [
   {
     provider: "openrouter",
     id: "openai/gpt-6-luna",
@@ -186,7 +186,7 @@ export type CoachModelOption = {
   recommended: boolean;
 };
 
-export const AUTO_REASONING = null;
+const AUTO_REASONING = null;
 
 export const DEFAULT_COACH_MODEL = {
   provider: "openrouter",
@@ -223,7 +223,7 @@ export const DEFAULT_COACH_MODELS: CoachModels = {
   plan: DEFAULT_COACH_MODEL,
 };
 
-export function findCoachModel(provider: CoachProvider, id: string) {
+function findCoachModel(provider: CoachProvider, id: string) {
   return COACH_MODELS.find((model) => model.provider === provider && model.id === id);
 }
 

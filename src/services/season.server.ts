@@ -5,6 +5,7 @@ import { activities, coachPlans, goals } from "@/db/schema.ts";
 import { logger } from "@/lib/logger.server.ts";
 import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts";
 import { getAthleteSettings } from "./athlete-settings.server.ts";
+import { goalsFor } from "./goals.server.ts";
 import { trainingPacesFor } from "./training-paces.server.ts";
 import { predictsRaceTime } from "./training-paces.types.ts";
 import { addDayKey, dayKey } from "./day-key.ts";
@@ -19,22 +20,6 @@ import {
   type PastGoal,
   type SeasonData,
 } from "./season.types.ts";
-
-const goalColumns = {
-  id: goals.id,
-  name: goals.name,
-  sportType: goals.sportType,
-  date: goals.date,
-  distanceM: goals.distanceM,
-  elevationGainM: goals.elevationGainM,
-  priority: goals.priority,
-  effort: goals.effort,
-};
-
-export async function goalsFor(userId: string): Promise<Goal[]> {
-  const rows = await db.select(goalColumns).from(goals).where(eq(goals.userId, userId));
-  return rows as Goal[];
-}
 
 async function matchPastActivities(
   userId: string,
@@ -70,7 +55,7 @@ async function matchPastActivities(
   });
 }
 
-export async function athleteTimeZone(userId: string) {
+async function athleteTimeZone(userId: string) {
   const [row] = await db
     .select({ timeZone: coachPlans.timeZone })
     .from(coachPlans)

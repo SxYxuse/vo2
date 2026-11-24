@@ -7,7 +7,6 @@ import { StravaDailyLimitError, StravaShortLimitError } from "@/integrations/str
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import type { SyncKind, SyncResult } from "./strava-sync.types.ts";
 import {
-  isAbortError,
   historyCompleteFromRun,
   isOverSyncBudget,
   remainingSyncBudgetMs,
@@ -16,6 +15,7 @@ import {
   storedPauseResult,
   STRAVA_RECONNECT_MESSAGE,
 } from "./strava-sync.types.ts";
+import { isAbortError } from "@/lib/is-abort-error.ts";
 
 const ACTIVITY_PAGE_SIZE = 200;
 const ACTIVITY_PAGES_PER_CALL = 1;
@@ -24,7 +24,7 @@ const STREAM_RETRY_ATTEMPTS = 3;
 const RECENT_REFRESH_COUNT = 3;
 const SHORT_LIMIT_RESERVE = 5;
 
-export type StravaReader = {
+type StravaReader = {
   listAthleteActivities(params: {
     page: number;
     perPage: number;
@@ -38,9 +38,9 @@ export type StravaReader = {
   };
 };
 
-export type StoredSyncRun = NonNullable<Parameters<typeof storedPauseResult>[0]>;
+type StoredSyncRun = NonNullable<Parameters<typeof storedPauseResult>[0]>;
 
-export type RecordedSyncRun = {
+type RecordedSyncRun = {
   status: Exclude<SyncKind, "never">;
   activitiesUpserted: number;
   streamsFetched: number;

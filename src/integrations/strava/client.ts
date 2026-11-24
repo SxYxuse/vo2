@@ -10,7 +10,7 @@ type StreamKey = NonNullable<
   operations["getActivityStreams"]["parameters"]["query"]
 >["keys"][number];
 
-export const DEFAULT_STREAM_KEYS = [
+const DEFAULT_STREAM_KEYS = [
   "time",
   "distance",
   "latlng",

@@ -14,7 +14,6 @@ import { daysBetween, roughGoalHours, type Goal } from "./season.types.ts";
 import { addDayKey } from "./day-key.ts";
 
 export type SportDay = { date: string; km: number; minutes: number };
-export type RunDay = SportDay;
 
 type SportBudget = {
   amount: (day: SportDay) => number;
@@ -22,7 +21,7 @@ type SportBudget = {
   noHistoryPerSession: number;
 };
 
-export const MAX_WEEK_GROWTH = 1.15;
+const MAX_WEEK_GROWTH = 1.15;
 
 const SPORT_BUDGETS: Record<PlanSport, SportBudget> = {
   run: {
@@ -63,13 +62,10 @@ export function weeklyAmount(
   return totals;
 }
 
-export const weeklyKm = (runs: SportDay[], weekStart: string, weeks: number) =>
-  weeklyAmount(runs, weekStart, weeks, "run");
-
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
-export function floorOf(days: SportDay[], weekStart: string, perWeek: number, sport: PlanSport) {
+function floorOf(days: SportDay[], weekStart: string, perWeek: number, sport: PlanSport) {
   const usual = usualWeek(days, weekStart, sport);
   return usual > 0
     ? usual * RETURN_FLOOR_SHARE
@@ -252,7 +248,7 @@ export function projectSport(
 
 export type TimeOutDays = { start: string; end: string | null };
 
-export function daysOutside(weekStart: string, timeOuts: TimeOutDays[]) {
+function daysOutside(weekStart: string, timeOuts: TimeOutDays[]) {
   let days = 0;
   for (let index = 0; index < 7; index += 1) {
     const day = addDayKey(weekStart, index);
@@ -357,7 +353,7 @@ export function weekBudgets(input: {
   }));
 }
 
-export function plannedAmount(week: Pick<PlanWeek, "sessions">, sport: PlanSport) {
+function plannedAmount(week: Pick<PlanWeek, "sessions">, sport: PlanSport) {
   return week.sessions
     .filter((session) => session.sport === sport && session.kind !== "race")
     .reduce((sum, session) => sum + sessionAmount(session), 0);

@@ -169,3 +169,11 @@ export const changeCoachBriefDef = toolDefinition({
   inputSchema: briefChangeInputSchema,
   needsApproval: true,
 });
+
+type Definitions = typeof import("./coach-tools.ts");
+
+export type CoachToolName = {
+  [K in keyof Definitions]: Definitions[K] extends { __toolSide: "definition"; name: infer N }
+    ? N
+    : never;
+}[keyof Definitions];

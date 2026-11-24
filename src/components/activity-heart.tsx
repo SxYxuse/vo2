@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/item";
 import { ActivityDetailSection } from "@/components/activity-detail-section.tsx";
 import { StatCard, StatGrid, type StatCardProps } from "@/components/stat-card.tsx";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 const STAT_INFO = {
   efficiency:
@@ -126,7 +127,7 @@ function useFormOnDay(start: string) {
   const { data } = useQuery(fitnessQueryOptions);
   return useMemo(() => {
     if (!data?.fitnessLoads.length) return null;
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timeZone = localTimeZone();
     const key = dayKey(new Date(start), timeZone);
     const point = buildPmc(data.fitnessLoads, timeZone).find((item) => item.date === key);
     return point ? point.tsb : null;

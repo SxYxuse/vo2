@@ -4,8 +4,6 @@ import type { BestsPeriod, BestsSport } from "./bests-search.ts";
 
 export {
   BESTS_SPORTS,
-  parseBestsReturn,
-  parseBestsSearch,
   type BestsPeriod,
   type BestsReturn,
   type BestsSearch,
@@ -48,7 +46,7 @@ export type ProgressionPoint = {
   isBest: boolean;
 };
 
-export const NEW_BEST_DAYS = 30;
+const NEW_BEST_DAYS = 30;
 export const TOP_EFFORTS = 10;
 const DAY_MS = 86_400_000;
 
@@ -64,7 +62,7 @@ function beats(kind: BoardKind, a: number, b: number) {
   return lowerIsBetter(kind) ? a < b : a > b;
 }
 
-export function inPeriod(start: string, period: BestsPeriod, now = new Date()) {
+function inPeriod(start: string, period: BestsPeriod, now = new Date()) {
   const at = new Date(start);
   if (period === "all") return true;
   if (period === "12m") return now.getTime() - at.getTime() < 365 * DAY_MS;

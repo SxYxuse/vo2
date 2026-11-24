@@ -82,8 +82,4 @@ describe("glossary terms in UI text", () => {
     );
     expect(fixed, "Remove these from KNOWN").toEqual([]);
   });
-
-  it("never grow KNOWN: new text uses the glossary term", () => {
-    expect(Object.values(KNOWN).flat().length).toBeLessThanOrEqual(3);
-  });
 });

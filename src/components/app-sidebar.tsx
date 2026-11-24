@@ -5,16 +5,12 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
-  CalendarDaysIcon,
   ChevronRightIcon,
-  FlagIcon,
-  TargetIcon,
   HeartPulseIcon,
   LogOutIcon,
   MapIcon,
   RouteIcon,
   Settings2Icon,
-  SparklesIcon,
   TrendingUpIcon,
   TrophyIcon,
   ZapIcon,
@@ -23,6 +19,7 @@ import {
 import { Vo2Mark, Vo2Wordmark } from "@/components/vo2-mark.tsx";
 import { APP_NAME } from "@/lib/brand.ts";
 import { appShellQueryOptions } from "@/lib/app-shell-query.ts";
+import { trainingNavFor, type TrainingNavItem } from "@/components/training-nav.ts";
 import { authClient } from "@/lib/auth-client.ts";
 import { useSignOut } from "@/hooks/use-sign-out.ts";
 import { useThemeToggle } from "@/hooks/use-theme-toggle.ts";
@@ -60,13 +57,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const TRAINING_NAV_ITEMS = [
-  { title: "Calendar", to: "/", icon: CalendarDaysIcon },
-  { title: "Plan", to: "/week", icon: TargetIcon },
-  { title: "Season", to: "/season", icon: FlagIcon },
-  { title: "Coach", to: "/coach", icon: SparklesIcon },
-] as const;
-
 const MOBILE_FOOTER_BUTTON = "size-[2.75rem] justify-center [&_svg]:size-5";
 
 const COLLAPSIBLE_NAV_GROUPS = [
@@ -90,9 +80,7 @@ const COLLAPSIBLE_NAV_GROUPS = [
   },
 ] as const;
 
-type NavItem =
-  | (typeof TRAINING_NAV_ITEMS)[number]
-  | (typeof COLLAPSIBLE_NAV_GROUPS)[number]["items"][number];
+type NavItem = TrainingNavItem | (typeof COLLAPSIBLE_NAV_GROUPS)[number]["items"][number];
 
 const CLOSED_GROUPS_KEY = "vo2.sidebar.closed";
 
@@ -159,7 +147,7 @@ function CollapsibleNavGroup({
 }
 
 function isActiveNavItem(item: NavItem, pathname: string) {
-  if (item.to === "/") return pathname === "/" || pathname.startsWith("/activities/");
+  if ("matches" in item) return item.matches(pathname);
   return pathname === item.to || (item.to === "/power" && pathname.startsWith("/power/"));
 }
 
@@ -287,10 +275,7 @@ export function AppSidebar() {
   const lastHref = useLastHrefOutsideSettings();
   const inSettings = isSettingsPath(pathname) && !isMobile;
   const { data: shell } = useSuspenseQuery(appShellQueryOptions);
-  const trainingItems =
-    shell.planningStyle === "off"
-      ? TRAINING_NAV_ITEMS.filter((item) => item.to !== "/week")
-      : TRAINING_NAV_ITEMS;
+  const trainingItems = trainingNavFor(shell.planningStyle);
 
   return (
     <Sidebar collapsible="icon">

@@ -9,16 +9,10 @@ import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { ensureBestEfforts } from "./best-efforts.server.ts";
 import { buildFlatPaces, isFlatPaces, zone2Pace, type FlatPaces } from "./easy-pace.ts";
 import { estimateMaxHrAnchor } from "./heart-insights.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
-import {
-  athleteMaxHr,
-  emptyHistogram,
-  heartRateFamily,
-  isPlausibleBpm,
-  sportHeartRate,
-  zonesFromHistogram,
-} from "./heart-rate.ts";
+import { athleteMaxHr, heartRateFamily, sportHeartRate, zonesFromHistogram } from "./heart-rate.ts";
+import { emptyHistogram, isPlausibleBpm } from "./bpm.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import {
   DEFAULT_TARGET_M,
@@ -260,7 +254,7 @@ function weekEnds(efforts: RunEffort[], now: Date, timeZone: string) {
   return ends;
 }
 
-export async function predictedTimeTrendFor(
+async function predictedTimeTrendFor(
   userId: string,
   now = new Date(),
 ): Promise<PredictedTimeTrend> {

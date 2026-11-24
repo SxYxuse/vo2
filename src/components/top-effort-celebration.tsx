@@ -12,8 +12,8 @@ import {
   ResponsiveDialogDescription,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
-  useIsDesktop,
 } from "@/components/responsive-dialog.tsx";
+import { useIsDesktop } from "@/hooks/use-desktop-media.ts";
 import { boardLabel, formatValue } from "@/components/best-labels.ts";
 import { Button } from "@/components/ui/button";
 import { topEffortCelebrationsQueryOptions } from "@/lib/queries.ts";

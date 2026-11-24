@@ -7,6 +7,8 @@ import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts"
 import {
   ageFromBirthDate,
   DEFAULT_ATHLETE_SETTINGS,
+  DEFAULT_CALENDAR_PERIOD,
+  DEFAULT_PHONE_CALENDAR_VIEW,
   DEFAULT_PROFILE_SETTINGS,
   mergeAthleteSettings,
   nextTopEffortsSince,
@@ -22,16 +24,17 @@ import type {
 } from "./athlete-settings.ts";
 import type { CoachFeature, CoachModelChoice, CoachModels } from "./coach-models.ts";
 import { estimateMaxHrAnchor, type HeartPeak } from "./heart-insights.ts";
-import { heartRateFamily, isPlausibleBpm, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
+import { heartRateFamily, isZonedFamily, type ZonedFamily } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import {
   DEFAULT_HEART_RATE_SETTINGS,
   heartRateSettingsIssues,
   parseHeartRateSettings,
   type HeartRateEstimates,
   type HeartRateSettings,
+  storedLthr,
 } from "./heart-rate-settings.ts";
-import { toFitnessLoad } from "./training-load.ts";
-import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
+import { refreshTrainingLoads } from "./training-load.server.ts";
 
 async function storedAthleteSettings(userId: string) {
   const [row] = await db
@@ -118,11 +121,7 @@ async function heartRateEstimates(userId: string): Promise<HeartRateEstimates> {
   return {
     restHr: metrics?.restHr ?? null,
     maxHr: { cycling: maxHr("cycling"), running: maxHr("running"), swimming: maxHr("swimming") },
-    lthr: {
-      cycling: metrics?.cyclingLthr ?? metrics?.lthr ?? null,
-      running: metrics?.runLthr ?? null,
-      swimming: metrics?.swimLthr ?? null,
-    },
+    lthr: storedLthr(metrics),
   };
 }
 
@@ -144,27 +143,17 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
   if (!session) {
     return {
       signedIn: false,
-      fitnessLoads: [],
       profile: DEFAULT_PROFILE_SETTINGS,
       settings: DEFAULT_ATHLETE_SETTINGS,
       heartRate: DEFAULT_HEART_RATE_SETTINGS,
       heartRateEstimates: NO_ESTIMATES,
     };
   }
-  const [profile, settings, heartRate, estimates, loadRows] = await Promise.all([
+  const [profile, settings, heartRate, estimates] = await Promise.all([
     getAthleteProfile(session.user.id),
     getAthleteSettings(session.user.id),
     getHeartRateSettings(session.user.id),
     heartRateEstimates(session.user.id),
-    db
-      .select({
-        startDate: activities.startDate,
-        movingTime: activities.movingTime,
-        trainingLoad: activities.trainingLoad,
-        loadSource: activities.loadSource,
-      })
-      .from(activities)
-      .where(eq(activities.userId, session.user.id)),
   ]);
   return {
     signedIn: true,
@@ -172,14 +161,6 @@ export async function loadSettingsSnapshotImpl(): Promise<SettingsSnapshot> {
     settings,
     heartRate,
     heartRateEstimates: estimates,
-    fitnessLoads: loadRows.map((row) =>
-      toFitnessLoad(
-        row.startDate,
-        row.trainingLoad ?? 0,
-        row.loadSource ?? "duration",
-        row.movingTime,
-      ),
-    ),
   };
 }
 
@@ -204,8 +185,9 @@ export async function saveAthleteSettingsImpl(
     ...(stored ?? DEFAULT_ATHLETE_SETTINGS),
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
     sportGroupShares: value.sportGroupShares,
-    calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
-    phoneCalendarView: value.phoneCalendarView ?? stored?.phoneCalendarView ?? "days",
+    calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? DEFAULT_CALENDAR_PERIOD,
+    phoneCalendarView:
+      value.phoneCalendarView ?? stored?.phoneCalendarView ?? DEFAULT_PHONE_CALENDAR_VIEW,
     planningStyle: value.planningStyle ?? stored?.planningStyle ?? null,
     topEffortsSince: nextTopEffortsSince(
       stored?.topEffortsSince ?? null,
@@ -256,7 +238,7 @@ export async function saveAthleteSettingsImpl(
   }
 
   if (previousProfile.birthDate !== value.profile.birthDate || heartRateChanged) {
-    await refreshTrainingLoadsForUser(userId);
+    await refreshTrainingLoads(userId);
   }
 
   logger.info("settings.saved", { planningStyle: settings.planningStyle });
@@ -272,7 +254,7 @@ export async function saveProfileImpl(value: ProfileSave): Promise<void> {
     .values({ userId: session.user.id, ...fields })
     .onConflictDoUpdate({ target: athleteMetrics.userId, set: fields });
   if (previousProfile.birthDate !== value.birthDate) {
-    await refreshTrainingLoadsForUser(session.user.id);
+    await refreshTrainingLoads(session.user.id);
   }
   logger.info("profile.saved");
 }

@@ -1,8 +1,6 @@
 import { formatSpeed, type StreamSeriesKey } from "./activity-detail.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 
-export type LocomotionKind = "pace" | "speed";
-
 export type PaceUnit = "/km" | "/100m";
 
 export type Locomotion =
@@ -52,17 +50,12 @@ export function locomotionFor(sportType: string): Locomotion {
   return SPEED;
 }
 
-export function showsPaceByDefault(sportType: string) {
-  const group = sportGroupFor(sportType)?.id;
-  return group === "running" || group === "walking" || group === "swimming";
-}
-
 export function defaultVisibleSeries(detail: {
   sportType: string;
   series: readonly StreamSeriesKey[];
 }) {
   const offByDefault = new Set<StreamSeriesKey>(["cadence"]);
-  if (!showsPaceByDefault(detail.sportType)) offByDefault.add("speed");
+  if (locomotionFor(detail.sportType).kind !== "pace") offByDefault.add("speed");
   if (sportGroupFor(detail.sportType)?.id === "running") offByDefault.add("watts");
   return detail.series.filter((key) => !offByDefault.has(key));
 }
@@ -96,10 +89,4 @@ export function chartLocomotionValue(kmh: number | undefined, sportType: string)
   if (kmh == null || kmh < PACE_STOP_KMH) return undefined;
   const seconds = paceSeconds(kmh, loco.unit);
   return seconds ?? undefined;
-}
-
-export function normalizeSeriesPoint(value: number, min: number, max: number, inverted: boolean) {
-  const span = max - min;
-  const ratio = span === 0 ? 0 : (value - min) / span;
-  return (inverted ? 1 - ratio : ratio) * 100;
 }

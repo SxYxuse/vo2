@@ -23,7 +23,7 @@ function messageText(message: ModelMessage) {
   return content.flatMap((part) => (part.type === "text" ? [part.content] : [])).join(" ");
 }
 
-export function chatTitle(messages: readonly ModelMessage[]) {
+function chatTitle(messages: readonly ModelMessage[]) {
   const first = messages.find((message) => message.role === "user");
   const text = (first ? messageText(first) : "")
     .replace(/\[((?:\\.|[^\]\\])*)\]\([^)]*\)/g, (_link, label: string) =>

@@ -36,6 +36,7 @@ import {
   updateTimeOut,
   type TimeOut,
 } from "@/services/time-outs.ts";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 export type TimeOutEditing = TimeOut | "new" | null;
 
@@ -63,10 +64,6 @@ export function TimeOutSheet({
   );
 }
 
-function deviceTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
 export function currentTimeOut(timeOuts: TimeOut[], today: string) {
   return timeOuts.find((item) => item.end == null || item.end >= today) ?? null;
 }
@@ -82,7 +79,7 @@ export function TimeOutBanner({
 }) {
   const queryClient = useQueryClient();
   const online = useOnline();
-  const [timeZone] = useState(deviceTimeZone);
+  const [timeZone] = useState(localTimeZone);
   const back = useMutation({
     mutationFn: (id: string) => endTimeOut({ data: { id, timeZone } }),
     onSuccess: () => afterTimeOutsChanged(queryClient),
@@ -157,7 +154,7 @@ export function TimeOutBanner({
 function TimeOutForm({ timeOut, onDone }: { timeOut: TimeOut | null; onDone: () => void }) {
   const queryClient = useQueryClient();
   const online = useOnline();
-  const [timeZone] = useState(deviceTimeZone);
+  const [timeZone] = useState(localTimeZone);
   const [now] = useState(() => new Date());
   const today = dayKey(now, timeZone);
   const window = timeOutStartWindow(today, weekStartKey(now, timeZone));

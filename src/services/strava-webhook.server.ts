@@ -6,7 +6,7 @@ import { account, activities } from "@/db/schema.ts";
 import { errorFields, logger } from "@/lib/logger.server.ts";
 import { removeAthlete } from "./athlete-deletion.server.ts";
 import { handleStravaWebhook } from "./strava-webhook.ts";
-import { refreshTrainingLoadsForUser } from "./training-load.server.ts";
+import { refreshTrainingLoads } from "./training-load.server.ts";
 
 export function handleStravaWebhookRequest(request: Request) {
   return handleStravaWebhook(
@@ -29,7 +29,7 @@ export function handleStravaWebhookRequest(request: Request) {
         logger.info("activity.deleted_on_strava", { userId, activityId });
         // The load anchors and borrowed heart rates were estimated with this activity included.
         // Rebuilding reads every stream, so it runs after Strava gets its 200 within two seconds.
-        void refreshTrainingLoadsForUser(userId).catch((error: unknown) =>
+        void refreshTrainingLoads(userId).catch((error: unknown) =>
           logger.error("training_load.refresh_failed", errorFields(error)),
         );
       },

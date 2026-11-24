@@ -6,12 +6,11 @@ import { logger } from "@/lib/logger.server.ts";
 import { ageFromBirthDate } from "./athlete-settings.types.ts";
 import { parseHeartRateSettings } from "./heart-rate-settings.ts";
 import { getOptionalSession } from "@/lib/session.server.ts";
-import { goalsFor } from "./season.server.ts";
+import { goalsFor } from "./goals.server.ts";
 import {
   activityTrainingLoad,
   couldHoldThreshold,
   estimateLoadAnchors,
-  isPowerCyclingSport,
   toFitnessLoad,
   type FitnessPageData,
   type LoadAnchors,
@@ -19,6 +18,7 @@ import {
   type LoadSource,
   withAthleteAnchors,
 } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 type StoredLoadRow = LoadInputs & {
   id: string;
@@ -141,7 +141,7 @@ async function writeLoads(
   `);
 }
 
-async function refreshTrainingLoads(userId: string) {
+export async function refreshTrainingLoads(userId: string) {
   const rows = await loadActivityRows(userId);
   if (!rows.length) return;
 
@@ -178,10 +178,6 @@ async function refreshTrainingLoads(userId: string) {
     swimLthr: anchors.swimLthr,
     restHr: anchors.restHr,
   });
-}
-
-export async function refreshTrainingLoadsForUser(userId: string) {
-  await refreshTrainingLoads(userId);
 }
 
 export async function loadFitnessDataImpl(): Promise<FitnessPageData> {

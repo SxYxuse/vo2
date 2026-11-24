@@ -63,8 +63,8 @@ import {
 } from "./coach-plan.types.ts";
 import { addDayKey, dayKey, weekStartKey } from "./day-key.ts";
 import { mondayOf, seasonWeeks } from "./season-phase.ts";
-import { goalsFor } from "./season.server.ts";
-import { parseHeartRateSettings } from "./heart-rate-settings.ts";
+import { goalsFor } from "./goals.server.ts";
+import { parseHeartRateSettings, storedCyclingLthr } from "./heart-rate-settings.ts";
 import { daysBetween, effortLabel, roughGoalHours, type Goal } from "./season.types.ts";
 import { sportGroupFor } from "./sport-groups.ts";
 import { swimCssFor } from "./swim-css.server.ts";
@@ -149,10 +149,7 @@ export async function gather(userId: string, now = new Date()) {
   const rides = all.filter((item) => planSportOf(item.sportType) === "ride");
   const swims = all.filter((item) => planSportOf(item.sportType) === "swim");
   const rideLthr =
-    parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ??
-    metrics?.cyclingLthr ??
-    metrics?.lthr ??
-    null;
+    parseHeartRateSettings(metrics?.heartRate).sports.cycling.lthr ?? storedCyclingLthr(metrics);
   return {
     row,
     style,
@@ -321,7 +318,7 @@ function easyChanged(written: PlanBasis["easy"], now: PlanBasis["easy"]) {
   return Math.abs(written.secPerKm - now.secPerKm) >= EASY_CHANGE_SEC_PER_KM;
 }
 
-export function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
+function dueWrite(inputs: Inputs, basis: PlanBasis): Due | null {
   const first = inputs.currentWeek;
   const { plan, row, today } = inputs;
   if (openTimeOut(inputs)) return null;
@@ -379,6 +376,11 @@ export function statusOf(
     return { status: "failed", error: "Writing stopped before it finished. Try again." };
   }
   return { status: row.status as CoachPlanStatus, error: row.error };
+}
+
+function noActiveWriter(now: Date) {
+  const stale = new Date(now.getTime() - STALE_WRITING_MS);
+  return or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale));
 }
 
 function stateOf(inputs: Inputs, row: Row | null): CoachPlanState {
@@ -494,16 +496,10 @@ async function startIfDue(userId: string, inputs: Inputs, force = false): Promis
   if (!due) return row;
   const attemptKey = attemptKeyOf(due);
   if (!force && row.status === "failed" && row.attemptKey === attemptKey) return row;
-  const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [claimed] = await db
     .update(coachPlans)
     .set({ status: "writing", error: null, statusAt: new Date(), attemptKey })
-    .where(
-      and(
-        eq(coachPlans.userId, userId),
-        or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale)),
-      ),
-    )
+    .where(and(eq(coachPlans.userId, userId), noActiveWriter(inputs.now)))
     .returning();
   if (!claimed) return row;
   logger.info("coach_plan.writing", { fromWeek: due.fromWeek, reason: due.reason });
@@ -762,6 +758,11 @@ async function writePlan(userId: string, fromWeek: string, claimedAt: Date) {
   }
 }
 
+async function currentState(userId: string, { force = false } = {}) {
+  const inputs = await gather(userId);
+  return stateOf(inputs, await startIfDue(userId, inputs, force));
+}
+
 const SIGNED_OUT: CoachPlanState = {
   signedIn: false,
   today: "",
@@ -781,8 +782,7 @@ const SIGNED_OUT: CoachPlanState = {
 export async function loadCoachPlanImpl(): Promise<CoachPlanState> {
   const session = await getOptionalSession();
   if (!session) return SIGNED_OUT;
-  const inputs = await gather(session.user.id);
-  return stateOf(inputs, await startIfDue(session.user.id, inputs));
+  return currentState(session.user.id);
 }
 
 export async function saveAvailabilityImpl(
@@ -801,8 +801,7 @@ export async function saveAvailabilityImpl(
     ridesPerWeek: availability.ridesPerWeek,
     swimsPerWeek: availability.swimsPerWeek,
   });
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function saveProgressionImpl(progression: Progression): Promise<CoachPlanState> {
@@ -836,8 +835,7 @@ export async function saveProgressionImpl(progression: Progression): Promise<Coa
     })
     .where(eq(coachPlans.userId, userId));
   logger.info("coach_plan.progression_saved", { rewrite: requestedFrom != null });
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function saveBrief(userId: string, brief: string, expected?: string) {
@@ -859,8 +857,7 @@ export async function saveBriefImpl(brief: string): Promise<CoachPlanState> {
   const session = await getRequiredSession();
   const userId = session.user.id;
   if (!(await saveBrief(userId, brief))) throw new Error("Set your availability first.");
-  const inputs = await gather(userId);
-  return stateOf(inputs, await startIfDue(userId, inputs));
+  return currentState(userId);
 }
 
 export async function startCoachPlanIfDue(userId: string) {
@@ -869,8 +866,7 @@ export async function startCoachPlanIfDue(userId: string) {
 
 export async function writeCoachPlanAgainImpl(): Promise<CoachPlanState> {
   const session = await getRequiredSession();
-  const inputs = await gather(session.user.id);
-  return stateOf(inputs, await startIfDue(session.user.id, inputs, true));
+  return currentState(session.user.id, { force: true });
 }
 
 export async function requestCoachPlanRewrite(userId: string) {
@@ -899,16 +895,10 @@ export async function markSessionImpl(sessionId: string, done: boolean): Promise
       sessions: week.sessions.map((item) => (item.id === sessionId ? { ...item, done } : item)),
     })),
   };
-  const stale = new Date(inputs.now.getTime() - STALE_WRITING_MS);
   const [saved] = await db
     .update(coachPlans)
     .set({ plan: next, updatedAt: new Date() })
-    .where(
-      and(
-        eq(coachPlans.userId, userId),
-        or(ne(coachPlans.status, "writing"), lt(coachPlans.statusAt, stale)),
-      ),
-    )
+    .where(and(eq(coachPlans.userId, userId), noActiveWriter(inputs.now)))
     .returning();
   if (!saved) throw new Error("Your plan is being written again: mark it once it's written.");
   logger.info("coach_plan.session_marked", { done });

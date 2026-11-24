@@ -23,13 +23,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-export {
-  DESKTOP_MQ,
-  readIsDesktop,
-  useDesktopMedia,
-  useIsDesktop,
-} from "@/hooks/use-desktop-media.ts";
-
 const desktopOverlay = {
   Content: DialogContent,
   Header: DialogHeader,
@@ -151,9 +144,4 @@ export function ResponsiveDialogDescription({
 }: ComponentProps<typeof DialogDescription>) {
   const Overlay = useOverlay();
   return <Overlay.Description className={className} {...props} />;
-}
-
-export function ResponsiveDialogClose({ ...props }: ComponentProps<typeof DialogClose>) {
-  const Overlay = useOverlay();
-  return <Overlay.Close {...props} />;
 }

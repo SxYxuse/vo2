@@ -19,6 +19,7 @@ import { loadSyncStatus } from "@/services/strava-sync.ts";
 import { listTimeOuts } from "@/services/time-outs.ts";
 import { loadFitnessData } from "@/services/training-load.ts";
 import { loadPredictedTimeTrend, loadTrainingPaces } from "@/services/training-paces.ts";
+import { localTimeZone } from "@/services/time-zone.ts";
 
 export { appShellQueryOptions, loaderQuery, planningStyleOf } from "./app-shell-query.ts";
 
@@ -110,8 +111,7 @@ export const predictedTimeTrendQueryOptions = queryOptions({
 export const coachSpendingQueryOptions = queryOptions({
   queryKey: ["coach-spending"],
   staleTime: 0,
-  queryFn: () =>
-    getCoachSpending({ data: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone } }),
+  queryFn: () => getCoachSpending({ data: { timeZone: localTimeZone() } }),
 });
 
 export const coachStatusQueryOptions = queryOptions({
@@ -133,13 +133,17 @@ export const coachChatsQueryOptions = queryOptions({
   staleTime: 30_000,
 });
 
+export const COACH_CHAT_KEY = "coach-chat";
+
 export function coachChatQueryKey(threadId: string) {
-  return ["coach-chat", threadId] as const;
+  return [COACH_CHAT_KEY, threadId] as const;
 }
+
+export const ACTIVITY_DETAIL_KEY = "activity";
 
 export function activityDetailQueryOptions(id: string) {
   return queryOptions({
-    queryKey: ["activity", id] as const,
+    queryKey: [ACTIVITY_DETAIL_KEY, id] as const,
     queryFn: () => getActivityDetail({ data: { id } }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,

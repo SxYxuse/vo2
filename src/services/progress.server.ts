@@ -10,7 +10,7 @@ import { ensureBestEfforts } from "./best-efforts.server.ts";
 import type { BestEfforts } from "./best-efforts.ts";
 import { toEfficiencyPoint, type EfficiencyPoint } from "./heart-insights.ts";
 import { athleteHeartRateFrom } from "./heart-rate-settings.ts";
-import { HEART_RATE_METRICS } from "./heart-rate.server.ts";
+import { HEART_RATE_METRICS } from "./heart-rate-metrics.server.ts";
 import {
   BEST_YEAR_DAYS,
   compareEfficiency,
@@ -21,7 +21,7 @@ import {
   type ProgressData,
   type ProgressSport,
 } from "./progress.ts";
-import { isPowerCyclingSport } from "./training-load.ts";
+import { isPowerCyclingSport } from "./sport-groups.ts";
 
 function progressSport(row: { sportType: string; deviceWatts: boolean }): ProgressSport | null {
   if (isPowerCyclingSport(row.sportType) && row.deviceWatts) return "cycling";

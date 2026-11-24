@@ -9,8 +9,8 @@
   ],
   "ignoreBinaries": ["shasum", "flock"],
   "rules": {
-    "exports": "off",
-    "types": "off",
+    "exports": "error",
+    "types": "error",
     "nsExports": "off",
     "nsTypes": "off",
     "enumMembers": "off",

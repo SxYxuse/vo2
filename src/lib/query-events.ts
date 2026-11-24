@@ -1,11 +1,12 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import {
-  activityDetailQueryOptions,
+  ACTIVITY_DETAIL_KEY,
   appShellQueryOptions,
   coachPlanQueryOptions,
   fitnessQueryOptions,
   homeQueryOptions,
+  powerFilesQueryOptions,
   seasonQueryOptions,
   settingsSnapshotQueryOptions,
   timeOutsQueryOptions,
@@ -66,11 +67,17 @@ export async function afterTimeOutsChanged(queryClient: QueryClient) {
 }
 
 export async function afterLocalCopyChanged(queryClient: QueryClient) {
-  const detail = activityDetailQueryOptions("").queryKey[0];
   await Promise.all([
-    queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== detail }),
-    queryClient.invalidateQueries({ queryKey: [detail], refetchType: "none" }),
+    queryClient.invalidateQueries({
+      predicate: (query) => query.queryKey[0] !== ACTIVITY_DETAIL_KEY,
+    }),
+    queryClient.invalidateQueries({ queryKey: [ACTIVITY_DETAIL_KEY], refetchType: "none" }),
   ]);
+}
+
+export async function afterPowerFilesChanged(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({ queryKey: powerFilesQueryOptions.queryKey });
+  void queryClient.invalidateQueries({ queryKey: [ACTIVITY_DETAIL_KEY] });
 }
 
 export function afterSignOut(queryClient: QueryClient) {

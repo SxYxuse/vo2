@@ -23,7 +23,7 @@ export const SETUP_FOOTER =
 
 export const SETUP_CARD = "overflow-visible pb-0";
 
-export const SETUP_STEP_TITLES = [
+const SETUP_STEP_TITLES = [
   "Copy from Strava",
   "About you",
   "Your sports",

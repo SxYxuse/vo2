@@ -1,4 +1,4 @@
-import { isPlausibleBpm } from "./heart-rate.ts";
+import { isPlausibleBpm } from "./bpm.ts";
 import type { PaceRange } from "./training-paces.types.ts";
 
 const FLAT_PACES_VERSION = 1;

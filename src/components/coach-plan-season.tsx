@@ -54,7 +54,7 @@ export function weekTotals(week: PlanWeek) {
     .join(" · ");
 }
 
-export function phaseText(road: SeasonWeek[]) {
+function phaseText(road: SeasonWeek[]) {
   const parts: string[] = [];
   road.forEach((week, index) => {
     if (index > 0 && road[index - 1]!.phase === week.phase) return;

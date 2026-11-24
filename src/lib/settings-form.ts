@@ -13,9 +13,12 @@ import {
   type PlanningStyle,
   type ProfileSave,
   type ProfileSettings,
+  DEFAULT_CALENDAR_PERIOD,
+  DEFAULT_PHONE_CALENDAR_VIEW,
 } from "@/services/athlete-settings.types.ts";
 import type { AthleteSettingsSave, SavedAthleteSettings } from "@/services/athlete-settings.ts";
-import { BPM_MAX, BPM_MIN, ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
+import { ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
+import { BPM_MAX, BPM_MIN } from "@/services/bpm.ts";
 import {
   DEFAULT_HEART_RATE_SETTINGS,
   REST_HR_MAX,
@@ -122,7 +125,7 @@ export type OnboardingFormValues = z.output<typeof onboardingFormSchema>;
 export type OnboardingFormInput = z.input<typeof onboardingFormSchema>;
 export type SportsFormInput = Pick<OnboardingFormInput, "sportTypes" | "sportGroupShares">;
 export type HeartRateFormInput = z.input<typeof heartRateFormSchema>;
-export type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][ZonedFamily];
+type SportHeartRateFormInput = HeartRateFormInput["heartRate"]["sports"][ZonedFamily];
 
 export const PROFILE_FIELDS = ["birthDate", "weightKg"] as const satisfies ReadonlyArray<
   keyof OnboardingFormInput
@@ -148,7 +151,7 @@ function bpmString(value: number | null) {
   return value == null ? "" : String(value);
 }
 
-export function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFormInput {
+function heartRateFormDefaults(settings: HeartRateSettings): HeartRateFormInput {
   const sport = (family: ZonedFamily): SportHeartRateFormInput => {
     const value = settings.sports[family];
     return {
@@ -188,7 +191,7 @@ export function heartRateFormPreview(values: HeartRateFormInput): HeartRateSetti
   });
 }
 
-export function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
+function heartRateFromForm(values: HeartRateFormInput): HeartRateSettings | null {
   return heartRateFormSchema.safeParse(values).success ? heartRateFormPreview(values) : null;
 }
 
@@ -248,8 +251,8 @@ export function settingsFormDefaults(input: {
     ...profileFormDefaults(input.profile),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
-    calendarPeriod: input.calendarPeriod ?? "month",
-    phoneCalendarView: input.phoneCalendarView ?? "days",
+    calendarPeriod: input.calendarPeriod ?? DEFAULT_CALENDAR_PERIOD,
+    phoneCalendarView: input.phoneCalendarView ?? DEFAULT_PHONE_CALENDAR_VIEW,
     celebrateTopEfforts: input.celebrateTopEfforts ?? false,
     planningStyle: input.planningStyle ?? "coachPlan",
   };

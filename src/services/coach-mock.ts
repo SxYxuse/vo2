@@ -1,6 +1,7 @@
 import { EventType, type AnyTextAdapter, type ModelMessage, type TextOptions } from "@tanstack/ai";
 
 import { metresText, type WrittenSession } from "./coach-plan.types.ts";
+import type { CoachToolName } from "./coach-tools.ts";
 
 type MockActivity = { id: string; name: string; day: string; movingTimeS: number };
 
@@ -20,11 +21,12 @@ function lastUserIndex(messages: ModelMessage[]) {
 
 function resultListThisTurn(messages: ModelMessage[]) {
   const turn = messages.slice(lastUserIndex(messages) + 1);
-  const names = new Map<string, string>();
+  const names = new Map<string, CoachToolName>();
   for (const message of turn) {
-    for (const call of message.toolCalls ?? []) names.set(call.id, call.function.name);
+    for (const call of message.toolCalls ?? [])
+      names.set(call.id, call.function.name as CoachToolName);
   }
-  const results: { name: string; value: unknown }[] = [];
+  const results: { name: CoachToolName; value: unknown }[] = [];
   for (const message of turn) {
     if (message.role !== "tool") continue;
     const name = names.get(message.toolCallId ?? "");
@@ -348,7 +350,7 @@ function powerFileStep(messages: ModelMessage[]): Step | null {
   return { kind: "text", text: powerFileText(results.get("get_power_file") as MockPowerFile) };
 }
 
-function recentActivities(results: Map<string, unknown>): MockActivity[] {
+function recentActivities(results: Map<CoachToolName, unknown>): MockActivity[] {
   const found = results.get("find_activities") as { activities?: MockActivity[] } | undefined;
   return (found?.activities ?? []).slice(0, 7).reverse();
 }
@@ -418,7 +420,7 @@ async function* paced(text: string, perTick = 1) {
 }
 
 type Step =
-  | { kind: "tools"; calls: { name: string; input: Record<string, unknown> }[] }
+  | { kind: "tools"; calls: { name: CoachToolName; input: Record<string, unknown> }[] }
   | { kind: "text"; text: string };
 
 function reasoningFor(step: Step) {

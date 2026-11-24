@@ -12,7 +12,7 @@ export type HeartRateReportBucket = {
   avgBpm: number | null;
 };
 
-export type IntensitySplit = { low: number; moderate: number; high: number };
+type IntensitySplit = { low: number; moderate: number; high: number };
 
 export type HeartRateReport = {
   size: ReportBucketSize;
@@ -44,7 +44,7 @@ function nextKey(key: string, size: ReportBucketSize) {
   return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
-export function intensitySplit(zoneSeconds: number[]): IntensitySplit | null {
+function intensitySplit(zoneSeconds: number[]): IntensitySplit | null {
   const [z1 = 0, z2 = 0, z3 = 0, z4 = 0, z5 = 0] = zoneSeconds;
   const total = z1 + z2 + z3 + z4 + z5;
   if (total <= 0) return null;

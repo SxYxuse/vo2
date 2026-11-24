@@ -5,6 +5,7 @@ import {
   maxIterations,
   toServerSentEventsResponse,
 } from "@tanstack/ai";
+import { byokMissing } from "@tanstack/ai/byok";
 import { defineAIPersistence, reconstructChat, withPersistence } from "@tanstack/ai-persistence";
 import { inlineSkill, withSkills } from "@tanstack/ai-skills";
 
@@ -34,7 +35,7 @@ import { recordCoachUsage } from "./coach-usage.server.ts";
 import { downsampleStreams, measureActivity, type MeasureRequest } from "./coach-measure.ts";
 import { chatOwnedByOther, coachChatPersistence } from "./coach-chats.server.ts";
 import { mockCoachText } from "./coach-mock.ts";
-import { coachKeyMissing, coachModelFor } from "./coach-model.server.ts";
+import { coachModelFor } from "./coach-model.server.ts";
 import {
   applyBriefChange,
   applyPlanChange,
@@ -71,8 +72,10 @@ import { loadPowerFile, loadPowerFiles, powerFileIdFor } from "./power-file.serv
 import { topEfforts, type BestsPeriod } from "./personal-bests.ts";
 import { seasonWeeks } from "./season-phase.ts";
 import { loadSeasonImpl } from "./season.server.ts";
+import { isTimeZone } from "./time-zone.ts";
 import { loadFitnessDataImpl } from "./training-load.server.ts";
-import { buildPmc, dayKey, roundLoad, trainingPhase } from "./training-load.ts";
+import { buildPmc, roundLoad, trainingPhase } from "./training-load.ts";
+import { dayKey } from "./day-key.ts";
 
 type CoachRuntime = { userId: string; timeZone: string };
 
@@ -113,13 +116,7 @@ const DAY_MS = 86_400_000;
 const MAX_FITNESS_DAYS = 180;
 
 function validTimeZone(value: unknown) {
-  if (typeof value !== "string" || !value) return "UTC";
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value });
-    return value;
-  } catch {
-    return "UTC";
-  }
+  return typeof value === "string" && value && isTimeZone(value) ? value : "UTC";
 }
 
 function round1(value: number | null | undefined) {
@@ -400,7 +397,7 @@ export async function handleCoachChat(request: Request) {
     coachModelFor(session.user.id, "chat"),
     storedPlanningStyle(session.user.id),
   ]);
-  if (coach.kind === "missing") return coachKeyMissing(coach.provider);
+  if (coach.kind === "missing") return byokMissing(coach.provider);
   const params = await chatParamsFromRequest(request);
   if (await chatOwnedByOther(session.user.id, params.threadId)) {
     return new Response("Not found", { status: 404 });

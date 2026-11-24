@@ -7,8 +7,6 @@ import {
   isOtherSportType,
   mergeSportGroupShares,
   sportGroupFor,
-  SPORT_GROUPS,
-  type SportGroupId,
 } from "./sport-groups.ts";
 
 const GEIST_HUES = ["blue", "red", "amber", "green", "teal", "purple", "pink", "gray"] as const;
@@ -68,6 +66,7 @@ export const CALENDAR_PERIODS = [
 ] as const;
 
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
+export const DEFAULT_CALENDAR_PERIOD = "month" satisfies CalendarPeriod;
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
 export const PHONE_CALENDAR_VIEWS = [
@@ -85,6 +84,7 @@ export const PHONE_CALENDAR_VIEWS = [
 ] as const;
 
 export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary"]);
+export const DEFAULT_PHONE_CALENDAR_VIEW = "days" satisfies PhoneCalendarView;
 export type PhoneCalendarView = z.infer<typeof phoneCalendarViewSchema>;
 
 export const PLANNING_STYLES = [
@@ -111,8 +111,10 @@ const storedPlanningStyleSchema = z.preprocess(
 const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
-  calendarPeriod: calendarPeriodSchema.default("month"),
-  phoneCalendarView: phoneCalendarViewSchema.default("days").catch("days"),
+  calendarPeriod: calendarPeriodSchema.default(DEFAULT_CALENDAR_PERIOD),
+  phoneCalendarView: phoneCalendarViewSchema
+    .default(DEFAULT_PHONE_CALENDAR_VIEW)
+    .catch(DEFAULT_PHONE_CALENDAR_VIEW),
   topEffortsSince: z.iso.datetime().nullable().default(null),
   coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
   planningStyle: storedPlanningStyleSchema.nullable().default(null),
@@ -130,7 +132,6 @@ export const shownSportTypesSchema = athleteSettingsSchema.shape.sportTypes.refi
   { error: SHOW_ONE_SPORT_MESSAGE },
 );
 
-type SportTypeSetting = z.infer<typeof sportTypeSettingSchema>;
 export type AthleteSettings = z.infer<typeof athleteSettingsSchema>;
 export type SportTypeSettings = AthleteSettings["sportTypes"];
 
@@ -142,18 +143,6 @@ export function sportTypeColor(sportTypes: SportTypeSettings, sportType: string)
   return sportTypes[sportType]?.color ?? defaultColorForSport(sportType);
 }
 
-export type SportCollectors = {
-  heartRate: boolean;
-  power: boolean;
-  powerPartial: boolean;
-};
-
-const EMPTY_COLLECTORS: SportCollectors = {
-  heartRate: true,
-  power: false,
-  powerPartial: false,
-};
-
 export function sportOffersPower(sportType: string) {
   return sportGroupFor(sportType)?.id === "cycling";
 }
@@ -163,23 +152,6 @@ export function heartRateCollectorLabel(sportType: string) {
   if (group === "cycling") return "HR belt";
   if (group === "running" || group === "walking") return "HR watch";
   return "Heart rate";
-}
-
-export function familyCollectors(
-  sportTypes: SportTypeSettings,
-  family: SportGroupId,
-): SportCollectors {
-  const members = SPORT_GROUPS.find((group) => group.id === family)?.members ?? [];
-  const pool = members
-    .map((sportType) => sportTypes[sportType])
-    .filter((setting): setting is SportTypeSetting => Boolean(setting));
-  if (!pool.length) return EMPTY_COLLECTORS;
-  const withPower = pool.filter((setting) => setting.power).length;
-  return {
-    heartRate: pool.some((setting) => setting.heartRate),
-    power: withPower > 0,
-    powerPartial: withPower > 0 && withPower < pool.length,
-  };
 }
 
 export function nextTopEffortsSince(
@@ -195,8 +167,8 @@ export function nextTopEffortsSince(
 export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
-  calendarPeriod: "month",
-  phoneCalendarView: "days",
+  calendarPeriod: DEFAULT_CALENDAR_PERIOD,
+  phoneCalendarView: DEFAULT_PHONE_CALENDAR_VIEW,
   topEffortsSince: null,
   coachModels: DEFAULT_COACH_MODELS,
   planningStyle: null,
@@ -280,7 +252,7 @@ export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 200;
 const weightKgSchema = z.number().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG);
 
-export const profileSettingsSchema = z.object({
+const profileSettingsSchema = z.object({
   birthDate: birthDateSchema.nullable(),
   weightKg: weightKgSchema.nullable(),
 });

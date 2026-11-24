@@ -22,7 +22,7 @@ import type {
   PowerFileImport,
   PowerFileListItem,
 } from "./power-file.ts";
-import { isCyclingSport } from "./training-load.ts";
+import { isCyclingSport } from "./sport-groups.ts";
 
 const MATCH_WINDOW_MS = 5 * 60_000;
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;

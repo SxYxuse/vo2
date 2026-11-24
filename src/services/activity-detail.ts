@@ -18,16 +18,13 @@ export {
   formatDuration,
   formatElapsedTick,
   formatElevation,
-  formatSpeed,
   formatWatts,
 } from "./activity-detail.types.ts";
 export {
-  chartLocomotionValue,
   defaultVisibleSeries,
   formatLocomotion,
   formatPaceClock,
   locomotionFor,
-  normalizeSeriesPoint,
 } from "./locomotion.ts";
 
 export const getActivityDetail = createServerFn({ method: "GET" })
