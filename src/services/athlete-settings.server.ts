@@ -7,6 +7,8 @@ import { getOptionalSession, getRequiredSession } from "@/lib/session.server.ts"
 import {
   ageFromBirthDate,
   DEFAULT_ATHLETE_SETTINGS,
+  DEFAULT_CALENDAR_PERIOD,
+  DEFAULT_PHONE_CALENDAR_VIEW,
   DEFAULT_PROFILE_SETTINGS,
   mergeAthleteSettings,
   nextTopEffortsSince,
@@ -202,8 +204,9 @@ export async function saveAthleteSettingsImpl(
     ...(stored ?? DEFAULT_ATHLETE_SETTINGS),
     sportTypes: { ...stored?.sportTypes, ...value.sportTypes },
     sportGroupShares: value.sportGroupShares,
-    calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? "month",
-    phoneCalendarView: value.phoneCalendarView ?? stored?.phoneCalendarView ?? "days",
+    calendarPeriod: value.calendarPeriod ?? stored?.calendarPeriod ?? DEFAULT_CALENDAR_PERIOD,
+    phoneCalendarView:
+      value.phoneCalendarView ?? stored?.phoneCalendarView ?? DEFAULT_PHONE_CALENDAR_VIEW,
     planningStyle: value.planningStyle ?? stored?.planningStyle ?? null,
     topEffortsSince: nextTopEffortsSince(
       stored?.topEffortsSince ?? null,

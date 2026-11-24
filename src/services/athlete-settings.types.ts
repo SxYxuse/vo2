@@ -66,6 +66,7 @@ export const CALENDAR_PERIODS = [
 ] as const;
 
 export const calendarPeriodSchema = z.enum(["month", "weeks"]);
+export const DEFAULT_CALENDAR_PERIOD = "month" satisfies CalendarPeriod;
 export type CalendarPeriod = z.infer<typeof calendarPeriodSchema>;
 
 export const PHONE_CALENDAR_VIEWS = [
@@ -83,6 +84,7 @@ export const PHONE_CALENDAR_VIEWS = [
 ] as const;
 
 export const phoneCalendarViewSchema = z.enum(["days", "strip", "summary"]);
+export const DEFAULT_PHONE_CALENDAR_VIEW = "days" satisfies PhoneCalendarView;
 export type PhoneCalendarView = z.infer<typeof phoneCalendarViewSchema>;
 
 export const PLANNING_STYLES = [
@@ -109,8 +111,10 @@ const storedPlanningStyleSchema = z.preprocess(
 const athleteSettingsSchema = z.object({
   sportTypes: z.record(z.string(), sportTypeSettingSchema),
   sportGroupShares: z.record(z.string(), z.boolean()).optional(),
-  calendarPeriod: calendarPeriodSchema.default("month"),
-  phoneCalendarView: phoneCalendarViewSchema.default("days").catch("days"),
+  calendarPeriod: calendarPeriodSchema.default(DEFAULT_CALENDAR_PERIOD),
+  phoneCalendarView: phoneCalendarViewSchema
+    .default(DEFAULT_PHONE_CALENDAR_VIEW)
+    .catch(DEFAULT_PHONE_CALENDAR_VIEW),
   topEffortsSince: z.iso.datetime().nullable().default(null),
   coachModels: coachModelsSchema.default(DEFAULT_COACH_MODELS),
   planningStyle: storedPlanningStyleSchema.nullable().default(null),
@@ -163,8 +167,8 @@ export function nextTopEffortsSince(
 export const DEFAULT_ATHLETE_SETTINGS: AthleteSettings = {
   sportTypes: {},
   sportGroupShares: DEFAULT_SPORT_GROUP_SHARES,
-  calendarPeriod: "month",
-  phoneCalendarView: "days",
+  calendarPeriod: DEFAULT_CALENDAR_PERIOD,
+  phoneCalendarView: DEFAULT_PHONE_CALENDAR_VIEW,
   topEffortsSince: null,
   coachModels: DEFAULT_COACH_MODELS,
   planningStyle: null,

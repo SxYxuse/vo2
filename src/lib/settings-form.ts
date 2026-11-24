@@ -13,6 +13,8 @@ import {
   type PlanningStyle,
   type ProfileSave,
   type ProfileSettings,
+  DEFAULT_CALENDAR_PERIOD,
+  DEFAULT_PHONE_CALENDAR_VIEW,
 } from "@/services/athlete-settings.types.ts";
 import type { AthleteSettingsSave, SavedAthleteSettings } from "@/services/athlete-settings.ts";
 import { ZONED_FAMILIES, type ZonedFamily } from "@/services/heart-rate.ts";
@@ -249,8 +251,8 @@ export function settingsFormDefaults(input: {
     ...profileFormDefaults(input.profile),
     ...sportsFormDefaults(input.sportTypes, input.sportGroupShares),
     ...heartRateFormDefaults(input.heartRate ?? DEFAULT_HEART_RATE_SETTINGS),
-    calendarPeriod: input.calendarPeriod ?? "month",
-    phoneCalendarView: input.phoneCalendarView ?? "days",
+    calendarPeriod: input.calendarPeriod ?? DEFAULT_CALENDAR_PERIOD,
+    phoneCalendarView: input.phoneCalendarView ?? DEFAULT_PHONE_CALENDAR_VIEW,
     celebrateTopEfforts: input.celebrateTopEfforts ?? false,
     planningStyle: input.planningStyle ?? "coachPlan",
   };
